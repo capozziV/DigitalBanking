@@ -17,8 +17,5 @@
 - Positivas: um serviço a menos para manter; autenticação na borda sem código próprio; defesa em profundidade com validação JWT nos serviços.
 - Negativas: comportamento local (nginx) difere da AWS; Cognito no LocalStack é recurso pago, então o ambiente local não reproduz a autenticação real.
 
-## Pontos em aberto
-- Estratégia exata de autenticação no ambiente local (sem Cognito); o planejamento prevê um modo local com usuários/tokens de teste, sem detalhar como.
-
 ## Alternativas consideradas
 - **Gateway em Spring:** descartado em favor do API Gateway HTTP API, que já entrega roteamento e autorizador JWT gerenciados.

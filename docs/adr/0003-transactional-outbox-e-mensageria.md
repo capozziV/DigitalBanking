@@ -15,9 +15,3 @@ Serviços precisam publicar eventos (ex.: lançamentos no ledger, etapas da saga
 ## Consequências
 - Positivas: sem dual write; falhas de publicação são reprocessadas a partir do outbox; mensagens problemáticas isoladas na DLQ; cada consumidor evolui com sua própria fila.
 - Negativas: entrega pelo menos uma vez (exige idempotência em todo consumidor); latência extra entre gravação e publicação; mais recursos SNS/SQS para gerenciar.
-
-## Pontos em aberto
-- **Onde roda o relay do outbox:** dentro de cada serviço ou como processo separado — pendente.
-
-## Alternativas consideradas
-- Relay dentro do serviço vs processo separado (ainda em aberto, ver acima). Outras alternativas: não registradas no planejamento.

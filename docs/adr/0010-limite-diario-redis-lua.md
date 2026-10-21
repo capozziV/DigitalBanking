@@ -14,9 +14,3 @@ Transferências têm limite diário. A verificação precisa ser atômica sob co
 ## Consequências
 - Positivas: verificação e reserva atômicas; retentativas não consomem limite duas vezes; perda do Redis é recuperável.
 - Negativas: dois lugares com o mesmo dado (Redis e PostgreSQL); exige rotina de reconstrução e liberação na compensação da saga.
-
-## Pontos em aberto
-- Valor padrão do limite diário e se varia por tipo de conta.
-
-## Alternativas consideradas
-Não registradas no planejamento.

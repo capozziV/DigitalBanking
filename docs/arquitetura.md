@@ -1,9 +1,10 @@
 # Arquitetura
 
 ## Stack
-- **Backend:** Kotlin + Spring Boot 3, JDK 21, Spring MVC com virtual threads, Gradle Kotlin DSL multi-módulo, monorepo.
+- **Backend:** Kotlin + Spring Boot 4.1, JDK 21, Spring MVC com virtual threads, Gradle Kotlin DSL multi-módulo, monorepo.
 - **Arquitetura por serviço:** Clean Architecture (`domain` → `application` → `adapters` → `bootstrap`), regras validadas com ArchUnit.
 - **AWS:** RDS PostgreSQL, DynamoDB, SNS, SQS + DLQ, ElastiCache (Redis), Cognito, API Gateway (HTTP API), ECS Fargate.
+- **Lint:** ktlint.
 - **Infraestrutura como código:** Terraform.
 - **Local:** docker-compose com PostgreSQL, Redis, LocalStack e nginx (no papel do API Gateway). Testes de integração com Testcontainers.
 - **Frontend (etapa 9):** Angular + BFF em Node/NestJS.
@@ -75,7 +76,7 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 - (ver [ADR 0006](adr/0006-observabilidade-com-correlation-id.md))
 
 ### Frontend (etapa 9, detalhar depois)
-- Angular (standalone components, signals), Angular Material ou PrimeNG.
+- Angular (standalone components, signals); biblioteca de componentes em aberto.
 - BFF em NestJS: login OAuth2 com Cognito (`openid-client`), sessão no Redis, cookie `HttpOnly`, CSRF, refresh de token, correlation ID via `AsyncLocalStorage`, logs JSON com pino.
 - BFF expõe endpoints por tela (agregação), não proxy genérico.
 - `Idempotency-Key` gerada no Angular ao abrir o formulário de transferência; o BFF só repassa.
@@ -85,8 +86,17 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 - (ver [ADR 0005](adr/0005-frontend-angular-e-bff-nestjs.md))
 
 ## Em aberto
-- Valor padrão do limite diário e se varia por tipo de conta.
-- Cache local (Caffeine) na frente do Redis ou só Redis.
-- Relay do outbox dentro de cada serviço ou como processo separado.
-- Estratégia exata de autenticação no ambiente local (sem Cognito).
-- Angular Material ou PrimeNG.
+Fonte única das decisões pendentes. Ao decidir, registre no ADR indicado (ou crie um) e remova o item daqui.
+
+**Antes da etapa 1**
+- Mecanismo de controle de concorrência no saldo ([ADR 0007](adr/0007-conta-e-ledger-no-accounts.md)).
+
+**Antes das etapas 2 a 7**
+- Avaliar ADRs próprios para a saga orquestrada com compensação (`transfers`) e para ECS Service Connect.
+- Relay do outbox dentro de cada serviço ou como processo separado ([ADR 0003](adr/0003-transactional-outbox-e-mensageria.md)).
+- Cache local (Caffeine) na frente do Redis ou só Redis ([ADR 0009](adr/0009-cache-do-extrato.md)).
+- Valor padrão do limite diário e se varia por tipo de conta ([ADR 0010](adr/0010-limite-diario-redis-lua.md)).
+- Estratégia de autenticação no ambiente local, sem Cognito ([ADR 0004](adr/0004-api-gateway-http-api-na-borda.md)).
+
+**Etapa 9**
+- Angular Material ou PrimeNG ([ADR 0005](adr/0005-frontend-angular-e-bff-nestjs.md)).

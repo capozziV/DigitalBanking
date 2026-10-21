@@ -15,9 +15,3 @@ O extrato é um caso de leitura frequente e não deve sobrecarregar o `accounts`
 ## Consequências
 - Positivas: leitura do extrato isolada da escrita; ordenação cronológica nativa pela chave; eventos duplicados não geram lançamentos duplicados.
 - Negativas: consistência eventual (o extrato pode ficar atrás do ledger por alguns instantes); mais um banco para operar.
-
-## Pontos em aberto
-Nenhum.
-
-## Alternativas consideradas
-Não registradas no planejamento.

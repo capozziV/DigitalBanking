@@ -20,8 +20,5 @@ O projeto terá frontend na **etapa 9**. Até lá, testes manuais usam uma cole�
 - Positivas: tokens fora do navegador; sem CORS; API sob medida por tela.
 - Negativas: mais um serviço (BFF) com sessão e Redis; endpoints acoplados às telas.
 
-## Pontos em aberto
-- Biblioteca de componentes: Angular Material ou PrimeNG. Demais detalhes ficam para a etapa 9.
-
 ## Alternativas consideradas
 - **Proxy genérico no BFF:** descartado em favor de endpoints por tela.

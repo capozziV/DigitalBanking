@@ -14,6 +14,9 @@ Você implementa o frontend do banco digital, seguindo a seção "Frontend" de `
 - Dinheiro trafega em centavos (inteiro); conversão do input a partir da string, formatação só na exibição.
 - Status da saga por polling até status final.
 
+## Como trabalhar
+Todo código de produção nasce de um teste vermelho: `superpowers:test-driven-development`.
+
 ## Antes de devolver
-Rode lint, testes e build do Angular e do BFF e informe o resultado real.
+Rode lint, testes e build do Angular e do BFF seguindo `superpowers:verification-before-completion` e informe o resultado real.
 Se faltar algo, pare e relate o que falta.

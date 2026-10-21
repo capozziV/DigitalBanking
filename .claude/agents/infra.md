@@ -17,5 +17,5 @@ Você cuida da infraestrutura do projeto, seguindo `docs/arquitetura.md`.
 - Lembre que Cognito e API Gateway HTTP API no LocalStack são recursos pagos; use as alternativas locais definidas.
 
 ## Antes de devolver
-Rode o que for possível (subir o compose, validar Terraform com `fmt`/`validate`/`plan`) e informe o resultado real.
+Rode o que for possível (subir o compose, validar Terraform com `fmt`/`validate`/`plan`) seguindo `superpowers:verification-before-completion` e informe o resultado real. Condições atuais do ambiente (rede, Docker) estão em `docs/status.md`.
 Se faltar acesso, credencial ou ferramenta, pare e relate o que falta.

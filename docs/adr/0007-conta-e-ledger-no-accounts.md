@@ -16,9 +16,3 @@ Saldo e lançamentos precisam estar sempre consistentes entre si. Débitos só p
 ## Consequências
 - Positivas: saldo e lançamento nunca divergem; histórico auditável; sem risco de autorizar débito com saldo desatualizado.
 - Negativas: toda autorização de débito vai ao banco; o `accounts` concentra a carga de escrita e precisa tratar concorrência no saldo (tema da etapa 1).
-
-## Pontos em aberto
-- Mecanismo de controle de concorrência no saldo: não definido no planejamento (previsto para a etapa 1).
-
-## Alternativas consideradas
-Não registradas no planejamento.

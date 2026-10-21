@@ -15,9 +15,3 @@ Os serviços são consumidos pela borda, entre si e, mais tarde, pelo BFF. É pr
 ## Consequências
 - Positivas: contratos documentados e verificáveis (testes de contrato na etapa 8); tratamento de erro uniforme entre serviços; retentativas de transferência sem efeito duplicado.
 - Negativas: contratos e coleção precisam ser mantidos junto com o código; clientes precisam gerar e guardar a `Idempotency-Key`.
-
-## Pontos em aberto
-Nenhum.
-
-## Alternativas consideradas
-Não registradas no planejamento.

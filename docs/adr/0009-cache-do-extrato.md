@@ -16,9 +16,3 @@ A primeira página do extrato é a consulta mais comum. Um cache reduz leituras 
 ## Consequências
 - Positivas: menos leituras no DynamoDB na consulta mais comum; jitter evita expiração em massa; indisponibilidade do Redis não derruba o extrato.
 - Negativas: janela curta de dado desatualizado entre o evento e a invalidação; lógica extra de invalidação no consumidor.
-
-## Pontos em aberto
-- Cache local (Caffeine) na frente do Redis ou só Redis.
-
-## Alternativas consideradas
-Não registradas no planejamento.

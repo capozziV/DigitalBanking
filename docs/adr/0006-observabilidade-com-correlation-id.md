@@ -17,8 +17,5 @@ Uma requisição atravessa vários serviços por HTTP e por eventos (SNS/SQS). �
 - Positivas: simples de implementar e de entender; sem infraestrutura extra de tracing; cobre também o caminho assíncrono via outbox e mensageria.
 - Negativas: sem visão de tempo por etapa (spans) nem grafo de chamadas; a correlação depende de busca em logs.
 
-## Pontos em aberto
-Nenhum.
-
 ## Alternativas consideradas
 - **Tracing distribuído (OpenTelemetry, Jaeger ou X-Ray):** descartado; o planejamento optou só por correlation ID.

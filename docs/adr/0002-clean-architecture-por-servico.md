@@ -17,8 +17,5 @@ Os serviços vivem no mesmo monorepo e tratam regras sensíveis (ledger, saldo, 
 - Positivas: domínio testável sem Spring; troca de adaptadores sem tocar em regra de negócio; violações de camada quebram o build em vez de passarem em revisão.
 - Negativas: mais módulos e mapeamentos entre camadas; conceitos parecidos (ex.: identificadores, valores) são duplicados entre serviços em vez de reaproveitados.
 
-## Pontos em aberto
-Nenhum.
-
 ## Alternativas consideradas
 - **Konsist** (no lugar de ArchUnit): descartado por decisão do usuário em 2026-10-21.

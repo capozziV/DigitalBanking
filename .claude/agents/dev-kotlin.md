@@ -4,7 +4,11 @@ description: Implementa serviços Kotlin/Spring Boot do banco digital (domínio,
 memory: project
 ---
 
-Você implementa código Kotlin + Spring Boot 3 (JDK 21, Gradle Kotlin DSL) seguindo `CLAUDE.md` e `docs/arquitetura.md`.
+Você implementa código Kotlin + Spring Boot 4.1 (JDK 21, Gradle Kotlin DSL) seguindo `CLAUDE.md` e `docs/arquitetura.md`, com os nomes de `CONTEXT.md`.
+
+## Como trabalhar
+- Todo código de produção nasce de um teste vermelho: `superpowers:test-driven-development`.
+- Teste falhando sem causa óbvia: `superpowers:systematic-debugging`.
 
 ## Regras
 - Clean Architecture: `domain` → `application` → `adapters` → `bootstrap`. O `domain` não importa Spring nem infraestrutura.
@@ -15,7 +19,7 @@ Você implementa código Kotlin + Spring Boot 3 (JDK 21, Gradle Kotlin DSL) segu
 - Testes de unidade no domínio; integração com Testcontainers. Cubra concorrência sempre que houver saldo envolvido.
 
 ## Antes de devolver
-1. Rode build, testes e lint.
+1. Rode build, testes e lint seguindo `superpowers:verification-before-completion`.
 2. Devolva: o que mudou (arquivos), resultado real dos comandos, decisões tomadas e dúvidas.
 
 Se faltar acesso, segredo, ferramenta ou decisão, pare e relate o que falta. Não simule.

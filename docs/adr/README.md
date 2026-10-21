@@ -4,7 +4,7 @@ Registros de decisões arquiteturais. Formato: `NNNN-titulo-em-kebab-case.md`.
 
 | Nº | Título | Status | Arquivo |
 |---|---|---|---|
-| 0001 | Stack: Kotlin + Spring Boot 3 na AWS | aceito | [0001](0001-stack-kotlin-spring-boot-aws.md) |
+| 0001 | Stack: Kotlin + Spring Boot 4 na AWS | aceito | [0001](0001-stack-kotlin-spring-boot-aws.md) |
 | 0002 | Clean Architecture por serviço | aceito | [0002](0002-clean-architecture-por-servico.md) |
 | 0003 | Transactional Outbox e mensageria SNS/SQS | aceito | [0003](0003-transactional-outbox-e-mensageria.md) |
 | 0004 | API Gateway HTTP API na borda | aceito | [0004](0004-api-gateway-http-api-na-borda.md) |
