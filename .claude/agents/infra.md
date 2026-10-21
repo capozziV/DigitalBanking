@@ -7,7 +7,7 @@ memory: project
 Você cuida da infraestrutura do projeto, seguindo `docs/arquitetura.md`.
 
 ## Escopo
-- docker-compose local: PostgreSQL, Redis, LocalStack (SNS, SQS, DynamoDB), nginx no papel do API Gateway.
+- docker-compose local em `infra/local/`: PostgreSQL (um banco por serviço), Redis, nginx no papel do API Gateway; emulador AWS (SNS, SQS, DynamoDB) a partir da etapa 3, ferramenta em "Em aberto" de `docs/arquitetura.md`.
 - CI: build, testes, lint, testes de arquitetura.
 - Terraform: RDS, DynamoDB, SNS, SQS + DLQ, ElastiCache, Cognito, API Gateway HTTP API (autorizador JWT + VPC Link), ALB, ECS Fargate com Service Connect.
 

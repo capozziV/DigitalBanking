@@ -6,7 +6,7 @@
 - **AWS:** RDS PostgreSQL, DynamoDB, SNS, SQS + DLQ, ElastiCache (Redis), Cognito, API Gateway (HTTP API), ECS Fargate.
 - **Lint:** ktlint.
 - **Infraestrutura como código:** Terraform.
-- **Local:** docker-compose com PostgreSQL, Redis, LocalStack e nginx (no papel do API Gateway). Testes de integração com Testcontainers.
+- **Local:** docker-compose em `infra/local/` com PostgreSQL (um banco por serviço), Redis e nginx (no papel do API Gateway); emulador AWS a definir antes da etapa 3. Testes de integração com Testcontainers.
 - **Frontend (etapa 9):** Angular + BFF em Node/NestJS.
 - **Diagramas:** Excalidraw.
 
@@ -90,6 +90,10 @@ Fonte única das decisões pendentes. Ao decidir, registre no ADR indicado (ou c
 
 **Antes da etapa 1**
 - Mecanismo de controle de concorrência no saldo ([ADR 0007](adr/0007-conta-e-ledger-no-accounts.md)).
+- Biblioteca de persistência: Spring JDBC, JPA ou jOOQ (datasource, driver e Flyway já ficam prontos na etapa 0).
+
+**Antes da etapa 3**
+- Emulador AWS local (SNS, SQS, DynamoDB): LocalStack com conta gratuita e token (local e segredo no CI) ou emulador aberto como Moto. Desde 2026-03-23 o LocalStack exige autenticação ([ADR 0001](adr/0001-stack-kotlin-spring-boot-aws.md)).
 
 **Antes das etapas 2 a 7**
 - Avaliar ADRs próprios para a saga orquestrada com compensação (`transfers`) e para ECS Service Connect.

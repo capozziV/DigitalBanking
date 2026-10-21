@@ -24,6 +24,10 @@
 ## Pendências e decisões em aberto
 Fonte única: seção "Em aberto" de `docs/arquitetura.md`.
 
+## Com o usuário (fora do código)
+- Fazer `git push` dos commits locais (nenhum ambiente do Claude tem credencial do GitHub).
+- Depois que o CI existir: proteger a `main` no GitHub exigindo CI verde para merge.
+
 ## Bloqueios
 - Ambiente de nuvem (testado em 2026-10-21 19:25): JDK 21 instalado, `dockerd` sobe como root, e `repo1.maven.org`, `services.gradle.org` e `plugins.gradle.org` estão liberados. Gradle destravado.
 - Docker na nuvem: pull do Docker Hub funcionou às 19:29 depois de um `429 Too Many Requests` intermitente (limite anônimo por IP compartilhado). `mirror.gcr.io` está acessível; falta configurá-lo como `registry-mirrors` no `dockerd` e validar as imagens da etapa 0 (postgres, redis, localstack, nginx).
