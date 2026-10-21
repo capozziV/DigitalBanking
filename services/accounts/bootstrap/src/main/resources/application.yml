@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: accounts
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${ACCOUNTS_DB_URL:jdbc:postgresql://localhost:5432/accounts}
+    username: ${ACCOUNTS_DB_USER:accounts}
+    password: ${ACCOUNTS_DB_PASSWORD:accounts}
+
+server:
+  port: 8081
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
