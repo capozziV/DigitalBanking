@@ -1,7 +1,7 @@
 # Etapa 0 — Fundação: design
 
 - **Data:** 2026-10-21
-- **Status:** aguardando revisão do usuário
+- **Status:** aprovada (2026-10-21)
 - **Roadmap:** etapa 0 de [`docs/roadmap.md`](../../roadmap.md)
 
 ## Objetivo
@@ -10,7 +10,7 @@ Criar o molde que os cinco microsserviços do monorepo vão seguir e provar que 
 ## Critério de pronto
 1. `./gradlew build` verde no ambiente de nuvem do Claude (compilação, ktlint, testes, ArchUnit, Testcontainers).
 2. Jobs `build` e `smoke` do CI verdes no GitHub Actions.
-3. `docker compose -f infra/local/docker-compose.yml up --wait` termina com todos os contêineres saudáveis.
+3. `docker compose -f infra/local/docker-compose.yml up --wait`, com ou sem `--env-file infra/local/.env.example` (as senhas de desenvolvimento têm padrão no compose), termina com todos os contêineres saudáveis.
 
 ## Restrições (de `CLAUDE.md` e ADRs)
 - Kotlin, Spring Boot 4.1, JDK 21, Spring MVC com virtual threads ([ADR 0001](../../adr/0001-stack-kotlin-spring-boot-aws.md)).
@@ -78,8 +78,8 @@ DigitalBanking/
 | `nginx` | `nginx:alpine` | Papel do API Gateway: `/accounts/` → `accounts` em `host.docker.internal` (com `extra_hosts: host-gateway` para Linux). |
 
 - Todos com healthcheck; `docker compose up --wait` é o critério de saúde.
-- `accounts` roda fora do compose: `./gradlew :services:accounts:bootRun`.
-- Portas e credenciais de desenvolvimento em `infra/local/.env.example` (versionado); `.env` no `.gitignore`.
+- `accounts` roda fora do compose: `./gradlew :services:accounts:bootstrap:bootRun`.
+- Portas e credenciais de desenvolvimento em `infra/local/.env.example` (versionado; o compose usa os mesmos valores como padrão, então funciona sem `--env-file`); `.env` no `.gitignore`.
 - Ambiente de nuvem do Claude: `dockerd` com `registry-mirrors: ["https://mirror.gcr.io"]` para evitar o limite anônimo do Docker Hub (configuração do ambiente, não do repo).
 
 ## 5. CI (GitHub Actions)
