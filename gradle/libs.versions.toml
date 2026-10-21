@@ -1,0 +1,24 @@
+[versions]
+kotlin = "2.3.21"
+spring-boot = "4.1.1"
+ktlint = "1.8.0"
+ktlint-gradle = "14.2.0"
+archunit = "1.5.1"
+junit = "6.0.3"
+assertj = "3.27.7"
+
+[libraries]
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
+spring-boot-bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
+archunit = { module = "com.tngtech.archunit:archunit", version.ref = "archunit" }
+testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql" }
+testcontainers-junit-jupiter = { module = "org.testcontainers:testcontainers-junit-jupiter" }
+flyway-postgresql = { module = "org.flywaydb:flyway-database-postgresql" }
+postgresql = { module = "org.postgresql:postgresql" }
+
+# Dependencias de plugin para o build-logic
+kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+kotlin-allopen = { module = "org.jetbrains.kotlin:kotlin-allopen", version.ref = "kotlin" }
+spring-boot-gradle-plugin = { module = "org.springframework.boot:spring-boot-gradle-plugin", version.ref = "spring-boot" }
+ktlint-gradle = { module = "org.jlleitschuh.gradle:ktlint-gradle", version.ref = "ktlint-gradle" }
