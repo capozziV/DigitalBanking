@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Build (compile, ktlint, testes, ArchUnit, integracao)
+        run: ./gradlew build
+      - name: Publicar relatorios de teste
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports
+          path: '**/build/reports/tests/'
+
+  smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Gerar o jar executavel
+        run: ./gradlew :services:accounts:bootstrap:bootJar
+      - name: Subir a infra local
+        run: docker compose --env-file infra/local/.env.example -f infra/local/docker-compose.yml up --wait
+      - name: Subir o servico accounts
+        run: |
+          java -jar services/accounts/bootstrap/build/libs/bootstrap.jar > accounts.log 2>&1 &
+      - name: Health via nginx
+        run: |
+          for i in $(seq 1 60); do
+            if body=$(curl -fsS http://localhost/accounts/actuator/health) && echo "$body" | grep -q '"status":"UP"'; then
+              echo "$body"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "health nao ficou UP em 60 s" >&2
+          cat accounts.log >&2 || true
+          exit 1
+      - name: Derrubar a infra local
+        if: always()
+        run: docker compose --env-file infra/local/.env.example -f infra/local/docker-compose.yml down -v
