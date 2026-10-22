@@ -15,6 +15,7 @@ dependencyResolutionManagement {
 rootProject.name = "digitalbanking"
 
 include(
+    ":libs:outbox",
     ":services:accounts:domain",
     ":services:accounts:application",
     ":services:accounts:adapters",
