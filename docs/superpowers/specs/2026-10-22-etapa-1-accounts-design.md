@@ -1,7 +1,7 @@
 # Etapa 1 — `accounts`: design
 
 - **Data:** 2026-10-22
-- **Status:** em revisão
+- **Status:** aprovada (2026-10-22)
 - **Roadmap:** etapa 1 de [`docs/roadmap.md`](../../roadmap.md) (com o outbox, o relay e o SNS antecipados da etapa 3)
 
 ## Objetivo
@@ -10,7 +10,7 @@ Entregar o `accounts` com regra de negócio real: abrir conta, creditar, debitar
 ## Critério de pronto
 1. `./gradlew build` verde (compilação, ktlint, unitários, `integrationTest`, ArchUnit).
 2. Jobs `build` e `smoke` do CI verdes no GitHub Actions.
-3. Teste de concorrência: 100 débitos paralelos numa conta com saldo disponível para 37 → exatamente 37 aprovados, saldo final exato, `sequence` de 1 a 37 sem buraco.
+3. Teste de concorrência: conta `FREE` com um crédito de 3700; 100 débitos paralelos de 100 → exatamente 37 aprovados e 63 recusados, saldo final 0, `sequence` de 1 a 38 sem buraco (o crédito e os 37 débitos).
 4. Teste de idempotência: 20 pedidos paralelos com a mesma `Idempotency-Key` → um único lançamento.
 5. Teste com LocalStack: eventos de duas contas chegam à fila FIFO de inspeção em ordem por conta, com duas instâncias do relay rodando juntas, sem duplicata nem evento fora de ordem.
 6. Coleção Bruno com todos os endpoints; o smoke do CI abre conta, credita, debita e consulta pelo nginx.
