@@ -1,7 +1,7 @@
 # Arquitetura
 
 ## Stack
-- **Backend:** Kotlin + Spring Boot 4.1, JDK 21, Spring MVC com virtual threads, Gradle Kotlin DSL multi-módulo, monorepo.
+- **Backend:** Kotlin + Spring Boot 4.1, JDK 21, Spring MVC com virtual threads, Spring JDBC (`JdbcClient`) na persistência, Gradle Kotlin DSL multi-módulo, monorepo.
 - **Arquitetura por serviço:** Clean Architecture (`domain` → `application` → `adapters` → `bootstrap`), regras validadas com ArchUnit.
 - **AWS:** RDS PostgreSQL, DynamoDB, SNS, SQS + DLQ, ElastiCache (Redis), Cognito, API Gateway (HTTP API), ECS Fargate.
 - **Lint:** ktlint.
@@ -39,8 +39,11 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 ## Decisões tomadas
 ### Dados e consistência
 - Conta e ledger no mesmo serviço (`accounts`), na mesma transação ACID.
+- O saldo fica no lançamento (`sequence` por conta e `balance_after`); não há coluna de saldo na conta. Concorrência com trava pessimista `FOR UPDATE` na conta e `UNIQUE (account_id, sequence)` como rede de segurança; `lock_timeout` configurável (padrão 2s), estouro vira `503` com `Retry-After`. Nenhuma transação do `accounts` trava duas contas.
+- O saldo pode ficar negativo até o limite de cheque especial, definido pelo tipo de conta (`FREE`, `STANDARD`, `GOLD`, `BLACK`, `DIAMOND`). Os limites ficam numa tabela do `accounts`, alterável pelo endpoint `/admin/account-types/{type}` (protegido na etapa 7). Débito acima do saldo disponível: `422` com tipo `insufficient-available-balance`.
+- Persistência com Spring JDBC (`JdbcClient`), SQL explícito e mapeamento manual.
 - `statement` no DynamoDB, chave `accountId` + `timestamp#entryId`, gravação idempotente com `PutItem` condicional.
-- (ver [ADR 0007](adr/0007-conta-e-ledger-no-accounts.md) e [ADR 0008](adr/0008-statement-cqrs-dynamodb.md))
+- (ver [ADR 0007](adr/0007-conta-e-ledger-no-accounts.md), [ADR 0008](adr/0008-statement-cqrs-dynamodb.md), [ADR 0012](adr/0012-saldo-no-lancamento-e-trava-pessimista.md), [ADR 0013](adr/0013-persistencia-com-spring-jdbc.md) e [ADR 0014](adr/0014-tipo-de-conta-e-cheque-especial.md))
 
 ### Cache
 - Extrato: cache-aside só da primeira página, TTL curto com jitter, invalidação ao consumir evento, fallback para DynamoDB se o Redis cair.
@@ -88,10 +91,6 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 ## Em aberto
 Fonte única das decisões pendentes. Ao decidir, registre no ADR indicado (ou crie um) e remova o item daqui.
 
-**Antes da etapa 1**
-- Mecanismo de controle de concorrência no saldo ([ADR 0007](adr/0007-conta-e-ledger-no-accounts.md)).
-- Biblioteca de persistência: Spring JDBC, JPA ou jOOQ (datasource, driver e Flyway já ficam prontos na etapa 0).
-
 **Antes da etapa 3**
 - Emulador AWS local (SNS, SQS, DynamoDB): LocalStack com conta gratuita e token (local e segredo no CI) ou emulador aberto como Moto. Desde 2026-03-23 o LocalStack exige autenticação ([ADR 0001](adr/0001-stack-kotlin-spring-boot-aws.md)).
 
@@ -99,7 +98,7 @@ Fonte única das decisões pendentes. Ao decidir, registre no ADR indicado (ou c
 - Avaliar ADRs próprios para a saga orquestrada com compensação (`transfers`) e para ECS Service Connect.
 - Relay do outbox dentro de cada serviço ou como processo separado ([ADR 0003](adr/0003-transactional-outbox-e-mensageria.md)).
 - Cache local (Caffeine) na frente do Redis ou só Redis ([ADR 0009](adr/0009-cache-do-extrato.md)).
-- Valor padrão do limite diário e se varia por tipo de conta ([ADR 0010](adr/0010-limite-diario-redis-lua.md)).
+- Valor padrão do limite diário, único para todas as contas no MVP, a definir antes da etapa 6; variação por tipo de conta fica para depois do MVP ([ADR 0010](adr/0010-limite-diario-redis-lua.md)).
 - Estratégia de autenticação no ambiente local, sem Cognito ([ADR 0004](adr/0004-api-gateway-http-api-na-borda.md)).
 
 **Etapa 9**

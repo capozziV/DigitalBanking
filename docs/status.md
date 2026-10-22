@@ -2,12 +2,12 @@
 
 > Atualizado pelo agente coordenador ao fim de cada tarefa.
 
-**Última atualização:** 2026-10-21
-**Fase atual:** etapa 0 (fundação) pronta no PR #1 (`etapa-0-fundacao` → `main`), com CI verde; falta o merge.
-**Próxima etapa:** 1 — `accounts` (decidir antes: persistência e concorrência no saldo).
+**Última atualização:** 2026-10-22
+**Fase atual:** etapa 0 (fundação) na `main` (PR #1). Decisões de antes da etapa 1 tomadas (ADRs 0012–0014) na branch `etapa-1-decisoes-saldo`.
+**Próxima etapa:** 1 — `accounts`, começando pelo brainstorming.
 
 ## Concluído
-- Planejamento: arquitetura, roadmap, ADRs 0001–0011, glossário `CONTEXT.md`, agentes e fluxo com os plugins Superpowers e Matt Pocock; papéis do fluxo mapeados para os agentes do projeto no `CLAUDE.md`, com nomes: Helena (coordenação), Marina (`dev-kotlin`), Rafael (`infra`), Lucas (`dev-frontend`), Beatriz (`revisor`), Clara (`documentador`).
+- Planejamento: arquitetura, roadmap, ADRs 0001–0014, glossário `CONTEXT.md`, agentes e fluxo com os plugins Superpowers e Matt Pocock; papéis do fluxo mapeados para os agentes do projeto no `CLAUDE.md`, com nomes: Helena (coordenação), Marina (`dev-kotlin`), Rafael (`infra`), Lucas (`dev-frontend`), Beatriz (`revisor`), Clara (`documentador`).
 - Código Kotlin em inglês, com os nomes de código do glossário `CONTEXT.md`; docs e commits em português.
 - Decisões de 2026-10-21: Terraform, ArchUnit, Spring MVC com virtual threads, Spring Boot 4.1, ktlint, um módulo Gradle por camada, pacote raiz `io.github.capozziv.digitalbanking`, LocalStack fora da etapa 0.
 - Etapa 0 ([spec](superpowers/specs/2026-10-21-etapa-0-fundacao-design.md), [plano](superpowers/plans/2026-10-21-etapa-0-fundacao.md)), cada task revisada:
@@ -16,6 +16,8 @@
   - `accounts` com Spring Boot 4.1.1, virtual threads, Flyway e teste Testcontainers do `/actuator/health` (db `UP`);
   - docker-compose em `infra/local/` (PostgreSQL 17, Redis, nginx);
   - CI no GitHub Actions (jobs `build` e `smoke`).
+- Decisões de 2026-10-22 (antes da etapa 1): saldo no lançamento (`sequence` e `balance_after`) com trava pessimista `FOR UPDATE` na conta ([ADR 0012](adr/0012-saldo-no-lancamento-e-trava-pessimista.md)); Spring JDBC com `JdbcClient` ([ADR 0013](adr/0013-persistencia-com-spring-jdbc.md)); cheque especial por tipo de conta, com limites numa tabela alterável por `/admin/account-types/{type}` ([ADR 0014](adr/0014-tipo-de-conta-e-cheque-especial.md)); glossário com Tipo de conta, Limite de cheque especial e Saldo disponível; limite diário único no MVP.
+- PR #1 da etapa 0 com merge na `main` (2026-10-22).
 - Verificação (ambiente de nuvem, 2026-10-21): `./gradlew build --rerun-tasks` verde (5 testes, 0 falhas); compose saudável com e sem `--env-file`; rota `/accounts/actuator/health` pelo nginx `UP`; actionlint sem erros.
 - CI no GitHub (PR #1, 2026-10-21): `build` e `smoke` verdes. O `smoke` falhou na primeira execução porque o healthcheck do nginx usava `localhost`, que no runner resolve para IPv6 enquanto o nginx escuta só em IPv4; corrigido para `127.0.0.1` (sem `listen [::]:80`, que derruba o nginx em máquinas sem IPv6).
 
@@ -35,12 +37,17 @@ docker compose -f infra/local/docker-compose.yml down -v           # derruba e a
 - Nada.
 
 ## Próximos passos
-1. Usuário: fazer o merge do PR #1 na `main`.
-2. Decidir os itens "Antes da etapa 1" de `docs/arquitetura.md` (persistência, concorrência no saldo).
-3. Etapa 1 pelo fluxo dos skills (brainstorming → spec → plano).
+1. PR da branch `etapa-1-decisoes-saldo` (ADRs 0012–0014) e merge na `main`.
+2. Etapa 1 pelo fluxo dos skills (brainstorming → spec → plano), incluindo o desenho de idempotência (o que uma nova tentativa com a mesma chave devolve, inclusive após recusa por saldo disponível insuficiente).
 
 ## Pendências e decisões em aberto
 Decisões: fonte única na seção "Em aberto" de `docs/arquitetura.md`.
+
+Débito técnico de produto, fora do MVP (decidido em 2026-10-22):
+- Juros e tarifa sobre saldo negativo.
+- Histórico de troca de tipo de conta.
+- Auditoria com autor das alterações de limite por tipo (junto da etapa 7).
+- Limite diário variando por tipo de conta.
 
 Melhorias técnicas adiadas na revisão da etapa 0 (nenhuma bloqueia):
 - **Etapa 1:** tirar `allowEmptyShould` e ver cada regra ArchUnit falhar; separar as duas direções web↔persistence em testes próprios; decidir se haverá source set `integrationTest` (hoje `AccountsApplicationIT` roda no `test`); trocar o cast do teste de health por asserção AssertJ de mapa; teste de virtual threads hoje só lê a propriedade.
@@ -55,5 +62,5 @@ Melhorias técnicas adiadas na revisão da etapa 0 (nenhuma bloqueia):
 
 ## Ambiente do Claude
 - **Nuvem:** JDK 21 e Docker. Maven Central e Docker Hub limitam o IP compartilhado (`429`): usar o init script do Gradle com o espelho `maven-central.storage-download.googleapis.com` e `registry-mirrors: ["https://mirror.gcr.io"]` no `dockerd` (configuração do ambiente, fora do repo).
-- **Push:** funciona pela nuvem quando o repositório está conectado à sessão (clone de `github.com/capozziV/digitalbanking`); a VM do Mac não tem credencial do GitHub.
+- **Push:** pela VM do Mac, com um token fine-grained do GitHub em `.git/github-token` (fora do controle de versão), lido por um `credential.helper` configurado só no `.git/config` local. Sem esse arquivo, o push pela VM falha; pela nuvem funciona quando o repositório está conectado à sessão.
 - **VM do Mac:** sem Docker e sem acesso ao Docker Desktop do Mac; serve para editar arquivos da pasta do usuário.

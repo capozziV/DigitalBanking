@@ -15,4 +15,4 @@ Saldo e lançamentos precisam estar sempre consistentes entre si. Débitos só p
 
 ## Consequências
 - Positivas: saldo e lançamento nunca divergem; histórico auditável; sem risco de autorizar débito com saldo desatualizado.
-- Negativas: toda autorização de débito vai ao banco; o `accounts` concentra a carga de escrita e precisa tratar concorrência no saldo (tema da etapa 1).
+- Negativas: toda autorização de débito vai ao banco; o `accounts` concentra a carga de escrita e precisa tratar concorrência no saldo (resolvido no [ADR 0012](0012-saldo-no-lancamento-e-trava-pessimista.md)).

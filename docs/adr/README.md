@@ -15,3 +15,6 @@ Registros de decisões arquiteturais. Formato: `NNNN-titulo-em-kebab-case.md`.
 | 0009 | Cache do extrato | aceito | [0009](0009-cache-do-extrato.md) |
 | 0010 | Limite diário com Redis + Lua | aceito | [0010](0010-limite-diario-redis-lua.md) |
 | 0011 | Contratos de API | aceito | [0011](0011-contratos-de-api.md) |
+| 0012 | Saldo no lançamento e trava pessimista por conta | aceito | [0012](0012-saldo-no-lancamento-e-trava-pessimista.md) |
+| 0013 | Persistência com Spring JDBC (`JdbcClient`) | aceito | [0013](0013-persistencia-com-spring-jdbc.md) |
+| 0014 | Tipo de conta e cheque especial | aceito | [0014](0014-tipo-de-conta-e-cheque-especial.md) |
