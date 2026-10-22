@@ -7,7 +7,8 @@
 **Próxima etapa:** 1 — `accounts` (decidir antes: persistência e concorrência no saldo).
 
 ## Concluído
-- Planejamento: arquitetura, roadmap, ADRs 0001–0011, glossário `CONTEXT.md`, agentes e fluxo com os plugins Superpowers e Matt Pocock; papéis do fluxo mapeados para os agentes do projeto no `CLAUDE.md`.
+- Planejamento: arquitetura, roadmap, ADRs 0001–0011, glossário `CONTEXT.md`, agentes e fluxo com os plugins Superpowers e Matt Pocock; papéis do fluxo mapeados para os agentes do projeto no `CLAUDE.md`, com nomes: Helena (coordenação), Marina (`dev-kotlin`), Rafael (`infra`), Lucas (`dev-frontend`), Beatriz (`revisor`), Clara (`documentador`).
+- Código Kotlin em inglês, com os nomes de código do glossário `CONTEXT.md`; docs e commits em português.
 - Decisões de 2026-10-21: Terraform, ArchUnit, Spring MVC com virtual threads, Spring Boot 4.1, ktlint, um módulo Gradle por camada, pacote raiz `io.github.capozziv.digitalbanking`, LocalStack fora da etapa 0.
 - Etapa 0 ([spec](superpowers/specs/2026-10-21-etapa-0-fundacao-design.md), [plano](superpowers/plans/2026-10-21-etapa-0-fundacao.md)), cada task revisada:
   - build: Gradle 9.8.2, catálogo de versões, `build-logic` com 3 plugins de convenção, ktlint;
