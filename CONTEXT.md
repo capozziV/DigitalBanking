@@ -19,10 +19,15 @@ Conta de um cliente que guarda valores e possui um saldo.
 _Código_: `Account`
 _Evite_: carteira, wallet
 
+**Tipo de conta**:
+Categoria da conta que define o limite de cheque especial; valores Free, Standard, Gold, Black e Diamond.
+_Código_: `AccountType`
+_Evite_: plano, categoria, nível
+
 ## Ledger
 
 **Lançamento**:
-Registro imutável de um crédito ou débito numa conta.
+Registro imutável de um crédito ou débito numa conta, com o saldo resultante.
 _Código_: `LedgerEntry`
 _Evite_: transação, movimentação, entrada
 
@@ -40,9 +45,18 @@ _Código_: `Ledger`
 _Evite_: histórico, livro
 
 **Saldo**:
-Valor disponível numa conta, resultado dos seus lançamentos.
+Resultado dos lançamentos da conta; pode ser negativo.
 _Código_: `Balance`
 _Evite_: balanço
+
+**Limite de cheque especial**:
+Quanto o saldo pode ficar abaixo de zero; definido pelo tipo de conta.
+_Código_: `OverdraftLimit`
+_Evite_: crédito, limite (sem qualificador, para não confundir com limite diário)
+
+**Saldo disponível**:
+Saldo somado ao limite de cheque especial; o máximo que um débito pode tirar agora.
+_Código_: `AvailableBalance`
 
 ## Transferências
 
