@@ -1,6 +1,7 @@
 package io.github.capozziv.digitalbanking.accounts.application.usecase
 
 import io.github.capozziv.digitalbanking.accounts.application.CustomerAlreadyHasAccountException
+import io.github.capozziv.digitalbanking.accounts.application.IdempotencyKeyReusedException
 import io.github.capozziv.digitalbanking.accounts.application.fake.DirectTransactionRunner
 import io.github.capozziv.digitalbanking.accounts.application.fake.InMemoryAccountRepository
 import io.github.capozziv.digitalbanking.accounts.application.fake.RecordingEventOutbox
@@ -39,6 +40,19 @@ class OpenAccountUseCaseTest {
         val retry = useCase.execute(OpenAccountCommand(customerId, "open-key-1"))
 
         assertThat(retry).isEqualTo(OpenAccountResult(expectedAccount, created = false))
+        assertThat(accounts.all()).containsExactly(expectedAccount)
+        assertThat(outbox.events).containsExactly(AccountOpened(expectedAccount.id, customerId, AccountType.FREE))
+    }
+
+    @Test
+    fun `reusing an opening key of another customer fails without returning that account`() {
+        val otherCustomerId = UUID.fromString("0199a0b0-0000-7000-8000-0000000000c2")
+        useCase.execute(OpenAccountCommand(customerId, "open-key-1"))
+
+        assertThatThrownBy { useCase.execute(OpenAccountCommand(otherCustomerId, "open-key-1")) }
+            .isInstanceOfSatisfying(IdempotencyKeyReusedException::class.java) {
+                assertThat(it.key).isEqualTo("open-key-1")
+            }
         assertThat(accounts.all()).containsExactly(expectedAccount)
         assertThat(outbox.events).containsExactly(AccountOpened(expectedAccount.id, customerId, AccountType.FREE))
     }

@@ -1,6 +1,7 @@
 package io.github.capozziv.digitalbanking.accounts.application.usecase
 
 import io.github.capozziv.digitalbanking.accounts.application.CustomerAlreadyHasAccountException
+import io.github.capozziv.digitalbanking.accounts.application.IdempotencyKeyReusedException
 import io.github.capozziv.digitalbanking.accounts.application.port.AccountRepository
 import io.github.capozziv.digitalbanking.accounts.application.port.EventOutbox
 import io.github.capozziv.digitalbanking.accounts.application.port.IdGenerator
@@ -39,6 +40,9 @@ class OpenAccountUseCase(
                         checkNotNull(accounts.findByOpeningIdempotencyKey(command.idempotencyKey)) {
                             "account with opening key ${command.idempotencyKey} not found after a duplicate key conflict"
                         }
+                    if (existing.customerId != command.customerId) {
+                        throw IdempotencyKeyReusedException(command.idempotencyKey)
+                    }
                     OpenAccountResult(existing, created = false)
                 }
 
