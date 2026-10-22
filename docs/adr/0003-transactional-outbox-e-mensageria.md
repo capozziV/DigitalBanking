@@ -10,6 +10,7 @@ Serviços precisam publicar eventos (ex.: lançamentos no ledger, etapas da saga
 - Eventos são publicados **somente** via Transactional Outbox: o evento é gravado na mesma transação do dado de negócio e publicado depois por um relay.
 - **Um tópico SNS por produtor**; **uma fila SQS + DLQ por consumidor**.
 - Consumidores são sempre **idempotentes**.
+- O relay roda dentro de cada serviço, com um relay ativo por vez e SNS FIFO ([ADR 0015](0015-outbox-relay-lider-e-sns-fifo.md)).
 - O correlation ID é gravado em uma coluna do outbox, vai no envelope do evento e nos atributos SNS/SQS (raw message delivery).
 
 ## Consequências

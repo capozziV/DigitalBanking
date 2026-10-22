@@ -18,3 +18,4 @@ Registros de decisões arquiteturais. Formato: `NNNN-titulo-em-kebab-case.md`.
 | 0012 | Saldo no lançamento e trava pessimista por conta | aceito | [0012](0012-saldo-no-lancamento-e-trava-pessimista.md) |
 | 0013 | Persistência com Spring JDBC (`JdbcClient`) | aceito | [0013](0013-persistencia-com-spring-jdbc.md) |
 | 0014 | Tipo de conta e cheque especial | aceito | [0014](0014-tipo-de-conta-e-cheque-especial.md) |
+| 0015 | Relay do outbox com líder único e SNS FIFO | aceito | [0015](0015-outbox-relay-lider-e-sns-fifo.md) |
