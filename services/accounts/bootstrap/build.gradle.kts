@@ -8,8 +8,9 @@ dependencies {
 
     testImplementation(libs.archunit)
     testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testImplementation("org.springframework.boot:spring-boot-starter-webmvc")
-    testImplementation("org.springframework.boot:spring-boot-testcontainers")
-    testImplementation(libs.testcontainers.postgresql)
-    testImplementation(libs.testcontainers.junit.jupiter)
+
+    integrationTestImplementation("org.springframework.boot:spring-boot-starter-webmvc")
+    integrationTestImplementation("org.springframework.boot:spring-boot-testcontainers")
+    integrationTestImplementation(libs.testcontainers.postgresql)
+    integrationTestImplementation(libs.testcontainers.junit.jupiter)
 }
