@@ -9,10 +9,11 @@ Responder sempre em português.
 - @docs/status.md — onde estamos agora, bloqueios e condições do ambiente
 - @docs/arquitetura.md — stack, serviços, decisões e a lista "Em aberto"
 - @docs/roadmap.md — etapas do projeto
-- @CONTEXT.md — linguagem do domínio; use esses termos em classes, eventos, testes e docs
+- @CONTEXT.md — linguagem do domínio; o glossário dá o termo em português (docs e conversa) e o nome em inglês usado no código
 - ADRs em `docs/adr/` — o porquê de cada decisão
 
 ## Regras inegociáveis
+- Código Kotlin (classes, funções, variáveis, pacotes, testes, comentários e mensagens de log) sempre em inglês, com os nomes de código do `CONTEXT.md`. Documentação, ADRs e commits seguem em português.
 - Valores monetários sempre em centavos (`Long`/inteiro), nunca `Double`/float.
 - Clean Architecture por serviço: `domain` → `application` → `adapters` → `bootstrap`. O `domain` não depende de Spring nem de infraestrutura (validado com ArchUnit).
 - Não compartilhar classes de domínio entre serviços. Bibliotecas compartilhadas só de infraestrutura (outbox, observabilidade).
@@ -45,6 +46,23 @@ Todo trabalho no projeto passa pelos skills dos plugins **Superpowers** e **Matt
 | Antes de declarar pronto | `superpowers:verification-before-completion` — build, testes e lint rodados, com o resultado real no relato |
 | Fechar a branch (merge, PR) | `superpowers:finishing-a-development-branch` |
 | Editar `CLAUDE.md`, agentes ou skills | `mattpocock-skills:writing-for-agents` |
+
+## Agentes do projeto
+Quem executa cada papel do fluxo acima são os agentes de `.claude/agents/`, chamados pelo identificador no `Agent`:
+
+| Papel | Nome | Agente |
+|---|---|---|
+| Implementar task de código Kotlin (domínio, casos de uso, adapters, migrations, testes) | Marina | `dev-kotlin` |
+| Implementar task de build, `build-logic`, docker-compose, nginx, CI, Terraform | Rafael | `infra` |
+| Implementar task de frontend e BFF (etapa 9) | Lucas | `dev-frontend` |
+| Revisar task, re-revisar correção, revisar a branch | Beatriz | `revisor` |
+| ADR, `CONTEXT.md`, README, docs de arquitetura | Clara | `documentador` |
+| Coordenar, delegar, manter `docs/status.md` | Helena | sessão principal (`coordenador`) |
+
+- Nas mensagens ao usuário, chame cada agente pelo nome (com o identificador entre parênteses quando ajudar); nos despachos, use o identificador em `subagent_type`.
+- Task que mistura papéis vai para o agente da maior parte do diff; o prompt cita o resto.
+- O modelo de cada despacho segue a seleção de modelo do `superpowers:subagent-driven-development`; informe-o sempre.
+- Os agentes só existem quando o repositório está conectado à sessão (clone do GitHub). Sem eles, diga isso e use um agente genérico com o arquivo do agente como parte do prompt.
 
 ## Git
 Commits e pushes saem só com o autor do usuário (capozziV <vitorcapozzi4@gmail.com>), sem trailers `Co-Authored-By` ou `Claude-Session`.
