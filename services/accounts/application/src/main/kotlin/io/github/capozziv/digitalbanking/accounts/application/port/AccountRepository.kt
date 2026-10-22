@@ -20,7 +20,12 @@ interface AccountRepository {
 
     fun findById(id: UUID): Account?
 
-    /** Locks the account row (FOR UPDATE with lock_timeout); throws AccountBusyException when the lock times out. */
+    /**
+     * Locks the account row until the end of the current transaction (SELECT ... FOR UPDATE with the
+     * configured lock_timeout). Returns null when the account does not exist. Throws AccountBusyException
+     * when the lock times out; the transaction is then aborted and nothing must be written.
+     * Credit and debit rely on this lock to serialize entries of the same account.
+     */
     fun lockById(id: UUID): Account?
 
     fun findByOpeningIdempotencyKey(key: String): Account?
