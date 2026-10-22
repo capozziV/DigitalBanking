@@ -40,7 +40,7 @@ infra/local/                       # + LocalStack, init do SNS/SQS, dois usuári
 api/bruno/accounts/                # coleção Bruno
 ```
 - **`domain`:** Kotlin puro. As operações devolvem o lançamento e o evento de domínio.
-- **`application`:** um caso de uso por operação (`OpenAccountUseCase`, `GetAccountUseCase`, `RecordCreditUseCase`, `RecordDebitUseCase`, `ChangeAccountTypeUseCase`, `ListAccountTypesUseCase`, `ChangeOverdraftLimitUseCase`). Portas: `AccountRepository`, `LedgerEntryRepository`, `AccountTypeRepository`, `Outbox`, `TransactionRunner` (mantém `@Transactional` fora desta camada). Sem Spring.
+- **`application`:** um caso de uso por operação (`OpenAccountUseCase`, `GetAccountUseCase`, `RecordCreditUseCase`, `RecordDebitUseCase`, `ChangeAccountTypeUseCase`, `ListAccountTypesUseCase`, `ChangeOverdraftLimitUseCase`). Portas: `AccountRepository`, `LedgerEntryRepository`, `AccountTypeRepository`, `EventOutbox`, `TransactionRunner` (mantém `@Transactional` fora desta camada). Sem Spring.
 - **`libs/outbox`:** só infraestrutura ([ADR 0002](../../adr/0002-clean-architecture-por-servico.md)). Não depende de nenhum serviço. O serviço fornece só o tipo e o payload de cada evento.
 - **Caminho Gradle:** `:libs:outbox`. Pacote `io.github.capozziv.digitalbanking.outbox`.
 - **Source set `integrationTest`:** plugin de convenção no `build-logic`. `./gradlew test` roda só unitários, sem Docker; `./gradlew integrationTest` roda os de integração; `./gradlew build` roda os dois.
@@ -71,6 +71,7 @@ api/bruno/accounts/                # coleção Bruno
 
 **`outbox`** (migration modelo fornecida pelo `libs/outbox`, copiada para as migrations do serviço)
 - `position` (`bigserial`, PK, ordem de gravação), `event_id` (`uuid`, `UNIQUE`), `aggregate_id`, `event_type`, `event_version`, `payload` (`jsonb`), `correlation_id`, `occurred_at`, `published_at` (nulo até publicar), `attempts` (padrão 0), `last_error`.
+- `NOT NULL` nas colunas que o writer sempre preenche: `event_id`, `aggregate_id`, `event_type`, `event_version`, `payload`, `occurred_at`. Aceitam nulo: `correlation_id`, `published_at` e `last_error`.
 - Índice parcial `(position) WHERE published_at IS NULL`. As linhas publicadas ficam para sempre.
 
 **Usuários de banco** (criados pelo script de init do PostgreSQL)
@@ -118,7 +119,7 @@ Payloads `eventVersion` 1:
 - `LedgerEntryRecorded`: `entryId`, `accountId`, `sequence`, `kind`, `amount`, `balanceAfter`, `description`, `idempotencyKey`, `createdAt`.
 - `AccountTypeChanged`: `accountId`, `previousType`, `newType`.
 
-**Gravação:** `JdbcOutboxWriter` implementa a porta `Outbox` na mesma conexão e transação do caso de uso. Preenche `eventId` (UUID v7), `occurredAt` e `correlationId`.
+**Gravação:** a porta `EventOutbox` fica na camada `application` do `accounts` e é implementada pelo `OutboxEventAppender` do adapter de persistência, que chama o `JdbcOutboxWriter` da lib (a lib não depende do serviço). A gravação usa a mesma conexão e transação do caso de uso. Preenche `eventId` (UUID v7), `occurredAt` e `correlationId`.
 
 **Ciclo do `OutboxRelay`** (`@Scheduled`, intervalo configurável, padrão 500 ms):
 1. Abre transação e tenta `pg_try_advisory_xact_lock(<chave do relay do serviço>)`. Sem a trava, encerra o ciclo. A trava se solta no fim da transação.
@@ -188,7 +189,7 @@ Payloads `eventVersion` 1:
    - Primeira task: confirmar a versão do springdoc compatível com o Spring Boot 4.1 (fonte primária).
    - Source set `integrationTest`; ArchUnit (regras novas e sem `allowEmptyShould`).
    - Domínio, casos de uso, persistência, web, correlation ID, as sete operações.
-   - `libs/outbox` só com envelope, porta e `JdbcOutboxWriter` (sem relay).
+   - `libs/outbox` só com envelope e `JdbcOutboxWriter` (sem relay); porta `EventOutbox` no `application` e `OutboxEventAppender` no adapter de persistência do `accounts`.
    - Dois usuários de banco; nginx; coleção Bruno; smoke com as operações.
 2. **Bloco 2 — relay e SNS FIFO** (PR próprio)
    - Primeira task: teste de SNS FIFO → SQS FIFO no LocalStack (ordem por `MessageGroupId`, deduplicação). Se o LocalStack não suportar, parar e levar a decisão ao usuário.
@@ -200,7 +201,7 @@ Payloads `eventVersion` 1:
 - **ADR 0015 (novo):** outbox e relay — relay no próprio serviço, um relay ativo por trava consultiva, SNS FIFO com `MessageGroupId` por conta, falha bloqueando só a conta, outbox guardado para sempre, envelope com `eventVersion`, LocalStack como emulador. Alternativas: `SKIP LOCKED` com vários relays (quebra a ordem por conta), relay separado, CDC, tópico Standard, CloudEvents.
 - **ADR 0003:** referência ao 0015; relay decidido. **ADR 0014:** lista de tipos no enum, limites na tabela. **ADR 0001:** LocalStack escolhido.
 - **`docs/arquitetura.md`:** remover de "Em aberto" o emulador AWS e o relay; registrar idempotência por chave no lançamento.
-- **`CONTEXT.md`:** sem termos novos (os eventos e operações usam termos já definidos).
+- **`CONTEXT.md`:** novos termos Valor (`Money`) e Tipo de lançamento (`EntryKind`).
 - **`CLAUDE.md`:** convenção de sufixos nas regras de código.
 - **`docs/roadmap.md`:** outbox, relay, SNS e LocalStack na etapa 1; a etapa 3 fica com SQS, DLQ, `notification` e consumidores idempotentes.
 
