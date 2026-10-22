@@ -71,7 +71,7 @@ api/bruno/accounts/                # coleção Bruno
 
 **`outbox`** (migration modelo fornecida pelo `libs/outbox`, copiada para as migrations do serviço)
 - `position` (`bigserial`, PK, ordem de gravação), `event_id` (`uuid`, `UNIQUE`), `aggregate_id`, `event_type`, `event_version`, `payload` (`jsonb`), `correlation_id`, `occurred_at`, `published_at` (nulo até publicar), `attempts` (padrão 0), `last_error`.
-- `NOT NULL` nas colunas que o writer sempre preenche: `event_id`, `aggregate_id`, `event_type`, `event_version`, `payload`, `occurred_at`. Aceitam nulo: `correlation_id`, `published_at` e `last_error`.
+- `NOT NULL` nas colunas que o writer sempre preenche: `event_id`, `aggregate_id`, `event_type`, `event_version`, `payload`, `occurred_at`; e `attempts` (`NOT NULL`, padrão 0). Aceitam nulo: `correlation_id`, `published_at` e `last_error`.
 - Índice parcial `(position) WHERE published_at IS NULL`. As linhas publicadas ficam para sempre.
 
 **Usuários de banco** (criados pelo script de init do PostgreSQL)
@@ -119,7 +119,7 @@ Payloads `eventVersion` 1:
 - `LedgerEntryRecorded`: `entryId`, `accountId`, `sequence`, `kind`, `amount`, `balanceAfter`, `description`, `idempotencyKey`, `createdAt`.
 - `AccountTypeChanged`: `accountId`, `previousType`, `newType`.
 
-**Gravação:** a porta `EventOutbox` fica na camada `application` do `accounts` e é implementada pelo `OutboxEventAppender` do adapter de persistência, que chama o `JdbcOutboxWriter` da lib (a lib não depende do serviço). A gravação usa a mesma conexão e transação do caso de uso. Preenche `eventId` (UUID v7), `occurredAt` e `correlationId`.
+**Gravação:** a porta `EventOutbox` fica na camada `application` do `accounts` e é implementada pelo `OutboxEventAppender` do adapter de persistência, que chama o `JdbcOutboxWriter` da lib (a lib não depende do serviço). A gravação usa a mesma conexão e transação do caso de uso. O `JdbcOutboxWriter` preenche `eventId` (UUID v7), `occurredAt` e `correlationId`.
 
 **Ciclo do `OutboxRelay`** (`@Scheduled`, intervalo configurável, padrão 500 ms):
 1. Abre transação e tenta `pg_try_advisory_xact_lock(<chave do relay do serviço>)`. Sem a trava, encerra o ciclo. A trava se solta no fim da transação.
