@@ -3,7 +3,7 @@
 > Atualizado pelo agente coordenador ao fim de cada tarefa.
 
 **Última atualização:** 2026-10-21
-**Fase atual:** etapa 0 (fundação) implementada e enviada na branch `etapa-0-fundacao`; falta abrir o PR e ver o CI verde.
+**Fase atual:** etapa 0 (fundação) pronta no PR #1 (`etapa-0-fundacao` → `main`), com CI verde; falta o merge.
 **Próxima etapa:** 1 — `accounts` (decidir antes: persistência e concorrência no saldo).
 
 ## Concluído
@@ -17,6 +17,7 @@
   - docker-compose em `infra/local/` (PostgreSQL 17, Redis, nginx);
   - CI no GitHub Actions (jobs `build` e `smoke`).
 - Verificação (ambiente de nuvem, 2026-10-21): `./gradlew build --rerun-tasks` verde (5 testes, 0 falhas); compose saudável com e sem `--env-file`; rota `/accounts/actuator/health` pelo nginx `UP`; actionlint sem erros.
+- CI no GitHub (PR #1, 2026-10-21): `build` e `smoke` verdes. O `smoke` falhou na primeira execução porque o healthcheck do nginx usava `localhost`, que no runner resolve para IPv6 enquanto o nginx escuta só em IPv4; corrigido para `127.0.0.1` (sem `listen [::]:80`, que derruba o nginx em máquinas sem IPv6).
 
 ## Como rodar localmente
 ```bash
@@ -34,7 +35,7 @@ docker compose -f infra/local/docker-compose.yml down -v           # derruba e a
 - Nada.
 
 ## Próximos passos
-1. Usuário: abrir o PR de `etapa-0-fundacao` para `main`, conferir os jobs `build` e `smoke` verdes e fazer o merge.
+1. Usuário: fazer o merge do PR #1 na `main`.
 2. Decidir os itens "Antes da etapa 1" de `docs/arquitetura.md` (persistência, concorrência no saldo).
 3. Etapa 1 pelo fluxo dos skills (brainstorming → spec → plano).
 
@@ -45,8 +46,8 @@ Melhorias técnicas adiadas na revisão da etapa 0 (nenhuma bloqueia):
 - **Etapa 1:** tirar `allowEmptyShould` e ver cada regra ArchUnit falhar; separar as duas direções web↔persistence em testes próprios; decidir se haverá source set `integrationTest` (hoje `AccountsApplicationIT` roda no `test`); trocar o cast do teste de health por asserção AssertJ de mapa; teste de virtual threads hoje só lê a propriedade.
 - **Etapa 2 (2º serviço):** `repositoriesMode = FAIL_ON_PROJECT_REPOS`; avaliar remover `pluginManagement.repositories` da raiz (só `includeBuild`); extrair o `val libs = ...` repetido nos plugins de convenção se crescer; documentar o fluxo de adicionar banco no init; init com senha via `psql -v` e idempotente; volume nomeado para o PostgreSQL.
 - **Etapa 7:** restringir `management.endpoint.health.show-details` (hoje `always`, sem autenticação); headers `X-Forwarded-Proto`/`X-Real-IP` no nginx.
-- **Etapa 8:** nome do jar por serviço (`accounts.jar`), smoke reaproveitando o jar do job `build`, detectar morte do processo no laço do smoke, `cancel-in-progress` só em PRs, actions fixadas por SHA, shellcheck nos blocos `run`.
-- **Quando incomodar:** ruído de CDS da JVM nos testes (agente do Mockito); `webmvc` explícito no `bootstrap`; healthcheck do nginx com `127.0.0.1`.
+- **Etapa 8:** nome do jar por serviço (`accounts.jar`), smoke reaproveitando o jar do job `build`, step `if: failure()` no smoke com `docker compose logs` e o `State.Health` dos contêineres, detectar morte do processo no laço do smoke, `cancel-in-progress` só em PRs, actions fixadas por SHA, shellcheck nos blocos `run`.
+- **Quando incomodar:** ruído de CDS da JVM nos testes (agente do Mockito); `webmvc` explícito no `bootstrap`. Healthchecks e curls dentro de contêineres: usar `127.0.0.1`, nunca `localhost` (IPv6 no runner).
 
 ## Com o usuário (fora do código)
 - Abrir PRs (a CLI do GitHub da sessão não tem login; o push funciona).
