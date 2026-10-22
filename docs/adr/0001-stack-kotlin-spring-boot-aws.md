@@ -12,7 +12,7 @@ Backend de banco digital simulado, para portfólio, organizado em microsserviço
 - **Build:** Gradle Kotlin DSL multi-módulo, em **monorepo**.
 - **AWS:** RDS PostgreSQL, DynamoDB, SNS, SQS + DLQ, ElastiCache (Redis), Cognito, API Gateway (HTTP API), ECS Fargate.
 - **Infraestrutura como código:** Terraform.
-- **Ambiente local:** docker-compose com PostgreSQL, Redis, LocalStack e nginx (no papel do API Gateway).
+- **Ambiente local:** docker-compose com PostgreSQL, Redis, LocalStack e nginx (no papel do API Gateway). LocalStack escolhido em 2026-10-22, com conta gratuita e `LOCALSTACK_AUTH_TOKEN` (local e segredo no CI), a partir da etapa 1 ([ADR 0015](0015-outbox-relay-lider-e-sns-fifo.md)).
 - **Testes de integração:** Testcontainers.
 
 ## Consequências

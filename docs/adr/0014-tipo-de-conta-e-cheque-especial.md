@@ -9,6 +9,7 @@ O saldo pode ficar negativo ([ADR 0012](0012-saldo-no-lancamento-e-trava-pessimi
 ## Decisão
 - O saldo pode ficar negativo **até o limite de cheque especial**, que vem do **tipo de conta**.
 - Tipos: `FREE`, `STANDARD`, `GOLD`, `BLACK`, `DIAMOND`. Limites iniciais (em reais; no código, em centavos): Free 0, Standard 500, Gold 2.000, Black 10.000, Diamond 50.000.
+- A lista de tipos vive só no código (enum); o limite de cada tipo vem da tabela. Tipo novo = valor novo no enum + migration semeando a linha.
 - Os limites ficam numa **tabela no banco do `accounts`**, semeada por migration, com `updated_at`.
 - **Alteração do limite** por endpoint administrativo `/admin/account-types/{type}`, aberto como o resto da API até a etapa 7, quando passa a exigir um grupo de administradores no Cognito. Validação: só limite ≥ 0; a ordem entre os tipos é convenção comercial, não regra do domínio.
 - **Alteração concorrente com débito:** o débito lê o limite do tipo na própria transação, sem trava extra na tabela de tipos. Um débito em andamento usa o limite que leu; a alteração vale a partir do próximo débito. É comportamento esperado, não falha.
