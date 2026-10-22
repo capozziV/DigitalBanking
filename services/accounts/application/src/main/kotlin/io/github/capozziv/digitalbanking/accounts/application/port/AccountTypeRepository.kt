@@ -12,8 +12,14 @@ interface AccountTypeRepository {
      */
     fun findLimit(type: AccountType): OverdraftLimit
 
+    /** Returns the limit of every account type, read from the database; callers do not rely on its order. */
     fun findAll(): List<AccountTypeLimit>
 
+    /**
+     * Sets the overdraft limit and updated_at = [now] of the type in the caller's transaction and returns
+     * the stored row. Takes no account lock. Every AccountType has a seeded row, so updating no row is a
+     * configuration error and the adapter throws.
+     */
     fun updateLimit(
         type: AccountType,
         limit: OverdraftLimit,

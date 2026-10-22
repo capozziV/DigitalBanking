@@ -8,8 +8,10 @@ import io.github.capozziv.digitalbanking.accounts.application.port.TransactionRu
 import io.github.capozziv.digitalbanking.accounts.domain.Account
 import io.github.capozziv.digitalbanking.accounts.domain.AccountEvent
 import io.github.capozziv.digitalbanking.accounts.domain.AccountType
+import io.github.capozziv.digitalbanking.accounts.domain.AccountTypeLimit
 import io.github.capozziv.digitalbanking.accounts.domain.LedgerEntry
 import io.github.capozziv.digitalbanking.accounts.domain.OverdraftLimit
+import java.time.Instant
 import java.util.UUID
 
 /**
@@ -42,6 +44,11 @@ class CallLog {
             override fun findById(id: UUID): Account? = delegate.findById(id).also { record("accounts.findById") }
 
             override fun lockById(id: UUID): Account? = delegate.lockById(id).also { record("accounts.lockById") }
+
+            override fun updateType(account: Account) {
+                delegate.updateType(account)
+                record("accounts.updateType")
+            }
         }
 
     fun entries(delegate: LedgerEntryRepository): LedgerEntryRepository =
@@ -62,6 +69,12 @@ class CallLog {
     fun types(delegate: AccountTypeRepository): AccountTypeRepository =
         object : AccountTypeRepository by delegate {
             override fun findLimit(type: AccountType): OverdraftLimit = delegate.findLimit(type).also { record("types.findLimit") }
+
+            override fun updateLimit(
+                type: AccountType,
+                limit: OverdraftLimit,
+                now: Instant,
+            ): AccountTypeLimit = delegate.updateLimit(type, limit, now).also { record("types.updateLimit") }
         }
 
     fun outbox(delegate: EventOutbox): EventOutbox =

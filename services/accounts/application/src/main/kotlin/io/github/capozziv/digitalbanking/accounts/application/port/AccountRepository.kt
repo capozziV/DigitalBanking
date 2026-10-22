@@ -30,6 +30,12 @@ interface AccountRepository {
 
     fun findByOpeningIdempotencyKey(key: String): Account?
 
+    /**
+     * Writes the type of an existing account. ChangeAccountTypeUseCase calls it with the account lock held
+     * (lockById) in the same transaction, always with an account produced by Account.changeType. Only the
+     * type column changes; the account exists because it is locked, so updating no row is an unexpected
+     * error and the adapter throws (the transaction rolls back).
+     */
     fun updateType(account: Account)
 }
 
