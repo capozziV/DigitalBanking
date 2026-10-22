@@ -6,3 +6,4 @@ build/
 .scratch/
 infra/local/.env
 .superpowers/
+.DS_Store
