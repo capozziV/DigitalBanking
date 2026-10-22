@@ -3,11 +3,11 @@
 > Atualizado pelo agente coordenador ao fim de cada tarefa.
 
 **Última atualização:** 2026-10-21
-**Fase atual:** etapa 0 (fundação) implementada na branch `etapa-0-fundacao`; falta o push e o CI verde no GitHub.
+**Fase atual:** etapa 0 (fundação) implementada e enviada na branch `etapa-0-fundacao`; falta abrir o PR e ver o CI verde.
 **Próxima etapa:** 1 — `accounts` (decidir antes: persistência e concorrência no saldo).
 
 ## Concluído
-- Planejamento: arquitetura, roadmap, ADRs 0001–0011, glossário `CONTEXT.md`, agentes e fluxo com os plugins Superpowers e Matt Pocock.
+- Planejamento: arquitetura, roadmap, ADRs 0001–0011, glossário `CONTEXT.md`, agentes e fluxo com os plugins Superpowers e Matt Pocock; papéis do fluxo mapeados para os agentes do projeto no `CLAUDE.md`.
 - Decisões de 2026-10-21: Terraform, ArchUnit, Spring MVC com virtual threads, Spring Boot 4.1, ktlint, um módulo Gradle por camada, pacote raiz `io.github.capozziv.digitalbanking`, LocalStack fora da etapa 0.
 - Etapa 0 ([spec](superpowers/specs/2026-10-21-etapa-0-fundacao-design.md), [plano](superpowers/plans/2026-10-21-etapa-0-fundacao.md)), cada task revisada:
   - build: Gradle 9.8.2, catálogo de versões, `build-logic` com 3 plugins de convenção, ktlint;
@@ -33,7 +33,7 @@ docker compose -f infra/local/docker-compose.yml down -v           # derruba e a
 - Nada.
 
 ## Próximos passos
-1. Usuário: push da branch `etapa-0-fundacao` e conferir os jobs `build` e `smoke` verdes; depois merge na `main`.
+1. Usuário: abrir o PR de `etapa-0-fundacao` para `main`, conferir os jobs `build` e `smoke` verdes e fazer o merge.
 2. Decidir os itens "Antes da etapa 1" de `docs/arquitetura.md` (persistência, concorrência no saldo).
 3. Etapa 1 pelo fluxo dos skills (brainstorming → spec → plano).
 
@@ -48,9 +48,10 @@ Melhorias técnicas adiadas na revisão da etapa 0 (nenhuma bloqueia):
 - **Quando incomodar:** ruído de CDS da JVM nos testes (agente do Mockito); `webmvc` explícito no `bootstrap`; healthcheck do nginx com `127.0.0.1`.
 
 ## Com o usuário (fora do código)
-- Push dos commits (nenhum ambiente do Claude tem credencial do GitHub).
+- Abrir PRs (a CLI do GitHub da sessão não tem login; o push funciona).
 - Proteger a `main` no GitHub exigindo CI verde para merge.
 
 ## Ambiente do Claude
 - **Nuvem:** JDK 21 e Docker. Maven Central e Docker Hub limitam o IP compartilhado (`429`): usar o init script do Gradle com o espelho `maven-central.storage-download.googleapis.com` e `registry-mirrors: ["https://mirror.gcr.io"]` no `dockerd` (configuração do ambiente, fora do repo).
-- **VM do Mac:** sem Docker e sem acesso ao Docker Desktop do Mac; serve para editar e para git.
+- **Push:** funciona pela nuvem quando o repositório está conectado à sessão (clone de `github.com/capozziV/digitalbanking`); a VM do Mac não tem credencial do GitHub.
+- **VM do Mac:** sem Docker e sem acesso ao Docker Desktop do Mac; serve para editar arquivos da pasta do usuário.

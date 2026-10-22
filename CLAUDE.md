@@ -46,6 +46,22 @@ Todo trabalho no projeto passa pelos skills dos plugins **Superpowers** e **Matt
 | Fechar a branch (merge, PR) | `superpowers:finishing-a-development-branch` |
 | Editar `CLAUDE.md`, agentes ou skills | `mattpocock-skills:writing-for-agents` |
 
+## Agentes do projeto
+Quem executa cada papel do fluxo acima são os agentes de `.claude/agents/`, chamados pelo nome no `Agent`:
+
+| Papel | Agente |
+|---|---|
+| Implementar task de código Kotlin (domínio, casos de uso, adapters, migrations, testes) | `dev-kotlin` |
+| Implementar task de build, `build-logic`, docker-compose, nginx, CI, Terraform | `infra` |
+| Implementar task de frontend e BFF (etapa 9) | `dev-frontend` |
+| Revisar task, re-revisar correção, revisar a branch | `revisor` |
+| ADR, `CONTEXT.md`, README, docs de arquitetura | `documentador` |
+| Coordenar, delegar, manter `docs/status.md` | sessão principal (`coordenador`) |
+
+- Task que mistura papéis vai para o agente da maior parte do diff; o prompt cita o resto.
+- O modelo de cada despacho segue a seleção de modelo do `superpowers:subagent-driven-development`; informe-o sempre.
+- Os agentes só existem quando o repositório está conectado à sessão (clone do GitHub). Sem eles, diga isso e use um agente genérico com o arquivo do agente como parte do prompt.
+
 ## Git
 Commits e pushes saem só com o autor do usuário (capozziV <vitorcapozzi4@gmail.com>), sem trailers `Co-Authored-By` ou `Claude-Session`.
 
