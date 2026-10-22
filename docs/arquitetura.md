@@ -6,7 +6,7 @@
 - **AWS:** RDS PostgreSQL, DynamoDB, SNS, SQS + DLQ, ElastiCache (Redis), Cognito, API Gateway (HTTP API), ECS Fargate.
 - **Lint:** ktlint.
 - **Infraestrutura como código:** Terraform.
-- **Local:** docker-compose em `infra/local/` com PostgreSQL (um banco por serviço), Redis e nginx (no papel do API Gateway) e LocalStack (SNS/SQS, conta gratuita com token; a partir da etapa 1). Testes de integração com Testcontainers.
+- **Local:** docker-compose em `infra/local/` com PostgreSQL (um banco por serviço), Redis e nginx (no papel do API Gateway) e LocalStack (SNS/SQS, conta gratuita com token; entra no bloco 2 da etapa 1 e cobrirá também o DynamoDB na etapa 4). Testes de integração com Testcontainers.
 - **Frontend (etapa 9):** Angular + BFF em Node/NestJS.
 - **Diagramas:** Excalidraw.
 
@@ -42,7 +42,7 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 - O saldo fica no lançamento (`sequence` por conta e `balance_after`); não há coluna de saldo na conta. Concorrência com trava pessimista `FOR UPDATE` na conta e `UNIQUE (account_id, sequence)` como rede de segurança; `lock_timeout` configurável (padrão 2s), estouro vira `503` com `Retry-After`. Nenhuma transação do `accounts` trava duas contas.
 - O saldo pode ficar negativo até o limite de cheque especial, definido pelo tipo de conta (`FREE`, `STANDARD`, `GOLD`, `BLACK`, `DIAMOND`). Os limites ficam numa tabela do `accounts`, alterável pelo endpoint `/admin/account-types/{type}` (protegido na etapa 7). Débito acima do saldo disponível: `422` com tipo `insufficient-available-balance`.
 - Persistência com Spring JDBC (`JdbcClient`), SQL explícito e mapeamento manual.
-- Idempotência por chave no lançamento: `UNIQUE (account_id, idempotency_key)`, conferida sob a trava da conta. Nova tentativa igual devolve o lançamento original; mesma chave com outro tipo ou valor é `422 idempotency-key-reused`.
+- Idempotência por chave no lançamento: `UNIQUE (account_id, idempotency_key)`, conferida sob a trava da conta. Nova tentativa igual devolve o lançamento original; mesma chave com outro tipo ou valor é `422 idempotency-key-reused`. A abertura de conta tem chave de idempotência própria: a mesma chave devolve a conta existente.
 - `statement` no DynamoDB, chave `accountId` + `timestamp#entryId`, gravação idempotente com `PutItem` condicional.
 - (ver [ADR 0007](adr/0007-conta-e-ledger-no-accounts.md), [ADR 0008](adr/0008-statement-cqrs-dynamodb.md), [ADR 0012](adr/0012-saldo-no-lancamento-e-trava-pessimista.md), [ADR 0013](adr/0013-persistencia-com-spring-jdbc.md) e [ADR 0014](adr/0014-tipo-de-conta-e-cheque-especial.md))
 
