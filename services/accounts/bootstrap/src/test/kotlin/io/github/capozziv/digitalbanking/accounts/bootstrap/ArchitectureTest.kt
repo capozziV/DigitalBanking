@@ -12,7 +12,7 @@ class ArchitectureTest {
             .importPackages("io.github.capozziv.digitalbanking.accounts")
 
     @Test
-    fun `domain nao depende de spring nem de outras camadas`() {
+    fun `domain does not depend on spring or other layers`() {
         noClasses()
             .that()
             .resideInAPackage("..accounts.domain..")
@@ -24,7 +24,7 @@ class ArchitectureTest {
     }
 
     @Test
-    fun `application nao depende de spring nem de adapters`() {
+    fun `application does not depend on spring or adapters`() {
         noClasses()
             .that()
             .resideInAPackage("..accounts.application..")
@@ -36,7 +36,7 @@ class ArchitectureTest {
     }
 
     @Test
-    fun `adapters web e persistence sao independentes`() {
+    fun `web and persistence adapters are independent`() {
         noClasses()
             .that()
             .resideInAPackage("..adapters.web..")

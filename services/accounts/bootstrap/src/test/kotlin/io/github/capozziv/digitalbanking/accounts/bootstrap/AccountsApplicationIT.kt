@@ -23,7 +23,7 @@ class AccountsApplicationIT {
     private lateinit var environment: Environment
 
     @Test
-    fun `health responde UP com o banco UP`() {
+    fun `health is UP with database UP`() {
         val health =
             RestClient
                 .create("http://localhost:$port")
@@ -39,7 +39,7 @@ class AccountsApplicationIT {
     }
 
     @Test
-    fun `virtual threads ligadas`() {
+    fun `virtual threads are enabled`() {
         assertThat(environment.getProperty("spring.threads.virtual.enabled")).isEqualTo("true")
     }
 
