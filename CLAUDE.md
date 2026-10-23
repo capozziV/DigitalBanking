@@ -70,3 +70,9 @@ Commits e pushes saem só com o autor do usuário (capozziV <vitorcapozzi4@gmail
 
 ## Ao terminar uma tarefa
 Atualizar `docs/status.md` (o coordenador faz isso; especialistas reportam o que mudou).
+
+## Grafo do código (graphify)
+- Com `graphify-out/graph.json` presente, toda pergunta sobre o código começa por `graphify query "<pergunta>"`; use `graphify path "<A>" "<B>"` para a relação entre dois pontos e `graphify explain "<conceito>"` para um conceito. Leia arquivos de código só nas linhas que o grafo já localizou, e repita esta regra no prompt de todo agente que explore código.
+- `graphify-out/GRAPH_REPORT.md` serve para revisão ampla de arquitetura, quando `query`, `path` e `explain` não bastam.
+- Depois de mudar código, rode `graphify update .` (só AST, sem custo de API); o hook do git também reconstrói o grafo a cada commit.
+- `graphify-out/` é versionado e reescrito inteiro a cada build: o diff grande dele faz parte de todo commit e PR que mexe em código.
