@@ -6,7 +6,7 @@
 - **AWS:** RDS PostgreSQL, DynamoDB, SNS, SQS + DLQ, ElastiCache (Redis), Cognito, API Gateway (HTTP API), ECS Fargate.
 - **Lint:** ktlint.
 - **Infraestrutura como código:** Terraform.
-- **Local:** docker-compose em `infra/local/` com PostgreSQL (um banco por serviço), Redis e nginx (no papel do API Gateway); emulador AWS a definir antes da etapa 3. Testes de integração com Testcontainers.
+- **Local:** docker-compose em `infra/local/` com PostgreSQL (um banco por serviço), Redis e nginx (no papel do API Gateway) e LocalStack (SNS/SQS, conta gratuita com token; entra no bloco 2 da etapa 1 e cobrirá também o DynamoDB na etapa 4). Testes de integração com Testcontainers.
 - **Frontend (etapa 9):** Angular + BFF em Node/NestJS.
 - **Diagramas:** Excalidraw.
 
@@ -42,6 +42,7 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 - O saldo fica no lançamento (`sequence` por conta e `balance_after`); não há coluna de saldo na conta. Concorrência com trava pessimista `FOR UPDATE` na conta e `UNIQUE (account_id, sequence)` como rede de segurança; `lock_timeout` configurável (padrão 2s), estouro vira `503` com `Retry-After`. Nenhuma transação do `accounts` trava duas contas.
 - O saldo pode ficar negativo até o limite de cheque especial, definido pelo tipo de conta (`FREE`, `STANDARD`, `GOLD`, `BLACK`, `DIAMOND`). Os limites ficam numa tabela do `accounts`, alterável pelo endpoint `/admin/account-types/{type}` (protegido na etapa 7). Débito acima do saldo disponível: `422` com tipo `insufficient-available-balance`.
 - Persistência com Spring JDBC (`JdbcClient`), SQL explícito e mapeamento manual.
+- Idempotência por chave no lançamento: `UNIQUE (account_id, idempotency_key)`, conferida sob a trava da conta. Nova tentativa igual devolve o lançamento original; mesma chave com outro tipo ou valor é `422 idempotency-key-reused`. A abertura de conta tem chave de idempotência própria: a mesma chave devolve a conta existente.
 - `statement` no DynamoDB, chave `accountId` + `timestamp#entryId`, gravação idempotente com `PutItem` condicional.
 - (ver [ADR 0007](adr/0007-conta-e-ledger-no-accounts.md), [ADR 0008](adr/0008-statement-cqrs-dynamodb.md), [ADR 0012](adr/0012-saldo-no-lancamento-e-trava-pessimista.md), [ADR 0013](adr/0013-persistencia-com-spring-jdbc.md) e [ADR 0014](adr/0014-tipo-de-conta-e-cheque-especial.md))
 
@@ -58,7 +59,9 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 ### Mensageria
 - Eventos publicados via Transactional Outbox.
 - Um tópico SNS por produtor; uma fila SQS + DLQ por consumidor; consumidores idempotentes.
-- (ver [ADR 0003](adr/0003-transactional-outbox-e-mensageria.md))
+- O tópico é SNS FIFO (`accounts-events.fifo`), com `MessageGroupId` = conta e `MessageDeduplicationId` = `eventId`: ordem garantida por conta.
+- Relay (`OutboxRelay`) dentro de cada serviço, com um relay ativo por vez (trava consultiva do PostgreSQL). Falha de publicação bloqueia só a conta afetada. Outbox guardado para sempre; envelope com `eventVersion`.
+- (ver [ADR 0003](adr/0003-transactional-outbox-e-mensageria.md) e [ADR 0015](adr/0015-outbox-relay-lider-e-sns-fifo.md))
 
 ### Borda e segurança
 - **API Gateway HTTP API** substitui um gateway em Spring: roteamento por caminho, autorizador JWT nativo do Cognito, VPC Link para ALB interno.
@@ -91,12 +94,8 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 ## Em aberto
 Fonte única das decisões pendentes. Ao decidir, registre no ADR indicado (ou crie um) e remova o item daqui.
 
-**Antes da etapa 3**
-- Emulador AWS local (SNS, SQS, DynamoDB): LocalStack com conta gratuita e token (local e segredo no CI) ou emulador aberto como Moto. Desde 2026-03-23 o LocalStack exige autenticação ([ADR 0001](adr/0001-stack-kotlin-spring-boot-aws.md)).
-
 **Antes das etapas 2 a 7**
 - Avaliar ADRs próprios para a saga orquestrada com compensação (`transfers`) e para ECS Service Connect.
-- Relay do outbox dentro de cada serviço ou como processo separado ([ADR 0003](adr/0003-transactional-outbox-e-mensageria.md)).
 - Cache local (Caffeine) na frente do Redis ou só Redis ([ADR 0009](adr/0009-cache-do-extrato.md)).
 - Valor padrão do limite diário, único para todas as contas no MVP, a definir antes da etapa 6; variação por tipo de conta fica para depois do MVP ([ADR 0010](adr/0010-limite-diario-redis-lua.md)).
 - Estratégia de autenticação no ambiente local, sem Cognito ([ADR 0004](adr/0004-api-gateway-http-api-na-borda.md)).

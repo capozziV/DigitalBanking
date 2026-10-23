@@ -6,10 +6,13 @@ dependencies {
     implementation(project(":services:accounts:domain"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
+    testImplementation(project(":libs:outbox"))
     testImplementation(libs.archunit)
     testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testImplementation("org.springframework.boot:spring-boot-starter-webmvc")
-    testImplementation("org.springframework.boot:spring-boot-testcontainers")
-    testImplementation(libs.testcontainers.postgresql)
-    testImplementation(libs.testcontainers.junit.jupiter)
+
+    integrationTestImplementation(project(":libs:outbox"))
+    integrationTestImplementation("org.springframework.boot:spring-boot-starter-webmvc")
+    integrationTestImplementation("org.springframework.boot:spring-boot-starter-jdbc")
+    integrationTestImplementation(libs.testcontainers.postgresql)
+    integrationTestImplementation(libs.testcontainers.junit.jupiter)
 }

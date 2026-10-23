@@ -31,13 +31,22 @@ Registro imutável de um crédito ou débito numa conta, com o saldo resultante.
 _Código_: `LedgerEntry`
 _Evite_: transação, movimentação, entrada
 
+**Valor**:
+Número de centavos, sempre positivo, de um lançamento.
+_Código_: `Money`
+_Evite_: quantia, montante
+
+**Tipo de lançamento**:
+Indica se o lançamento é um crédito ou um débito; valores `CREDIT` e `DEBIT`.
+_Código_: `EntryKind`
+
 **Crédito**:
-Lançamento que aumenta o saldo da conta.
-_Código_: `Credit`
+Lançamento que aumenta o saldo da conta; valor de Tipo de lançamento.
+_Código_: `EntryKind.CREDIT`
 
 **Débito**:
-Lançamento que diminui o saldo da conta.
-_Código_: `Debit`
+Lançamento que diminui o saldo da conta; valor de Tipo de lançamento.
+_Código_: `EntryKind.DEBIT`
 
 **Ledger**:
 Sequência imutável de lançamentos de uma conta; a fonte da verdade do saldo.

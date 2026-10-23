@@ -6,8 +6,25 @@ spring:
       enabled: true
   datasource:
     url: ${ACCOUNTS_DB_URL:jdbc:postgresql://localhost:5432/accounts}
-    username: ${ACCOUNTS_DB_USER:accounts}
-    password: ${ACCOUNTS_DB_PASSWORD:accounts}
+    username: ${ACCOUNTS_DB_USER:accounts_app}
+    password: ${ACCOUNTS_DB_PASSWORD:accounts_app}
+  jackson:
+    deserialization:
+      # Amounts are whole cents: 1.5 must be rejected, never truncated to 1.
+      accept-float-as-int: false
+  flyway:
+    user: ${ACCOUNTS_DB_OWNER_USER:accounts_owner}
+    password: ${ACCOUNTS_DB_OWNER_PASSWORD:accounts_owner}
+    placeholders:
+      appUser: ${ACCOUNTS_DB_USER:accounts_app}
+
+accounts:
+  lock-timeout: 2s
+
+logging:
+  pattern:
+    # Correlation id of the request (MDC key of OutboxEnvelope.CORRELATION_ID_MDC_KEY) on every log line.
+    correlation: "[%X{correlationId:-}] "
 
 server:
   port: 8081

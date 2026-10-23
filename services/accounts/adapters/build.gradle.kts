@@ -3,10 +3,17 @@ plugins { id("digitalbanking.spring-module") }
 dependencies {
     implementation(project(":services:accounts:application"))
     implementation(project(":services:accounts:domain"))
+    implementation(project(":libs:outbox"))
 
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
+    implementation("org.springframework.boot:spring-boot-starter-jackson")
+    implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("tools.jackson.module:jackson-module-kotlin")
+    implementation("io.micrometer:micrometer-core")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation(libs.flyway.postgresql)
+    implementation(libs.java.uuid.generator)
+    implementation(libs.springdoc.openapi.starter.webmvc.ui)
     runtimeOnly(libs.postgresql)
 }

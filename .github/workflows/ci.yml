@@ -49,19 +49,26 @@ jobs:
         run: docker compose --env-file infra/local/.env.example -f infra/local/docker-compose.yml up --wait
       - name: Subir o servico accounts
         run: |
+          set -a
+          . infra/local/.env.example
+          set +a
           java -jar services/accounts/bootstrap/build/libs/bootstrap.jar > accounts.log 2>&1 &
       - name: Health via nginx
         run: |
-          for i in $(seq 1 60); do
-            if body=$(curl -fsS http://localhost/accounts/actuator/health) && echo "$body" | grep -q '"status":"UP"'; then
+          for _ in $(seq 1 60); do
+            if body=$(curl -fsS http://127.0.0.1/accounts/actuator/health) && echo "$body" | grep -q '"status":"UP"'; then
               echo "$body"
               exit 0
             fi
             sleep 1
           done
           echo "health nao ficou UP em 60 s" >&2
-          cat accounts.log >&2 || true
           exit 1
+      - name: Operacoes via nginx (abrir, creditar, debitar, consultar)
+        run: bash infra/local/smoke.sh http://127.0.0.1
+      - name: Log do servico em caso de falha
+        if: failure()
+        run: cat accounts.log || true
       - name: Derrubar a infra local
         if: always()
         run: docker compose --env-file infra/local/.env.example -f infra/local/docker-compose.yml down -v
