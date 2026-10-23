@@ -1,0 +1,24 @@
+meta {
+  name: Alterar limite de cheque especial
+  type: http
+  seq: 7
+}
+
+put {
+  url: {{baseUrl}}/admin/account-types/GOLD
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "overdraftLimit": 200000
+  }
+}
+
+tests {
+  test("200 com o limite (valor da migration, para nao alterar o ambiente)", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.overdraftLimit).to.equal(200000);
+  });
+}

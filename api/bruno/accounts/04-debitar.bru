@@ -1,0 +1,29 @@
+meta {
+  name: Debitar
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/accounts/{{accountId}}/debits
+  body: json
+  auth: none
+}
+
+headers {
+  Idempotency-Key: {{$guid}}
+}
+
+body:json {
+  {
+    "amount": 300,
+    "description": "debito pela colecao Bruno"
+  }
+}
+
+tests {
+  test("201 com o lancamento", function () {
+    expect(res.status).to.equal(201);
+    expect(res.body.kind).to.equal("DEBIT");
+  });
+}
