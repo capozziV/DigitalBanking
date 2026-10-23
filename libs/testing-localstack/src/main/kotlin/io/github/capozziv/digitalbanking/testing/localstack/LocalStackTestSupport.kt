@@ -34,11 +34,13 @@ object LocalStackTestSupport {
         val token = environment[AUTH_TOKEN_VARIABLE]
         if (!token.isNullOrBlank()) return token
         check(environment["CI"] != "true") { "$AUTH_TOKEN_VARIABLE is not set on CI; LocalStack tests cannot run" }
-        abort<Unit>("$AUTH_TOKEN_VARIABLE is not set; skipping LocalStack tests (load infra/local/.env into the environment)")
-        error("unreachable")
+        return abort("$AUTH_TOKEN_VARIABLE is not set; skipping LocalStack tests (load infra/local/.env into the environment)")
     }
 
-    /** A container (not started) for [services], with the token and, when configured, the egress proxy. */
+    /**
+     * A container (not started) for [services], with the token and, when [HTTPS_PROXY_VARIABLE] is set,
+     * the egress proxy. [CA_BUNDLE_VARIABLE] only applies together with the proxy, since the CA belongs to it.
+     */
     fun container(
         services: List<String>,
         environment: Map<String, String> = System.getenv(),
@@ -47,9 +49,8 @@ object LocalStackTestSupport {
             LocalStackContainer(DockerImageName.parse(IMAGE))
                 .withServices(*services.toTypedArray())
                 .withEnv(AUTH_TOKEN_VARIABLE, authToken(environment))
-        environment[HTTPS_PROXY_VARIABLE]?.takeIf { it.isNotBlank() }?.let { proxy ->
-            container.withEnv("HTTPS_PROXY", proxy).withEnv("NO_PROXY", "localhost,127.0.0.1")
-        }
+        val proxy = environment[HTTPS_PROXY_VARIABLE]?.takeIf { it.isNotBlank() } ?: return container
+        container.withEnv("HTTPS_PROXY", proxy).withEnv("NO_PROXY", "localhost,127.0.0.1")
         environment[CA_BUNDLE_VARIABLE]?.takeIf { it.isNotBlank() }?.let { caBundle ->
             container
                 .withCopyFileToContainer(MountableFile.forHostPath(caBundle), CONTAINER_CA_BUNDLE)

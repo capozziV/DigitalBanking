@@ -42,6 +42,17 @@ class LocalStackTestSupportTest {
     }
 
     @Test
+    fun `CA bundle without a proxy is ignored`() {
+        val container =
+            LocalStackTestSupport.container(
+                listOf("sns"),
+                mapOf("LOCALSTACK_AUTH_TOKEN" to "token-1", "LOCALSTACK_CA_BUNDLE" to "/some/ca.crt"),
+            )
+
+        assertThat(container.envMap).doesNotContainKeys("HTTPS_PROXY", "REQUESTS_CA_BUNDLE", "SSL_CERT_FILE")
+    }
+
+    @Test
     fun `container goes through the egress proxy and trusts its CA when configured`() {
         val container =
             LocalStackTestSupport.container(
