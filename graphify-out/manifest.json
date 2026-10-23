@@ -54,9 +54,9 @@
     "semantic_hash": ""
   },
   "libs/outbox/build.gradle.kts": {
-    "mtime": 1792694196.838885,
-    "seen": 1792714749.925942,
-    "ast_hash": "1137ffe0b6f872027e0a1a8d293165f0",
+    "mtime": 1792767785.6595616,
+    "seen": 1792768442.099468,
+    "ast_hash": "03aa0eb1b1dd67688fb84126f1bf80e8",
     "semantic_hash": ""
   },
   "libs/outbox/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/outbox/JdbcOutboxWriterIT.kt": {
@@ -732,9 +732,9 @@
     "semantic_hash": ""
   },
   "docs/superpowers/research/2026-10-22-versoes-etapa-1.md": {
-    "mtime": 1792693306.192149,
-    "seen": 1792714749.926154,
-    "ast_hash": "93ad418be4e2f2162e1dfc70d4fd7386",
+    "mtime": 1792768434.0036001,
+    "seen": 1792768442.0996485,
+    "ast_hash": "c0cd9474e3a3b23ba24da5670e6af78b",
     "semantic_hash": ""
   },
   "docs/superpowers/specs/2026-10-21-etapa-0-fundacao-design.md": {
@@ -855,6 +855,12 @@
     "mtime": 1792716711.9548297,
     "seen": 1792716940.818578,
     "ast_hash": "7e7b60cd7e10271759046c5c20918b96",
+    "semantic_hash": ""
+  },
+  "libs/outbox/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/outbox/LocalStackFifoIT.kt": {
+    "mtime": 1792768295.0751593,
+    "seen": 1792768442.0994725,
+    "ast_hash": "69538a63927c3ae65a4b8928f93b4020",
     "semantic_hash": ""
   }
 }
