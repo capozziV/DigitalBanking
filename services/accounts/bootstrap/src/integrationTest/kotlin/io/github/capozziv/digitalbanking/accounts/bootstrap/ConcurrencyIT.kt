@@ -3,6 +3,7 @@ package io.github.capozziv.digitalbanking.accounts.bootstrap
 import io.github.capozziv.digitalbanking.accounts.bootstrap.web.ApiClient
 import io.github.capozziv.digitalbanking.accounts.bootstrap.web.ApiResponse
 import io.github.capozziv.digitalbanking.accounts.bootstrap.web.assertProblem
+import io.github.capozziv.digitalbanking.accounts.bootstrap.web.retryWhileAccountBusy
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.web.server.LocalServerPort
@@ -120,11 +121,18 @@ class ConcurrencyIT : AccountsIntegrationTest() {
         idempotencyKey: String,
     ): ApiResponse = api.post("/accounts/$accountId/credits", """{"amount":$amount}""", key(idempotencyKey))
 
+    /**
+     * A debit as a well-behaved client sends it: a `503 account-busy` (lock timeout under contention) is
+     * retried after `Retry-After` with the same Idempotency-Key, so the counts below do not depend on timing.
+     */
     private fun debit(
         accountId: String,
         amount: Long,
         idempotencyKey: String,
-    ): ApiResponse = api.post("/accounts/$accountId/debits", """{"amount":$amount}""", key(idempotencyKey))
+    ): ApiResponse =
+        retryWhileAccountBusy {
+            api.post("/accounts/$accountId/debits", """{"amount":$amount}""", key(idempotencyKey))
+        }
 
     private fun key(value: String) = mapOf("Idempotency-Key" to value)
 
