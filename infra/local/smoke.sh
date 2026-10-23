@@ -16,7 +16,9 @@ call() {
     args+=(-H 'Content-Type: application/json' -H "Idempotency-Key: $(cat /proc/sys/kernel/random/uuid 2>/dev/null || uuidgen)" -d "$body")
   fi
   local status
-  status=$(curl "${args[@]}" "$base$path")
+  : > "$out"
+  # Falha de transporte (sem conexao) vira status 000, em vez de derrubar o script pelo set -e.
+  status=$(curl "${args[@]}" "$base$path") || status="000"
   if [ "$status" != "$expected" ]; then
     echo "FALHA: $method $path -> $status (esperado $expected)" >&2
     cat "$out" >&2
