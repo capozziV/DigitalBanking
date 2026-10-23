@@ -14,5 +14,6 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation(libs.flyway.postgresql)
     implementation(libs.java.uuid.generator)
+    implementation(libs.springdoc.openapi.starter.webmvc.ui)
     runtimeOnly(libs.postgresql)
 }

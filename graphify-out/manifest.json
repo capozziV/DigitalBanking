@@ -84,14 +84,14 @@
     "semantic_hash": ""
   },
   "services/accounts/adapters/build.gradle.kts": {
-    "mtime": 1792714106.035735,
-    "seen": 1792714749.9259498,
-    "ast_hash": "e1a3d20ac71b80fbbf4c9cf8e4231b1d",
+    "mtime": 1792715714.4308252,
+    "seen": 1792715733.0632732,
+    "ast_hash": "3f10eb4a7b2896a9d39a4de4a2008a2a",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/adapters/persistence/JdbcAccountRepository.kt": {
-    "mtime": 1792696268.48033,
-    "seen": 1792714749.925951,
+    "mtime": 1792715620.4428139,
+    "seen": 1792715733.0632758,
     "ast_hash": "ff3d4893a9b4a1b21a9a58b789e135c3",
     "semantic_hash": ""
   },
@@ -132,15 +132,15 @@
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/adapters/web/AccountController.kt": {
-    "mtime": 1792715086.375206,
-    "seen": 1792715140.0639458,
-    "ast_hash": "8414c6b204f008d917e4d009c379871e",
+    "mtime": 1792716006.12761,
+    "seen": 1792716102.2310643,
+    "ast_hash": "e0037a2ced491b231a77018b7dee1894",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/adapters/web/AccountTypeAdminController.kt": {
-    "mtime": 1792714203.138624,
-    "seen": 1792714749.9259634,
-    "ast_hash": "071d334d6132554b4351a66f49698a05",
+    "mtime": 1792715921.0550058,
+    "seen": 1792716102.2310672,
+    "ast_hash": "e6364c62d8826ae2a440fdfffce3c661",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/adapters/web/CorrelationIdFilter.kt": {
@@ -708,9 +708,9 @@
     "semantic_hash": ""
   },
   "docs/roadmap.md": {
-    "mtime": 1792693618.1121674,
-    "seen": 1792714749.9261136,
-    "ast_hash": "af3dcbc0bf96d100f1d7cf5b68664df9",
+    "mtime": 1792715728.3428154,
+    "seen": 1792715733.063527,
+    "ast_hash": "0b983cf3b410843313ca2b75d23c1167",
     "semantic_hash": ""
   },
   "docs/status.md": {
@@ -744,9 +744,9 @@
     "semantic_hash": ""
   },
   "docs/superpowers/specs/2026-10-22-etapa-1-accounts-design.md": {
-    "mtime": 1792694520.220221,
-    "seen": 1792714749.9261596,
-    "ast_hash": "2eab79671b7d69175a52f7c9b77b3f36",
+    "mtime": 1792715728.3468153,
+    "seen": 1792715733.0635395,
+    "ast_hash": "d48ddb2a6fa2b9071d0fc33fe9877061",
     "semantic_hash": ""
   },
   "infra/local/docker-compose.yml": {
@@ -807,6 +807,24 @@
     "mtime": 1792715017.9188051,
     "seen": 1792715140.0640595,
     "ast_hash": "35cd8ba5f41d4a05cee8d574480f5f22",
+    "semantic_hash": ""
+  },
+  "services/accounts/bootstrap/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/ConcurrencyIT.kt": {
+    "mtime": 1792715998.2591631,
+    "seen": 1792716102.2311783,
+    "ast_hash": "c753a298e28434994bfbfd25bdfd6bbb",
+    "semantic_hash": ""
+  },
+  "services/accounts/bootstrap/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/OpenApiIT.kt": {
+    "mtime": 1792715998.6318543,
+    "seen": 1792716102.2311802,
+    "ast_hash": "a0a39785a7d1f5dd9b820d0f92321a75",
+    "semantic_hash": ""
+  },
+  "services/accounts/adapters/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/adapters/web/OpenApiConfiguration.kt": {
+    "mtime": 1792715881.4188175,
+    "seen": 1792716102.2310753,
+    "ast_hash": "5085637e57a1c1ff6a2c2b6d53522ff5",
     "semantic_hash": ""
   }
 }
