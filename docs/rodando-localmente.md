@@ -85,7 +85,7 @@ A coleção fica em `api/bruno/accounts/`, com uma requisição por endpoint e `
 - **App do Bruno:** "Open Collection" → `api/bruno/accounts`, escolha o ambiente `local` e rode "Abrir conta" primeiro (ela guarda o `accountId` para as outras).
 - **Terminal** (precisa da CLI dos pré-requisitos opcionais):
   ```bash
-  cd api/bruno/accounts && bru run --env local; cd -
+  (cd api/bruno/accounts && bru run --env local)
   ```
   Esperado: `Requests 7 (7 Passed)`. A requisição de limite grava o valor da migration (`GOLD` = 200000), sem alterar o ambiente.
 
