@@ -6,12 +6,12 @@
 - Unclassified: 18 file(s) not represented in the graph (top: .bru 8, (none) 3, .properties 2)
 
 ## Summary
-- 1106 nodes · 2710 edges · 71 communities (40 shown, 31 thin omitted)
+- 1108 nodes · 2710 edges · 80 communities (45 shown, 35 thin omitted)
 - Extraction: 90% EXTRACTED · 10% INFERRED · 0% AMBIGUOUS · INFERRED: 268 edges (avg confidence: 0.89)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `48b15ccd`
+- Built from commit: `fea86460`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -19,19 +19,19 @@
 - LedgerEntry
 - IdGenerator
 - AccountApiIT
-- .record
+- Foco de revisão
 - AccountsIntegrationTest
 - OverdraftLimit
 - LocalStackFifoIT.kt
 - JdbcRepositoriesIT
-- Money
+- CallLog
 - Etapa 0 — Fundação: design
-- Bloco 1 — `accounts` gravando no outbox
+- CorrelationIdFilter.kt
 - ProblemDetailsExceptionHandler.kt
-- AccountEvent
-- .entry
-- Balance
-- assertthat
+- JdbcOutboxWriter
+- AvailableBalance
+- Money
+- uuid
 - Etapa 1 — `accounts`: design
 - LedgerEntry
 - Decisões tomadas
@@ -64,15 +64,21 @@
 - documentador.md
 - revisor.md
 - 01-create-service-databases.sh
+- .eventType
 - .record
-- 0012 — Saldo no lançamento e trava pessimista por conta
 - OutboxWriterConfiguration.kt
 - account
 - ConcurrencyIT
 - outbox-table.sql
 - V4__outbox.sql
+- ArchitectureTest
+- InMemoryAccountTypeRepository
+- Status do projeto
+- Ledger
+- AccountsApplication.kt
 - smoke.sh
-- AccountOpened
+- .inTransaction
+- .findLimit
 
 ## God Nodes (most connected - your core abstractions)
 1. `Account` - 67 edges
@@ -87,65 +93,77 @@
 10. `LedgerEntryRecorded` - 33 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `Decisão` --references--> `LedgerEntry`  [INFERRED]
-  docs/adr/0012-saldo-no-lancamento-e-trava-pessimista.md → services/accounts/domain/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/domain/LedgerEntry.kt
-- `4. Fluxos` --references--> `JdbcOutboxWriter`  [INFERRED]
-  docs/superpowers/specs/2026-10-22-etapa-1-accounts-design.md → libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/JdbcOutboxWriter.kt
-- `5. Outbox e relay (`libs/outbox`)` --references--> `JdbcOutboxWriter`  [INFERRED]
-  docs/superpowers/specs/2026-10-22-etapa-1-accounts-design.md → libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/JdbcOutboxWriter.kt
-- `9. Entrega em dois blocos` --references--> `JdbcOutboxWriter`  [INFERRED]
-  docs/superpowers/specs/2026-10-22-etapa-1-accounts-design.md → libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/JdbcOutboxWriter.kt
-- `Restrições (de `CLAUDE.md` e ADRs)` --references--> `JdbcOutboxWriter`  [INFERRED]
-  docs/superpowers/specs/2026-10-22-etapa-1-accounts-design.md → libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/JdbcOutboxWriter.kt
+- `Task 13: Documentação do bloco 1 e das decisões da etapa (Clara, `documentador`; em paralelo às Tasks 8–12)` --references--> `main()`  [INFERRED]
+  docs/superpowers/plans/2026-10-22-etapa-1-accounts.md → services/accounts/bootstrap/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/AccountsApplication.kt
+- `5. CI (GitHub Actions)` --references--> `main()`  [INFERRED]
+  docs/superpowers/specs/2026-10-21-etapa-0-fundacao-design.md → services/accounts/bootstrap/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/AccountsApplication.kt
+- `Fora de escopo (e onde foi registrado)` --references--> `main()`  [INFERRED]
+  docs/superpowers/specs/2026-10-21-etapa-0-fundacao-design.md → services/accounts/bootstrap/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/AccountsApplication.kt
+- `Task 5: Casos de uso de crédito e débito (Marina, `dev-kotlin`)` --references--> `IdempotentEntryLookup`  [INFERRED]
+  docs/superpowers/plans/2026-10-22-etapa-1-accounts.md → services/accounts/application/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/application/usecase/IdempotentEntryLookup.kt
+- `Task 10: OpenAPI, concorrência e idempotência ponta a ponta (Marina, `dev-kotlin`)` --references--> `LedgerEntryRecorded`  [INFERRED]
+  docs/superpowers/plans/2026-10-22-etapa-1-accounts.md → services/accounts/domain/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/domain/AccountEvent.kt
 
 ## Import Cycles
 - None detected.
 
-## Communities (71 total, 31 thin omitted)
+## Communities (80 total, 35 thin omitted)
 
 ### Community 0 - "LedgerEntry"
-Cohesion: 0.10
-Nodes (16): Task 5: Casos de uso de crédito e débito (Marina, `dev-kotlin`), IdempotencyKeyReusedException, IdempotentEntryLookup, RecordCreditUseCase, DebitOutcome, Recorded, Refused, RecordEntryCommand (+8 more)
+Cohesion: 0.15
+Nodes (9): DebitOutcome, Recorded, Refused, RecordEntryCommand, RecordEntryResult, SequentialIdGenerator, RecordCreditUseCaseTest, RecordDebitUseCaseTest (+1 more)
 
 ### Community 1 - "IdGenerator"
-Cohesion: 0.07
-Nodes (10): 1. Módulos e camadas, 4. Fluxos, UuidV7IdGenerator, IdGenerator, ChangeAccountTypeUseCase, GetAccountUseCase, OpenAccountUseCase, RecordDebitUseCase (+2 more)
+Cohesion: 0.06
+Nodes (13): 1. Módulos e camadas, 4. Fluxos, Restrições (de `CLAUDE.md` e ADRs), UuidV7IdGenerator, IdGenerator, ChangeAccountTypeUseCase, GetAccountUseCase, ListAccountTypesUseCase (+5 more)
 
-### Community 3 - ".record"
-Cohesion: 0.07
-Nodes (19): Ambiente de execução, Etapa 0 — Fundação: plano de implementação, Foco de revisão, Restrições globais, Task 1: Esqueleto do build (wrapper, catálogo, `build-logic`, módulos vazios, ktlint), Task 2: Regras de arquitetura (ArchUnit), Task 4: Ambiente local (docker-compose), Task 5: CI no GitHub Actions (+11 more)
+### Community 3 - "Foco de revisão"
+Cohesion: 0.13
+Nodes (14): Ambiente de execução, Etapa 0 — Fundação: plano de implementação, Foco de revisão, Restrições globais, Task 1: Esqueleto do build (wrapper, catálogo, `build-logic`, módulos vazios, ktlint), Task 2: Regras de arquitetura (ArchUnit), Task 3: Aplicação `accounts` com health do banco (Testcontainers), Task 4: Ambiente local (docker-compose) (+6 more)
 
 ### Community 4 - "AccountsIntegrationTest"
 Cohesion: 0.07
 Nodes (5): AccountsIntegrationTest, ClockWiringIT, UseCaseConfigurationIT, AccountTypeAdminApiIT, UnexpectedErrorApiIT
 
 ### Community 5 - "OverdraftLimit"
-Cohesion: 0.05
-Nodes (30): Banco digital, Clientes e contas, Consulta e avisos, Ledger, Transferências, 10. Documentação que acompanha, 2. Modelo de domínio, JdbcAccountTypeRepository (+22 more)
+Cohesion: 0.14
+Nodes (10): JdbcAccountTypeRepository, AccountTypeRepository, AccountType, BLACK, DIAMOND, FREE, GOLD, STANDARD (+2 more)
+
+### Community 8 - "CallLog"
+Cohesion: 0.14
+Nodes (6): ChangeOverdraftLimitUseCase, CallLog, DirectTransactionRunner, ChangeAccountTypeUseCaseTest, ChangeOverdraftLimitUseCaseTest, AccountTypeChanged
 
 ### Community 9 - "Etapa 0 — Fundação: design"
-Cohesion: 0.10
-Nodes (23): Ambiente do Claude, Com o usuário (fora do código), Como rodar localmente, Concluído, Em andamento, Pendências e decisões em aberto, Próximos passos, Status do projeto (+15 more)
-
-### Community 10 - "Bloco 1 — `accounts` gravando no outbox"
-Cohesion: 0.07
-Nodes (12): Bloco 1 — `accounts` gravando no outbox, Task 10: OpenAPI, concorrência e idempotência ponta a ponta (Marina, `dev-kotlin`), Task 11: Regras ArchUnit e melhorias da etapa 0 (Marina, `dev-kotlin`), Task 12: nginx, coleção Bruno e smoke (Rafael, `infra`), Task 2: Valores monetários e tipos (Marina, `dev-kotlin`), Task 3: Conta, lançamento e eventos de domínio (Marina, `dev-kotlin`), Task 6: Casos de uso de tipo e limites (Marina, `dev-kotlin`), Task 7: `libs/outbox` — envelope e writer (Marie, `dev-kotlin`; em paralelo às Tasks 2–6) (+4 more)
+Cohesion: 0.22
+Nodes (9): 2. Build e convenções, 4. Ambiente local, 5. CI (GitHub Actions), Critério de pronto, Etapa 0 — Fundação: design, Fora de escopo (e onde foi registrado), Objetivo, Restrições (de `CLAUDE.md` e ADRs) (+1 more)
 
 ### Community 11 - "ProblemDetailsExceptionHandler.kt"
-Cohesion: 0.12
-Nodes (10): Task 4: Portas e casos de uso de abrir e consultar conta (Marina, `dev-kotlin`), ProblemDetailsExceptionHandler, AccountTypeNotFoundException, InsufficientAvailableBalanceException, InvalidField, InvalidRequestException, AccountBusyException, AccountNotFoundException (+2 more)
+Cohesion: 0.07
+Nodes (23): Bloco 1 — `accounts` gravando no outbox, Task 10: OpenAPI, concorrência e idempotência ponta a ponta (Marina, `dev-kotlin`), Task 12: nginx, coleção Bruno e smoke (Rafael, `infra`), Task 13: Documentação do bloco 1 e das decisões da etapa (Clara, `documentador`; em paralelo às Tasks 8–12), Task 2: Valores monetários e tipos (Marina, `dev-kotlin`), Task 3: Conta, lançamento e eventos de domínio (Marina, `dev-kotlin`), Task 4: Portas e casos de uso de abrir e consultar conta (Marina, `dev-kotlin`), Task 5: Casos de uso de crédito e débito (Marina, `dev-kotlin`) (+15 more)
 
-### Community 12 - "AccountEvent"
+### Community 12 - "JdbcOutboxWriter"
+Cohesion: 0.23
+Nodes (4): 5. Outbox e relay (`libs/outbox`), 9. Entrega em dois blocos, JdbcOutboxWriter, OutboxEventAppender
+
+### Community 13 - "AvailableBalance"
 Cohesion: 0.18
-Nodes (4): Task 8: Esquema, usuários de banco e repositórios JDBC (Marina, `dev-kotlin`; o script de init do compose segue o padrão do Rafael), OutboxEventAppender, EventOutbox, AccountEvent
+Nodes (6): Pendências e decisões em aberto, 2. Modelo de domínio, AccountView, GetAccountUseCaseTest, AvailableBalance, currentBalance()
+
+### Community 14 - "Money"
+Cohesion: 0.09
+Nodes (6): Balance, Money, AccountTest, BalanceTest, LedgerEntryTest, MoneyTest
+
+### Community 15 - "uuid"
+Cohesion: 0.14
+Nodes (4): TransactionRunner, EntryKind, CREDIT, DEBIT
 
 ### Community 16 - "Etapa 1 — `accounts`: design"
-Cohesion: 0.14
-Nodes (15): Bloco 2 — relay e SNS FIFO, Task 14: Verificação do SNS FIFO no LocalStack (Rafael, `infra`), Task 15: Relay e publicador SNS (Marina, `dev-kotlin`), Task 16: Relay no `accounts`, LocalStack no compose e CI (Rafael, `infra`, com a configuração Spring feita pela Marina na mesma task se o diff de Kotlin for a maior parte — decidir pelo diff), 3. Esquema do banco, 5. Outbox e relay (`libs/outbox`), 6. API, 7. Testes (+7 more)
+Cohesion: 0.22
+Nodes (9): 10. Documentação que acompanha, 6. API, 7. Testes, 8. Ambiente local e CI, Critério de pronto, Etapa 1 — `accounts`: design, Fora de escopo (e onde fica registrado), Objetivo (+1 more)
 
 ### Community 17 - "LedgerEntry"
-Cohesion: 0.12
-Nodes (5): JdbcLedgerEntryRepository, LedgerEntryRepository, InMemoryLedgerEntryRepository, currentBalance(), LedgerEntry
+Cohesion: 0.06
+Nodes (22): Agentes do projeto, Ao terminar uma tarefa, Banco digital em microsserviços, Contexto (leia antes de qualquer tarefa), Fluxo de trabalho (skills), Git, Grafo do código (graphify), Regras inegociáveis (+14 more)
 
 ### Community 18 - "Decisões tomadas"
 Cohesion: 0.14
@@ -153,7 +171,7 @@ Nodes (14): Arquitetura, Borda e segurança, Cache, Contratos, Dados e consistê
 
 ### Community 21 - "AccountController.kt"
 Cohesion: 0.06
-Nodes (13): AccountController, AccountTypeAdminController, ChangeAccountTypeRequest, ChangeOverdraftLimitRequest, OpenAccountRequest, RecordEntryRequest, AccountResponse, AccountTypeLimitResponse (+5 more)
+Nodes (16): AccountController, AccountTypeAdminController, ChangeAccountTypeRequest, ChangeOverdraftLimitRequest, OpenAccountRequest, RecordEntryRequest, AccountResponse, AccountTypeLimitResponse (+8 more)
 
 ### Community 22 - "status.md"
 Cohesion: 0.20
@@ -212,8 +230,8 @@ Cohesion: 0.40
 Nodes (5): 0015 — Relay do outbox com líder único e SNS FIFO, Alternativas consideradas, Consequências, Contexto, Decisão
 
 ### Community 37 - "Account"
-Cohesion: 0.06
-Nodes (18): Agentes do projeto, Ao terminar uma tarefa, Banco digital em microsserviços, Contexto (leia antes de qualquer tarefa), Fluxo de trabalho (skills), Git, Grafo do código (graphify), Regras inegociáveis (+10 more)
+Cohesion: 0.10
+Nodes (9): JdbcAccountRepository, AccountRepository, InsertAccountResult, DUPLICATE_CUSTOMER, DUPLICATE_OPENING_KEY, INSERTED, InMemoryAccountRepository, InMemoryAccountRepositoryTest (+1 more)
 
 ### Community 38 - "dev-frontend.md"
 Cohesion: 0.50
@@ -243,13 +261,9 @@ Nodes (4): 0011 — Contratos de API, Consequências, Contexto, Decisão
 Cohesion: 0.50
 Nodes (3): Observações, springdoc e Spring Boot 4.1.x, Versões novas da etapa 1
 
-### Community 60 - ".record"
-Cohesion: 0.33
-Nodes (4): DebitResult, EntryRecorded, Recorded, Refused
-
-### Community 61 - "0012 — Saldo no lançamento e trava pessimista por conta"
-Cohesion: 0.40
-Nodes (5): 0012 — Saldo no lançamento e trava pessimista por conta, Alternativas consideradas, Consequências, Contexto, Decisão
+### Community 60 - ".eventType"
+Cohesion: 0.22
+Nodes (7): Bloco 2 — relay e SNS FIFO, Task 14: Verificação do SNS FIFO no LocalStack (Rafael, `infra`), Task 15: Relay e publicador SNS (Marina, `dev-kotlin`), Task 16: Relay no `accounts`, LocalStack no compose e CI (Rafael, `infra`, com a configuração Spring feita pela Marina na mesma task se o diff de Kotlin for a maior parte — decidir pelo diff), Task 7: `libs/outbox` — envelope e writer (Marie, `dev-kotlin`; em paralelo às Tasks 2–6), 3. Esquema do banco, OutboxEnvelope
 
 ### Community 63 - "account"
 Cohesion: 0.33
@@ -259,29 +273,41 @@ Nodes (3): account_type, account, ledger_entry
 Cohesion: 0.06
 Nodes (7): ConcurrencyIT, OpenApiIT, ApiClient, ApiResponse, isAccountBusy(), retryWhileAccountBusy(), RetryWhileAccountBusyTest
 
-### Community 78 - "AccountOpened"
+### Community 70 - "InMemoryAccountTypeRepository"
+Cohesion: 0.24
+Nodes (3): InMemoryAccountTypeRepository, ListAccountTypesUseCaseTest, AccountTypeRepository
+
+### Community 72 - "Status do projeto"
+Cohesion: 0.36
+Nodes (8): Ambiente do Claude, Com o usuário (fora do código), Como rodar localmente, Concluído, Em andamento, Próximos passos, Status do projeto, main()
+
+### Community 73 - "Ledger"
 Cohesion: 0.33
-Nodes (3): OpenAccountCommand, OpenAccountResult, AccountOpened
+Nodes (5): Banco digital, Clientes e contas, Consulta e avisos, Ledger, Transferências
+
+### Community 74 - "AccountsApplication.kt"
+Cohesion: 0.40
+Nodes (3): 3. Esqueleto do `accounts`, Testes (no `bootstrap`, que enxerga todos os módulos), AccountsApplication
 
 ## Knowledge Gaps
-- **10 isolated node(s):** `INSERTED`, `DUPLICATE_OPENING_KEY`, `DUPLICATE_CUSTOMER`, `FREE`, `STANDARD` (+5 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 262 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **31 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **10 isolated node(s):** `DUPLICATE_CUSTOMER`, `DUPLICATE_OPENING_KEY`, `INSERTED`, `BLACK`, `DIAMOND` (+5 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 264 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **35 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `AccountsIntegrationTest` connect `AccountsIntegrationTest` to `ConcurrencyIT`, `AccountApiIT`, `JdbcRepositoriesIT`, `AccountEvent`, `Etapa 1 — `accounts`: design`, `AccountsApplicationIT.kt`?**
-  _High betweenness centrality (0.133) - this node is a cross-community bridge._
+- **Why does `AccountsIntegrationTest` connect `AccountsIntegrationTest` to `ConcurrencyIT`, `AccountApiIT`, `JdbcRepositoriesIT`, `ProblemDetailsExceptionHandler.kt`, `AccountsApplicationIT.kt`, `uuid`, `.eventType`?**
+  _High betweenness centrality (0.123) - this node is a cross-community bridge._
 - **Are the 8 inferred relationships involving `Account` (e.g. with `Regras inegociáveis` and `Clientes e contas`) actually correct?**
   _`Account` has 8 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `INSERTED`, `DUPLICATE_OPENING_KEY`, `DUPLICATE_CUSTOMER` to the rest of the system?**
+- **What connects `DUPLICATE_CUSTOMER`, `DUPLICATE_OPENING_KEY`, `INSERTED` to the rest of the system?**
   _10 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `LedgerEntry` be split into smaller, more focused modules?**
-  _Cohesion score 0.09713487071977638 - nodes in this community are weakly interconnected._
-- **Why does `Etapa 1 — `accounts`: design` connect `Etapa 1 — `accounts`: design` to `Account`, `IdGenerator`, `README.md`, `OverdraftLimit`?**
-  _High betweenness centrality (0.088) - this node is a cross-community bridge._
+- **Should `IdGenerator` be split into smaller, more focused modules?**
+  _Cohesion score 0.061952074810052604 - nodes in this community are weakly interconnected._
+- **Why does `LedgerEntry` connect `LedgerEntry` to `LedgerEntry`, `IdGenerator`, `OverdraftLimit`, `JdbcRepositoriesIT`, `Status do projeto`, `Ledger`, `ProblemDetailsExceptionHandler.kt`, `AvailableBalance`, `Money`, `uuid`, `AccountController.kt`, `.record`?**
+  _High betweenness centrality (0.100) - this node is a cross-community bridge._
 - **Are the 10 inferred relationships involving `LedgerEntry` (e.g. with `Regras inegociáveis` and `Ledger`) actually correct?**
   _`LedgerEntry` has 10 INFERRED edges - model-reasoned connections that need verification._
-- **Should `IdGenerator` be split into smaller, more focused modules?**
-  _Cohesion score 0.07088989441930618 - nodes in this community are weakly interconnected._
+- **Should `AccountApiIT` be split into smaller, more focused modules?**
+  _Cohesion score 0.1111111111111111 - nodes in this community are weakly interconnected._
