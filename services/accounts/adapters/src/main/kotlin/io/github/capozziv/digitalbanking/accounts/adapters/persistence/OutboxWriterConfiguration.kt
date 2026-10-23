@@ -6,9 +6,15 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.jdbc.core.simple.JdbcClient
 import java.time.Clock
 
-/** The outbox lib has no Spring configuration of its own; the service declares its writer. */
+/**
+ * The outbox lib has no Spring configuration of its own; the service declares its writer, with the
+ * application clock (microsecond ticks, as timestamptz stores them).
+ */
 @Configuration(proxyBeanMethods = false)
 class OutboxWriterConfiguration {
     @Bean
-    fun jdbcOutboxWriter(jdbcClient: JdbcClient): JdbcOutboxWriter = JdbcOutboxWriter(jdbcClient, Clock.systemUTC())
+    fun jdbcOutboxWriter(
+        jdbcClient: JdbcClient,
+        clock: Clock,
+    ): JdbcOutboxWriter = JdbcOutboxWriter(jdbcClient, clock)
 }
