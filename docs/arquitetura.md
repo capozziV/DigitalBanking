@@ -6,7 +6,7 @@
 - **AWS:** RDS PostgreSQL, DynamoDB, SNS, SQS + DLQ, ElastiCache (Redis), Cognito, API Gateway (HTTP API), ECS Fargate.
 - **Lint:** ktlint.
 - **Infraestrutura como código:** Terraform.
-- **Local:** docker-compose em `infra/local/` com PostgreSQL (um banco por serviço), Redis e nginx (no papel do API Gateway) e LocalStack (SNS/SQS, conta gratuita com token; entra no bloco 2 da etapa 1 e cobrirá também o DynamoDB na etapa 4). Testes de integração com Testcontainers.
+- **Local:** docker-compose em `infra/local/` com PostgreSQL (um banco por serviço), Redis e nginx (no papel do API Gateway) e LocalStack (SNS/SQS, conta gratuita com token, desde o bloco 2 da etapa 1; cobrirá também o DynamoDB na etapa 4). Testes de integração com Testcontainers.
 - **Frontend (etapa 9):** Angular + BFF em Node/NestJS.
 - **Diagramas:** Excalidraw.
 
@@ -61,6 +61,7 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 - Um tópico SNS por produtor; uma fila SQS + DLQ por consumidor; consumidores idempotentes.
 - O tópico é SNS FIFO (`accounts-events.fifo`), com `MessageGroupId` = conta e `MessageDeduplicationId` = `eventId`: ordem garantida por conta.
 - Relay (`OutboxRelay`) dentro de cada serviço, com um relay ativo por vez (trava consultiva do PostgreSQL). Falha de publicação bloqueia só a conta afetada. Outbox guardado para sempre; envelope com `eventVersion`.
+- A leitura do lote pula os eventos seguintes de uma conta presa, que não ocupa o lote das outras. Limites de tempo: 2 s por publicação e 10 s por ciclo (configuráveis).
 - (ver [ADR 0003](adr/0003-transactional-outbox-e-mensageria.md) e [ADR 0015](adr/0015-outbox-relay-lider-e-sns-fifo.md))
 
 ### Borda e segurança

@@ -30,7 +30,8 @@ Entregar o `accounts` com regra de negócio real: abrir conta, creditar, debitar
 ```
 build-logic/                       # + plugin de convenção do source set integrationTest
 libs/
-└── outbox/                        # novo: envelope, writer JDBC, relay, publicador SNS
+├── outbox/                        # novo: envelope, writer JDBC, relay, publicador SNS
+└── testing-localstack/            # novo (bloco 2): helper de LocalStack só para o integrationTest
 services/accounts/
 ├── domain/                        # Account, AccountType, LedgerEntry, value objects, eventos de domínio
 ├── application/                   # *UseCase e portas
@@ -140,7 +141,7 @@ Payloads `eventVersion` 1:
 - **Recursos:** tópico `accounts-events.fifo` e fila `accounts-events-inspection.fifo` assinada nele (sem consumidor; para inspeção manual e testes), criados pelo script de init do LocalStack.
 - **Métricas Micrometer:** eventos pendentes, idade do pendente mais antigo, falhas de publicação e ciclos do relay (os gauges congelam se o relay parar; a parada aparece no contador de ciclos). `/actuator/metrics` passa a ser exposto.
 - O relay **não** afeta o `/actuator/health`.
-- Desligamento: o ciclo em andamento termina antes de a aplicação parar.
+- Desligamento: o ciclo em andamento termina antes de a aplicação parar (espera até prazo do ciclo + limite da chamada + 1 s).
 
 ## 6. API
 **Caminhos.** O nginx deixa de remover o prefixo da API: `/accounts/**` e `/admin/account-types/**` vão ao serviço como estão. Só o actuator continua sem o prefixo (`/accounts/actuator/…` → `/actuator/…`), e o smoke da etapa 0 segue igual.
@@ -188,7 +189,7 @@ Payloads `eventVersion` 1:
 - **Compose:** + `localstack` (imagem `localstack/localstack`, versão fixa, `LOCALSTACK_AUTH_TOKEN` do `.env`), com script de init criando o tópico e a fila FIFO. `.env.example` ganha a variável vazia e o aviso de que ela é necessária.
 - **PostgreSQL:** script de init cria `accounts_owner` e `accounts_app`. Exige `down -v` para recriar.
 - **CI `build`:** recebe o segredo `LOCALSTACK_AUTH_TOKEN` para os testes com LocalStack.
-- **CI `smoke`:** sobe o compose com LocalStack; pelo nginx abre conta, credita, debita e consulta, conferindo os valores.
+- **CI `smoke`:** sobe o compose com LocalStack; pelo nginx abre conta, credita, debita e consulta, conferindo os valores; depois lê a fila de inspeção e confere `AccountOpened` e dois `LedgerEntryRecorded`, em ordem.
 
 ## 9. Entrega em dois blocos
 1. **Bloco 1 — `accounts` gravando no outbox** (PR próprio)
@@ -225,7 +226,7 @@ Payloads `eventVersion` 1:
 | Juros, histórico de troca de tipo, auditoria de limite, limite diário por tipo | pós-MVP | `status.md` (já registrado) |
 
 ## Riscos
-- **LocalStack e SNS FIFO:** a documentação não confirma o suporte a FIFO. Mitigação: primeira task do bloco 2.
+- **LocalStack e SNS FIFO:** resolvido na Task 14 — o LocalStack `2026.10.2` suporta SNS FIFO.
 - **springdoc e Spring Boot 4.1:** compatibilidade não confirmada. Mitigação: primeira task do bloco 1, com plano B em YAML.
 - **Plano gratuito do LocalStack:** só uso não comercial, dentro da política de uso justo no CI; se mudar, a alternativa aberta (MiniStack, Moto) volta à mesa.
 - **Escopo:** a etapa 1 absorveu parte da etapa 3. Mitigação: dois blocos com PRs independentes.

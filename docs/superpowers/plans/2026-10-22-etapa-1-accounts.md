@@ -300,44 +300,50 @@
 ### Task 14: Verificação do SNS FIFO no LocalStack (Rafael, `infra`)
 
 **Files:**
-- Modify: `libs/outbox/build.gradle.kts` (+ AWS SDK `sns`, `sqs` no `integrationTest`; `testcontainers-localstack`)
-- Test: `libs/outbox/src/integrationTest/kotlin/.../outbox/LocalStackFifoIT.kt`
+- Create: `libs/testing-localstack` (módulo `:libs:testing-localstack`, sem Spring, consumido só por `integrationTestImplementation`): `LocalStackTestSupport` com `IMAGE` (`localstack/localstack:2026.10.2`), `authToken(env)` (sem token: pula fora do CI e falha com `CI=true`), `container(services, env)`, `snsClient` e `sqsClient`; expõe em `api` o SDK `sns`/`sqs` e o `testcontainers-localstack`
+- Modify: `libs/outbox/build.gradle.kts` (`integrationTestImplementation(project(":libs:testing-localstack"))`), `settings.gradle.kts`, `build-logic/.../digitalbanking.integration-test.gradle.kts` (presença do token e `CI` como entradas do `integrationTest`, sem guardar o valor)
+- Test: `libs/outbox/src/integrationTest/kotlin/.../outbox/LocalStackFifoIT.kt`, `libs/testing-localstack/src/test/.../LocalStackTestSupportTest.kt`
 
-- [ ] **Step 1:** IT com `LocalStackContainer` (imagem fixa da Task 1, token por variável de ambiente): cria tópico `t.fifo` e fila `q.fifo` com assinatura `RawMessageDelivery=false`; publica A1, B1, A2, B2, A3 (`MessageGroupId` A/B) e A2 repetido com o mesmo `MessageDeduplicationId`; lê a fila → por grupo, ordem A1, A2, A3 e B1, B2; sem duplicata de A2; atributos `eventType` e `correlationId` presentes.
-- [ ] **Step 2:** Rodar. **Se falhar por falta de suporte do LocalStack, parar e reportar ao coordenador** (decisão do usuário).
-- [ ] **Step 3:** Commit `test(outbox): sns fifo no localstack`.
+- [x] **Step 1:** IT com `LocalStackContainer` (imagem fixa da Task 1, token por variável de ambiente): cria tópico `t.fifo` e fila `q.fifo` com assinatura `RawMessageDelivery=false`; publica A1, B1, A2, B2, A3 (`MessageGroupId` A/B) e A2 repetido com o mesmo `MessageDeduplicationId`; lê a fila → por grupo, ordem A1, A2, A3 e B1, B2; sem duplicata de A2; atributos `eventType` e `correlationId` presentes.
+- [x] **Step 2:** Rodar. **Se falhar por falta de suporte do LocalStack, parar e reportar ao coordenador** (decisão do usuário). Resultado: o LocalStack `2026.10.2` suporta SNS FIFO → SQS FIFO.
+- [x] **Step 3:** Commit `test(outbox): sns fifo no localstack`.
 
 ### Task 15: Relay e publicador SNS (Marina, `dev-kotlin`)
 
 **Files:**
-- Create em `libs/outbox/src/main/kotlin/.../outbox/`: `EventPublisher.kt`, `SnsEventPublisher.kt`, `OutboxStore.kt`, `JdbcOutboxStore.kt`, `OutboxRelay.kt`, `OutboxRelaySettings.kt`, `OutboxMetrics.kt`; completar `OutboxEnvelope.kt`
-- Test: `libs/outbox/src/test/kotlin/.../outbox/OutboxRelayTest.kt` (fakes de `OutboxStore` e `EventPublisher`), `libs/outbox/src/integrationTest/kotlin/.../outbox/JdbcOutboxStoreIT.kt`
+- Create em `libs/outbox/src/main/kotlin/.../outbox/`: `PendingEvent.kt`, `EventPublisher.kt`, `SnsEventPublisher.kt`, `OutboxStore.kt`, `JdbcOutboxStore.kt`, `OutboxRelay.kt`, `OutboxRelaySettings.kt`, `OutboxMetrics.kt`; completar `OutboxEnvelope.kt` (`toJson`); índice `outbox_stuck_idx` no DDL modelo
+- Create: `services/accounts/.../db/migration/V6__outbox_stuck_idx.sql` (o `V4` já está aplicado)
+- Test: `libs/outbox/src/test/kotlin/.../outbox/OutboxRelayTest.kt` (fakes de `OutboxStore` e `EventPublisher`), `OutboxRelaySettingsTest.kt`, `OutboxEnvelopeTest.kt`, `OutboxMetricsTest.kt`, `SnsEventPublisherTest.kt`; `libs/outbox/src/integrationTest/kotlin/.../outbox/JdbcOutboxStoreIT.kt`, `SnsEventPublisherIT.kt`
 
 **Interfaces:**
 - Consumes: Tasks 7 e 14.
 - Produces:
   - `data class PendingEvent(val position: Long, val eventId: UUID, val aggregateId: String, val eventType: String, val eventVersion: Int, val payloadJson: String, val correlationId: String?, val occurredAt: Instant, val attempts: Int)`.
   - `interface EventPublisher { fun publish(event: PendingEvent) }` — lança exceção em falha.
-  - `class SnsEventPublisher(snsClient: SnsClient, topicArn: String) : EventPublisher` — corpo = `OutboxEnvelope.toJson(event)` (campos da spec, seção 5), `MessageGroupId = aggregateId`, `MessageDeduplicationId = eventId`, atributos `eventType` e `correlationId` (este só se não nulo).
-  - `interface OutboxStore { fun <T> asLeader(block: () -> T): T?; fun fetchPending(limit: Int): List<PendingEvent>; fun markPublished(position: Long, at: Instant); fun markFailed(position: Long, error: String) }` — `asLeader` abre transação, tenta `pg_try_advisory_xact_lock(lockKey)` e devolve `null` sem executar `block` se não conseguir.
-  - `data class OutboxRelaySettings(val batchSize: Int = 100, val alertAfterAttempts: Int = 10, val lockKey: Long)`.
-  - `class OutboxRelay(store, publisher, settings, clock, metrics: OutboxMetrics) { fun runCycle() }` — algoritmo da spec, seção 5, passos 1–4.
-  - `class OutboxMetrics(registry: MeterRegistry)` — gauges `outbox.pending`, `outbox.oldest.pending.age` (segundos) e contador `outbox.publish.failures`.
+  - `class SnsEventPublisher(snsClient: SnsClient, topicArn: String, publishTimeout: Duration) : EventPublisher` — corpo = `OutboxEnvelope.toJson(event)` (campos da spec, seção 5), `MessageGroupId = aggregateId`, `MessageDeduplicationId = eventId`, atributos `eventType` e `correlationId` (este só se não nulo); `apiCallTimeout = publishTimeout` em cada `PublishRequest`; `publishTimeout` sem padrão.
+  - `interface OutboxStore { fun <T : Any> asLeader(lockKey: Long, block: () -> T): T?; fun fetchPending(limit: Int): List<PendingEvent>; fun markPublished(position: Long, at: Instant); fun markFailed(position: Long, error: String); fun backlog(now: Instant): OutboxBacklog }` — `asLeader` abre transação, tenta `pg_try_advisory_xact_lock(lockKey)` e devolve `null` sem executar `block` se não conseguir. `fetchPending` lê os pendentes em ordem de `position` e pula os eventos de conta presa (conta com evento pendente anterior e `attempts > 0`); só a cabeça da conta presa entra no lote. `markFailed` incrementa `attempts` e grava `last_error`. `backlog` conta todos os pendentes e a idade do mais antigo, fora da transação de líder.
+  - `data class OutboxBacklog(val pending: Long, val oldestAge: Duration?)`.
+  - `class JdbcOutboxStore(jdbcClient: JdbcClient, transactions: TransactionOperations) : OutboxStore` — leitura do lote com `not exists` apoiada nos índices parciais `outbox_unpublished_idx` e `outbox_stuck_idx (aggregate_id, position) where published_at is null and attempts > 0`.
+  - `data class OutboxRelaySettings(val batchSize: Int = 100, val alertAfterAttempts: Int = 10, val lockKey: Long, val publishTimeout: Duration = Duration.ofSeconds(2), val maxCycleDuration: Duration = Duration.ofSeconds(10))` — valores positivos; `lockKey` constante e única por serviço, distinta de outras travas consultivas do banco.
+  - `class OutboxRelay(store, publisher, settings, clock, metrics: OutboxMetrics) { fun runCycle() }` — algoritmo da spec, seção 5, passos 1–4. O prazo do ciclo (`maxCycleDuration`) é conferido antes de cada evento; estourado, um `WARN` e o lote termina (pior caso: `maxCycleDuration + publishTimeout`). Falha abaixo do limiar: `WARN` sem stack trace; no limiar: `ERROR` com a exceção. Erro de banco no `markPublished` propaga.
+  - `class OutboxMetrics(registry: MeterRegistry)` — gauges `outbox.pending`, `outbox.oldest.pending.age` (segundos) e contadores `outbox.publish.failures` e `outbox.relay.cycles` (ciclos concluídos, com ou sem liderança).
 
-- [ ] **Step 1:** Testes unitários do relay: publica em ordem de `position`; falha no 2º evento da conta A → 3º evento de A não é publicado no ciclo, eventos de B são; `markFailed` com a mensagem do erro; log `ERROR` quando `attempts + 1 >= alertAfterAttempts` (capturar com appender de teste); sem liderança → nada lido nem publicado.
-- [ ] **Step 2:** IT do `JdbcOutboxStore`: dois `asLeader` concorrentes → só um executa o bloco; `fetchPending` respeita o índice parcial e a ordem.
-- [ ] **Step 3:** Rodar → falha; implementar; passa; `./gradlew build` verde.
-- [ ] **Step 4:** Commit `feat(outbox): relay líder e publicador sns fifo`.
+- [x] **Step 1:** Testes unitários do relay: publica em ordem de `position`; falha no 2º evento da conta A → 3º evento de A não é publicado no ciclo, eventos de B são; conta presa não impede eventos de outras contas no ciclo seguinte; `markFailed` com a mensagem do erro; log `ERROR` quando `attempts + 1 >= alertAfterAttempts` (capturar com appender de teste); prazo do ciclo; sem liderança → nada lido nem publicado.
+- [x] **Step 2:** IT do `JdbcOutboxStore`: dois `asLeader` concorrentes → só um executa o bloco; `fetchPending` respeita os índices parciais, a ordem e pula conta presa; plano sem `Seq Scan` com outbox grande.
+- [x] **Step 3:** Rodar → falha; implementar; passa; `./gradlew build` verde.
+- [x] **Step 4:** Commit `feat(outbox): relay líder e publicador sns fifo`.
 
 ### Task 16: Relay no `accounts`, LocalStack no compose e CI (Rafael, `infra`, com a configuração Spring feita pela Marina na mesma task se o diff de Kotlin for a maior parte — decidir pelo diff)
 
 **Files:**
-- Create: `services/accounts/bootstrap/src/main/kotlin/.../bootstrap/OutboxRelayConfiguration.kt` (`@EnableScheduling`, beans de `SnsClient`, `SnsEventPublisher`, `JdbcOutboxStore`, `OutboxRelay`; `@Scheduled(fixedDelayString = "\${accounts.outbox.poll-interval:500ms}")` chamando `runCycle`; desligamento gracioso)
-- Modify: `application.yml` (`accounts.outbox.*`, `accounts.aws.endpoint`, `accounts.aws.region`, `accounts.aws.topic-arn`; `management.endpoints.web.exposure.include: health,metrics`), `infra/local/docker-compose.yml` (+ `localstack`, imagem fixa, `LOCALSTACK_AUTH_TOKEN`, healthcheck), `infra/local/localstack/init/ready.d/01-accounts-topic.sh` (tópico `accounts-events.fifo`, fila `accounts-events-inspection.fifo`, assinatura), `infra/local/.env.example`, `.github/workflows/ci.yml` (segredo no `build` e no `smoke`; smoke lê a fila de inspeção e confere `AccountOpened` e dois `LedgerEntryRecorded`)
-- Test: `.../bootstrap/OutboxRelayIT.kt` (base `AccountsIntegrationTest` + LocalStack)
+- Create: `services/accounts/bootstrap/src/main/kotlin/.../bootstrap/OutboxRelayConfiguration.kt` (`@EnableScheduling`, `@ConditionalOnBooleanProperty("accounts.outbox.relay-enabled", matchIfMissing = true)`; beans de `OutboxRelaySettings` com `RELAY_LOCK_KEY`, `AwsCredentialsProvider`, `SnsClient` com `apiCallTimeout`/`apiCallAttemptTimeout` = `publishTimeout`, `SnsEventPublisher(snsClient, topicArn, settings.publishTimeout)`, `JdbcOutboxStore(jdbcClient, transactionTemplate)`, `OutboxMetrics`, `OutboxRelay` e `OutboxRelayScheduler`), `OutboxRelayProperties` e `AwsProperties` (`@ConfigurationProperties`)
+- Create: `.../bootstrap/OutboxRelayScheduler.kt` — `@Scheduled(fixedDelayString = "\${accounts.outbox.poll-interval:500ms}")` chamando `runCycle`; desligamento gracioso próprio (`DisposableBean`: nenhum ciclo novo e espera o ciclo em andamento por `maxCycleDuration + publishTimeout + 1 s`); bean com `@DependsOn("taskScheduler")`, para ser destruído antes do agendador do Boot e antes do pool de conexões
+- Modify: `application.yml` (`accounts.outbox.*` com `relay-enabled`, `batch-size`, `alert-after-attempts`, `publish-timeout`, `max-cycle-duration`, `poll-interval`; `accounts.aws.endpoint`, `accounts.aws.region`, `accounts.aws.topic-arn`; `management.endpoints.web.exposure.include: health,metrics`), `services/accounts/bootstrap/build.gradle.kts` (`libs/outbox` em `implementation`, `libs/testing-localstack` no `integrationTest`, scripts de init do LocalStack como entrada com caminho relativo), `infra/local/docker-compose.yml` (+ `localstack`, imagem fixa, `LOCALSTACK_AUTH_TOKEN`, healthcheck em `python3` pelo `/_localstack/init/ready`), `infra/local/localstack/init/ready.d/01-accounts-topic.sh` (tópico `accounts-events.fifo`, fila `accounts-events-inspection.fifo`, assinatura com `RawMessageDelivery=true`), `infra/local/.env.example`, `infra/local/smoke.sh` (lê a fila de inspeção e confere `AccountOpened` e dois `LedgerEntryRecorded`, em ordem), `.github/workflows/ci.yml` (segredo no `build` e no `smoke`), `docs/rodando-localmente.md`
+- Modify: `AccountsIntegrationTest` (`accounts.outbox.relay-enabled=false` nos ITs que não exercitam o relay)
+- Test: `.../bootstrap/OutboxRelayIT.kt` (base `AccountsIntegrationTest` + LocalStack), `.../bootstrap/OutboxRelayUnreachableBrokerIT.kt` (endpoint inválido, sem LocalStack), `.../bootstrap/OutboxRelaySchedulerTest.kt` (unitário)
 
-- [ ] **Step 1:** `OutboxRelayIT`: operações em duas contas → na fila de inspeção, por conta, os eventos na ordem de `sequence`, com `eventType` e `correlationId`; **dois `OutboxRelay` rodando `runCycle` em paralelo em loop** → nenhum evento duplicado nem fora de ordem; com o endpoint do SNS inválido, `attempts` cresce e o `/actuator/health` continua `UP`.
-- [ ] **Step 2:** Rodar → falha; implementar; passa; `./gradlew build` verde; compose saudável com LocalStack; `actionlint` sem erros.
-- [ ] **Step 3:** Commit `feat(accounts): relay do outbox publicando no sns fifo`.
+- [x] **Step 1:** `OutboxRelayIT`: operações em duas contas → na fila de inspeção, por conta, os eventos na ordem de `sequence`, com `eventType` e `correlationId`; **dois `OutboxRelay` rodando `runCycle` em paralelo em loop** → nenhum evento duplicado nem fora de ordem; métricas do relay no actuator. `OutboxRelayUnreachableBrokerIT`: com o endpoint do SNS inválido, `attempts` cresce e o `/actuator/health` continua `UP`; o agendador do relay depende do `taskScheduler`.
+- [x] **Step 2:** Rodar → falha; implementar; passa; `./gradlew build` verde; compose saudável com LocalStack; `actionlint` sem erros.
+- [x] **Step 3:** Commit `feat(accounts): relay do outbox publicando no sns fifo`.
 
 **Fim do bloco 2:** revisão da branch pela Beatriz, verificação, PR, `docs/status.md` atualizado pelo coordenador.

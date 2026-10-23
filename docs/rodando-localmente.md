@@ -35,7 +35,7 @@ Preencha `LOCALSTACK_AUTH_TOKEN` no `infra/local/.env`. Os outros valores do `.e
 ```bash
 docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml up --wait
 ```
-O comando volta quando os quatro contêineres estão saudáveis. O LocalStack só fica saudável depois que o script de `infra/local/localstack/init/ready.d/` cria o tópico `accounts-events.fifo` e a fila `accounts-events-inspection.fifo`, assinada nele. O script de init do PostgreSQL (roles `accounts_owner` e `accounts_app`, banco `accounts`) só roda com volume novo: se mudar senhas ou o script, recrie com `down -v` (passo 8).
+O comando volta quando os quatro contêineres estão saudáveis. O LocalStack só fica saudável depois que o script de `infra/local/localstack/init/ready.d/` cria o tópico `accounts-events.fifo` e a fila `accounts-events-inspection.fifo`, assinada nele. O script de init do PostgreSQL (roles `accounts_owner` e `accounts_app`, banco `accounts`) só roda com volume novo: se mudar senhas ou o script, recrie com `down -v` (passo 8). Sem o token, o `up --wait` volta com erro porque o LocalStack encerra, mas PostgreSQL, Redis e nginx ficam de pé.
 
 ## 3. Build e testes
 O build completo compila, roda o ktlint, os testes unitários, o ArchUnit e os testes de integração, que precisam do Docker. Os testes com LocalStack leem o token do ambiente, então carregue o `.env` antes:
@@ -63,7 +63,7 @@ Primeiro o health, que deve responder `"status":"UP"`; depois o smoke, que abre 
 curl http://localhost/accounts/actuator/health
 infra/local/smoke.sh http://localhost
 ```
-O smoke é o mesmo que roda no CI e termina com `OK: eventos da conta <id> na fila accounts-events-inspection.fifo: AccountOpened LedgerEntryRecorded:1 LedgerEntryRecorded:2`. Ele apaga da fila só as mensagens da conta que criou. A mesma sequência à mão:
+O smoke é o mesmo que roda no CI e termina com `OK: eventos da conta <id> na fila accounts-events-inspection.fifo: AccountOpened LedgerEntryRecorded:1 LedgerEntryRecorded:2`. Ele apaga da fila só as mensagens da conta que criou; as de outras contas ficam escondidas por 2 minutos depois do smoke. Como a fila não tem consumidor, ela acumula: se o smoke não achar os próprios eventos, recrie o ambiente com `down -v`. A mesma sequência à mão:
 ```bash
 ACCOUNT_ID=$(curl -sS -X POST http://localhost/accounts \
   -H 'Content-Type: application/json' -H "Idempotency-Key: $(uuidgen)" \
