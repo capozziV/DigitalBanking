@@ -372,9 +372,9 @@
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/build.gradle.kts": {
-    "mtime": 1792713452.7478945,
-    "seen": 1792714749.9260292,
-    "ast_hash": "2f8af90f86d6c7ed4622b0c058ea93cd",
+    "mtime": 1792716381.6468248,
+    "seen": 1792716479.5165415,
+    "ast_hash": "0f0eba7744f5ca3dbff5b68e45662673",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/AccountsApplicationIT.kt": {
@@ -438,9 +438,9 @@
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/ArchitectureTest.kt": {
-    "mtime": 1792692508.3683095,
-    "seen": 1792714749.9260464,
-    "ast_hash": "de51a8931868c7b09b78650fe629a25b",
+    "mtime": 1792716380.670825,
+    "seen": 1792716479.5165694,
+    "ast_hash": "4ae9569bf9bf1b8ee2a67a0131ada368",
     "semantic_hash": ""
   },
   "services/accounts/domain/build.gradle.kts": {
@@ -588,9 +588,9 @@
     "semantic_hash": ""
   },
   ".github/workflows/ci.yml": {
-    "mtime": 1792692508.365672,
-    "seen": 1792714749.9260862,
-    "ast_hash": "59329f648d0c1eb568f72e65b7338044",
+    "mtime": 1792716475.5548263,
+    "seen": 1792716479.5166142,
+    "ast_hash": "cbe01b6b6b18ee5c3063a06792c2ba52",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -825,6 +825,24 @@
     "mtime": 1792715881.4188175,
     "seen": 1792716102.2310753,
     "ast_hash": "5085637e57a1c1ff6a2c2b6d53522ff5",
+    "semantic_hash": ""
+  },
+  "api/bruno/accounts/bruno.json": {
+    "mtime": 1792716475.5573888,
+    "seen": 1792716479.5163977,
+    "ast_hash": "b5926122e3d2d976acdfa2bf3470917e",
+    "semantic_hash": ""
+  },
+  "infra/local/smoke.sh": {
+    "mtime": 1792716475.5588262,
+    "seen": 1792716479.5164242,
+    "ast_hash": "ff6154f34f9262471f9c5633774fabac",
+    "semantic_hash": ""
+  },
+  "docs/rodando-localmente.md": {
+    "mtime": 1792716475.5573888,
+    "seen": 1792716479.5166533,
+    "ast_hash": "27460482e48575e088f3becd196113b9",
     "semantic_hash": ""
   }
 }

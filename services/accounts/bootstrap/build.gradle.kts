@@ -6,6 +6,7 @@ dependencies {
     implementation(project(":services:accounts:domain"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
+    testImplementation(project(":libs:outbox"))
     testImplementation(libs.archunit)
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 
