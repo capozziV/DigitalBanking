@@ -53,6 +53,7 @@ api/bruno/accounts/                # coleção Bruno
 - **`AccountType`:** enum `FREE`, `STANDARD`, `GOLD`, `BLACK`, `DIAMOND`. A lista de tipos vive só no código; o limite de cada tipo vem da tabela, pela porta `AccountTypeRepository`.
 - **`LedgerEntry`:** imutável: `id`, `accountId`, `sequence`, `kind` (`CREDIT`/`DEBIT`), `amount`, `balanceAfter`, `description`, `idempotencyKey`, `createdAt`.
 - **Value objects:** `Money` (centavos, `Long`, > 0 para valores de lançamento), `Balance` (pode ser negativo), `OverdraftLimit` (≥ 0), `AvailableBalance` (saldo + limite).
+- **Estouro de `Long`:** `AvailableBalance` satura em `Long.MAX_VALUE` em vez de estourar. Crédito que faria o saldo passar de `Long.MAX_VALUE` continua recusado com `400 validation-error`.
 - **Recusa como resultado, não exceção:** `debit` devolve um tipo selado (`Recorded` | `Refused`). Exceções ficam para erros de verdade (conta inexistente, validação, timeout da trava).
 - **Eventos de domínio:** `AccountOpened`, `LedgerEntryRecorded`, `AccountTypeChanged`, no `domain`. O caso de uso os converte no envelope do `libs/outbox`.
 - **Conta nova:** nasce `FREE`, sem lançamentos (saldo 0 implícito); o primeiro lançamento tem `sequence` 1.
@@ -89,7 +90,7 @@ api/bruno/accounts/                # coleção Bruno
    - `kind` ou `amount` diferente → `422 idempotency-key-reused`.
 4. Lê o último lançamento (saldo e `sequence` n) e o limite do tipo da conta.
 5. `account.debit(...)`:
-   - `Refused` → `422 insufficient-available-balance`, nada gravado, log `INFO` e métrica;
+   - `Refused` → `422 insufficient-available-balance`, nada gravado; no adapter web, log `INFO` (com `accountId` e `availableBalance`) e contador Micrometer `accounts.debit.refused`;
    - `Recorded` → `INSERT` do lançamento (`sequence` n+1) e `INSERT` do `LedgerEntryRecorded` no outbox.
 6. Commit e `201`. Violação de `UNIQUE` neste ponto indica bug (a trava deveria impedir): erro interno com log `ERROR`.
 
@@ -103,7 +104,9 @@ api/bruno/accounts/                # coleção Bruno
 
 **Consultar** (`GetAccountUseCase`): conta, último lançamento e limite do tipo, sem trava, sempre do banco.
 
-**Correlation ID:** filtro mínimo no adapter web do `accounts` lê `X-Correlation-Id` ou gera um UUID, põe no MDC e devolve no header da resposta. O `JdbcOutboxWriter` lê do MDC. O filtro muda para a `libs/observabilidade` na etapa 7.
+**Relógio:** um relógio único do serviço, com precisão de microssegundos (o que o `timestamptz` guarda), usado pelos casos de uso que gravam lançamento ou alteram limite e pelo `JdbcOutboxWriter`. O repositório de lançamentos recusa `createdAt` mais fino que microssegundos. Assim, uma nova tentativa idempotente devolve exatamente o corpo da primeira resposta.
+
+**Correlation ID:** filtro mínimo no adapter web do `accounts` lê `X-Correlation-Id` ou gera um UUID (regra de validação na seção 6), põe no MDC e devolve no header da resposta. O `JdbcOutboxWriter` lê do MDC. O filtro muda para a `libs/observabilidade` na etapa 7.
 
 ## 5. Outbox e relay (`libs/outbox`)
 **Envelope** (JSON publicado no SNS):
@@ -143,7 +146,7 @@ Payloads `eventVersion` 1:
 
 | Endpoint | Sucesso | Erros |
 |---|---|---|
-| `POST /accounts` (`Idempotency-Key`) `{customerId}` | `201` conta nova; `200` nova tentativa | `400`, `409 customer-already-has-account` |
+| `POST /accounts` (`Idempotency-Key`) `{customerId}` | `201` conta nova; `200` nova tentativa | `400`, `409 customer-already-has-account`, `422 idempotency-key-reused` (chave usada por outro cliente) |
 | `GET /accounts/{id}` | `200` `{id, customerId, type, balance, overdraftLimit, availableBalance}` | `404 account-not-found` |
 | `POST /accounts/{id}/credits` (`Idempotency-Key`) `{amount, description?}` | `201` lançamento; `200` nova tentativa | `400`, `404`, `422 idempotency-key-reused`, `503 account-busy` |
 | `POST /accounts/{id}/debits` (`Idempotency-Key`) `{amount, description?}` | `201`; `200` | os mesmos + `422 insufficient-available-balance` (com `availableBalance`) |
@@ -152,8 +155,10 @@ Payloads `eventVersion` 1:
 | `PUT /admin/account-types/{type}` `{overdraftLimit}` | `200` | `400`, `404 account-type-not-found` |
 
 - Valores em centavos, inteiros. JSON em camelCase. `amount` > 0; `description` até 140 caracteres; só real, sem campo de moeda.
-- `Idempotency-Key`: 1 a 255 caracteres (UUID recomendado). Ausente → `400 missing-idempotency-key`. Escopo da chave: a conta (crédito/débito) ou a abertura de conta.
+- `Idempotency-Key`: 1 a 255 caracteres (UUID recomendado). A presença é verificada antes do corpo: ausente → `400 missing-idempotency-key`, mesmo com corpo inválido. O tamanho é validado junto com o corpo. Escopo da chave: a conta (crédito/débito) ou a abertura de conta. Chave de abertura reutilizada por outro cliente → `422 idempotency-key-reused`.
+- `X-Correlation-Id` recebido é reaproveitado se tiver de 1 a 128 caracteres em `[A-Za-z0-9._\-=+/]`; senão, o serviço gera um UUID.
 - Problem Details (RFC 9457) com `type` relativo `/problems/<slug>`. `400 validation-error` lista os campos inválidos. `503 account-busy` com `Retry-After: 1`.
+- Qualquer endpoint pode responder `500 internal-error`, com detalhe genérico e log `ERROR` com o correlation ID.
 - Resposta do lançamento: `{id, accountId, sequence, kind, amount, balanceAfter, description, createdAt}`.
 - **OpenAPI** gerado do código com springdoc, se houver versão compatível com o Spring Boot 4.1 (verificado na primeira task do bloco 1). Se não houver, contrato em YAML escrito à mão e validado num teste.
 - **Coleção Bruno** em `api/bruno/accounts/`: uma requisição por endpoint, `Idempotency-Key` gerada a cada envio.
@@ -213,6 +218,7 @@ Payloads `eventVersion` 1:
 | Vários relays divididos por conta | se a vazão exigir | ADR 0015 |
 | Mover o filtro de correlation ID para `libs/observabilidade` | etapa 7 | `roadmap.md` |
 | Proteger `/admin` com grupo de administradores | etapa 7 | `roadmap.md` |
+| Tratar exceções de segurança (`AccessDeniedException`, `AuthenticationException`) e desconexão do cliente fora do handler genérico de 500 | etapa 7 | `roadmap.md` |
 | Listar lançamentos (extrato) | etapa 4 (`statement`) | `roadmap.md` |
 | Encerrar ou bloquear conta | sem regra definida | `status.md` → débito técnico |
 | Juros, histórico de troca de tipo, auditoria de limite, limite diário por tipo | pós-MVP | `status.md` (já registrado) |

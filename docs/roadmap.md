@@ -9,7 +9,7 @@
 | 4 | `statement` | CQRS com DynamoDB, `PutItem` condicional; listagem de lançamentos (extrato) |
 | 5 | Cache do extrato | Cache-aside da 1ª página, TTL com jitter, invalidação por evento, fallback |
 | 6 | Limite diário | Redis + Lua, reserva idempotente, reconstrução a partir do PostgreSQL |
-| 7 | Borda e identidade | `customer`, Cognito, API Gateway HTTP API (autorizador JWT + VPC Link), validação JWT nos serviços, correlation ID ponta a ponta em `libs/observabilidade` (recebe o filtro mínimo criado no `accounts` na etapa 1); proteger `/admin` com grupo de administradores; restringir detalhes do `/actuator/health` |
+| 7 | Borda e identidade | `customer`, Cognito, API Gateway HTTP API (autorizador JWT + VPC Link), validação JWT nos serviços, correlation ID ponta a ponta em `libs/observabilidade` (recebe o filtro mínimo criado no `accounts` na etapa 1); proteger `/admin` com grupo de administradores; restringir detalhes do `/actuator/health`; exceções de segurança e desconexão do cliente fora do handler genérico de 500 |
 | 8 | Acabamento | Testes de contrato, Terraform em `terraform/`, imagem Docker por serviço e deploy no CI, README com diagrama, revisão dos ADRs |
 | 9 | Frontend | Angular + BFF em NestJS em `frontend/` (sessão, CSRF, endpoints por tela) |
 
