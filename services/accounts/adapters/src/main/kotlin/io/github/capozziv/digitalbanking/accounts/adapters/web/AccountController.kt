@@ -48,10 +48,13 @@ class AccountController(
             .description("Debits refused because the available balance does not cover the amount")
             .register(meterRegistry)
 
+    // The Idempotency-Key header is declared before the body: a missing key is reported (400
+    // missing-idempotency-key) before the body is read and validated.
+
     /** 201 with the new account; 200 with the existing one when the opening key is repeated. */
     @PostMapping
     fun open(
-        @RequestHeader(IdempotencyKeyHeader.NAME, required = false) idempotencyKey: String?,
+        @RequestHeader(IdempotencyKeyHeader.NAME) idempotencyKey: String,
         @Valid @RequestBody request: OpenAccountRequest,
     ): ResponseEntity<AccountResponse> {
         val key = IdempotencyKeyHeader.require(idempotencyKey)
@@ -72,14 +75,14 @@ class AccountController(
     @PostMapping("/{id}/credits")
     fun credit(
         @PathVariable id: UUID,
-        @RequestHeader(IdempotencyKeyHeader.NAME, required = false) idempotencyKey: String?,
+        @RequestHeader(IdempotencyKeyHeader.NAME) idempotencyKey: String,
         @Valid @RequestBody request: RecordEntryRequest,
     ): ResponseEntity<LedgerEntryResponse> = entryResponse(recordCredit.execute(command(id, idempotencyKey, request)))
 
     @PostMapping("/{id}/debits")
     fun debit(
         @PathVariable id: UUID,
-        @RequestHeader(IdempotencyKeyHeader.NAME, required = false) idempotencyKey: String?,
+        @RequestHeader(IdempotencyKeyHeader.NAME) idempotencyKey: String,
         @Valid @RequestBody request: RecordEntryRequest,
     ): ResponseEntity<LedgerEntryResponse> =
         when (val outcome = recordDebit.execute(command(id, idempotencyKey, request))) {
@@ -105,7 +108,7 @@ class AccountController(
 
     private fun command(
         accountId: UUID,
-        idempotencyKey: String?,
+        idempotencyKey: String,
         request: RecordEntryRequest,
     ) = RecordEntryCommand(
         accountId = accountId,

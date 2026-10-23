@@ -13,8 +13,6 @@ class InvalidRequestException(
     val errors: List<InvalidField>,
 ) : RuntimeException("invalid request: ${errors.joinToString { it.field }}")
 
-class MissingIdempotencyKeyException : RuntimeException("Idempotency-Key header is required")
-
 class AccountTypeNotFoundException(
     val type: String,
 ) : RuntimeException("account type $type not found")

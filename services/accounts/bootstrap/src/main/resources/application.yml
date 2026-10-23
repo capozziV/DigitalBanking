@@ -21,6 +21,11 @@ spring:
 accounts:
   lock-timeout: 2s
 
+logging:
+  pattern:
+    # Correlation id of the request (MDC key of OutboxEnvelope.CORRELATION_ID_MDC_KEY) on every log line.
+    correlation: "[%X{correlationId:-}] "
+
 server:
   port: 8081
 

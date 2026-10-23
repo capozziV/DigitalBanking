@@ -463,6 +463,57 @@ class AccountApiIT : AccountsIntegrationTest() {
         assertThat(response.header("X-Correlation-Id")).isEqualTo(correlationId)
     }
 
+    @Test
+    fun `a correlation id with a space or longer than 128 characters is replaced by a generated UUID`() {
+        for (sent in listOf("abc def", "c".repeat(129))) {
+            val response = api.get("/accounts/${UUID.randomUUID()}", mapOf("X-Correlation-Id" to sent))
+
+            val returned = response.header("X-Correlation-Id")
+            assertThat(returned).describedAs(sent).isNotEqualTo(sent)
+            assertThat(UUID.fromString(returned)).isNotNull()
+        }
+    }
+
+    @Test
+    fun `a base64 correlation id of the API Gateway and one of 128 characters are kept`() {
+        for (sent in listOf("JTHoQgr2oAMEPMg=", "a+b/c=", "c".repeat(128))) {
+            val response = api.get("/accounts/${UUID.randomUUID()}", mapOf("X-Correlation-Id" to sent))
+
+            assertThat(response.header("X-Correlation-Id")).isEqualTo(sent)
+        }
+    }
+
+    // --- Idempotency-Key before the body ---
+
+    @Test
+    fun `without Idempotency-Key an invalid body is still 400 missing-idempotency-key`() {
+        val accountId = openAccount()
+
+        assertProblem(api.post("/accounts", """{}"""), 400, "missing-idempotency-key")
+        assertProblem(api.post("/accounts", """{"customerId":"""), 400, "missing-idempotency-key")
+        assertProblem(api.post("/accounts/$accountId/credits", """{"amount":0}"""), 400, "missing-idempotency-key")
+        assertProblem(api.post("/accounts/$accountId/debits", """{"amount":1.5}"""), 400, "missing-idempotency-key")
+    }
+
+    // --- balance near the maximum ---
+
+    @Test
+    fun `an account with a balance near the maximum and an overdraft limit can be read and change type`() {
+        val accountId = openAccount()
+        credit(accountId, Long.MAX_VALUE - 10)
+
+        val changed = api.put("/accounts/$accountId/type", """{"type":"GOLD"}""")
+        val read = api.get("/accounts/$accountId")
+
+        assertThat(changed.status).describedAs(changed.rawBody).isEqualTo(200)
+        assertThat(read.status).describedAs(read.rawBody).isEqualTo(200)
+        assertThat(read.body!!.get("balance").asLong()).isEqualTo(Long.MAX_VALUE - 10)
+        assertThat(read.body.get("overdraftLimit").asLong()).isEqualTo(200_000)
+        assertThat(read.body.get("availableBalance").asLong()).isEqualTo(Long.MAX_VALUE)
+        assertThat(api.post("/accounts/$accountId/debits", """{"amount":100}""", key(UUID.randomUUID().toString())).status)
+            .isEqualTo(201)
+    }
+
     // --- helpers ---
 
     private fun key(value: String) = mapOf("Idempotency-Key" to value)

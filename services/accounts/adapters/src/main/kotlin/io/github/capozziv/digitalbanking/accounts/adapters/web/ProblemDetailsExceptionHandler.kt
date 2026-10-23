@@ -5,6 +5,7 @@ import io.github.capozziv.digitalbanking.accounts.application.AccountNotFoundExc
 import io.github.capozziv.digitalbanking.accounts.application.CustomerAlreadyHasAccountException
 import io.github.capozziv.digitalbanking.accounts.application.IdempotencyKeyReusedException
 import io.github.capozziv.digitalbanking.accounts.domain.BalanceOverflowException
+import org.slf4j.LoggerFactory
 import org.springframework.beans.TypeMismatchException
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
@@ -13,6 +14,8 @@ import org.springframework.http.ProblemDetail
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.MethodArgumentNotValidException
+import org.springframework.web.bind.MissingRequestHeaderException
+import org.springframework.web.bind.ServletRequestBindingException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.context.request.WebRequest
@@ -62,9 +65,27 @@ class ProblemDetailsExceptionHandler : ResponseEntityExceptionHandler() {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).header(HttpHeaders.RETRY_AFTER, "1").body(body)
     }
 
-    @ExceptionHandler
-    fun handle(e: MissingIdempotencyKeyException) =
-        problem(HttpStatus.BAD_REQUEST, "missing-idempotency-key", "Missing Idempotency-Key", e.message)
+    /** A missing Idempotency-Key gets its own type; other binding errors keep Spring's Problem Details. */
+    override fun handleServletRequestBindingException(
+        ex: ServletRequestBindingException,
+        headers: HttpHeaders,
+        status: HttpStatusCode,
+        request: WebRequest,
+    ): ResponseEntity<Any>? {
+        if (ex is MissingRequestHeaderException && ex.headerName.equals(IdempotencyKeyHeader.NAME, ignoreCase = true)) {
+            return ResponseEntity
+                .badRequest()
+                .body(
+                    problem(
+                        HttpStatus.BAD_REQUEST,
+                        "missing-idempotency-key",
+                        "Missing Idempotency-Key",
+                        "The Idempotency-Key header is required",
+                    ),
+                )
+        }
+        return super.handleServletRequestBindingException(ex, headers, status, request)
+    }
 
     @ExceptionHandler
     fun handle(e: InvalidRequestException) = validationError(e.errors)
@@ -95,6 +116,17 @@ class ProblemDetailsExceptionHandler : ResponseEntityExceptionHandler() {
         return badRequest(listOf(if (field != null) InvalidField(field, "is invalid") else InvalidField("body", "is not valid JSON")))
     }
 
+    /**
+     * Anything not mapped above is a bug: logged here as ERROR, while the MDC still holds the correlation id,
+     * and answered with a generic detail that does not leak the internal message.
+     */
+    @ExceptionHandler
+    fun handle(e: Exception): ProblemDetail {
+        log.error("unexpected error", e)
+        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "internal-error", "Internal error", "An unexpected error occurred")
+    }
+
+    /** Only a credit or debit can overflow the balance (the available balance saturates instead). */
     @ExceptionHandler
     fun handle(e: BalanceOverflowException) = validationError(listOf(InvalidField("amount", "would take the balance out of range")))
 
@@ -124,4 +156,8 @@ class ProblemDetailsExceptionHandler : ResponseEntityExceptionHandler() {
             ?.mapNotNull { it.propertyName ?: it.index.takeIf { index -> index >= 0 }?.toString() }
             ?.takeIf { it.isNotEmpty() }
             ?.joinToString(".")
+
+    private companion object {
+        val log = LoggerFactory.getLogger(ProblemDetailsExceptionHandler::class.java)
+    }
 }

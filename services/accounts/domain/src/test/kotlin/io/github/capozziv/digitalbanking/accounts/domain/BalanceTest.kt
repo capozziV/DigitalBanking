@@ -40,10 +40,15 @@ class BalanceTest {
     }
 
     @Test
-    fun `available balance beyond the maximum fails instead of wrapping around`() {
-        assertThatThrownBy { AvailableBalance.of(Balance(Long.MAX_VALUE), OverdraftLimit(1)) }
-            .isInstanceOf(BalanceOverflowException::class.java)
-            .hasMessage("available balance overflow")
+    fun `available balance beyond the maximum saturates at Long MAX_VALUE instead of wrapping around`() {
+        assertThat(AvailableBalance.of(Balance(Long.MAX_VALUE), OverdraftLimit(1)).cents).isEqualTo(Long.MAX_VALUE)
+        assertThat(AvailableBalance.of(Balance(Long.MAX_VALUE - 10), OverdraftLimit(5_000_000)).cents).isEqualTo(Long.MAX_VALUE)
+    }
+
+    @Test
+    fun `available balance just below the maximum is exact`() {
+        assertThat(AvailableBalance.of(Balance(Long.MAX_VALUE - 10), OverdraftLimit(10)).cents).isEqualTo(Long.MAX_VALUE)
+        assertThat(AvailableBalance.of(Balance(Long.MAX_VALUE - 10), OverdraftLimit(9)).cents).isEqualTo(Long.MAX_VALUE - 1)
     }
 
     @Test
