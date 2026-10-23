@@ -45,6 +45,7 @@ import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * The relay of the running application publishes to the SNS FIFO topic created by the local init script,
@@ -77,7 +78,7 @@ class OutboxRelayIT : AccountsIntegrationTest() {
     /** Events left by other integration tests on the shared database are not part of these tests. */
     @BeforeEach
     fun skipBacklogOfOtherTests() {
-        ownerJdbc.sql("update outbox set published_at = now() where published_at is null").update()
+        markPendingOutboxEventsPublished()
     }
 
     @Test
@@ -124,8 +125,17 @@ class OutboxRelayIT : AccountsIntegrationTest() {
     fun `two relays running in parallel publish each event once and in order`() {
         val running = AtomicBoolean(true)
         val relays = List(2) { OutboxRelay(store, publisher, settings, clock, metrics) }
-        val loops = Executors.newFixedThreadPool(2)
-        relays.forEach { relay -> loops.submit { while (running.get()) relay.runCycle() } }
+        val cycles = List(relays.size) { AtomicInteger() }
+        val loops = Executors.newFixedThreadPool(relays.size)
+        val loopResults =
+            relays.mapIndexed { i, relay ->
+                loops.submit {
+                    while (running.get()) {
+                        relay.runCycle()
+                        cycles[i].incrementAndGet()
+                    }
+                }
+            }
         val accounts =
             try {
                 val operations = Executors.newVirtualThreadPerTaskExecutor()
@@ -145,7 +155,10 @@ class OutboxRelayIT : AccountsIntegrationTest() {
                 running.set(false)
                 loops.shutdown()
                 assertThat(loops.awaitTermination(30, TimeUnit.SECONDS)).isTrue()
+                // A cycle that threw ends its loop; get() rethrows it here instead of losing it.
+                loopResults.forEach { it.get() }
             }
+        assertThat(cycles.map { it.get() }).allSatisfy { assertThat(it).isPositive() }
 
         val expectedPerAccount = CREDITS_PER_ACCOUNT + 1
         accounts.forEach { account ->
@@ -168,16 +181,21 @@ class OutboxRelayIT : AccountsIntegrationTest() {
 
     @Test
     fun `relay meters are exposed on the actuator`() {
-        val cycles = api.get("/actuator/metrics/outbox.relay.cycles")
+        val deadline = Instant.now().plusSeconds(10)
+        var cycles = 0.0
+        while (cycles <= 0.0) {
+            check(Instant.now().isBefore(deadline)) { "outbox.relay.cycles still 0 after 10 s" }
+            val response = api.get("/actuator/metrics/outbox.relay.cycles")
+            assertThat(response.status).isEqualTo(200)
+            cycles =
+                response.body!!
+                    .get("measurements")
+                    .get(0)
+                    .get("value")
+                    .asDouble()
+            if (cycles <= 0.0) Thread.sleep(100)
+        }
 
-        assertThat(cycles.status).isEqualTo(200)
-        assertThat(
-            cycles.body!!
-                .get("measurements")
-                .get(0)
-                .get("value")
-                .asDouble(),
-        ).isPositive()
         assertThat(api.get("/actuator/metrics/outbox.pending").status).isEqualTo(200)
     }
 

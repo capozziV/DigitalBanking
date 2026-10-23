@@ -17,9 +17,20 @@ dependencies {
     integrationTestImplementation(libs.testcontainers.junit.jupiter)
 }
 
-// OutboxRelayIT runs LocalStack with the same init scripts as the local compose.
-val localStackInitDir = rootProject.layout.projectDirectory.dir("infra/local/localstack/init/ready.d")
+// OutboxRelayIT runs LocalStack with the same init scripts as the local compose. The directory is a
+// relative-path input, so the absolute path of the clone does not enter the build cache key.
+abstract class LocalStackInitScripts : CommandLineArgumentProvider {
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val directory: DirectoryProperty
+
+    override fun asArguments() = listOf("-Daccounts.localstack.init-dir=${directory.get().asFile.absolutePath}")
+}
+
 tasks.named<Test>("integrationTest") {
-    inputs.dir(localStackInitDir).withPropertyName("localStackInitScripts")
-    systemProperty("accounts.localstack.init-dir", localStackInitDir.asFile.absolutePath)
+    jvmArgumentProviders.add(
+        objects.newInstance<LocalStackInitScripts>().apply {
+            directory.set(rootProject.layout.projectDirectory.dir("infra/local/localstack/init/ready.d"))
+        },
+    )
 }

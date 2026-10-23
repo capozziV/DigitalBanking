@@ -3,7 +3,9 @@ package io.github.capozziv.digitalbanking.accounts.bootstrap
 import io.github.capozziv.digitalbanking.accounts.bootstrap.web.ApiClient
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.web.server.LocalServerPort
+import org.springframework.context.ConfigurableApplicationContext
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.TestPropertySource
 import java.time.Duration
@@ -24,11 +26,25 @@ class OutboxRelayUnreachableBrokerIT : AccountsIntegrationTest() {
     @LocalServerPort
     private var port: Int = 0
 
+    @Autowired
+    private lateinit var context: ConfigurableApplicationContext
+
     private val api by lazy { ApiClient(port) }
+
+    /**
+     * The scheduler of Spring Boot (bean `taskScheduler`, a SimpleAsyncTaskScheduler with virtual threads)
+     * interrupts its running tasks when closed; the relay scheduler must be destroyed before it, so that its
+     * own wait for the cycle in progress comes first.
+     */
+    @Test
+    fun `the relay scheduler is destroyed before the task scheduler`() {
+        assertThat(context.containsBean("taskScheduler")).isTrue()
+        assertThat(context.beanFactory.getDependenciesForBean("outboxRelayScheduler")).contains("taskScheduler")
+    }
 
     @Test
     fun `failed publications increase attempts and health stays UP`() {
-        ownerJdbc.sql("update outbox set published_at = now() where published_at is null").update()
+        markPendingOutboxEventsPublished()
         val opened =
             api.post(
                 "/accounts",
@@ -69,8 +85,10 @@ class OutboxRelayUnreachableBrokerIT : AccountsIntegrationTest() {
                     .query()
                     .singleRow()
             val attempts = (row["attempts"] as Number).toInt()
-            if (attempts >= atLeast || Instant.now().isAfter(deadline)) {
-                return Triple(attempts, row["last_error"] as String?, row["published_at"])
+            if (attempts >= atLeast) return Triple(attempts, row["last_error"] as String?, row["published_at"])
+            check(Instant.now().isBefore(deadline)) {
+                "outbox event of $account reached only $attempts attempts (expected $atLeast); " +
+                    "last_error=${row["last_error"]}"
             }
             Thread.sleep(100)
         }

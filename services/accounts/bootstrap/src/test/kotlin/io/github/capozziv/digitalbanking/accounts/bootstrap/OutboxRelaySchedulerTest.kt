@@ -79,10 +79,10 @@ class OutboxRelaySchedulerTest {
         val cycleEntered = CountDownLatch(1)
         val release = CountDownLatch(1)
 
-        @Volatile private var block = false
+        @Volatile private var blockNext = false
 
         fun blockNextCycle() {
-            block = true
+            blockNext = true
         }
 
         override fun <T : Any> asLeader(
@@ -90,7 +90,7 @@ class OutboxRelaySchedulerTest {
             block: () -> T,
         ): T? {
             leaderCalls.incrementAndGet()
-            if (this.block) {
+            if (blockNext) {
                 cycleEntered.countDown()
                 release.await(10, TimeUnit.SECONDS)
             }

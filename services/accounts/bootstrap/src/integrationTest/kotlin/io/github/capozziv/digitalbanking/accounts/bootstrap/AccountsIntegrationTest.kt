@@ -24,6 +24,11 @@ abstract class AccountsIntegrationTest {
         JdbcClient.create(DriverManagerDataSource(postgres.jdbcUrl, postgres.username, postgres.password))
     }
 
+    /** Marks as published every pending outbox event, such as those left by other tests on the shared database. */
+    protected fun markPendingOutboxEventsPublished() {
+        ownerJdbc.sql("update outbox set published_at = now() where published_at is null").update()
+    }
+
     companion object {
         const val APP_USER = "accounts_app"
         const val APP_PASSWORD = "app"

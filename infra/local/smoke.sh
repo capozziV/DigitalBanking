@@ -73,6 +73,9 @@ for _ in $(seq 1 30); do
     | select($e.aggregateId == $id)
     | [.ReceiptHandle, ((.MessageAttributes.eventType.StringValue // "sem-atributo-eventType") + (if $e.payload.sequence then ":" + ($e.payload.sequence | tostring) else "" end))]
     | @tsv')
+  # Para no terceiro evento: uma duplicata que chegasse depois nao seria vista. Aceitavel porque a
+  # deduplicacao do FIFO (MessageDeduplicationId = eventId) e a exclusividade do relay ja sao testadas
+  # no OutboxRelayIT; o smoke so confere a entrega ponta a ponta e a ordem.
   [ "$(echo "$events" | wc -w)" -lt 3 ] || break
 done
 

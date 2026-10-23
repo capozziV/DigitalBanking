@@ -13,10 +13,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.DependsOn
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.scheduling.annotation.EnableScheduling
 import org.springframework.transaction.support.TransactionTemplate
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
+import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
 import software.amazon.awssdk.regions.Region
@@ -45,28 +47,34 @@ class OutboxRelayConfiguration {
         )
 
     /**
-     * With an endpoint (LocalStack), static test credentials; without one, the AWS default endpoint and
-     * credential chain. Client timeouts back up the per-request publish timeout.
+     * With an endpoint (LocalStack), static test credentials; without one, the AWS default credential chain.
+     * A bean of its own because the SNS client does not close a provider it was given: the default chain is
+     * AutoCloseable, so Spring closes it on shutdown (inferred destroy method).
      */
+    @Bean
+    fun awsCredentialsProvider(aws: AwsProperties): AwsCredentialsProvider =
+        if (aws.endpoint.isNullOrBlank()) {
+            DefaultCredentialsProvider.builder().build()
+        } else {
+            StaticCredentialsProvider.create(AwsBasicCredentials.create("test", "test"))
+        }
+
+    /** The endpoint override only with an endpoint (LocalStack). Client timeouts back up the per-request publish timeout. */
     @Bean(destroyMethod = "close")
     fun snsClient(
         aws: AwsProperties,
+        credentials: AwsCredentialsProvider,
         settings: OutboxRelaySettings,
     ): SnsClient {
         val builder =
             SnsClient
                 .builder()
                 .region(Region.of(aws.region))
+                .credentialsProvider(credentials)
                 .overrideConfiguration {
                     it.apiCallTimeout(settings.publishTimeout).apiCallAttemptTimeout(settings.publishTimeout)
                 }
-        if (aws.endpoint.isNullOrBlank()) {
-            builder.credentialsProvider(DefaultCredentialsProvider.builder().build())
-        } else {
-            builder
-                .endpointOverride(URI.create(aws.endpoint))
-                .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("test", "test")))
-        }
+        if (!aws.endpoint.isNullOrBlank()) builder.endpointOverride(URI.create(aws.endpoint))
         return builder.build()
     }
 
@@ -95,8 +103,13 @@ class OutboxRelayConfiguration {
         metrics: OutboxMetrics,
     ) = OutboxRelay(store, publisher, settings, clock, metrics)
 
-    /** Waits on shutdown for the longest a cycle can take: its maximum duration plus one publish call. */
+    /**
+     * Waits on shutdown for the longest a cycle can take: its maximum duration plus one publish call.
+     * Depends on `taskScheduler` (the bean name of Spring Boot's scheduler, with platform or virtual threads)
+     * so that it is destroyed first: closing that scheduler calls `shutdownNow()` on the executor running the cycle.
+     */
     @Bean
+    @DependsOn("taskScheduler")
     fun outboxRelayScheduler(
         relay: OutboxRelay,
         settings: OutboxRelaySettings,
