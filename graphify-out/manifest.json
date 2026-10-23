@@ -54,9 +54,9 @@
     "semantic_hash": ""
   },
   "libs/outbox/build.gradle.kts": {
-    "mtime": 1792769995.2436929,
-    "seen": 1792770605.5463834,
-    "ast_hash": "b7211d2ee23696dcc01006807dbee248",
+    "mtime": 1792771184.8986871,
+    "seen": 1792771714.7106822,
+    "ast_hash": "f11ea92c7a7a6626dd29fab67d94a7b3",
     "semantic_hash": ""
   },
   "libs/outbox/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/outbox/JdbcOutboxWriterIT.kt": {
@@ -744,9 +744,9 @@
     "semantic_hash": ""
   },
   "docs/superpowers/specs/2026-10-22-etapa-1-accounts-design.md": {
-    "mtime": 1792763487.0460286,
-    "seen": 1792763579.929857,
-    "ast_hash": "d424c8eb0f71059af7e6e63a037c3fb8",
+    "mtime": 1792771483.9027734,
+    "seen": 1792771714.7108705,
+    "ast_hash": "fd4992dbb7fa4c7bf6be74b90c633efe",
     "semantic_hash": ""
   },
   "infra/local/docker-compose.yml": {
@@ -762,9 +762,9 @@
     "semantic_hash": ""
   },
   "libs/outbox/src/main/resources/outbox/outbox-table.sql": {
-    "mtime": 1792694196.8394911,
-    "seen": 1792714767.7267532,
-    "ast_hash": "a5a86dcfd65a5803db6da88b66effe18",
+    "mtime": 1792771462.7917802,
+    "seen": 1792771714.7107067,
+    "ast_hash": "1289ce3901e16d951823733964154997",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/resources/db/migration/V1__account_type.sql": {
@@ -882,15 +882,15 @@
     "semantic_hash": ""
   },
   "libs/outbox/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/outbox/JdbcOutboxStoreIT.kt": {
-    "mtime": 1792770457.5997205,
-    "seen": 1792770605.5463865,
-    "ast_hash": "cb180702cba466f249ee284cf32afa00",
+    "mtime": 1792771440.7917788,
+    "seen": 1792771714.7106853,
+    "ast_hash": "c404276a98fcc19ce111678945efe278",
     "semantic_hash": ""
   },
   "libs/outbox/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/outbox/SnsEventPublisherIT.kt": {
-    "mtime": 1792770215.759706,
-    "seen": 1792770605.5463915,
-    "ast_hash": "c2f4130a7c3137ad85862bdc69c1ca0c",
+    "mtime": 1792771522.1910694,
+    "seen": 1792771714.71069,
+    "ast_hash": "c072ae03e5956fd4b8636b851e137ee3",
     "semantic_hash": ""
   },
   "libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/EventPublisher.kt": {
@@ -900,33 +900,33 @@
     "semantic_hash": ""
   },
   "libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/JdbcOutboxStore.kt": {
-    "mtime": 1792770196.6736758,
-    "seen": 1792770605.546394,
-    "ast_hash": "5d49733cfb4d6d24107169a46268027d",
+    "mtime": 1792771284.238582,
+    "seen": 1792771714.7106931,
+    "ast_hash": "d74de1fcfb636172f88b2466860aee6f",
     "semantic_hash": ""
   },
   "libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/OutboxMetrics.kt": {
-    "mtime": 1792770089.2293844,
-    "seen": 1792770605.5464003,
-    "ast_hash": "cc8e1699e49eb6ef0dd55e3ae542c73c",
+    "mtime": 1792771184.8877726,
+    "seen": 1792771714.7106986,
+    "ast_hash": "d6dc1622c060a0f47c562af08d956076",
     "semantic_hash": ""
   },
   "libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/OutboxRelay.kt": {
-    "mtime": 1792770111.1519432,
-    "seen": 1792770605.5464015,
-    "ast_hash": "f3f0aa3e6d0ae3faddb145da09f8e8d4",
+    "mtime": 1792771245.6886275,
+    "seen": 1792771714.7106998,
+    "ast_hash": "affd3ac6ccc150c6a993c61b53a22441",
     "semantic_hash": ""
   },
   "libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/OutboxRelaySettings.kt": {
-    "mtime": 1792770089.2268176,
-    "seen": 1792770605.5464025,
-    "ast_hash": "e80da98e3ec7df6b5a6f520032763952",
+    "mtime": 1792771184.8646376,
+    "seen": 1792771714.710701,
+    "ast_hash": "16f99bd68c2076be0d44547e494dc25c",
     "semantic_hash": ""
   },
   "libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/OutboxStore.kt": {
-    "mtime": 1792770089.224747,
-    "seen": 1792770605.5464036,
-    "ast_hash": "4708c107e8f17c6d982a4841a61e9e01",
+    "mtime": 1792771184.891069,
+    "seen": 1792771714.7107022,
+    "ast_hash": "5fe9070057071e7ab37b25776d0072e9",
     "semantic_hash": ""
   },
   "libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/PendingEvent.kt": {
@@ -936,9 +936,9 @@
     "semantic_hash": ""
   },
   "libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/SnsEventPublisher.kt": {
-    "mtime": 1792770339.4747403,
-    "seen": 1792770605.546407,
-    "ast_hash": "7809023efa0bf0147a7d3858d0400467",
+    "mtime": 1792771184.8882377,
+    "seen": 1792771714.7107048,
+    "ast_hash": "91c657fd7f9d2ed3e11750aad496f573",
     "semantic_hash": ""
   },
   "libs/outbox/src/test/kotlin/io/github/capozziv/digitalbanking/outbox/OutboxEnvelopeTest.kt": {
@@ -948,15 +948,33 @@
     "semantic_hash": ""
   },
   "libs/outbox/src/test/kotlin/io/github/capozziv/digitalbanking/outbox/OutboxMetricsTest.kt": {
-    "mtime": 1792770438.3110635,
-    "seen": 1792770605.5464115,
-    "ast_hash": "0b94685859136b665025cf08821811e5",
+    "mtime": 1792771116.5501864,
+    "seen": 1792771714.7107093,
+    "ast_hash": "1f50073020bba93d1877a6ccf8cbaded",
     "semantic_hash": ""
   },
   "libs/outbox/src/test/kotlin/io/github/capozziv/digitalbanking/outbox/OutboxRelayTest.kt": {
-    "mtime": 1792770040.0956957,
-    "seen": 1792770605.5464125,
-    "ast_hash": "af2f6c556cbb4ba7ace5afe33f276e04",
+    "mtime": 1792771097.2557585,
+    "seen": 1792771714.7107124,
+    "ast_hash": "d62c1361de2188b7593166449bc13679",
+    "semantic_hash": ""
+  },
+  "libs/outbox/src/test/kotlin/io/github/capozziv/digitalbanking/outbox/OutboxRelaySettingsTest.kt": {
+    "mtime": 1792771116.5517597,
+    "seen": 1792771714.710711,
+    "ast_hash": "054376f346d1385a20595fe2c1e302e8",
+    "semantic_hash": ""
+  },
+  "libs/outbox/src/test/kotlin/io/github/capozziv/digitalbanking/outbox/SnsEventPublisherTest.kt": {
+    "mtime": 1792771522.9237838,
+    "seen": 1792771714.7107136,
+    "ast_hash": "547a8f2a0a91f8f3fefdc1265035cb11",
+    "semantic_hash": ""
+  },
+  "services/accounts/adapters/src/main/resources/db/migration/V6__outbox_stuck_idx.sql": {
+    "mtime": 1792771462.7989023,
+    "seen": 1792771714.7107494,
+    "ast_hash": "207b7628e1fdba76b7b65988deee47ae",
     "semantic_hash": ""
   }
 }
