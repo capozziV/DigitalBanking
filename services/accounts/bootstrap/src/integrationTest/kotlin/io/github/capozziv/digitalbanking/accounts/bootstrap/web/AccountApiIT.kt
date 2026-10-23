@@ -256,6 +256,45 @@ class AccountApiIT : AccountsIntegrationTest() {
     }
 
     @Test
+    fun `a description with a control character is 400 validation-error and records nothing`() {
+        val accountId = openAccount()
+
+        val withNul =
+            api.post(
+                "/accounts/$accountId/credits",
+                """{"amount":1,"description":"desc\u0000"}""",
+                key(UUID.randomUUID().toString()),
+            )
+        val withNewline =
+            api.post(
+                "/accounts/$accountId/credits",
+                """{"amount":1,"description":"a\nb"}""",
+                key(UUID.randomUUID().toString()),
+            )
+
+        assertProblem(withNul, 400, "validation-error")
+        assertThat(withNul.errorFields()).containsExactly("description")
+        assertProblem(withNewline, 400, "validation-error")
+        assertThat(withNewline.errorFields()).containsExactly("description")
+        assertThat(entryCount(accountId)).isZero()
+    }
+
+    @Test
+    fun `a description with accents and symbols is accepted as sent`() {
+        val accountId = openAccount()
+
+        val response =
+            api.post(
+                "/accounts/$accountId/credits",
+                """{"amount":1,"description":"Café ☕ ação 💸"}""",
+                key(UUID.randomUUID().toString()),
+            )
+
+        assertThat(response.status).isEqualTo(201)
+        assertThat(response.body!!.get("description").asString()).isEqualTo("Café ☕ ação 💸")
+    }
+
+    @Test
     fun `an empty or blank description is recorded as absent`() {
         val accountId = openAccount()
 

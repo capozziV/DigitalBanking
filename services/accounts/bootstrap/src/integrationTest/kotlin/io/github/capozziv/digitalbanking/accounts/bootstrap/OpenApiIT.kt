@@ -108,6 +108,20 @@ class OpenApiIT : AccountsIntegrationTest() {
     }
 
     @Test
+    fun `the entry description documents its maximum length and the refusal of control characters`() {
+        val description =
+            docs
+                .get("components")
+                .get("schemas")
+                .get("RecordEntryRequest")
+                .get("properties")
+                .get("description")
+
+        assertThat(description.get("maxLength").asInt()).isEqualTo(140)
+        assertThat(description.get("pattern").asString()).isEqualTo("[^\\x00-\\x1F]*")
+    }
+
+    @Test
     fun `the ProblemDetail schema referenced by the error responses exists`() {
         assertThat(docs.get("components").get("schemas").get("ProblemDetail")).isNotNull()
     }

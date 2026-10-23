@@ -168,9 +168,9 @@
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/adapters/web/dto/AccountRequests.kt": {
-    "mtime": 1792714178.956241,
-    "seen": 1792714749.9259715,
-    "ast_hash": "2713e2296f193a08944abafc9c905a82",
+    "mtime": 1792761877.4909806,
+    "seen": 1792762110.556007,
+    "ast_hash": "ef202c74bdb1754322ff82e3b2a85946",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/adapters/web/dto/AccountResponses.kt": {
@@ -408,9 +408,9 @@
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/web/AccountApiIT.kt": {
-    "mtime": 1792715017.916712,
-    "seen": 1792715140.0640533,
-    "ast_hash": "6fb8bf5489c668c5e5ba9084db718694",
+    "mtime": 1792761991.241609,
+    "seen": 1792762110.5560982,
+    "ast_hash": "53b1b88fd11d24838750a9a9fb6ca3a6",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/web/AccountTypeAdminApiIT.kt": {
@@ -744,9 +744,9 @@
     "semantic_hash": ""
   },
   "docs/superpowers/specs/2026-10-22-etapa-1-accounts-design.md": {
-    "mtime": 1792715728.3468153,
-    "seen": 1792715733.0635395,
-    "ast_hash": "d48ddb2a6fa2b9071d0fc33fe9877061",
+    "mtime": 1792761899.6194708,
+    "seen": 1792762110.5563252,
+    "ast_hash": "95ff26db6fafa2c612d1a677d598be9b",
     "semantic_hash": ""
   },
   "infra/local/docker-compose.yml": {
@@ -816,9 +816,9 @@
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/OpenApiIT.kt": {
-    "mtime": 1792715998.6318543,
-    "seen": 1792716102.2311802,
-    "ast_hash": "a0a39785a7d1f5dd9b820d0f92321a75",
+    "mtime": 1792761990.4872172,
+    "seen": 1792762110.5560918,
+    "ast_hash": "16b1c0eec3c2a5ccca159e61d19ab9a3",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/adapters/web/OpenApiConfiguration.kt": {
@@ -840,9 +840,9 @@
     "semantic_hash": ""
   },
   "docs/rodando-localmente.md": {
-    "mtime": 1792716475.5573888,
-    "seen": 1792716479.5166533,
-    "ast_hash": "27460482e48575e088f3becd196113b9",
+    "mtime": 1792761899.6268728,
+    "seen": 1792762110.5563161,
+    "ast_hash": "d13ccba2ad8967d6532ced9c475a7de1",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/web/RetryWhileAccountBusy.kt": {
