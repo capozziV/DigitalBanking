@@ -39,6 +39,8 @@ class JdbcLedgerEntryRepository(
             .orElse(null)
 
     override fun insert(entry: LedgerEntry) {
+        // timestamptz keeps microseconds: a finer createdAt would come back different from the entry and its event.
+        require(entry.createdAt.nano % 1_000 == 0) { "createdAt must have microsecond precision" }
         try {
             jdbcClient
                 .sql(

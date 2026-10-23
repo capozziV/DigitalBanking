@@ -26,7 +26,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.simple.JdbcClient
 import java.sql.DriverManager
 import java.sql.SQLException
@@ -51,7 +51,11 @@ class JdbcRepositoriesIT : AccountsIntegrationTest() {
 
     @Autowired private lateinit var appJdbc: JdbcClient
 
-    private val now = Instant.parse("2026-10-22T14:31:00Z")
+    /** Microsecond precision, as timestamptz stores it: writes with it must round-trip unchanged. */
+    private val now = Instant.parse("2026-10-22T14:31:00.123456Z")
+
+    /** Nanosecond precision, which timestamptz would silently truncate. */
+    private val nanoInstant = Instant.parse("2026-10-22T14:31:00.123456789Z")
 
     @AfterEach
     fun clearMdc() {
@@ -93,19 +97,18 @@ class JdbcRepositoriesIT : AccountsIntegrationTest() {
 
     @Test
     fun `findLimit and updateLimit throw when the type row is missing`() {
-        val diamond = ownerJdbc.sql("select overdraft_limit from account_type where type = 'DIAMOND'").query(Long::class.java).single()
-        ownerJdbc.sql("delete from account_type where type = 'DIAMOND'").update()
-        try {
-            assertThatThrownBy { types.findLimit(AccountType.DIAMOND) }.isInstanceOf(IllegalStateException::class.java)
-            assertThatThrownBy {
-                tx.inTransaction { types.updateLimit(AccountType.DIAMOND, OverdraftLimit(1), now) }
-            }.isInstanceOf(IllegalStateException::class.java)
-        } finally {
-            ownerJdbc
-                .sql("insert into account_type (type, overdraft_limit, updated_at) values ('DIAMOND', :limit, now())")
-                .param("limit", diamond)
-                .update()
-        }
+        assertThatThrownBy {
+            tx.inTransaction {
+                appJdbc.sql("update account_type set type = 'GONE' where type = 'DIAMOND'").update()
+
+                assertThatThrownBy { types.findLimit(AccountType.DIAMOND) }.isInstanceOf(IllegalStateException::class.java)
+                assertThatThrownBy { types.updateLimit(AccountType.DIAMOND, OverdraftLimit(1), now) }
+                    .isInstanceOf(IllegalStateException::class.java)
+                throw RollbackSignal()
+            }
+        }.isInstanceOf(RollbackSignal::class.java)
+
+        assertThat(types.findLimit(AccountType.DIAMOND)).isEqualTo(OverdraftLimit(5_000_000))
     }
 
     // --- account ---
@@ -270,9 +273,31 @@ class JdbcRepositoriesIT : AccountsIntegrationTest() {
         tx.inTransaction { entries.insert(entry(account, 1, EntryKind.CREDIT, 100, 100, "k1")) }
 
         assertThatThrownBy { tx.inTransaction { entries.insert(entry(account, 1, EntryKind.CREDIT, 100, 200, "k2")) } }
-            .isInstanceOf(DataIntegrityViolationException::class.java)
+            .isInstanceOf(DuplicateKeyException::class.java)
         assertThatThrownBy { tx.inTransaction { entries.insert(entry(account, 2, EntryKind.CREDIT, 100, 200, "k1")) } }
-            .isInstanceOf(DataIntegrityViolationException::class.java)
+            .isInstanceOf(DuplicateKeyException::class.java)
+    }
+
+    @Test
+    fun `insert then findByIdempotencyKey returns an entry equal to the one written`() {
+        val account = openAccount()
+        val credit = entry(account, 1, EntryKind.CREDIT, 3_700, 3_700, "round-trip", description = "Salary")
+
+        tx.inTransaction { entries.insert(credit) }
+
+        assertThat(entries.findByIdempotencyKey(account.id, "round-trip")).isEqualTo(credit)
+        assertThat(entries.findLast(account.id)).isEqualTo(credit)
+    }
+
+    @Test
+    fun `insert rejects a createdAt finer than microseconds and writes nothing`() {
+        val account = openAccount()
+        val credit = entry(account, 1, EntryKind.CREDIT, 100, 100, "nano").copy(createdAt = nanoInstant)
+
+        assertThatThrownBy { tx.inTransaction { entries.insert(credit) } }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessage("createdAt must have microsecond precision")
+        assertThat(entries.findLast(account.id)).isNull()
     }
 
     @Test
@@ -303,7 +328,7 @@ class JdbcRepositoriesIT : AccountsIntegrationTest() {
                 """
                 {"entryId": "${credit.id}", "accountId": "${account.id}", "sequence": 1, "kind": "CREDIT",
                  "amount": 3700, "balanceAfter": 3700, "description": "Salary", "idempotencyKey": "credit-1",
-                 "createdAt": "2026-10-22T14:31:00Z"}
+                 "createdAt": "2026-10-22T14:31:00.123456Z"}
                 """,
         )
     }
@@ -323,7 +348,7 @@ class JdbcRepositoriesIT : AccountsIntegrationTest() {
                 """
                 {"entryId": "${debit.id}", "accountId": "${account.id}", "sequence": 1, "kind": "DEBIT",
                  "amount": 2500, "balanceAfter": -2500, "description": null, "idempotencyKey": "debit-1",
-                 "createdAt": "2026-10-22T14:31:00Z"}
+                 "createdAt": "2026-10-22T14:31:00.123456Z"}
                 """,
         )
     }
@@ -464,6 +489,8 @@ class JdbcRepositoriesIT : AccountsIntegrationTest() {
         val error = runCatching(statement).exceptionOrNull()
         return generateSequence(error) { it.cause }.filterIsInstance<SQLException>().firstOrNull()?.sqlState
     }
+
+    private class RollbackSignal : RuntimeException("rollback")
 
     private companion object {
         const val INSUFFICIENT_PRIVILEGE = "42501"

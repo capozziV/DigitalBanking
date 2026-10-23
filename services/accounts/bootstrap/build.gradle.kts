@@ -12,7 +12,6 @@ dependencies {
     integrationTestImplementation(project(":libs:outbox"))
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-webmvc")
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-jdbc")
-    integrationTestImplementation("org.springframework.boot:spring-boot-testcontainers")
     integrationTestImplementation(libs.testcontainers.postgresql)
     integrationTestImplementation(libs.testcontainers.junit.jupiter)
 }
