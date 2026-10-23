@@ -690,9 +690,9 @@
     "semantic_hash": ""
   },
   "docs/adr/0015-outbox-relay-lider-e-sns-fifo.md": {
-    "mtime": 1792693618.1121674,
-    "seen": 1792714749.9261096,
-    "ast_hash": "fa4ee008a25517f40be9f391b44c6706",
+    "mtime": 1792798011.023501,
+    "seen": 1792798018.0929315,
+    "ast_hash": "62e083e20723bc8a122750f3eaf0b108",
     "semantic_hash": ""
   },
   "docs/adr/README.md": {
@@ -702,9 +702,9 @@
     "semantic_hash": ""
   },
   "docs/arquitetura.md": {
-    "mtime": 1792694520.220221,
-    "seen": 1792714749.9261122,
-    "ast_hash": "072b75b89a203724763f2ab8d61fa4b4",
+    "mtime": 1792797818.7478812,
+    "seen": 1792798018.092936,
+    "ast_hash": "cd4100352e628d7ae4c12e624fc3fe95",
     "semantic_hash": ""
   },
   "docs/roadmap.md": {
@@ -714,9 +714,9 @@
     "semantic_hash": ""
   },
   "docs/status.md": {
-    "mtime": 1792796264.1215441,
-    "seen": 1792797123.9572515,
-    "ast_hash": "09df16935695cfa6307f52aded33c46a",
+    "mtime": 1792798011.0239785,
+    "seen": 1792798018.0929399,
+    "ast_hash": "f061ea1e3fdfcac7804f9584793a6a35",
     "semantic_hash": ""
   },
   "docs/superpowers/plans/2026-10-21-etapa-0-fundacao.md": {
@@ -726,9 +726,9 @@
     "semantic_hash": ""
   },
   "docs/superpowers/plans/2026-10-22-etapa-1-accounts.md": {
-    "mtime": 1792692920.246322,
-    "seen": 1792714749.9261177,
-    "ast_hash": "5fa713729dab0aa7acf7117fa0059618",
+    "mtime": 1792797769.9398782,
+    "seen": 1792798018.092942,
+    "ast_hash": "da57d6ecea0a5ac0af3cd822de606f75",
     "semantic_hash": ""
   },
   "docs/superpowers/research/2026-10-22-versoes-etapa-1.md": {
@@ -744,9 +744,9 @@
     "semantic_hash": ""
   },
   "docs/superpowers/specs/2026-10-22-etapa-1-accounts-design.md": {
-    "mtime": 1792771483.9027734,
-    "seen": 1792771714.7108705,
-    "ast_hash": "fd4992dbb7fa4c7bf6be74b90c633efe",
+    "mtime": 1792798011.023121,
+    "seen": 1792798018.0929468,
+    "ast_hash": "8dac00b3d4a442bdf86b4192c305e7e3",
     "semantic_hash": ""
   },
   "infra/local/docker-compose.yml": {
@@ -840,9 +840,9 @@
     "semantic_hash": ""
   },
   "docs/rodando-localmente.md": {
-    "mtime": 1792773939.6801498,
-    "seen": 1792774437.4227302,
-    "ast_hash": "5892b2bc8a5adb2b9444ebbe73888ddf",
+    "mtime": 1792798011.022328,
+    "seen": 1792798018.0929384,
+    "ast_hash": "fd648705489025b0efef6e30be0e55b9",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/web/RetryWhileAccountBusy.kt": {
