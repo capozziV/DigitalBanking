@@ -17,16 +17,18 @@ data class OpenAccountRequest(
 
 data class RecordEntryRequest(
     @field:NotNull @field:Positive val amount: Long?,
-    // PostgreSQL rejects 0x00 in text; C0 control characters are refused before reaching the database.
+    // The description is a single line, so the whole C0 range (U+0000-U+001F, tab and line breaks included)
+    // is refused on purpose; this also keeps 0x00, which PostgreSQL rejects in text, away from the database.
     @field:Size(max = LedgerEntry.MAX_DESCRIPTION_LENGTH)
-    @field:Pattern(regexp = NO_CONTROL_CHARACTERS)
+    @field:Pattern(regexp = NO_CONTROL_CHARACTERS, message = "must not contain control characters")
     val description: String?,
 ) {
     /** An empty or blank description is treated as absent before it reaches the domain. */
     fun normalizedDescription(): String? = description?.takeIf { it.isNotBlank() }
 
     private companion object {
-        const val NO_CONTROL_CHARACTERS = "[^\\x00-\\x1F]*"
+        // Anchored because it is published as the OpenAPI `pattern`, which (ECMA-262) is not implicitly anchored.
+        const val NO_CONTROL_CHARACTERS = "^[^\\x00-\\x1F]*$"
     }
 }
 

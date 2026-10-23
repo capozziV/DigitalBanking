@@ -154,7 +154,7 @@ Payloads `eventVersion` 1:
 | `GET /admin/account-types` | `200` `[{type, overdraftLimit, updatedAt}]` | — |
 | `PUT /admin/account-types/{type}` `{overdraftLimit}` | `200` | `400`, `404 account-type-not-found` |
 
-- Valores em centavos, inteiros. JSON em camelCase. `amount` > 0; `description` até 140 caracteres; só real, sem campo de moeda.
+- Valores em centavos, inteiros. JSON em camelCase. `amount` > 0; `description` até 140 caracteres, sem caracteres de controle U+0000–U+001F (inclui tab e quebra de linha) → `400 validation-error`; `""` ou só espaços é ausente; só real, sem campo de moeda.
 - `Idempotency-Key`: 1 a 255 caracteres (UUID recomendado). A presença é verificada antes do corpo: ausente → `400 missing-idempotency-key`, mesmo com corpo inválido. O tamanho é validado depois do corpo (`400 validation-error`). Escopo da chave: a conta (crédito/débito) ou a abertura de conta. Chave de abertura reutilizada por outro cliente → `422 idempotency-key-reused`.
 - `X-Correlation-Id` recebido é reaproveitado se tiver de 1 a 128 caracteres em `[A-Za-z0-9._\-=+/]`; senão, o serviço gera um UUID.
 - Problem Details (RFC 9457) com `type` relativo `/problems/<slug>`. `400 validation-error` lista os campos inválidos. `503 account-busy` com `Retry-After: 1`.

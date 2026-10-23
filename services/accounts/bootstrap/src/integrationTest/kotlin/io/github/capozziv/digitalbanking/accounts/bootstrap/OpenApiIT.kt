@@ -118,7 +118,7 @@ class OpenApiIT : AccountsIntegrationTest() {
                 .get("description")
 
         assertThat(description.get("maxLength").asInt()).isEqualTo(140)
-        assertThat(description.get("pattern").asString()).isEqualTo("[^\\x00-\\x1F]*")
+        assertThat(description.get("pattern").asString()).isEqualTo("^[^\\x00-\\x1F]*$")
     }
 
     @Test

@@ -274,9 +274,50 @@ class AccountApiIT : AccountsIntegrationTest() {
 
         assertProblem(withNul, 400, "validation-error")
         assertThat(withNul.errorFields()).containsExactly("description")
+        assertThat(withNul.errorMessages()).containsExactly("must not contain control characters")
         assertProblem(withNewline, 400, "validation-error")
         assertThat(withNewline.errorFields()).containsExactly("description")
         assertThat(entryCount(accountId)).isZero()
+    }
+
+    @Test
+    fun `a description that is only a tab is 400 validation-error, not treated as absent`() {
+        val accountId = openAccount()
+
+        val response =
+            api.post(
+                "/accounts/$accountId/credits",
+                """{"amount":1,"description":"\t"}""",
+                key(UUID.randomUUID().toString()),
+            )
+
+        assertProblem(response, 400, "validation-error")
+        assertThat(response.errorFields()).containsExactly("description")
+        assertThat(entryCount(accountId)).isZero()
+    }
+
+    @Test
+    fun `U+001F in a description is 400 validation-error while U+0020 is accepted`() {
+        val accountId = openAccount()
+
+        val unitSeparator =
+            api.post(
+                "/accounts/$accountId/credits",
+                """{"amount":1,"description":"a\u001Fb"}""",
+                key(UUID.randomUUID().toString()),
+            )
+        val space =
+            api.post(
+                "/accounts/$accountId/credits",
+                """{"amount":1,"description":"a\u0020b"}""",
+                key(UUID.randomUUID().toString()),
+            )
+
+        assertProblem(unitSeparator, 400, "validation-error")
+        assertThat(unitSeparator.errorFields()).containsExactly("description")
+        assertThat(space.status).describedAs(space.rawBody).isEqualTo(201)
+        assertThat(space.body!!.get("description").asString()).isEqualTo("a b")
+        assertThat(entryCount(accountId)).isEqualTo(1)
     }
 
     @Test

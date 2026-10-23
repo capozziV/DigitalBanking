@@ -24,6 +24,12 @@ data class ApiResponse(
         val errors = body?.get("errors") ?: return emptyList()
         return (0 until errors.size()).map { errors.get(it).get("field").asString() }
     }
+
+    /** Messages listed in `errors` of a validation-error problem. */
+    fun errorMessages(): List<String> {
+        val errors = body?.get("errors") ?: return emptyList()
+        return (0 until errors.size()).map { errors.get(it).get("message").asString() }
+    }
 }
 
 /** Plain HTTP client for the integration tests: never throws on 4xx/5xx, returns status, headers and JSON. */
