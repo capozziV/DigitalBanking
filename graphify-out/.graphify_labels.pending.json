@@ -85,5 +85,6 @@
   "83": "IdempotencyKeyReusedException",
   "84": "OpenAccountUseCase",
   "85": "InMemoryAccountRepositoryTest",
-  "86": "testing-localstack/build.gradle.kts"
+  "86": "testing-localstack/build.gradle.kts",
+  "87": "JvmStatic"
 }

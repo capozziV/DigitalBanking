@@ -6,12 +6,12 @@
 - Unclassified: 18 file(s) not represented in the graph (top: .bru 8, (none) 3, .properties 2)
 
 ## Summary
-- 1128 nodes · 2758 edges · 87 communities (49 shown, 38 thin omitted)
+- 1129 nodes · 2758 edges · 88 communities (49 shown, 39 thin omitted)
 - Extraction: 90% EXTRACTED · 10% INFERRED · 0% AMBIGUOUS · INFERRED: 268 edges (avg confidence: 0.89)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `f93b45a3`
+- Built from commit: `c841b521`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -103,19 +103,19 @@
 ## Surprising Connections (you probably didn't know these)
 - `Task 9: API HTTP, Problem Details e correlation ID (Marina, `dev-kotlin`)` --references--> `CorrelationIdFilter`  [INFERRED]
   docs/superpowers/plans/2026-10-22-etapa-1-accounts.md → services/accounts/adapters/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/adapters/web/CorrelationIdFilter.kt
-- `4. Fluxos` --references--> `JdbcOutboxWriter`  [INFERRED]
-  docs/superpowers/specs/2026-10-22-etapa-1-accounts-design.md → libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/JdbcOutboxWriter.kt
-- `5. Outbox e relay (`libs/outbox`)` --references--> `JdbcOutboxWriter`  [INFERRED]
-  docs/superpowers/specs/2026-10-22-etapa-1-accounts-design.md → libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/JdbcOutboxWriter.kt
-- `Restrições (de `CLAUDE.md` e ADRs)` --references--> `JdbcOutboxWriter`  [INFERRED]
-  docs/superpowers/specs/2026-10-22-etapa-1-accounts-design.md → libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/JdbcOutboxWriter.kt
-- `Task 8: Esquema, usuários de banco e repositórios JDBC (Marina, `dev-kotlin`; o script de init do compose segue o padrão do Rafael)` --references--> `OutboxMessage`  [INFERRED]
-  docs/superpowers/plans/2026-10-22-etapa-1-accounts.md → libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/OutboxMessage.kt
+- `1. Módulos e camadas` --references--> `RecordCreditUseCase`  [INFERRED]
+  docs/superpowers/specs/2026-10-22-etapa-1-accounts-design.md → services/accounts/application/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/application/usecase/RecordCreditUseCase.kt
+- `1. Módulos e camadas` --references--> `RecordDebitUseCase`  [INFERRED]
+  docs/superpowers/specs/2026-10-22-etapa-1-accounts-design.md → services/accounts/application/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/application/usecase/RecordDebitUseCase.kt
+- `4. Fluxos` --references--> `RecordDebitUseCase`  [INFERRED]
+  docs/superpowers/specs/2026-10-22-etapa-1-accounts-design.md → services/accounts/application/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/application/usecase/RecordDebitUseCase.kt
+- `Task 10: OpenAPI, concorrência e idempotência ponta a ponta (Marina, `dev-kotlin`)` --references--> `LedgerEntryRecorded`  [INFERRED]
+  docs/superpowers/plans/2026-10-22-etapa-1-accounts.md → services/accounts/domain/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/domain/AccountEvent.kt
 
 ## Import Cycles
 - None detected.
 
-## Communities (87 total, 38 thin omitted)
+## Communities (88 total, 39 thin omitted)
 
 ### Community 0 - "LedgerEntry"
 Cohesion: 0.09
@@ -314,23 +314,23 @@ Cohesion: 0.47
 Nodes (3): Task 5: Casos de uso de crédito e débito (Marina, `dev-kotlin`), IdempotencyKeyReusedException, IdempotentEntryLookup
 
 ## Knowledge Gaps
-- **10 isolated node(s):** `INSERTED`, `DUPLICATE_OPENING_KEY`, `DUPLICATE_CUSTOMER`, `FREE`, `STANDARD` (+5 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 264 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **38 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **10 isolated node(s):** `CREDIT`, `DEBIT`, `DUPLICATE_CUSTOMER`, `DUPLICATE_OPENING_KEY`, `INSERTED` (+5 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 265 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **39 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `AccountsIntegrationTest` connect `JdbcRepositoriesIT` to `ConcurrencyIT`, `IdGenerator`, `AccountApiIT`, `AccountTypeAdminApiIT`, `AccountsApplicationIT.kt`, `AccountBusyException`, `uuid`, `ClockWiringIT.kt`, `5. Outbox e relay (`libs/outbox`)`?**
-  _High betweenness centrality (0.099) - this node is a cross-community bridge._
+  _High betweenness centrality (0.116) - this node is a cross-community bridge._
 - **Are the 8 inferred relationships involving `Account` (e.g. with `Regras inegociáveis` and `Clientes e contas`) actually correct?**
   _`Account` has 8 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `INSERTED`, `DUPLICATE_OPENING_KEY`, `DUPLICATE_CUSTOMER` to the rest of the system?**
+- **What connects `CREDIT`, `DEBIT`, `DUPLICATE_CUSTOMER` to the rest of the system?**
   _10 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `LedgerEntry` be split into smaller, more focused modules?**
   _Cohesion score 0.0861952861952862 - nodes in this community are weakly interconnected._
-- **Why does `LedgerEntry` connect `Money` to `LedgerEntry`, `OverdraftLimit`, `JdbcRepositoriesIT`, `Status do projeto`, `ProblemDetailsExceptionHandler.kt`, `AccountType`, `AvailableBalance`, `AccountBusyException`, `uuid`, `Banco digital em microsserviços`, `IdempotencyKeyReusedException`, `OpenAccountUseCase`, `AccountController.kt`, `.record`?**
-  _High betweenness centrality (0.090) - this node is a cross-community bridge._
+- **Why does `AccountApiIT` connect `AccountApiIT` to `ConcurrencyIT`, `JdbcRepositoriesIT`?**
+  _High betweenness centrality (0.094) - this node is a cross-community bridge._
 - **Are the 10 inferred relationships involving `LedgerEntry` (e.g. with `Regras inegociáveis` and `Ledger`) actually correct?**
   _`LedgerEntry` has 10 INFERRED edges - model-reasoned connections that need verification._
 - **Should `IdGenerator` be split into smaller, more focused modules?**
