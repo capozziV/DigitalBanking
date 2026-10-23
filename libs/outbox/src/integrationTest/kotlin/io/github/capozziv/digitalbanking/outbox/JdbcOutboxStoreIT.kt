@@ -84,7 +84,7 @@ class JdbcOutboxStoreIT {
 
     @Test
     fun `a different lock key does not compete for leadership`() {
-        val result = store.asLeader(LOCK_KEY) { store.asLeaderOnOtherConnection(LOCK_KEY + 1) }
+        val result = store.asLeader(LOCK_KEY) { store.asLeaderOnOtherConnection(LOCK_KEY + 1) ?: "not leader" }
 
         assertThat(result).isEqualTo("other")
     }
@@ -112,6 +112,29 @@ class JdbcOutboxStoreIT {
 
         assertThat(pending.map { it.position }).containsExactly(p1, p3)
         assertThat(store.asLeader(LOCK_KEY) { store.fetchPending(10) }!!.map { it.position }).containsExactly(p1, p3, p4)
+    }
+
+    @Test
+    fun `fetchPending offers only the head event of an account with a failed event, so other accounts still fit the batch`() {
+        repeat(3) { write("acc-A") }
+        write("acc-B")
+        val (a1, _, _, b1) = positions()
+        assertThat(store.asLeader(LOCK_KEY) { store.fetchPending(3) }!!.map { it.aggregateId }).containsOnly("acc-A")
+
+        store.asLeader(LOCK_KEY) { store.markFailed(a1, "sns down") }
+
+        assertThat(store.asLeader(LOCK_KEY) { store.fetchPending(3) }!!.map { it.position }).containsExactly(a1, b1)
+    }
+
+    @Test
+    fun `fetchPending releases the rest of an account once its failed head event is published`() {
+        repeat(3) { write("acc-A") }
+        val (a1, a2, a3) = positions()
+        store.asLeader(LOCK_KEY) { store.markFailed(a1, "sns down") }
+
+        store.asLeader(LOCK_KEY) { store.markPublished(a1, now) }
+
+        assertThat(store.asLeader(LOCK_KEY) { store.fetchPending(10) }!!.map { it.position }).containsExactly(a2, a3)
     }
 
     @Test
@@ -151,6 +174,30 @@ class JdbcOutboxStoreIT {
             }
 
         assertThat(plan).contains("outbox_unpublished_idx")
+    }
+
+    @Test
+    fun `fetchPending reads a large, mostly published outbox without scanning the table`() {
+        jdbcClient
+            .sql(
+                """
+                insert into outbox (event_id, aggregate_id, event_type, event_version, payload, occurred_at, published_at)
+                select gen_random_uuid(), 'acc-' || (g % 500), 'T', 1, '{}', now(), case when g <= 19000 then now() end
+                from generate_series(1, 20000) g
+                """.trimIndent(),
+            ).update()
+        jdbcClient.sql("update outbox set attempts = 1 where position in (19001, 19050)").update()
+        jdbcClient.sql("analyze outbox").update()
+
+        val plan =
+            jdbcClient
+                .sql("explain ${JdbcOutboxStore.FETCH_PENDING_SQL}")
+                .param("limit", 100)
+                .query(String::class.java)
+                .list()
+                .joinToString("\n")
+
+        assertThat(plan).contains("outbox_unpublished_idx", "outbox_stuck_idx").doesNotContain("Seq Scan")
     }
 
     @Test

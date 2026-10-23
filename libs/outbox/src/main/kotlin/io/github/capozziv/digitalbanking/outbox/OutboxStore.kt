@@ -9,12 +9,16 @@ interface OutboxStore {
      * Runs [block] in one transaction holding the relay lock [lockKey]. Returns `null` without running
      * [block] when another instance holds the lock. The lock is released when the transaction ends.
      */
-    fun <T> asLeader(
+    fun <T : Any> asLeader(
         lockKey: Long,
         block: () -> T,
     ): T?
 
-    /** Up to [limit] unpublished events, in position order. */
+    /**
+     * Up to [limit] unpublished events, in position order, leaving out every event that has an earlier
+     * unpublished event of the same aggregate with a failed attempt. A stuck aggregate thus offers only its
+     * head event and cannot fill the batch.
+     */
     fun fetchPending(limit: Int): List<PendingEvent>
 
     fun markPublished(

@@ -8,10 +8,12 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.testcontainers.localstack.LocalStackContainer
 import software.amazon.awssdk.services.sns.SnsClient
+import software.amazon.awssdk.services.sns.model.SnsException
 import software.amazon.awssdk.services.sqs.SqsClient
 import software.amazon.awssdk.services.sqs.model.Message
 import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName
 import software.amazon.awssdk.services.sqs.model.QueueAttributeName
+import java.time.Duration
 import java.time.Instant
 import java.util.UUID
 
@@ -22,7 +24,7 @@ class SnsEventPublisherIT {
         val (topicArn, queueUrl) = topicWithQueue("full")
         val event = event(aggregateId = "acc-1", correlationId = "corr-1")
 
-        SnsEventPublisher(sns, topicArn).publish(event)
+        SnsEventPublisher(sns, topicArn, PUBLISH_TIMEOUT).publish(event)
 
         val message = receiveOne(queueUrl)
         assertThat(message.body()).isEqualTo(OutboxEnvelope.toJson(event))
@@ -37,7 +39,7 @@ class SnsEventPublisherIT {
     fun `omits the correlation id attribute when the event has none`() {
         val (topicArn, queueUrl) = topicWithQueue("nocorr")
 
-        SnsEventPublisher(sns, topicArn).publish(event(aggregateId = "acc-2", correlationId = null))
+        SnsEventPublisher(sns, topicArn, PUBLISH_TIMEOUT).publish(event(aggregateId = "acc-2", correlationId = null))
 
         assertThat(receiveOne(queueUrl).messageAttributes().keys).containsExactly("eventType")
     }
@@ -46,8 +48,13 @@ class SnsEventPublisherIT {
     fun `throws when the topic does not accept the message`() {
         val missingTopic = "arn:aws:sns:${localStack.region}:000000000000:missing.fifo"
 
-        assertThatThrownBy { SnsEventPublisher(sns, missingTopic).publish(event(aggregateId = "acc-3", correlationId = null)) }
-            .isInstanceOf(Exception::class.java)
+        assertThatThrownBy {
+            SnsEventPublisher(
+                sns,
+                missingTopic,
+                PUBLISH_TIMEOUT,
+            ).publish(event(aggregateId = "acc-3", correlationId = null))
+        }.isInstanceOf(SnsException::class.java)
     }
 
     private fun event(
@@ -102,6 +109,7 @@ class SnsEventPublisherIT {
             .single()
 
     companion object {
+        private val PUBLISH_TIMEOUT = Duration.ofSeconds(5)
         private lateinit var localStack: LocalStackContainer
         private lateinit var sns: SnsClient
         private lateinit var sqs: SqsClient

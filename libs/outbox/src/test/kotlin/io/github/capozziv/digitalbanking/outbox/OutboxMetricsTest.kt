@@ -14,6 +14,14 @@ class OutboxMetricsTest {
         assertThat(registry.get("outbox.pending").gauge().value()).isZero()
         assertThat(registry.get("outbox.oldest.pending.age").gauge().value()).isZero()
         assertThat(registry.get("outbox.publish.failures").counter().count()).isZero()
+        assertThat(registry.get("outbox.relay.cycles").counter().count()).isZero()
+    }
+
+    @Test
+    fun `each relay cycle increments the cycle counter`() {
+        metrics.recordCycle()
+
+        assertThat(registry.get("outbox.relay.cycles").counter().count()).isEqualTo(1.0)
     }
 
     @Test

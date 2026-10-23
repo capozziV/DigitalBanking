@@ -6,7 +6,12 @@ import io.micrometer.core.instrument.MeterRegistry
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
-/** Micrometer meters of the outbox relay: backlog gauges and the publish failure counter. */
+/**
+ * Micrometer meters of the outbox relay: backlog gauges, the publish failure counter and the cycle counter.
+ *
+ * The gauges hold the value of the last cycle, so they freeze if the relay stops running; a stopped relay
+ * shows as `outbox.relay.cycles` no longer increasing.
+ */
 class OutboxMetrics(
     registry: MeterRegistry,
 ) {
@@ -17,6 +22,11 @@ class OutboxMetrics(
             .builder("outbox.publish.failures")
             .description("Outbox events whose publication failed")
             .register(registry)
+    private val cycles: Counter =
+        Counter
+            .builder("outbox.relay.cycles")
+            .description("Relay cycles run, with or without leadership")
+            .register(registry)
 
     init {
         Gauge
@@ -25,7 +35,7 @@ class OutboxMetrics(
             .register(registry)
         Gauge
             .builder("outbox.oldest.pending.age", oldestAgeSeconds) { it.get() }
-            .description("Age of the oldest outbox event waiting for publication")
+            .description("Age of the oldest outbox event waiting for publication, as of the last relay cycle")
             .baseUnit("seconds")
             .register(registry)
     }
@@ -33,6 +43,10 @@ class OutboxMetrics(
     fun recordBacklog(backlog: OutboxBacklog) {
         pending.set(backlog.pending)
         oldestAgeSeconds.set(backlog.oldestAge?.let { it.toNanos() / NANOS_PER_SECOND } ?: 0.0)
+    }
+
+    fun recordCycle() {
+        cycles.increment()
     }
 
     fun recordPublishFailure() {

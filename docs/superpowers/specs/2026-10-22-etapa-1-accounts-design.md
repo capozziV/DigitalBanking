@@ -73,7 +73,7 @@ api/bruno/accounts/                # coleção Bruno
 **`outbox`** (migration modelo fornecida pelo `libs/outbox`, copiada para as migrations do serviço)
 - `position` (`bigserial`, PK, ordem de gravação), `event_id` (`uuid`, `UNIQUE`), `aggregate_id`, `event_type`, `event_version`, `payload` (`jsonb`), `correlation_id`, `occurred_at`, `published_at` (nulo até publicar), `attempts` (padrão 0), `last_error`.
 - `NOT NULL` nas colunas que o writer sempre preenche: `event_id`, `aggregate_id`, `event_type`, `event_version`, `payload`, `occurred_at`; e `attempts` (`NOT NULL`, padrão 0). Aceitam nulo: `correlation_id`, `published_at` e `last_error`.
-- Índice parcial `(position) WHERE published_at IS NULL`. As linhas publicadas ficam para sempre.
+- Índice parcial `(position) WHERE published_at IS NULL` e índice parcial `(aggregate_id, position) WHERE published_at IS NULL AND attempts > 0` (linhas com falha, para a leitura do relay não varrer a tabela). As linhas publicadas ficam para sempre.
 
 **Usuários de banco** (criados pelo script de init do PostgreSQL)
 - `accounts_owner`: dono das tabelas, usado pelo Flyway (`spring.flyway.user`/`password`).
@@ -126,18 +126,19 @@ Payloads `eventVersion` 1:
 
 **Ciclo do `OutboxRelay`** (`@Scheduled`, intervalo configurável, padrão 500 ms):
 1. Abre transação e tenta `pg_try_advisory_xact_lock(<chave do relay do serviço>)`. Sem a trava, encerra o ciclo. A trava se solta no fim da transação.
-2. Lê até 100 linhas (configurável) com `published_at IS NULL`, `ORDER BY position`.
+2. Lê até 100 linhas (configurável) com `published_at IS NULL`, `ORDER BY position`, deixando de fora as linhas cuja conta tem outra linha pendente com `attempts > 0` e `position` menor. Assim, a conta presa oferece só o evento da cabeça a cada ciclo e o resto do lote vem das outras contas.
 3. Para cada linha, em ordem:
+   - prazo do ciclo estourado (padrão 10 s, configurável) → para de publicar, com log `WARN`; o resto fica para o próximo ciclo;
    - conta (`aggregate_id`) que já falhou neste ciclo → pula;
-   - publica no SNS FIFO com `MessageGroupId = aggregateId`, `MessageDeduplicationId = eventId` e atributos `eventType` e `correlationId`;
+   - publica no SNS FIFO com `MessageGroupId = aggregateId`, `MessageDeduplicationId = eventId` e atributos `eventType` e `correlationId`, com limite de tempo por chamada (padrão 2 s, configurável);
    - sucesso → `published_at = now()`;
-   - falha → `attempts + 1`, `last_error`, conta marcada como bloqueada no ciclo; com `attempts` ≥ 10 (configurável), log `ERROR`.
+   - falha na publicação → `attempts + 1`, `last_error`, conta marcada como bloqueada no ciclo; log `WARN` com a mensagem e, com `attempts` ≥ 10 (configurável), `ERROR` com o stack trace. Erro de banco ao marcar a linha não conta como falha de publicação: desfaz o ciclo, e os eventos já publicados saem de novo (a deduplicação absorve).
 4. Commit.
 
 - Publicado e não confirmado (queda antes do commit) → sai de novo no próximo ciclo; a deduplicação FIFO (5 min) e os consumidores idempotentes absorvem.
 - **`SnsEventPublisher`:** AWS SDK for Java v2 (`SnsClient`) direto; endpoint e região por configuração (LocalStack no ambiente local e nos testes).
 - **Recursos:** tópico `accounts-events.fifo` e fila `accounts-events-inspection.fifo` assinada nele (sem consumidor; para inspeção manual e testes), criados pelo script de init do LocalStack.
-- **Métricas Micrometer:** eventos pendentes, idade do pendente mais antigo, falhas de publicação. `/actuator/metrics` passa a ser exposto.
+- **Métricas Micrometer:** eventos pendentes, idade do pendente mais antigo, falhas de publicação e ciclos do relay (os gauges congelam se o relay parar; a parada aparece no contador de ciclos). `/actuator/metrics` passa a ser exposto.
 - O relay **não** afeta o `/actuator/health`.
 - Desligamento: o ciclo em andamento termina antes de a aplicação parar.
 

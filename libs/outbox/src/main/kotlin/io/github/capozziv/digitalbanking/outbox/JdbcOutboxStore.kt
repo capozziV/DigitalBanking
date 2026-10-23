@@ -18,7 +18,7 @@ class JdbcOutboxStore(
     private val jdbcClient: JdbcClient,
     private val transactions: TransactionOperations,
 ) : OutboxStore {
-    override fun <T> asLeader(
+    override fun <T : Any> asLeader(
         lockKey: Long,
         block: () -> T,
     ): T? =
@@ -86,9 +86,19 @@ class JdbcOutboxStore(
         )
 
     companion object {
-        /** Reads through the partial index `outbox_unpublished_idx`. */
+        /**
+         * Pending events in position order, without those queued behind a failed event of the same aggregate.
+         * Both the scan and the anti-join probe read through the partial index `outbox_unpublished_idx`.
+         */
         const val FETCH_PENDING_SQL =
-            "select position, event_id, aggregate_id, event_type, event_version, payload, correlation_id, " +
-                "occurred_at, attempts from outbox where published_at is null order by position limit :limit"
+            "select o.position, o.event_id, o.aggregate_id, o.event_type, o.event_version, o.payload, " +
+                "o.correlation_id, o.occurred_at, o.attempts " +
+                "from outbox o " +
+                "where o.published_at is null " +
+                "and not exists (" +
+                "select 1 from outbox stuck " +
+                "where stuck.published_at is null and stuck.attempts > 0 " +
+                "and stuck.aggregate_id = o.aggregate_id and stuck.position < o.position) " +
+                "order by o.position limit :limit"
     }
 }

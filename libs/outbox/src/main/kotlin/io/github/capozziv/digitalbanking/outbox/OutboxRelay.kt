@@ -7,6 +7,7 @@ import java.time.Clock
 /**
  * Publishes the outbox in position order. Only the instance holding the relay lock publishes; a failed
  * event blocks the later events of its aggregate until the next cycle, while other aggregates go on.
+ * A cycle stops publishing after [OutboxRelaySettings.maxCycleDuration]; the rest waits for the next one.
  */
 class OutboxRelay(
     private val store: OutboxStore,
@@ -18,30 +19,41 @@ class OutboxRelay(
     fun runCycle() {
         val ranAsLeader = store.asLeader(settings.lockKey) { publishBatch() }
         if (ranAsLeader == null) log.debug("Outbox relay lock held by another instance; skipping cycle")
+        metrics.recordCycle()
         metrics.recordBacklog(store.backlog(clock.instant()))
     }
 
     private fun publishBatch() {
+        val deadline = clock.instant().plus(settings.maxCycleDuration)
         val blockedAggregates = mutableSetOf<String>()
         for (event in store.fetchPending(settings.batchSize)) {
+            if (!clock.instant().isBefore(deadline)) {
+                log.warn(
+                    "Outbox relay cycle exceeded its maximum duration of {}; remaining events wait for the next cycle",
+                    settings.maxCycleDuration,
+                )
+                return
+            }
             if (event.aggregateId in blockedAggregates) continue
             withCorrelationId(event.correlationId) {
-                if (!tryPublish(event)) blockedAggregates += event.aggregateId
+                if (!publish(event)) blockedAggregates += event.aggregateId
             }
         }
     }
 
-    private fun tryPublish(event: PendingEvent): Boolean =
+    /** A broker failure is recorded on the event; a database failure propagates and rolls the cycle back. */
+    private fun publish(event: PendingEvent): Boolean {
         try {
             publisher.publish(event)
-            store.markPublished(event.position, clock.instant())
-            true
         } catch (e: Exception) {
             store.markFailed(event.position, describe(e))
             metrics.recordPublishFailure()
             logFailure(event, e)
-            false
+            return false
         }
+        store.markPublished(event.position, clock.instant())
+        return true
+    }
 
     private fun logFailure(
         event: PendingEvent,
@@ -50,10 +62,10 @@ class OutboxRelay(
         val attempts = event.attempts + 1
         val message =
             "Outbox event publication failed; later events of the aggregate wait for the next cycle " +
-                "(position={}, eventId={}, aggregateId={}, eventType={}, attempts={})"
-        val arguments = arrayOf(event.position, event.eventId, event.aggregateId, event.eventType, attempts, error)
+                "(position={}, eventId={}, aggregateId={}, eventType={}, attempts={}, error={})"
+        val arguments = arrayOf<Any>(event.position, event.eventId, event.aggregateId, event.eventType, attempts, describe(error))
         if (attempts >= settings.alertAfterAttempts) {
-            log.error(message, *arguments)
+            log.error(message, *arguments, error)
         } else {
             log.warn(message, *arguments)
         }

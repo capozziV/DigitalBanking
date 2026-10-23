@@ -6,6 +6,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -14,17 +15,19 @@ import org.slf4j.MDC
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.UUID
 
 class OutboxRelayTest {
     private val now = Instant.parse("2026-10-22T14:31:00Z")
-    private val clock = Clock.fixed(now, ZoneOffset.UTC)
+    private val clock = MutableClock(now)
     private val store = FakeOutboxStore()
     private val publisher = FakeEventPublisher()
     private val registry = SimpleMeterRegistry()
-    private val settings = OutboxRelaySettings(batchSize = 50, alertAfterAttempts = 10, lockKey = 42)
-    private val relay = OutboxRelay(store, publisher, settings, clock, OutboxMetrics(registry))
+    private val settings =
+        OutboxRelaySettings(batchSize = 50, alertAfterAttempts = 10, lockKey = 42, maxCycleDuration = Duration.ofSeconds(10))
+    private val relay = relay(settings)
 
     private val logger = LoggerFactory.getLogger(OutboxRelay::class.java) as Logger
     private val logs = ListAppender<ILoggingEvent>()
@@ -74,6 +77,21 @@ class OutboxRelayTest {
     }
 
     @Test
+    fun `a stuck account filling a whole batch does not hold back other accounts in the next cycle`() {
+        val relay = relay(settings.copy(batchSize = 3))
+        store.add(event(1, "A"), event(2, "A"), event(3, "A"), event(4, "B"))
+        publisher.failOn(1)
+
+        relay.runCycle()
+        assertThat(publisher.attempted.map { it.position }).containsExactly(1)
+
+        relay.runCycle()
+
+        assertThat(publisher.attempted.map { it.position }).containsExactly(1, 1, 4)
+        assertThat(store.publishedAt.keys).containsExactly(4L)
+    }
+
+    @Test
     fun `failure is recorded with the error message`() {
         store.add(event(1, "A"))
         publisher.failOn(1)
@@ -84,17 +102,20 @@ class OutboxRelayTest {
     }
 
     @Test
-    fun `failure below the alert threshold logs a warning, not an error`() {
+    fun `failure below the alert threshold logs a warning with the error message and no stack trace`() {
         store.add(event(1, "A", attempts = 8))
         publisher.failOn(1)
 
         relay.runCycle()
 
-        assertThat(logs.list.map { it.level }).contains(Level.WARN).doesNotContain(Level.ERROR)
+        val warning = logs.list.single { it.level == Level.WARN }
+        assertThat(warning.formattedMessage).contains("sns down for 1")
+        assertThat(warning.throwableProxy).isNull()
+        assertThat(logs.list.map { it.level }).doesNotContain(Level.ERROR)
     }
 
     @Test
-    fun `failure that reaches the alert threshold logs an error with the event and its correlation id`() {
+    fun `failure that reaches the alert threshold logs an error with the event, its correlation id and the stack trace`() {
         store.add(event(1, "A", attempts = 9, correlationId = "corr-1"))
         publisher.failOn(1)
 
@@ -102,6 +123,7 @@ class OutboxRelayTest {
 
         val error = logs.list.single { it.level == Level.ERROR }
         assertThat(error.formattedMessage).contains("eventId=${eventId(1)}", "aggregateId=A", "attempts=10")
+        assertThat(error.throwableProxy.message).isEqualTo("sns down for 1")
         assertThat(error.mdcPropertyMap).containsEntry(OutboxEnvelope.CORRELATION_ID_MDC_KEY, "corr-1")
         assertThat(MDC.get(OutboxEnvelope.CORRELATION_ID_MDC_KEY)).isNull()
     }
@@ -118,6 +140,31 @@ class OutboxRelayTest {
     }
 
     @Test
+    fun `a database error when marking an event published propagates instead of counting as a publish failure`() {
+        store.add(event(1, "A"))
+        store.failMarkPublished = true
+
+        assertThatThrownBy { relay.runCycle() }.hasMessageContaining("database down")
+
+        assertThat(store.failures).isEmpty()
+        assertThat(registry.get("outbox.publish.failures").counter().count()).isZero()
+    }
+
+    @Test
+    fun `stops publishing when the cycle exceeds its maximum duration and warns once`() {
+        store.add(event(1, "A"), event(2, "B"), event(3, "C"), event(4, "D"))
+        publisher.onPublish = { clock.advance(Duration.ofSeconds(4)) }
+
+        relay.runCycle()
+
+        assertThat(publisher.attempted.map { it.position }).containsExactly(1, 2, 3)
+        assertThat(store.publishedAt.keys).containsExactly(1L, 2L, 3L)
+        assertThat(logs.list.filter { it.level == Level.WARN }).singleElement().satisfies({
+            assertThat(it.formattedMessage).contains("maximum duration")
+        })
+    }
+
+    @Test
     fun `without leadership nothing is read nor published`() {
         store.add(event(1, "A"))
         store.leader = false
@@ -130,16 +177,20 @@ class OutboxRelayTest {
     }
 
     @Test
-    fun `backlog gauges are refreshed after every cycle, with or without leadership`() {
+    fun `backlog gauges and the cycle counter are refreshed after every cycle, with or without leadership`() {
         store.backlog = OutboxBacklog(pending = 4, oldestAge = Duration.ofSeconds(3))
         store.leader = false
 
         relay.runCycle()
+        relay.runCycle()
 
-        assertThat(store.backlogQueriedAt).containsExactly(now)
+        assertThat(store.backlogQueriedAt).containsExactly(now, now)
         assertThat(registry.get("outbox.pending").gauge().value()).isEqualTo(4.0)
         assertThat(registry.get("outbox.oldest.pending.age").gauge().value()).isEqualTo(3.0)
+        assertThat(registry.get("outbox.relay.cycles").counter().count()).isEqualTo(2.0)
     }
+
+    private fun relay(settings: OutboxRelaySettings) = OutboxRelay(store, publisher, settings, clock, OutboxMetrics(registry))
 
     private fun eventId(position: Long) = UUID(0, position)
 
@@ -160,10 +211,26 @@ class OutboxRelayTest {
         attempts = attempts,
     )
 
+    private class MutableClock(
+        private var instant: Instant,
+    ) : Clock() {
+        fun advance(duration: Duration) {
+            instant = instant.plus(duration)
+        }
+
+        override fun instant(): Instant = instant
+
+        override fun getZone(): ZoneId = ZoneOffset.UTC
+
+        override fun withZone(zone: ZoneId): Clock = this
+    }
+
+    /** Follows the [OutboxStore.fetchPending] contract: an account with a failed event only offers that event. */
     private class FakeOutboxStore : OutboxStore {
         var leader = true
+        var failMarkPublished = false
         var backlog = OutboxBacklog(pending = 0, oldestAge = null)
-        private val pending = mutableListOf<PendingEvent>()
+        private val rows = linkedMapOf<Long, PendingEvent>()
         private var insideLeadership = false
         val leaderLockKeys = mutableListOf<Long>()
         val fetchLimits = mutableListOf<Int>()
@@ -173,10 +240,10 @@ class OutboxRelayTest {
         val callsOutsideLeadership = mutableListOf<String>()
 
         fun add(vararg events: PendingEvent) {
-            pending += events
+            events.forEach { rows[it.position] = it }
         }
 
-        override fun <T> asLeader(
+        override fun <T : Any> asLeader(
             lockKey: Long,
             block: () -> T,
         ): T? {
@@ -193,7 +260,11 @@ class OutboxRelayTest {
         override fun fetchPending(limit: Int): List<PendingEvent> {
             requireLeadership("fetchPending")
             fetchLimits += limit
-            return pending.sortedBy { it.position }.take(limit)
+            val pending = rows.values.filter { it.position !in publishedAt }.sortedBy { it.position }
+            return pending
+                .filter { event ->
+                    pending.none { it.aggregateId == event.aggregateId && it.attempts > 0 && it.position < event.position }
+                }.take(limit)
         }
 
         override fun markPublished(
@@ -201,6 +272,7 @@ class OutboxRelayTest {
             at: Instant,
         ) {
             requireLeadership("markPublished")
+            if (failMarkPublished) throw IllegalStateException("database down")
             publishedAt[position] = at
         }
 
@@ -210,6 +282,7 @@ class OutboxRelayTest {
         ) {
             requireLeadership("markFailed")
             failures[position] = error
+            rows.computeIfPresent(position) { _, row -> row.copy(attempts = row.attempts + 1) }
         }
 
         override fun backlog(now: Instant): OutboxBacklog {
@@ -224,6 +297,7 @@ class OutboxRelayTest {
 
     private class FakeEventPublisher : EventPublisher {
         private val failing = mutableSetOf<Long>()
+        var onPublish: () -> Unit = {}
         val attempted = mutableListOf<PendingEvent>()
         val published = mutableListOf<PendingEvent>()
 
@@ -233,6 +307,7 @@ class OutboxRelayTest {
 
         override fun publish(event: PendingEvent) {
             attempted += event
+            onPublish()
             if (event.position in failing) throw IllegalStateException("sns down for ${event.position}")
             published += event
         }

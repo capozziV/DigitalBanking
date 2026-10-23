@@ -15,3 +15,7 @@ create table outbox (
 );
 
 create index outbox_unpublished_idx on outbox (position) where published_at is null;
+
+-- Unpublished events that already failed: lets the relay leave out what queues behind a stuck aggregate
+-- without scanning the table (it stays tiny, since only failed events enter it).
+create index outbox_stuck_idx on outbox (aggregate_id, position) where published_at is null and attempts > 0;
