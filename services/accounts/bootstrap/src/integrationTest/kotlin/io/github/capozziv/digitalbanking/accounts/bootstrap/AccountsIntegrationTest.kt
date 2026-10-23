@@ -5,6 +5,7 @@ import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.jdbc.datasource.DriverManagerDataSource
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.context.TestPropertySource
 import org.testcontainers.postgresql.PostgreSQLContainer
 
 /**
@@ -12,8 +13,11 @@ import org.testcontainers.postgresql.PostgreSQLContainer
  * subclasses (singleton container, so the cached Spring context keeps a valid connection).
  * The application connects as [APP_USER] (no UPDATE/DELETE on ledger_entry); Flyway runs as the
  * container's owner user, mirroring accounts_owner / accounts_app of the local environment.
+ * The outbox relay is off, so outbox rows stay as the operations wrote them; the relay tests turn it on
+ * (a subclass @TestPropertySource overrides this one).
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@TestPropertySource(properties = ["accounts.outbox.relay-enabled=false"])
 abstract class AccountsIntegrationTest {
     /** JdbcClient connected as the owner user, for setup and inspection outside the application's grants. */
     protected val ownerJdbc: JdbcClient by lazy {

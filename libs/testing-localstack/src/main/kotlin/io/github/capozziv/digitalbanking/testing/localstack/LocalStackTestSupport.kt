@@ -15,7 +15,7 @@ import software.amazon.awssdk.services.sqs.SqsClient
  * environment, optional egress proxy, and the skip-locally / fail-on-CI rule for a missing token.
  */
 object LocalStackTestSupport {
-    /** Pinned release; the compose and the CI use the same tag. */
+    /** Pinned release; infra/local/docker-compose.yml (compose and CI smoke) uses the same tag: change both together. */
     const val IMAGE = "localstack/localstack:2026.10.2"
     const val AUTH_TOKEN_VARIABLE = "LOCALSTACK_AUTH_TOKEN"
 

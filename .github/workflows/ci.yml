@@ -24,6 +24,9 @@ jobs:
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v6
       - name: Build (compile, ktlint, testes, ArchUnit, integracao)
+        env:
+          # Testes com LocalStack; sem o segredo, falham no CI em vez de serem pulados.
+          LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
         run: ./gradlew build
       - name: Publicar relatorios de teste
         if: failure()
@@ -45,8 +48,15 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
       - name: Gerar o jar executavel
         run: ./gradlew :services:accounts:bootstrap:bootJar
-      - name: Subir a infra local
-        run: docker compose --env-file infra/local/.env.example -f infra/local/docker-compose.yml up --wait
+      - name: Subir a infra local (PostgreSQL, Redis, nginx, LocalStack)
+        env:
+          LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
+        run: |
+          if [ -z "$LOCALSTACK_AUTH_TOKEN" ]; then
+            echo "segredo LOCALSTACK_AUTH_TOKEN ausente" >&2
+            exit 1
+          fi
+          docker compose --env-file infra/local/.env.example -f infra/local/docker-compose.yml up --wait
       - name: Subir o servico accounts
         run: |
           set -a
@@ -64,11 +74,13 @@ jobs:
           done
           echo "health nao ficou UP em 60 s" >&2
           exit 1
-      - name: Operacoes via nginx (abrir, creditar, debitar, consultar)
+      - name: Operacoes via nginx e eventos na fila de inspecao do LocalStack
         run: bash infra/local/smoke.sh http://127.0.0.1
-      - name: Log do servico em caso de falha
+      - name: Log do servico e do LocalStack em caso de falha
         if: failure()
-        run: cat accounts.log || true
+        run: |
+          cat accounts.log || true
+          docker compose --env-file infra/local/.env.example -f infra/local/docker-compose.yml logs localstack || true
       - name: Derrubar a infra local
         if: always()
         run: docker compose --env-file infra/local/.env.example -f infra/local/docker-compose.yml down -v

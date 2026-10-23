@@ -10,7 +10,8 @@ import java.util.concurrent.atomic.AtomicReference
  * Micrometer meters of the outbox relay: backlog gauges, the publish failure counter and the cycle counter.
  *
  * The gauges hold the value of the last cycle, so they freeze if the relay stops running; a stopped relay
- * shows as `outbox.relay.cycles` no longer increasing.
+ * shows as `outbox.relay.cycles` no longer increasing. Only completed cycles count: a cycle that throws
+ * (a database error, for instance) records neither the cycle nor the backlog.
  */
 class OutboxMetrics(
     registry: MeterRegistry,
@@ -25,7 +26,7 @@ class OutboxMetrics(
     private val cycles: Counter =
         Counter
             .builder("outbox.relay.cycles")
-            .description("Relay cycles run, with or without leadership")
+            .description("Relay cycles completed, with or without leadership")
             .register(registry)
 
     init {
