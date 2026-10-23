@@ -15,7 +15,7 @@ value class Balance(
             try {
                 operation()
             } catch (e: ArithmeticException) {
-                throw IllegalArgumentException("balance overflow", e)
+                throw BalanceOverflowException("balance overflow", e)
             }
     }
 }

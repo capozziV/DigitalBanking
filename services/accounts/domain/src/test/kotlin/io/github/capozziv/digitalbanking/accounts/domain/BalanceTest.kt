@@ -23,14 +23,14 @@ class BalanceTest {
     @Test
     fun `adding money beyond the maximum balance fails`() {
         assertThatThrownBy { Balance(Long.MAX_VALUE) + Money(1) }
-            .isInstanceOf(IllegalArgumentException::class.java)
+            .isInstanceOf(BalanceOverflowException::class.java)
             .hasMessage("balance overflow")
     }
 
     @Test
     fun `subtracting money beyond the minimum balance fails`() {
         assertThatThrownBy { Balance(Long.MIN_VALUE) - Money(1) }
-            .isInstanceOf(IllegalArgumentException::class.java)
+            .isInstanceOf(BalanceOverflowException::class.java)
             .hasMessage("balance overflow")
     }
 
@@ -42,7 +42,7 @@ class BalanceTest {
     @Test
     fun `available balance beyond the maximum fails instead of wrapping around`() {
         assertThatThrownBy { AvailableBalance.of(Balance(Long.MAX_VALUE), OverdraftLimit(1)) }
-            .isInstanceOf(IllegalArgumentException::class.java)
+            .isInstanceOf(BalanceOverflowException::class.java)
             .hasMessage("available balance overflow")
     }
 

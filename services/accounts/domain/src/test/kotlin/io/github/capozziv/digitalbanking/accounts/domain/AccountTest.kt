@@ -115,7 +115,7 @@ class AccountTest {
     fun `credit beyond the maximum balance fails`() {
         assertThatThrownBy {
             account.credit(lastEntry(sequence = 1, balanceAfter = Long.MAX_VALUE), entryId, Money(1), null, "key-8", now)
-        }.isInstanceOf(IllegalArgumentException::class.java)
+        }.isInstanceOf(BalanceOverflowException::class.java)
             .hasMessage("balance overflow")
     }
 

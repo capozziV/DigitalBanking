@@ -14,7 +14,7 @@ value class AvailableBalance(
             try {
                 AvailableBalance(Math.addExact(balance.cents, limit.cents))
             } catch (e: ArithmeticException) {
-                throw IllegalArgumentException("available balance overflow", e)
+                throw BalanceOverflowException("available balance overflow", e)
             }
     }
 }
