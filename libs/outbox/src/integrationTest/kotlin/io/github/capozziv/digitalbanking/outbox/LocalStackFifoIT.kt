@@ -1,21 +1,19 @@
 package io.github.capozziv.digitalbanking.outbox
 
+import io.github.capozziv.digitalbanking.testing.localstack.LocalStackTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.testcontainers.localstack.LocalStackContainer
-import org.testcontainers.utility.DockerImageName
-import org.testcontainers.utility.MountableFile
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
-import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.sns.SnsClient
 import software.amazon.awssdk.services.sns.model.MessageAttributeValue
 import software.amazon.awssdk.services.sqs.SqsClient
+import software.amazon.awssdk.services.sqs.model.Message
 import software.amazon.awssdk.services.sqs.model.QueueAttributeName
 import tools.jackson.databind.json.JsonMapper
+import java.time.Duration
+import java.time.Instant
 
 /**
  * Checks that the pinned LocalStack image behaves like AWS for SNS FIFO -> SQS FIFO:
@@ -87,41 +85,48 @@ class LocalStackFifoIT {
             .stringValue(value)
             .build()
 
-    /** Reads until [expected] messages arrive, then one more long poll to prove nothing else is left. */
+    /**
+     * Waits up to [deliveryTimeout] for [expected] messages, then polls [CONFIRMATION_POLLS] more times
+     * so that a duplicate or extra message still in the queue is caught. Empty polls before the
+     * expected messages arrive do not end the wait.
+     */
     private fun drain(
         queueUrl: String,
         expected: Int,
+        deliveryTimeout: Duration = Duration.ofSeconds(30),
     ): List<ReceivedMessage> {
         val received = mutableListOf<ReceivedMessage>()
-        var emptyPolls = 0
-        while (emptyPolls < 2 && received.size <= expected) {
-            val messages =
-                sqs
-                    .receiveMessage {
-                        it
-                            .queueUrl(queueUrl)
-                            .maxNumberOfMessages(10)
-                            .waitTimeSeconds(if (received.size < expected) 5 else 2)
-                            .messageSystemAttributeNamesWithStrings("MessageGroupId")
-                    }.messages()
-            if (messages.isEmpty()) emptyPolls++
-            messages.forEach { message ->
-                received += parse(message.body(), message.attributesAsStrings().getValue("MessageGroupId"))
-                sqs.deleteMessage { it.queueUrl(queueUrl).receiptHandle(message.receiptHandle()) }
-            }
+        val deadline = Instant.now().plus(deliveryTimeout)
+        while (received.size < expected && Instant.now().isBefore(deadline)) {
+            received += receiveAndDelete(queueUrl, waitSeconds = 5)
         }
+        repeat(CONFIRMATION_POLLS) { received += receiveAndDelete(queueUrl, waitSeconds = 2) }
         return received
     }
 
-    private fun parse(
-        snsEnvelope: String,
-        group: String,
-    ): ReceivedMessage {
-        val envelope = jsonMapper.readTree(snsEnvelope)
+    private fun receiveAndDelete(
+        queueUrl: String,
+        waitSeconds: Int,
+    ): List<ReceivedMessage> =
+        sqs
+            .receiveMessage {
+                it
+                    .queueUrl(queueUrl)
+                    .maxNumberOfMessages(10)
+                    .waitTimeSeconds(waitSeconds)
+                    .messageSystemAttributeNamesWithStrings("MessageGroupId")
+            }.messages()
+            .map { message ->
+                sqs.deleteMessage { it.queueUrl(queueUrl).receiptHandle(message.receiptHandle()) }
+                parse(message)
+            }
+
+    private fun parse(message: Message): ReceivedMessage {
+        val envelope = jsonMapper.readTree(message.body())
         val attributes = envelope.path("MessageAttributes")
         return ReceivedMessage(
             body = envelope.path("Message").asString(),
-            group = group,
+            group = message.attributesAsStrings().getValue("MessageGroupId"),
             eventType = attributes.path("eventType").path("Value").asString(),
             correlationId = attributes.path("correlationId").path("Value").asString(),
         )
@@ -135,9 +140,7 @@ class LocalStackFifoIT {
     )
 
     companion object {
-        /** Pinned release; keep in sync with the LocalStack image used by the compose and CI. */
-        const val LOCALSTACK_IMAGE = "localstack/localstack:2026.10.2"
-        private const val AUTH_TOKEN_VARIABLE = "LOCALSTACK_AUTH_TOKEN"
+        private const val CONFIRMATION_POLLS = 2
 
         private lateinit var localStack: LocalStackContainer
         private lateinit var sns: SnsClient
@@ -146,54 +149,11 @@ class LocalStackFifoIT {
         @JvmStatic
         @BeforeAll
         fun startLocalStack() {
-            val authToken = System.getenv(AUTH_TOKEN_VARIABLE)
-            assumeTrue(
-                !authToken.isNullOrBlank(),
-                "$AUTH_TOKEN_VARIABLE is not set; skipping LocalStack tests (load infra/local/.env into the environment)",
-            )
-            localStack =
-                LocalStackContainer(DockerImageName.parse(LOCALSTACK_IMAGE))
-                    .withServices("sns", "sqs")
-                    .withEnv(AUTH_TOKEN_VARIABLE, authToken)
-                    .withOptionalEgressProxy()
+            localStack = LocalStackTestSupport.container(listOf("sns", "sqs"))
             localStack.start()
-            val credentials =
-                StaticCredentialsProvider.create(AwsBasicCredentials.create(localStack.accessKey, localStack.secretKey))
-            val region = Region.of(localStack.region)
-            sns =
-                SnsClient
-                    .builder()
-                    .endpointOverride(localStack.endpoint)
-                    .region(region)
-                    .credentialsProvider(credentials)
-                    .build()
-            sqs =
-                SqsClient
-                    .builder()
-                    .endpointOverride(localStack.endpoint)
-                    .region(region)
-                    .credentialsProvider(credentials)
-                    .build()
+            sns = LocalStackTestSupport.snsClient(localStack)
+            sqs = LocalStackTestSupport.sqsClient(localStack)
         }
-
-        /**
-         * LocalStack must reach its licensing server at startup. Where outbound HTTPS only works through
-         * a proxy that re-terminates TLS, set LOCALSTACK_HTTPS_PROXY (reachable from the container) and
-         * LOCALSTACK_CA_BUNDLE (host path of the proxy CA). Unset, nothing changes.
-         */
-        private fun LocalStackContainer.withOptionalEgressProxy(): LocalStackContainer {
-            val proxy = System.getenv("LOCALSTACK_HTTPS_PROXY")?.takeIf { it.isNotBlank() } ?: return this
-            withEnv("HTTPS_PROXY", proxy)
-            withEnv("NO_PROXY", "localhost,127.0.0.1")
-            System.getenv("LOCALSTACK_CA_BUNDLE")?.takeIf { it.isNotBlank() }?.let { caBundle ->
-                withCopyFileToContainer(MountableFile.forHostPath(caBundle), CONTAINER_CA_BUNDLE)
-                withEnv("REQUESTS_CA_BUNDLE", CONTAINER_CA_BUNDLE)
-                withEnv("SSL_CERT_FILE", CONTAINER_CA_BUNDLE)
-            }
-            return this
-        }
-
-        private const val CONTAINER_CA_BUNDLE = "/etc/ssl/certs/egress-proxy-ca.crt"
 
         @JvmStatic
         @AfterAll

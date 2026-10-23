@@ -18,9 +18,9 @@
     "semantic_hash": ""
   },
   "build-logic/src/main/kotlin/digitalbanking.integration-test.gradle.kts": {
-    "mtime": 1792693171.9481409,
-    "seen": 1792714749.9259322,
-    "ast_hash": "e02518548e9d5ae39eb8a8cf85a5af26",
+    "mtime": 1792768757.7916193,
+    "seen": 1792769525.345807,
+    "ast_hash": "4b6d00013d0049cba270e0f23de26467",
     "semantic_hash": ""
   },
   "build-logic/src/main/kotlin/digitalbanking.kotlin-library.gradle.kts": {
@@ -54,9 +54,9 @@
     "semantic_hash": ""
   },
   "libs/outbox/build.gradle.kts": {
-    "mtime": 1792767785.6595616,
-    "seen": 1792768442.099468,
-    "ast_hash": "03aa0eb1b1dd67688fb84126f1bf80e8",
+    "mtime": 1792769084.5949018,
+    "seen": 1792769525.3458195,
+    "ast_hash": "8750bfa47c6190bf3536a8d9b642ddbb",
     "semantic_hash": ""
   },
   "libs/outbox/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/outbox/JdbcOutboxWriterIT.kt": {
@@ -546,9 +546,9 @@
     "semantic_hash": ""
   },
   "settings.gradle.kts": {
-    "mtime": 1792694196.8394911,
-    "seen": 1792714749.9260764,
-    "ast_hash": "7e069b810032e5b95782de7f60a521a1",
+    "mtime": 1792768938.688671,
+    "seen": 1792769525.3459597,
+    "ast_hash": "ade01cd814abc520073b6e4eac6f88c7",
     "semantic_hash": ""
   },
   ".claude/agents/coordenador.md": {
@@ -732,9 +732,9 @@
     "semantic_hash": ""
   },
   "docs/superpowers/research/2026-10-22-versoes-etapa-1.md": {
-    "mtime": 1792768434.0036001,
-    "seen": 1792768442.0996485,
-    "ast_hash": "c0cd9474e3a3b23ba24da5670e6af78b",
+    "mtime": 1792769362.6899948,
+    "seen": 1792769525.3459988,
+    "ast_hash": "61ac06b522b9d5735f9015bd5c9c410a",
     "semantic_hash": ""
   },
   "docs/superpowers/specs/2026-10-21-etapa-0-fundacao-design.md": {
@@ -858,9 +858,27 @@
     "semantic_hash": ""
   },
   "libs/outbox/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/outbox/LocalStackFifoIT.kt": {
-    "mtime": 1792768295.0751593,
-    "seen": 1792768442.0994725,
-    "ast_hash": "69538a63927c3ae65a4b8928f93b4020",
+    "mtime": 1792769245.4727929,
+    "seen": 1792769525.3458228,
+    "ast_hash": "02c67e26d15a09e263837ce272d5e055",
+    "semantic_hash": ""
+  },
+  "libs/testing-localstack/build.gradle.kts": {
+    "mtime": 1792768927.2596295,
+    "seen": 1792769525.3458304,
+    "ast_hash": "0192d15958d4eabf9792cd117848a23b",
+    "semantic_hash": ""
+  },
+  "libs/testing-localstack/src/main/kotlin/io/github/capozziv/digitalbanking/testing/localstack/LocalStackTestSupport.kt": {
+    "mtime": 1792768995.7796335,
+    "seen": 1792769525.345832,
+    "ast_hash": "65ae6f1bb0f67892a28623279d7ccfd7",
+    "semantic_hash": ""
+  },
+  "libs/testing-localstack/src/test/kotlin/io/github/capozziv/digitalbanking/testing/localstack/LocalStackTestSupportTest.kt": {
+    "mtime": 1792769055.3959785,
+    "seen": 1792769525.3458335,
+    "ast_hash": "a2ee9351b530355213bf11e527dd47a0",
     "semantic_hash": ""
   }
 }

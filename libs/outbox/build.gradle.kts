@@ -12,9 +12,6 @@ dependencies {
     integrationTestImplementation(libs.testcontainers.junit.jupiter)
     integrationTestRuntimeOnly(libs.postgresql)
 
-    integrationTestImplementation(platform(libs.aws.sdk.bom))
-    integrationTestImplementation(libs.aws.sdk.sns)
-    integrationTestImplementation(libs.aws.sdk.sqs)
-    integrationTestImplementation(libs.testcontainers.localstack)
+    integrationTestImplementation(project(":libs:testing-localstack"))
     integrationTestImplementation("tools.jackson.core:jackson-databind")
 }
