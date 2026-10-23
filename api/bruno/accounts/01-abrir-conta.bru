@@ -1,0 +1,32 @@
+meta {
+  name: Abrir conta
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/accounts
+  body: json
+  auth: none
+}
+
+headers {
+  Idempotency-Key: {{$guid}}
+}
+
+body:json {
+  {
+    "customerId": "{{$guid}}"
+  }
+}
+
+script:post-response {
+  bru.setVar("accountId", res.body.id);
+}
+
+tests {
+  test("201 com a conta nova", function () {
+    expect(res.status).to.equal(201);
+    expect(res.body.balance).to.equal(0);
+  });
+}

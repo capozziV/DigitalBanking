@@ -1,0 +1,24 @@
+meta {
+  name: Trocar tipo de conta
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/accounts/{{accountId}}/type
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "type": "GOLD"
+  }
+}
+
+tests {
+  test("200 com o tipo novo", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.type).to.equal("GOLD");
+  });
+}
