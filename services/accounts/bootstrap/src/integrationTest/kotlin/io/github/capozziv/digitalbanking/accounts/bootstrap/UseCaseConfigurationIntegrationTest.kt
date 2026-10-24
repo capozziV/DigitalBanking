@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import java.time.Clock
 
-class UseCaseConfigurationIT : AccountsIntegrationTest() {
+class UseCaseConfigurationIntegrationTest : AccountsIntegrationTest() {
     @Autowired
     private lateinit var clock: Clock
 

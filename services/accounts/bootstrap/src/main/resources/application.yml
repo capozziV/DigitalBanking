@@ -20,10 +20,22 @@ spring:
 
 accounts:
   lock-timeout: 2s
+  outbox:
+    relay-enabled: true
+    poll-interval: 500ms
+    batch-size: 100
+    alert-after-attempts: 10
+    publish-timeout: 2s
+    max-cycle-duration: 10s
+  aws:
+    # LocalStack by default; an empty ACCOUNTS_AWS_ENDPOINT uses the real AWS endpoint and credential chain.
+    endpoint: ${ACCOUNTS_AWS_ENDPOINT:http://localhost:4566}
+    region: ${ACCOUNTS_AWS_REGION:us-east-1}
+    topic-arn: ${ACCOUNTS_TOPIC_ARN:arn:aws:sns:us-east-1:000000000000:accounts-events.fifo}
 
 logging:
   pattern:
-    # Correlation id of the request (MDC key of OutboxEnvelope.CORRELATION_ID_MDC_KEY) on every log line.
+    # Correlation id of the request (MDC key of OutboxEventEnvelope.CORRELATION_ID_MDC_KEY) on every log line.
     correlation: "[%X{correlationId:-}] "
 
 server:
@@ -33,7 +45,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,metrics
   endpoint:
     health:
       show-details: always

@@ -15,6 +15,8 @@ Responder sempre em português.
 ## Regras inegociáveis
 - Código Kotlin (classes, funções, variáveis, pacotes, testes, comentários e mensagens de log) sempre em inglês, com os nomes de código do `CONTEXT.md`. Documentação, ADRs e commits seguem em português.
 - Classe com papel técnico leva o papel como sufixo (`OpenAccountUseCase`, `JdbcAccountRepository`, `AccountController`); classe de modelo de domínio não leva (`Account`, `LedgerEntry`).
+- Corpo de requisição e de resposta da API é DTO em `adapters/web/dto/`, com sufixo `DTO` (`OpenAccountDTO`, `AccountDTO`), conferido pelo ArchUnit.
+- Classe que contém testes termina em `Test`: unidade `OutboxRelayTest`, integração `OutboxRelayIntegrationTest`. Apoio de teste leva o papel no nome (`AccountsIntegrationTest` como base abstrata, `LocalStackTestSupport`, `InMemoryAccountRepository`).
 - Valores monetários sempre em centavos (`Long`/inteiro), nunca `Double`/float.
 - Clean Architecture por serviço: `domain` → `application` → `adapters` → `bootstrap`. O `domain` não depende de Spring nem de infraestrutura (validado com ArchUnit).
 - Não compartilhar classes de domínio entre serviços. Bibliotecas compartilhadas só de infraestrutura (outbox, observabilidade).

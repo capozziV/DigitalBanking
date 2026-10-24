@@ -12,7 +12,7 @@ import java.time.ZoneOffset
 import java.util.UUID
 
 /** The use cases and the outbox writer share the single Clock bean (replaced here by a fixed clock). */
-class ClockWiringIT : AccountsIntegrationTest() {
+class ClockWiringIntegrationTest : AccountsIntegrationTest() {
     @LocalServerPort
     private var port: Int = 0
 

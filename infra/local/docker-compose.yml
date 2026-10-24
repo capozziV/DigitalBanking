@@ -38,3 +38,25 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  # Emulador AWS (SNS e SQS). Exige LOCALSTACK_AUTH_TOKEN (conta Hobby gratuita) no .env.
+  # Mesma imagem de LocalStackTestSupport.IMAGE (libs/testing-localstack); mude as duas juntas.
+  localstack:
+    image: localstack/localstack:2026.10.2
+    environment:
+      LOCALSTACK_AUTH_TOKEN: ${LOCALSTACK_AUTH_TOKEN:-}
+      SERVICES: sns,sqs
+    ports:
+      - "${LOCALSTACK_PORT:-4566}:4566"
+    volumes:
+      - ./localstack/init/ready.d:/etc/localstack/init/ready.d:ro
+    healthcheck:
+      # Saudavel so depois que os scripts de init (topico e fila) terminam com sucesso.
+      test:
+        - CMD
+        - python3
+        - -c
+        - "import json, urllib.request as r; s = json.load(r.urlopen('http://127.0.0.1:4566/_localstack/init/ready')); exit(0 if s['completed'] and s['scripts'] and all(x['state'] == 'SUCCESSFUL' for x in s['scripts']) else 1)"
+      interval: 5s
+      timeout: 5s
+      retries: 30

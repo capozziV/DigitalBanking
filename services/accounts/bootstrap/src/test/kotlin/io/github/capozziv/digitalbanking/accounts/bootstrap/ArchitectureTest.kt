@@ -95,6 +95,19 @@ class ArchitectureTest {
     }
 
     @Test
+    fun `request and response bodies of the web adapter end with DTO`() {
+        // Top-level only: Kotlin companion objects compile to nested `...$Companion` classes.
+        classes()
+            .that()
+            .resideInAPackage("$ACCOUNTS_PACKAGE.adapters.web.dto..")
+            .and()
+            .areTopLevelClasses()
+            .should()
+            .haveSimpleNameEndingWith("DTO")
+            .check(classes)
+    }
+
+    @Test
     fun `outbox library does not depend on the accounts service`() {
         noClasses()
             .that()

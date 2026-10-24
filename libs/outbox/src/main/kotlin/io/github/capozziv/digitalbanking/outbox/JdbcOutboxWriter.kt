@@ -29,7 +29,7 @@ class JdbcOutboxWriter(
             .param("eventType", message.eventType)
             .param("eventVersion", message.eventVersion)
             .param("payload", message.payloadJson)
-            .param("correlationId", MDC.get(OutboxEnvelope.CORRELATION_ID_MDC_KEY))
+            .param("correlationId", MDC.get(OutboxEventEnvelope.CORRELATION_ID_MDC_KEY))
             .param("occurredAt", OffsetDateTime.ofInstant(clock.instant(), ZoneOffset.UTC))
             .update()
     }

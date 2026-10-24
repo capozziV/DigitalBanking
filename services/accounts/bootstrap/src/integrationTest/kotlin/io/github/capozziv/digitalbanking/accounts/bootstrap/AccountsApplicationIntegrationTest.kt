@@ -15,7 +15,7 @@ import org.springframework.web.client.RestClient
 import org.springframework.web.filter.OncePerRequestFilter
 import java.util.concurrent.atomic.AtomicReference
 
-class AccountsApplicationIT : AccountsIntegrationTest() {
+class AccountsApplicationIntegrationTest : AccountsIntegrationTest() {
     @LocalServerPort
     private var port: Int = 0
 

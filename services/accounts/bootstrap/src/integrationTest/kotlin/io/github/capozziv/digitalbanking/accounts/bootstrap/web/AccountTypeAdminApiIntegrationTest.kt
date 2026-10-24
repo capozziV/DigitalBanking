@@ -8,7 +8,7 @@ import org.springframework.boot.test.web.server.LocalServerPort
 import java.time.Instant
 import java.util.UUID
 
-class AccountTypeAdminApiIT : AccountsIntegrationTest() {
+class AccountTypeAdminApiIntegrationTest : AccountsIntegrationTest() {
     @LocalServerPort
     private var port: Int = 0
 

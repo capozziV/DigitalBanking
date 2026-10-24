@@ -1,6 +1,6 @@
 package io.github.capozziv.digitalbanking.accounts.adapters.web
 
-import io.github.capozziv.digitalbanking.outbox.OutboxEnvelope
+import io.github.capozziv.digitalbanking.outbox.OutboxEventEnvelope
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -27,11 +27,11 @@ class CorrelationIdFilter : OncePerRequestFilter() {
     ) {
         val correlationId = acceptedOrGenerated(request.getHeader(HEADER))
         response.setHeader(HEADER, correlationId)
-        MDC.put(OutboxEnvelope.CORRELATION_ID_MDC_KEY, correlationId)
+        MDC.put(OutboxEventEnvelope.CORRELATION_ID_MDC_KEY, correlationId)
         try {
             filterChain.doFilter(request, response)
         } finally {
-            MDC.remove(OutboxEnvelope.CORRELATION_ID_MDC_KEY)
+            MDC.remove(OutboxEventEnvelope.CORRELATION_ID_MDC_KEY)
         }
     }
 

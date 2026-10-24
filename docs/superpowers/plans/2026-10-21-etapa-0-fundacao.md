@@ -90,7 +90,7 @@
 - Criar: `services/accounts/bootstrap/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/AccountsApplication.kt`
 - Criar: `services/accounts/bootstrap/src/main/resources/application.yml`
 - Criar: `services/accounts/adapters/src/main/resources/db/migration/.gitkeep`
-- Criar: `services/accounts/bootstrap/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/AccountsApplicationIT.kt`
+- Criar: `services/accounts/bootstrap/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/AccountsApplicationIntegrationTest.kt`
 - Modificar: `services/accounts/adapters/build.gradle.kts`, `services/accounts/bootstrap/build.gradle.kts`
 
 **Interfaces:**
@@ -98,10 +98,10 @@
 - Produz: `AccountsApplication` (`@SpringBootApplication(scanBasePackages = ["io.github.capozziv.digitalbanking.accounts"])`, `fun main(args: Array<String>)`); aplicação na porta `8081`; variáveis `ACCOUNTS_DB_URL`, `ACCOUNTS_DB_USER`, `ACCOUNTS_DB_PASSWORD` com padrões `jdbc:postgresql://localhost:5432/accounts`, `accounts`, `accounts`.
 
 - [ ] **Passo 1: Dependências.** `adapters`: `implementation("org.springframework.boot:spring-boot-starter-webmvc")`, `spring-boot-starter-jdbc`, `spring-boot-starter-flyway`, `implementation(libs.flyway.postgresql)`, `runtimeOnly(libs.postgresql)`. `bootstrap`: `implementation("org.springframework.boot:spring-boot-starter-actuator")`; testes: `spring-boot-starter-test`, `spring-boot-testcontainers`, `libs.testcontainers.postgresql`, `libs.testcontainers.junit.jupiter`.
-- [ ] **Passo 2: Escrever o teste** `AccountsApplicationIT`: `@SpringBootTest(webEnvironment = RANDOM_PORT)` + `@Testcontainers`; `companion object { @Container @ServiceConnection @JvmStatic val postgres = PostgreSQLContainer("postgres:17-alpine") }`; `@LocalServerPort port`. Testes:
+- [ ] **Passo 2: Escrever o teste** `AccountsApplicationIntegrationTest`: `@SpringBootTest(webEnvironment = RANDOM_PORT)` + `@Testcontainers`; `companion object { @Container @ServiceConnection @JvmStatic val postgres = PostgreSQLContainer("postgres:17-alpine") }`; `@LocalServerPort port`. Testes:
   - `health responde UP com o banco UP` (foco 4): `RestClient.create("http://localhost:$port").get().uri("/actuator/health").retrieve().body<Map<String, Any>>()`; asserts `status == "UP"` e `components.db.status == "UP"`.
   - `virtual threads ligadas`: `Environment.getProperty("spring.threads.virtual.enabled") == "true"`.
-- [ ] **Passo 3: Ver vermelho.** `./gradlew :services:accounts:bootstrap:test --tests '*AccountsApplicationIT*'` → FAIL (classe de aplicação/configuração ausente).
+- [ ] **Passo 3: Ver vermelho.** `./gradlew :services:accounts:bootstrap:test --tests '*AccountsApplicationIntegrationTest*'` → FAIL (classe de aplicação/configuração ausente).
 - [ ] **Passo 4: Implementar** `AccountsApplication` e `application.yml`: `spring.application.name: accounts`, `server.port: 8081`, `spring.threads.virtual.enabled: true`, `spring.datasource.url/username/password` das variáveis acima com os padrões, `management.endpoints.web.exposure.include: health`, `management.endpoint.health.show-details: always`, `management.endpoint.health.show-components: always`.
 - [ ] **Passo 5: Ver verde.** Mesmo comando → PASS. Depois `./gradlew build` → `BUILD SUCCESSFUL` (no ambiente de nuvem, com Docker).
 - [ ] **Passo 6: Commit** `feat(accounts): aplicacao com health do banco e teste testcontainers`.

@@ -8,6 +8,7 @@ Pesquisa de 2026-10-22. Versões lidas dos `maven-metadata.xml` e POMs no Maven 
 | `com.fasterxml.uuid:java-uuid-generator` | 5.2.0 | [maven-metadata](https://repo1.maven.org/maven2/com/fasterxml/uuid/java-uuid-generator/maven-metadata.xml) (release 5.2.0, 2025-12-05) |
 | `software.amazon.awssdk:bom` | 2.57.1 | [maven-metadata](https://repo1.maven.org/maven2/software/amazon/awssdk/bom/maven-metadata.xml) (release 2.57.1, 2026-10-20) |
 | `org.testcontainers:testcontainers-localstack` | 2.0.5 (sem versão no catálogo; gerida pelo BOM do Boot) | [spring-boot-dependencies 4.1.1](https://repo1.maven.org/maven2/org/springframework/boot/spring-boot-dependencies/4.1.1/spring-boot-dependencies-4.1.1.pom): `testcontainers.version` = 2.0.5; [maven-metadata](https://repo1.maven.org/maven2/org/testcontainers/testcontainers-localstack/maven-metadata.xml) tem 2.0.5 |
+| Imagem `localstack/localstack` | 2026.10.2 (Task 14, 2026-10-23; digest `sha256:0e95fa70a58fff808cdc4c8deea8cf56a247cdad403c082e33ec37924987e0c3`) | [tags no Docker Hub](https://hub.docker.com/r/localstack/localstack/tags): release de 2026-10-22, a mesma apontada por `stable`/`latest` nesse dia. Fixada em `LocalStackTestSupport.IMAGE` (`libs/testing-localstack`); o compose e o CI (Task 16) usam a mesma tag |
 
 ## springdoc e Spring Boot 4.1.x
 

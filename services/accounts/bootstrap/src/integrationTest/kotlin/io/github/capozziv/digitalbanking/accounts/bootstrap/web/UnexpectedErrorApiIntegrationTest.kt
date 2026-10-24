@@ -14,7 +14,7 @@ import java.util.UUID
 
 /** An exception nobody expects becomes a generic 500 Problem Details, logged as ERROR with the correlation id. */
 @ExtendWith(OutputCaptureExtension::class)
-class UnexpectedErrorApiIT : AccountsIntegrationTest() {
+class UnexpectedErrorApiIntegrationTest : AccountsIntegrationTest() {
     @LocalServerPort
     private var port: Int = 0
 
