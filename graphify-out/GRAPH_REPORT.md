@@ -1,7 +1,7 @@
-# Graph Report - DigitalBanking  (2026-10-23)
+# Graph Report - DigitalBanking  (2026-10-24)
 
 ## Corpus Check
-- 166 files · ~49,890 words
+- 166 files · ~49,868 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 18 file(s) not represented in the graph (top: .bru 8, (none) 3, .properties 2)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `c20bd0c1`
+- Built from commit: `d884a0b1`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -330,15 +330,15 @@ Nodes (7): Agentes do projeto, Ao terminar uma tarefa, Banco digital em microsse
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `AccountsIntegrationTest` connect `AccountsIntegrationTest` to `uuid`, `AccountApiIntegrationTest`, `ApiClient`, `OutboxRelayIntegrationTest.kt`, `ClockWiringIntegrationTest.kt`, `Account`, `AccountsApplicationIntegrationTest.kt`, `AccountController.kt`, `OutboxRelayUnreachableBrokerIntegrationTest`, `OutboxRelayConfiguration.kt`?**
-  _High betweenness centrality (0.090) - this node is a cross-community bridge._
+  _High betweenness centrality (0.098) - this node is a cross-community bridge._
 - **Are the 8 inferred relationships involving `Account` (e.g. with `Regras inegociáveis` and `Clientes e contas`) actually correct?**
   _`Account` has 8 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `DUPLICATE_CUSTOMER`, `DUPLICATE_OPENING_KEY`, `INSERTED` to the rest of the system?**
   _13 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `AccountsIntegrationTest` be split into smaller, more focused modules?**
   _Cohesion score 0.0915915915915916 - nodes in this community are weakly interconnected._
-- **Why does `Account` connect `Account` to `uuid`, `AccountOpened`, `LedgerEntryRecorded`, `CallLog`, `.record`, `Money`, `OutboxRelayUnreachableBrokerIntegrationTest`, `OverdraftLimit`, `AccountController.kt`, `.record`?**
-  _High betweenness centrality (0.070) - this node is a cross-community bridge._
+- **Why does `AccountApiIntegrationTest` connect `AccountApiIntegrationTest` to `AccountsIntegrationTest`, `ApiClient`?**
+  _High betweenness centrality (0.069) - this node is a cross-community bridge._
 - **Are the 10 inferred relationships involving `LedgerEntry` (e.g. with `Regras inegociáveis` and `Ledger`) actually correct?**
   _`LedgerEntry` has 10 INFERRED edges - model-reasoned connections that need verification._
 - **Should `AccountApiIntegrationTest` be split into smaller, more focused modules?**
