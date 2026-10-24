@@ -1,17 +1,17 @@
 # Graph Report - digitalbanking  (2026-10-23)
 
 ## Corpus Check
-- 166 files · ~49,363 words
+- 166 files · ~49,383 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 18 file(s) not represented in the graph (top: .bru 8, (none) 3, .properties 2)
 
 ## Summary
-- 1428 nodes · 3504 edges · 91 communities (52 shown, 39 thin omitted)
-- Extraction: 91% EXTRACTED · 9% INFERRED · 0% AMBIGUOUS · INFERRED: 325 edges (avg confidence: 0.9)
+- 1428 nodes · 3507 edges · 91 communities (51 shown, 40 thin omitted)
+- Extraction: 91% EXTRACTED · 9% INFERRED · 0% AMBIGUOUS · INFERRED: 328 edges (avg confidence: 0.9)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `8df448fb`
+- Built from commit: `b870c7ad`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -38,6 +38,7 @@
 - README.md
 - AccountController
 - AccountTypeAdminController.kt
+- OutboxStore
 - coordenador.md
 - 0004 — API Gateway HTTP API na borda
 - 0005 — Frontend Angular e BFF em NestJS
@@ -68,7 +69,6 @@
 - outbox-table.sql
 - V4__outbox.sql
 - LedgerEntryRecorded
-- SnsEventPublisher
 - PendingEvent
 - OutboxRelayTest
 - smoke.sh
@@ -106,33 +106,33 @@
 10. `OutboxRelayIntegrationTest` - 35 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `Decisão` --references--> `LedgerEntry`  [INFERRED]
+  docs/adr/0012-saldo-no-lancamento-e-trava-pessimista.md → services/accounts/domain/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/domain/LedgerEntry.kt
 - `Mensageria` --references--> `OutboxRelay`  [INFERRED]
   docs/arquitetura.md → libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/OutboxRelay.kt
 - `Task 11: Regras ArchUnit e melhorias da etapa 0 (Marina, `dev-kotlin`)` --references--> `ArchitectureTest`  [INFERRED]
   docs/superpowers/plans/2026-10-22-etapa-1-accounts.md → services/accounts/bootstrap/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/ArchitectureTest.kt
-- `Decisão` --references--> `LedgerEntry`  [INFERRED]
-  docs/adr/0012-saldo-no-lancamento-e-trava-pessimista.md → services/accounts/domain/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/domain/LedgerEntry.kt
-- `Task 15: Relay e publicador SNS (Marina, `dev-kotlin`)` --references--> `JdbcOutboxStore`  [INFERRED]
-  docs/superpowers/plans/2026-10-22-etapa-1-accounts.md → libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/JdbcOutboxStore.kt
-- `4. Fluxos` --references--> `JdbcOutboxWriter`  [INFERRED]
-  docs/superpowers/specs/2026-10-22-etapa-1-accounts-design.md → libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/JdbcOutboxWriter.kt
+- `Regras inegociáveis` --references--> `OutboxRelayTest`  [INFERRED]
+  CLAUDE.md → libs/outbox/src/test/kotlin/io/github/capozziv/digitalbanking/outbox/OutboxRelayTest.kt
+- `Regras inegociáveis` --references--> `LocalStackTestSupport`  [INFERRED]
+  CLAUDE.md → libs/testing-localstack/src/main/kotlin/io/github/capozziv/digitalbanking/testing/localstack/LocalStackTestSupport.kt
 
 ## Import Cycles
 - None detected.
 
-## Communities (91 total, 39 thin omitted)
+## Communities (91 total, 40 thin omitted)
 
 ### Community 1 - "AccountsIntegrationTest"
 Cohesion: 0.09
 Nodes (4): AccountsIntegrationTest, UseCaseConfigurationIntegrationTest, AccountTypeAdminApiIntegrationTest, UnexpectedErrorApiIntegrationTest
 
 ### Community 6 - "SnsEventPublisherIntegrationTest.kt"
-Cohesion: 0.05
+Cohesion: 0.06
 Nodes (6): Task 14: Verificação do SNS FIFO no LocalStack (Rafael, `infra`), LocalStackFifoIntegrationTest, ReceivedMessage, SnsEventPublisherIntegrationTest, LocalStackTestSupport, LocalStackTestSupportTest
 
 ### Community 7 - "OutboxRelay"
-Cohesion: 0.15
-Nodes (7): Bloco 2 — relay e SNS FIFO, Task 15: Relay e publicador SNS (Marina, `dev-kotlin`), Task 16: Relay no `accounts`, LocalStack no compose e CI (Rafael, `infra`, com a configuração Spring feita pela Marina na mesma task se o diff de Kotlin for a maior parte — decidir pelo diff), EventPublisher, OutboxMetrics, OutboxRelay, OutboxStore
+Cohesion: 0.24
+Nodes (6): 0015 — Relay do outbox com líder único e SNS FIFO, Alternativas consideradas, Consequências, Contexto, Decisão, OutboxRelay
 
 ### Community 8 - "CallLog"
 Cohesion: 0.14
@@ -254,13 +254,9 @@ Nodes (4): 0011 — Contratos de API, Consequências, Contexto, Decisão
 Cohesion: 0.50
 Nodes (3): Observações, springdoc e Spring Boot 4.1.x, Versões novas da etapa 1
 
-### Community 61 - "OutboxRelayScheduler"
-Cohesion: 0.10
-Nodes (8): 0015 — Relay do outbox com líder único e SNS FIFO, Alternativas consideradas, Consequências, Contexto, Decisão, OutboxRelayScheduler, BlockingStore, OutboxRelaySchedulerTest
-
 ### Community 62 - "OutboxRelayConfiguration.kt"
-Cohesion: 0.17
-Nodes (3): AwsProperties, OutboxRelayConfiguration, OutboxRelayProperties
+Cohesion: 0.14
+Nodes (6): Task 16: Relay no `accounts`, LocalStack no compose e CI (Rafael, `infra`, com a configuração Spring feita pela Marina na mesma task se o diff de Kotlin for a maior parte — decidir pelo diff), OutboxMetrics, OutboxRelaySettings, AwsProperties, OutboxRelayConfiguration, OutboxRelayProperties
 
 ### Community 63 - "account"
 Cohesion: 0.33
@@ -275,8 +271,8 @@ Cohesion: 0.07
 Nodes (14): UuidV7IdGenerator, IdGenerator, RecordCreditUseCase, DebitOutcome, RecordDebitUseCase, Recorded, Refused, RecordEntryCommand (+6 more)
 
 ### Community 71 - "PendingEvent"
-Cohesion: 0.19
-Nodes (4): PendingEvent, OutboxEventEnvelopeTest, RecordingEventPublisher, NoOpPublisher
+Cohesion: 0.12
+Nodes (9): Bloco 2 — relay e SNS FIFO, Task 15: Relay e publicador SNS (Marina, `dev-kotlin`), 9. Entrega em dois blocos, EventPublisher, PendingEvent, SnsEventPublisher, OutboxEventEnvelopeTest, RecordingEventPublisher (+1 more)
 
 ### Community 72 - "OutboxRelayTest"
 Cohesion: 0.10
@@ -331,22 +327,22 @@ Cohesion: 0.21
 Nodes (4): 1. Módulos e camadas, ListAccountTypesUseCase, ListAccountTypesUseCaseTest, AccountTypeRepository
 
 ## Knowledge Gaps
-- **13 isolated node(s):** `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`, `INSERTED`, `DUPLICATE_OPENING_KEY` (+8 more)
+- **13 isolated node(s):** `CREDIT`, `DEBIT`, `DUPLICATE_CUSTOMER`, `DUPLICATE_OPENING_KEY`, `INSERTED` (+8 more)
   These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 297 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **39 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **40 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `AccountsIntegrationTest` connect `AccountsIntegrationTest` to `uuid`, `AccountApiIntegrationTest`, `ApiClient`, `OutboxRelay`, `OutboxRelayIntegrationTest.kt`, `Account`, `AccountsApplicationIntegrationTest.kt`, `OutboxRelayUnreachableBrokerIntegrationTest`?**
-  _High betweenness centrality (0.097) - this node is a cross-community bridge._
+- **Why does `AccountsIntegrationTest` connect `AccountsIntegrationTest` to `uuid`, `AccountApiIntegrationTest`, `ApiClient`, `OutboxRelayIntegrationTest.kt`, `Account`, `AccountsApplicationIntegrationTest.kt`, `OutboxRelayUnreachableBrokerIntegrationTest`, `AccountController`, `OutboxRelayConfiguration.kt`?**
+  _High betweenness centrality (0.094) - this node is a cross-community bridge._
 - **Are the 8 inferred relationships involving `Account` (e.g. with `Regras inegociáveis` and `Clientes e contas`) actually correct?**
   _`Account` has 8 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` to the rest of the system?**
+- **What connects `CREDIT`, `DEBIT`, `DUPLICATE_CUSTOMER` to the rest of the system?**
   _13 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `AccountsIntegrationTest` be split into smaller, more focused modules?**
   _Cohesion score 0.0915915915915916 - nodes in this community are weakly interconnected._
-- **Why does `OutboxRelay` connect `OutboxRelay` to `SnsEventPublisher`, `OutboxRelayTest`, `OutboxRelayIntegrationTest.kt`, `Etapa 1 — `accounts`: design`, `OutboxRelayUnreachableBrokerIntegrationTest`, `OutboxRelaySettings`, `Decisões tomadas`, `AccountController`, `OutboxRelayScheduler`, `OutboxRelayConfiguration.kt`?**
+- **Why does `AccountApiIntegrationTest` connect `AccountApiIntegrationTest` to `AccountsIntegrationTest`, `ApiClient`?**
   _High betweenness centrality (0.066) - this node is a cross-community bridge._
 - **Are the 10 inferred relationships involving `LedgerEntry` (e.g. with `Regras inegociáveis` and `Ledger`) actually correct?**
   _`LedgerEntry` has 10 INFERRED edges - model-reasoned connections that need verification._
