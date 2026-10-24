@@ -46,8 +46,7 @@ Guia completo, para macOS (zsh) e Linux: [`docs/rodando-localmente.md`](rodando-
 - PR `docs/guia-local-mac` (guia local corrigido no Mac e status), revisado pela Beatriz.
 
 ## Próximos passos
-1. Usuário: atualizar o segredo `LOCALSTACK_AUTH_TOKEN` no GitHub com o token novo (o `infra/local/.env` do Mac já tem o token novo, validado).
-2. Etapa 2 (`transfers` + saga), começando pelo brainstorming.
+1. Etapa 2 (`transfers` + saga), começando pelo brainstorming.
 
 ## Pendências e decisões em aberto
 Decisões: fonte única na seção "Em aberto" de `docs/arquitetura.md`.
