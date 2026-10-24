@@ -3,8 +3,8 @@
 > Atualizado pelo agente coordenador ao fim de cada tarefa.
 
 **Última atualização:** 2026-10-23
-**Fase atual:** etapa 1 concluída: bloco 1 (PR #3) e bloco 2 (PR #4) com merge na `main`.
-**Próxima etapa:** mudar o trabalho para a máquina do usuário e testar o guia local no Mac; depois, etapa 2.
+**Fase atual:** etapa 1 concluída (PRs #3, #4 e #5 com merge na `main`); trabalho movido para o Mac do usuário, guia local executado do zero lá.
+**Próxima etapa:** 2 (`transfers` + saga), começando pelo brainstorming.
 
 ## Concluído
 - Planejamento: arquitetura, roadmap, ADRs 0001–0014, glossário `CONTEXT.md`, agentes e fluxo com os plugins Superpowers e Matt Pocock; papéis do fluxo mapeados para os agentes do projeto no `CLAUDE.md`, com nomes: Helena (coordenação), Marina (`dev-kotlin`), Rafael (`infra`), Lucas (`dev-frontend`), Beatriz (`revisor`), Clara (`documentador`).
@@ -34,20 +34,20 @@
   - `./gradlew build --rerun-tasks` verde com o token (231 testes, 0 pulados), compose e smoke OK, actionlint e shellcheck sem erros; CI do PR #4 (`build` e `smoke`) verde com o segredo;
   - convenções de nome: testes `*IntegrationTest`, `OutboxEventEnvelope`, corpos da API com sufixo `DTO` em `adapters/web/dto/` (regra ArchUnit).
 - PR #4 do bloco 2 com merge na `main` (2026-10-23).
+- Guia local executado do zero no Mac do usuário (2026-10-23; Mac Intel `x86_64`, macOS 26.7.1, Docker Desktop 29.9.2): compose com os 4 contêineres saudáveis em 31 s (porta 80 sem ajuste); `./gradlew build` verde em 2m05s (231 testes, 0 falhas, 0 pulados, com LocalStack); `bootRun` com as 6 migrations; health `UP`, smoke OK (saldo 700 e os 3 eventos na fila); sequência manual com idempotência (`201` e depois `200`) e `X-Correlation-Id` até o evento; fila de inspeção e `outbox.pending` = 0; Bruno 7/7; `down -v`. Guia corrigido: Homebrew só existe para Apple Silicon (caminhos sem Homebrew para JDK, jq, Node e uv), `jq` em `/usr/bin` a partir do macOS 15, graphify com `graphifyy[sql]` e a skill do Claude. Sem teste no Mac: o caminho com uv (instalador do uv e `uv tool install "graphifyy[sql]"`), porque o graphify do Mac já estava instalado pelo pip e recebeu o `tree-sitter-sql` pelo pip; o `.pkg` do Temurin (o JDK já estava instalado).
 - graphify configurado (2026-10-22): `graphify-out/` versionado, skill, hook do Claude antes de buscas e hook do git que reconstrói o grafo a cada commit.
 - Verificação (ambiente de nuvem, 2026-10-21): `./gradlew build --rerun-tasks` verde (5 testes, 0 falhas); compose saudável com e sem `--env-file`; rota `/accounts/actuator/health` pelo nginx `UP`; actionlint sem erros.
 - CI no GitHub (PR #1, 2026-10-21): `build` e `smoke` verdes. O `smoke` falhou na primeira execução porque o healthcheck do nginx usava `localhost`, que no runner resolve para IPv6 enquanto o nginx escuta só em IPv4; corrigido para `127.0.0.1` (sem `listen [::]:80`, que derruba o nginx em máquinas sem IPv6).
 
 ## Como rodar localmente
-Guia completo, para macOS (zsh) e Linux: [`docs/rodando-localmente.md`](rodando-localmente.md). Resumo: JDK 21 e Docker Desktop; `cp infra/local/.env.example infra/local/.env`; compose `up --wait`; `./gradlew build` (ou `./gradlew test` sem Docker); `bootRun`; `infra/local/smoke.sh`; coleção Bruno em `api/bruno/accounts/`. O guia ainda não foi executado num Mac de verdade.
+Guia completo, para macOS (zsh) e Linux: [`docs/rodando-localmente.md`](rodando-localmente.md). Resumo: JDK 21 e Docker Desktop; `cp infra/local/.env.example infra/local/.env`; compose `up --wait`; `./gradlew build` (ou `./gradlew test` sem Docker); `bootRun`; `infra/local/smoke.sh`; coleção Bruno em `api/bruno/accounts/`. Executado do zero num Mac Intel em 2026-10-23.
 
 ## Em andamento
-- Nada.
+- PR `docs/guia-local-mac` (guia local corrigido no Mac e status), revisado pela Beatriz.
 
 ## Próximos passos
-1. Usuário: rotacionar o token do LocalStack (ficou registrado no chat) e atualizar o segredo no GitHub e o `infra/local/.env`.
-2. Trabalho passa para o Mac do usuário (decidido em 2026-10-23): sessão do Claude Code local em `~/Dev/DigitalBanking`, com o coordenador e os agentes editando, rodando build, Docker e LocalStack direto na máquina. Primeira tarefa lá: executar [`rodando-localmente.md`](rodando-localmente.md) do zero, passo a passo, e corrigir o guia no que divergir do Mac.
-3. Etapa 2 (`transfers` + saga), começando pelo brainstorming.
+1. Usuário: atualizar o segredo `LOCALSTACK_AUTH_TOKEN` no GitHub com o token novo (o `infra/local/.env` do Mac já tem o token novo, validado).
+2. Etapa 2 (`transfers` + saga), começando pelo brainstorming.
 
 ## Pendências e decisões em aberto
 Decisões: fonte única na seção "Em aberto" de `docs/arquitetura.md`.
@@ -82,11 +82,11 @@ Melhorias técnicas adiadas na revisão da etapa 0 (nenhuma bloqueia):
 - **Quando incomodar:** ruído de CDS da JVM nos testes (agente do Mockito); `webmvc` explícito no `bootstrap`. Healthchecks e curls dentro de contêineres: usar `127.0.0.1`, nunca `localhost` (IPv6 no runner).
 
 ## Com o usuário (fora do código)
-- Abrir PRs: pela API do GitHub com o token do usuário (PR #2) ou pelo link de criação; a CLI `gh` da sessão não tem login.
+- Abrir PRs: com o `gh` do Mac (logado como `capozziV`).
 - Proteger a `main` no GitHub exigindo CI verde para merge.
 
 ## Ambiente do Claude
-- **Mac do usuário (a partir da etapa 2):** sessão do Claude Code local, com JDK 21, Docker Desktop, graphify e os plugins Superpowers e Matt Pocock; o `infra/local/.env` (fora do git) guarda o `LOCALSTACK_AUTH_TOKEN`; o push usa o `credential.helper` local. Os itens abaixo sobre a nuvem valem só se o trabalho voltar para lá.
+- **Mac do usuário (a partir da etapa 2):** Mac Intel (`x86_64`), sem Homebrew (não suporta Intel). Sessão do Claude Code local com JDK 21 (Temurin), Docker Desktop, plugins `superpowers` e `mattpocock-skills` (marketplace `claude-plugins-official`, escopo do usuário), graphify 0.9.94 via pip no Python 3.15 com `tree-sitter-sql` e a skill em `~/.claude/skills/graphify`; Node v24.22.1 em `~/.local/node` (com a CLI `bru`) e `gh` 2.103.2 em `~/.local/bin`, ambos no PATH pelo `~/.zshrc`. O `infra/local/.env` (fora do git) guarda o `LOCALSTACK_AUTH_TOKEN`. Push e PRs pelo `gh` (`gh auth login` e `gh auth setup-git`, credencial no keyring do macOS; push testado com `--dry-run`); o `.git/github-token` da VM não é usado no Mac. Os itens abaixo sobre a nuvem valem só se o trabalho voltar para lá.
 - **Nuvem:** JDK 21 e Docker. Maven Central e Docker Hub limitam o IP compartilhado (`429`): usar o init script do Gradle com o espelho `maven-central.storage-download.googleapis.com` e `registry-mirrors: ["https://mirror.gcr.io"]` no `dockerd` (configuração do ambiente, fora do repo).
 - **Push:** pela VM do Mac, com um token fine-grained do GitHub em `.git/github-token` (fora do controle de versão), lido por um `credential.helper` configurado só no `.git/config` local. Sem esse arquivo, o push pela VM falha; pela nuvem funciona quando o repositório está conectado à sessão.
 - **VM do Mac:** sem Docker, sem acesso ao Docker Desktop do Mac e só com Java 11; serve para editar arquivos da pasta do usuário. Por isso o build e os testes rodam no clone da nuvem.
