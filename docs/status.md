@@ -3,7 +3,7 @@
 > Atualizado pelo agente coordenador ao fim de cada tarefa.
 
 **Última atualização:** 2026-10-23
-**Fase atual:** etapa 1 — bloco 1 com merge na `main` (PR #3); bloco 2 (relay e SNS FIFO no LocalStack) concluído na branch `etapa-1-bloco-2`, revisado task a task e na revisão final da branch; PR do bloco 2 para a `main`.
+**Fase atual:** etapa 1 concluída: bloco 1 (PR #3) e bloco 2 (PR #4) com merge na `main`.
 **Próxima etapa:** mudar o trabalho para a máquina do usuário e testar o guia local no Mac; depois, etapa 2.
 
 ## Concluído
@@ -31,7 +31,9 @@
   - SNS FIFO validado no LocalStack `2026.10.2`; helper de teste `libs/testing-localstack` (token, imagem fixa, falha no CI sem token);
   - `OutboxRelay` em `libs/outbox`: líder por `pg_try_advisory_xact_lock`, publicador SNS FIFO (`MessageGroupId` = conta, `MessageDeduplicationId` = `eventId`), conta presa não ocupa o lote das outras (índice `outbox_stuck_idx`, `V6`), limites de 2 s por publicação e 10 s por ciclo, métricas `outbox.pending`, idade do mais antigo e `outbox.relay.cycles`;
   - relay ligado no `accounts` (`OutboxRelayScheduler` com desligamento gracioso), LocalStack no docker-compose com tópico e fila de inspeção (`RawMessageDelivery=true`), segredo `LOCALSTACK_AUTH_TOKEN` nos jobs `build` e `smoke`, smoke conferindo os eventos na fila;
-  - `./gradlew build --rerun-tasks` verde com o token (230 testes, 0 pulados), compose e smoke OK, actionlint e shellcheck sem erros. O CI no GitHub ainda não rodou com o segredo (primeiro push do PR).
+  - `./gradlew build --rerun-tasks` verde com o token (231 testes, 0 pulados), compose e smoke OK, actionlint e shellcheck sem erros; CI do PR #4 (`build` e `smoke`) verde com o segredo;
+  - convenções de nome: testes `*IntegrationTest`, `OutboxEventEnvelope`, corpos da API com sufixo `DTO` em `adapters/web/dto/` (regra ArchUnit).
+- PR #4 do bloco 2 com merge na `main` (2026-10-23).
 - graphify configurado (2026-10-22): `graphify-out/` versionado, skill, hook do Claude antes de buscas e hook do git que reconstrói o grafo a cada commit.
 - Verificação (ambiente de nuvem, 2026-10-21): `./gradlew build --rerun-tasks` verde (5 testes, 0 falhas); compose saudável com e sem `--env-file`; rota `/accounts/actuator/health` pelo nginx `UP`; actionlint sem erros.
 - CI no GitHub (PR #1, 2026-10-21): `build` e `smoke` verdes. O `smoke` falhou na primeira execução porque o healthcheck do nginx usava `localhost`, que no runner resolve para IPv6 enquanto o nginx escuta só em IPv4; corrigido para `127.0.0.1` (sem `listen [::]:80`, que derruba o nginx em máquinas sem IPv6).
@@ -40,13 +42,12 @@
 Guia completo, para macOS (zsh) e Linux: [`docs/rodando-localmente.md`](rodando-localmente.md). Resumo: JDK 21 e Docker Desktop; `cp infra/local/.env.example infra/local/.env`; compose `up --wait`; `./gradlew build` (ou `./gradlew test` sem Docker); `bootRun`; `infra/local/smoke.sh`; coleção Bruno em `api/bruno/accounts/`. O guia ainda não foi executado num Mac de verdade.
 
 ## Em andamento
-- PR do bloco 2 (`etapa-1-bloco-2` → `main`), aguardando o CI.
+- Nada.
 
 ## Próximos passos
-1. Usuário: conferir o CI verde, revisar e fazer o merge do PR do bloco 2.
-2. Usuário: rotacionar o token do LocalStack (ficou registrado no chat) e atualizar o segredo no GitHub e o `infra/local/.env`.
-3. Pedido do usuário (2026-10-23), no fim do bloco 2: mudar o modo de trabalho para que o coordenador e os agentes alterem o código na máquina do usuário, que acompanha o código no próprio computador.
-4. Pedido do usuário (2026-10-22): depois da etapa 1, montar uma forma de rodar e testar o projeto na máquina dele (sessão do Claude Code no Mac ou uso do computador) e executar o guia local do zero lá.
+1. Usuário: rotacionar o token do LocalStack (ficou registrado no chat) e atualizar o segredo no GitHub e o `infra/local/.env`.
+2. Trabalho passa para o Mac do usuário (decidido em 2026-10-23): sessão do Claude Code local em `~/Dev/DigitalBanking`, com o coordenador e os agentes editando, rodando build, Docker e LocalStack direto na máquina. Primeira tarefa lá: executar [`rodando-localmente.md`](rodando-localmente.md) do zero, passo a passo, e corrigir o guia no que divergir do Mac.
+3. Etapa 2 (`transfers` + saga), começando pelo brainstorming.
 
 ## Pendências e decisões em aberto
 Decisões: fonte única na seção "Em aberto" de `docs/arquitetura.md`.
@@ -85,6 +86,7 @@ Melhorias técnicas adiadas na revisão da etapa 0 (nenhuma bloqueia):
 - Proteger a `main` no GitHub exigindo CI verde para merge.
 
 ## Ambiente do Claude
+- **Mac do usuário (a partir da etapa 2):** sessão do Claude Code local, com JDK 21, Docker Desktop, graphify e os plugins Superpowers e Matt Pocock; o `infra/local/.env` (fora do git) guarda o `LOCALSTACK_AUTH_TOKEN`; o push usa o `credential.helper` local. Os itens abaixo sobre a nuvem valem só se o trabalho voltar para lá.
 - **Nuvem:** JDK 21 e Docker. Maven Central e Docker Hub limitam o IP compartilhado (`429`): usar o init script do Gradle com o espelho `maven-central.storage-download.googleapis.com` e `registry-mirrors: ["https://mirror.gcr.io"]` no `dockerd` (configuração do ambiente, fora do repo).
 - **Push:** pela VM do Mac, com um token fine-grained do GitHub em `.git/github-token` (fora do controle de versão), lido por um `credential.helper` configurado só no `.git/config` local. Sem esse arquivo, o push pela VM falha; pela nuvem funciona quando o repositório está conectado à sessão.
 - **VM do Mac:** sem Docker, sem acesso ao Docker Desktop do Mac e só com Java 11; serve para editar arquivos da pasta do usuário. Por isso o build e os testes rodam no clone da nuvem.
