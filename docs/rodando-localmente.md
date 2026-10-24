@@ -4,9 +4,14 @@ Guia para subir a infraestrutura local, o serviço `accounts` e conferir a API p
 Todos os comandos rodam na raiz do repositório e valem tanto para o zsh (o shell padrão do macOS) quanto para o bash. Os blocos de comando não têm comentários: as explicações ficam no texto antes e depois de cada bloco, porque o zsh do macOS, por padrão, não aceita `# comentário` na linha de comando.
 
 ## Pré-requisitos
-- **JDK 21 instalado.** O Gradle não baixa JDK sozinho (`org.gradle.java.installations.auto-download=false` em `gradle.properties`). Instale e confira com:
+Os comandos `brew` abaixo valem só para Mac com chip Apple (M1 em diante): o Homebrew não instala em Mac Intel. Confira o processador com `uname -m` (`arm64` é Apple, `x86_64` é Intel). Para cada ferramenta há também o caminho sem Homebrew.
+
+- **JDK 21 instalado.** O Gradle não baixa JDK sozinho (`org.gradle.java.installations.auto-download=false` em `gradle.properties`). Com Homebrew:
   ```bash
   brew install --cask temurin@21
+  ```
+  Sem Homebrew: baixe o instalador `.pkg` do Temurin 21 para macOS (x64 no Intel, aarch64 no Apple) em [adoptium.net](https://adoptium.net/temurin/releases/?version=21&os=mac) e dê dois cliques. Depois, nos dois casos, confira:
+  ```bash
   export JAVA_HOME=$(/usr/libexec/java_home -v 21)
   java -version
   ```
@@ -17,12 +22,30 @@ Todos os comandos rodam na raiz do repositório e valem tanto para o zsh (o shel
   Ou repita o `export` em cada terminal novo antes de rodar o Gradle, como no passo 4.
 - **Docker Desktop em execução.** O compose e os testes de integração com Testcontainers precisam dele. Confira com `docker info`.
 - **Porta 80 no Docker Desktop.** O nginx publica a porta 80. Se o `up` falhar ao publicar essa porta, ative "Allow privileged port mapping" em Settings → Advanced do Docker Desktop, ou troque `NGINX_PORT` no `infra/local/.env` (passo 1).
-- **jq** para o smoke: `brew install jq`.
+- **jq** para o smoke. A partir do macOS 15 costuma vir em `/usr/bin/jq`; confira com `jq --version`. Se faltar: `brew install jq`, ou as outras formas de instalação em [jqlang.org/download](https://jqlang.org/download/).
 - **Token do LocalStack.** O LocalStack emula o SNS e o SQS e exige um token, mesmo no plano gratuito. Crie uma conta Hobby em [app.localstack.cloud](https://app.localstack.cloud), copie o seu Auth Token no painel da conta e preencha `LOCALSTACK_AUTH_TOKEN` no `infra/local/.env` (passo 1). Sem o token, o contêiner do LocalStack encerra na partida e os testes com LocalStack são pulados. Nunca coloque o token no `.env.example` nem em outro arquivo versionado; o `infra/local/.env` está no `.gitignore`.
-- **Opcional:** Node (para a CLI do Bruno) e uv (para o graphify):
+- **Opcional:** Node (para a CLI do Bruno) e uv (para o graphify). Com Homebrew:
   ```bash
   brew install node uv
   npm install -g @usebruno/cli
+  ```
+  Sem Homebrew, tudo na pasta pessoal e sem senha de administrador. Primeiro, uma única vez, ponha `~/.local/bin` e `~/.local/node/bin` no `PATH` (rodar de novo duplica a linha no `~/.zshrc`):
+  ```bash
+  echo 'export PATH="$HOME/.local/bin:$HOME/.local/node/bin:$PATH"' >> ~/.zshrc
+  source ~/.zshrc
+  ```
+  Node: baixe o `.tar.gz` do Node LTS para macOS (`darwin-x64` no Intel, `darwin-arm64` no Apple) em [nodejs.org/dist](https://nodejs.org/dist/) e extraia em `~/.local/node`. O exemplo usa o Node v24.22.1 num Mac Intel; troque a versão e a arquitetura se precisar. Os dois hashes mostrados pelo `shasum` e pelo `grep` precisam ser iguais:
+  ```bash
+  mkdir -p ~/.local/node
+  curl -fsSL -o /tmp/node.tar.gz https://nodejs.org/dist/v24.22.1/node-v24.22.1-darwin-x64.tar.gz
+  shasum -a 256 /tmp/node.tar.gz
+  curl -fsSL https://nodejs.org/dist/v24.22.1/SHASUMS256.txt | grep node-v24.22.1-darwin-x64.tar.gz
+  tar -xzf /tmp/node.tar.gz -C ~/.local/node --strip-components=1
+  npm install -g @usebruno/cli
+  ```
+  uv: o instalador oficial grava em `~/.local/bin`; abra um terminal novo depois dele:
+  ```bash
+  curl -LsSf https://astral.sh/uv/install.sh | sh
   ```
 
 ## 1. Configurar o ambiente
@@ -109,9 +132,13 @@ docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml dow
 ```
 
 ## Opcional: grafo do código (graphify)
-O repositório versiona o grafo do código em `graphify-out/`, usado por agentes para navegar o código. Instale a CLI com o uv (dos pré-requisitos opcionais):
+O repositório versiona o grafo do código em `graphify-out/`, usado por agentes para navegar o código. Instale a CLI com o uv (dos pré-requisitos opcionais), sempre com o extra `sql`:
 ```bash
-uv tool install graphifyy
+uv tool install "graphifyy[sql]"
+```
+Sem o extra, as migrations ficam fora do grafo, o grafo novo sai com menos nós que o versionado e o `graphify update .` se recusa a sobrescrevê-lo ("Refusing to overwrite"). Se o graphify já estiver instalado sem o extra, reinstale com `uv tool install --force "graphifyy[sql]"` (ou, se veio pelo pip, `python3 -m pip install "graphifyy[sql]"`; num Python que recusa com "externally-managed-environment", use o uv). Para o agente usar o grafo, instale também a skill no Claude Code:
+```bash
+graphify install --platform claude
 ```
 Uma vez por clone, instale os hooks do git, que atualizam o grafo a cada commit, checkout e merge:
 ```bash

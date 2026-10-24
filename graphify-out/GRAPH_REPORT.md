@@ -1,7 +1,7 @@
-# Graph Report - digitalbanking  (2026-10-23)
+# Graph Report - DigitalBanking  (2026-10-23)
 
 ## Corpus Check
-- 166 files · ~49,359 words
+- 166 files · ~49,890 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 18 file(s) not represented in the graph (top: .bru 8, (none) 3, .properties 2)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `dec682d6`
+- Built from commit: `c20bd0c1`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -113,12 +113,12 @@
   docs/arquitetura.md → libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/OutboxRelay.kt
 - `Task 11: Regras ArchUnit e melhorias da etapa 0 (Marina, `dev-kotlin`)` --references--> `ArchitectureTest`  [INFERRED]
   docs/superpowers/plans/2026-10-22-etapa-1-accounts.md → services/accounts/bootstrap/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/ArchitectureTest.kt
-- `Task 15: Relay e publicador SNS (Marina, `dev-kotlin`)` --references--> `JdbcOutboxStore`  [INFERRED]
-  docs/superpowers/plans/2026-10-22-etapa-1-accounts.md → libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/JdbcOutboxStore.kt
-- `4. Fluxos` --references--> `JdbcOutboxWriter`  [INFERRED]
-  docs/superpowers/specs/2026-10-22-etapa-1-accounts-design.md → libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/JdbcOutboxWriter.kt
-- `Restrições (de `CLAUDE.md` e ADRs)` --references--> `JdbcOutboxWriter`  [INFERRED]
-  docs/superpowers/specs/2026-10-22-etapa-1-accounts-design.md → libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/JdbcOutboxWriter.kt
+- `Concluído` --references--> `OutboxRelay`  [INFERRED]
+  docs/status.md → libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/OutboxRelay.kt
+- `Concluído` --references--> `OutboxRelayScheduler`  [INFERRED]
+  docs/status.md → services/accounts/bootstrap/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/OutboxRelayScheduler.kt
+- `Concluído` --references--> `Account`  [INFERRED]
+  docs/status.md → services/accounts/domain/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/domain/Account.kt
 
 ## Import Cycles
 - None detected.
@@ -322,7 +322,7 @@ Cohesion: 0.25
 Nodes (7): Agentes do projeto, Ao terminar uma tarefa, Banco digital em microsserviços, Contexto (leia antes de qualquer tarefa), Fluxo de trabalho (skills), Git, Grafo do código (graphify)
 
 ## Knowledge Gaps
-- **13 isolated node(s):** `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`, `INSERTED`, `DUPLICATE_OPENING_KEY` (+8 more)
+- **13 isolated node(s):** `DUPLICATE_CUSTOMER`, `DUPLICATE_OPENING_KEY`, `INSERTED`, `BLACK`, `DIAMOND` (+8 more)
   These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 298 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **45 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -330,15 +330,15 @@ Nodes (7): Agentes do projeto, Ao terminar uma tarefa, Banco digital em microsse
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `AccountsIntegrationTest` connect `AccountsIntegrationTest` to `uuid`, `AccountApiIntegrationTest`, `ApiClient`, `OutboxRelayIntegrationTest.kt`, `ClockWiringIntegrationTest.kt`, `Account`, `AccountsApplicationIntegrationTest.kt`, `AccountController.kt`, `OutboxRelayUnreachableBrokerIntegrationTest`, `OutboxRelayConfiguration.kt`?**
-  _High betweenness centrality (0.108) - this node is a cross-community bridge._
+  _High betweenness centrality (0.090) - this node is a cross-community bridge._
 - **Are the 8 inferred relationships involving `Account` (e.g. with `Regras inegociáveis` and `Clientes e contas`) actually correct?**
   _`Account` has 8 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` to the rest of the system?**
+- **What connects `DUPLICATE_CUSTOMER`, `DUPLICATE_OPENING_KEY`, `INSERTED` to the rest of the system?**
   _13 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `AccountsIntegrationTest` be split into smaller, more focused modules?**
   _Cohesion score 0.0915915915915916 - nodes in this community are weakly interconnected._
-- **Why does `OutboxRelay` connect `OutboxRelay` to `PendingEvent`, `OutboxRelayIntegrationTest.kt`, `Etapa 1 — `accounts`: design`, `OutboxRelayUnreachableBrokerIntegrationTest`, `Decisões tomadas`, `AccountController.kt`, `OutboxStore`, `Clock`, `OutboxRelayScheduler`, `OutboxRelayConfiguration.kt`?**
-  _High betweenness centrality (0.066) - this node is a cross-community bridge._
+- **Why does `Account` connect `Account` to `uuid`, `AccountOpened`, `LedgerEntryRecorded`, `CallLog`, `.record`, `Money`, `OutboxRelayUnreachableBrokerIntegrationTest`, `OverdraftLimit`, `AccountController.kt`, `.record`?**
+  _High betweenness centrality (0.070) - this node is a cross-community bridge._
 - **Are the 10 inferred relationships involving `LedgerEntry` (e.g. with `Regras inegociáveis` and `Ledger`) actually correct?**
   _`LedgerEntry` has 10 INFERRED edges - model-reasoned connections that need verification._
 - **Should `AccountApiIntegrationTest` be split into smaller, more focused modules?**
