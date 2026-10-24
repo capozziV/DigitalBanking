@@ -13,7 +13,7 @@ import java.sql.DriverManager
 import java.util.UUID
 
 @ExtendWith(OutputCaptureExtension::class)
-class AccountApiIT : AccountsIntegrationTest() {
+class AccountApiIntegrationTest : AccountsIntegrationTest() {
     @LocalServerPort
     private var port: Int = 0
 

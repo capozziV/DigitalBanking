@@ -1,7 +1,7 @@
 package io.github.capozziv.digitalbanking.accounts.adapters.web
 
-import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.AccountTypeLimitResponse
-import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.ChangeOverdraftLimitRequest
+import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.AccountTypeLimitDTO
+import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.ChangeOverdraftLimitDTO
 import io.github.capozziv.digitalbanking.accounts.application.usecase.ChangeOverdraftLimitUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.ListAccountTypesUseCase
 import io.github.capozziv.digitalbanking.accounts.domain.AccountType
@@ -36,13 +36,13 @@ class AccountTypeAdminController(
             content = [
                 Content(
                     mediaType = "application/json",
-                    array = ArraySchema(schema = Schema(implementation = AccountTypeLimitResponse::class)),
+                    array = ArraySchema(schema = Schema(implementation = AccountTypeLimitDTO::class)),
                 ),
             ],
         ),
     )
     @GetMapping
-    fun list(): List<AccountTypeLimitResponse> = listAccountTypes.execute().map(AccountTypeLimitResponse::from)
+    fun list(): List<AccountTypeLimitDTO> = listAccountTypes.execute().map(AccountTypeLimitDTO::from)
 
     /** The type in the path is a resource name: unknown or lowercase is 404, not 400. */
     @Operation(summary = "Change the overdraft limit of an account type")
@@ -50,7 +50,7 @@ class AccountTypeAdminController(
         ApiResponse(
             responseCode = "200",
             description = "The account type with its new overdraft limit",
-            content = [Content(mediaType = "application/json", schema = Schema(implementation = AccountTypeLimitResponse::class))],
+            content = [Content(mediaType = "application/json", schema = Schema(implementation = AccountTypeLimitDTO::class))],
         ),
         ApiResponse(
             responseCode = "400",
@@ -66,10 +66,10 @@ class AccountTypeAdminController(
     @PutMapping("/{type}")
     fun changeLimit(
         @PathVariable type: String,
-        @Valid @RequestBody request: ChangeOverdraftLimitRequest,
-    ): AccountTypeLimitResponse {
+        @Valid @RequestBody request: ChangeOverdraftLimitDTO,
+    ): AccountTypeLimitDTO {
         val accountType = AccountType.entries.find { it.name == type } ?: throw AccountTypeNotFoundException(type)
         val limit = OverdraftLimit(checkNotNull(request.overdraftLimit))
-        return AccountTypeLimitResponse.from(changeOverdraftLimit.execute(accountType, limit))
+        return AccountTypeLimitDTO.from(changeOverdraftLimit.execute(accountType, limit))
     }
 }

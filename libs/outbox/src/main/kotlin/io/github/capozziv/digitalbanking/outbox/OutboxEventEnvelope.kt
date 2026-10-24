@@ -6,7 +6,7 @@ import tools.jackson.databind.json.JsonMapper
  * Envelope of the events published from the outbox: eventId, eventType, eventVersion, occurredAt,
  * aggregateId, correlationId and the payload as a JSON object.
  */
-object OutboxEnvelope {
+object OutboxEventEnvelope {
     /** MDC key holding the correlation ID of the current request. */
     const val CORRELATION_ID_MDC_KEY = "correlationId"
 

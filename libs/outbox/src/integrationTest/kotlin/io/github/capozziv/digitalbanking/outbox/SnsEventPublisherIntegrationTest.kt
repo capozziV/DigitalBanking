@@ -18,7 +18,7 @@ import java.time.Instant
 import java.util.UUID
 
 /** Publishes through a FIFO topic into a FIFO queue subscribed with raw message delivery, as consumers will. */
-class SnsEventPublisherIT {
+class SnsEventPublisherIntegrationTest {
     @Test
     fun `publishes the envelope as body with group, deduplication id and attributes`() {
         val (topicArn, queueUrl) = topicWithQueue("full")
@@ -27,7 +27,7 @@ class SnsEventPublisherIT {
         SnsEventPublisher(sns, topicArn, PUBLISH_TIMEOUT).publish(event)
 
         val message = receiveOne(queueUrl)
-        assertThat(message.body()).isEqualTo(OutboxEnvelope.toJson(event))
+        assertThat(message.body()).isEqualTo(OutboxEventEnvelope.toJson(event))
         assertThat(message.attributes())
             .containsEntry(MessageSystemAttributeName.MESSAGE_GROUP_ID, "acc-1")
             .containsEntry(MessageSystemAttributeName.MESSAGE_DEDUPLICATION_ID, event.eventId.toString())

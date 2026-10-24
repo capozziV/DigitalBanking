@@ -17,7 +17,7 @@ import java.time.ZoneOffset
 import java.util.UUID
 
 @Testcontainers
-class JdbcOutboxWriterIT {
+class JdbcOutboxWriterIntegrationTest {
     private val now = Instant.parse("2026-10-22T14:31:00Z")
     private lateinit var jdbcClient: JdbcClient
     private lateinit var writer: JdbcOutboxWriter
@@ -38,7 +38,7 @@ class JdbcOutboxWriterIT {
 
     @Test
     fun `write stores an unpublished row with the message, the clock instant and the MDC correlation id`() {
-        MDC.put(OutboxEnvelope.CORRELATION_ID_MDC_KEY, "corr-123")
+        MDC.put(OutboxEventEnvelope.CORRELATION_ID_MDC_KEY, "corr-123")
         val payload = """{ "accountId": "acc-1",  "amount": 3700, "nested": {"kind": "CREDIT"} }"""
 
         writer.write(OutboxMessage("LedgerEntryRecorded", 1, "acc-1", payload))

@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 @Testcontainers
-class JdbcOutboxStoreIT {
+class JdbcOutboxStoreIntegrationTest {
     private val now = Instant.parse("2026-10-22T14:31:00.123456Z")
     private lateinit var jdbcClient: JdbcClient
     private lateinit var transactions: TransactionTemplate
@@ -139,7 +139,7 @@ class JdbcOutboxStoreIT {
 
     @Test
     fun `fetchPending maps every column of the row`() {
-        MDC.put(OutboxEnvelope.CORRELATION_ID_MDC_KEY, "corr-9")
+        MDC.put(OutboxEventEnvelope.CORRELATION_ID_MDC_KEY, "corr-9")
         try {
             write("acc-1", payload = """{"amount": 3700}""")
         } finally {

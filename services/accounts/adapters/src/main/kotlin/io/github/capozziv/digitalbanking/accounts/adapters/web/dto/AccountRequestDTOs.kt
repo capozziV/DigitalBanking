@@ -11,11 +11,11 @@ import java.util.UUID
 
 // Fields are nullable so that a missing value reaches bean validation and becomes a field error.
 
-data class OpenAccountRequest(
+data class OpenAccountDTO(
     @field:NotNull val customerId: UUID?,
 )
 
-data class RecordEntryRequest(
+data class RecordEntryDTO(
     @field:NotNull @field:Positive val amount: Long?,
     // The description is a single line, so the whole C0 range (U+0000-U+001F, tab and line breaks included)
     // is refused on purpose; this also keeps 0x00, which PostgreSQL rejects in text, away from the database.
@@ -32,10 +32,10 @@ data class RecordEntryRequest(
     }
 }
 
-data class ChangeAccountTypeRequest(
+data class ChangeAccountTypeDTO(
     @field:NotNull val type: AccountType?,
 )
 
-data class ChangeOverdraftLimitRequest(
+data class ChangeOverdraftLimitDTO(
     @field:NotNull @field:PositiveOrZero val overdraftLimit: Long?,
 )

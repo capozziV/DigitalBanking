@@ -6,7 +6,7 @@ import tools.jackson.databind.json.JsonMapper
 import java.time.Instant
 import java.util.UUID
 
-class OutboxEnvelopeTest {
+class OutboxEventEnvelopeTest {
     private val jsonMapper = JsonMapper.builder().build()
 
     private val event =
@@ -24,7 +24,7 @@ class OutboxEnvelopeTest {
 
     @Test
     fun `envelope has exactly the spec fields with the payload as a json object`() {
-        val json = jsonMapper.readTree(OutboxEnvelope.toJson(event))
+        val json = jsonMapper.readTree(OutboxEventEnvelope.toJson(event))
 
         assertThat(json.propertyNames())
             .containsExactly("eventId", "eventType", "eventVersion", "occurredAt", "aggregateId", "correlationId", "payload")
@@ -41,7 +41,7 @@ class OutboxEnvelopeTest {
 
     @Test
     fun `missing correlation id is written as null`() {
-        val json = jsonMapper.readTree(OutboxEnvelope.toJson(event.copy(correlationId = null)))
+        val json = jsonMapper.readTree(OutboxEventEnvelope.toJson(event.copy(correlationId = null)))
 
         assertThat(json.has("correlationId")).isTrue()
         assertThat(json.path("correlationId").isNull).isTrue()

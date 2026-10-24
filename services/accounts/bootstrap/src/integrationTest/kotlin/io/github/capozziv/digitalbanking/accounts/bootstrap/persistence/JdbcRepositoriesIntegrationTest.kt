@@ -19,7 +19,7 @@ import io.github.capozziv.digitalbanking.accounts.domain.LedgerEntry
 import io.github.capozziv.digitalbanking.accounts.domain.LedgerEntryRecorded
 import io.github.capozziv.digitalbanking.accounts.domain.Money
 import io.github.capozziv.digitalbanking.accounts.domain.OverdraftLimit
-import io.github.capozziv.digitalbanking.outbox.OutboxEnvelope
+import io.github.capozziv.digitalbanking.outbox.OutboxEventEnvelope
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
@@ -36,7 +36,7 @@ import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
-class JdbcRepositoriesIT : AccountsIntegrationTest() {
+class JdbcRepositoriesIntegrationTest : AccountsIntegrationTest() {
     @Autowired private lateinit var accounts: AccountRepository
 
     @Autowired private lateinit var entries: LedgerEntryRepository
@@ -314,7 +314,7 @@ class JdbcRepositoriesIT : AccountsIntegrationTest() {
 
     @Test
     fun `append writes LedgerEntryRecorded with the spec payload and the MDC correlation id`() {
-        MDC.put(OutboxEnvelope.CORRELATION_ID_MDC_KEY, "corr-ledger")
+        MDC.put(OutboxEventEnvelope.CORRELATION_ID_MDC_KEY, "corr-ledger")
         val account = openAccount()
         val credit = entry(account, 1, EntryKind.CREDIT, 3_700, 3_700, "credit-1", description = "Salary")
 
@@ -355,7 +355,7 @@ class JdbcRepositoriesIT : AccountsIntegrationTest() {
 
     @Test
     fun `append writes AccountOpened and AccountTypeChanged with the spec payloads`() {
-        MDC.put(OutboxEnvelope.CORRELATION_ID_MDC_KEY, "corr-account")
+        MDC.put(OutboxEventEnvelope.CORRELATION_ID_MDC_KEY, "corr-account")
         val accountId = ids.newId()
         val customerId = UUID.randomUUID()
 

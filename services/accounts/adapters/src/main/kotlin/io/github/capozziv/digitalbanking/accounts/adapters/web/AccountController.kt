@@ -1,10 +1,10 @@
 package io.github.capozziv.digitalbanking.accounts.adapters.web
 
-import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.AccountResponse
-import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.ChangeAccountTypeRequest
-import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.LedgerEntryResponse
-import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.OpenAccountRequest
-import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.RecordEntryRequest
+import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.AccountDTO
+import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.ChangeAccountTypeDTO
+import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.LedgerEntryDTO
+import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.OpenAccountDTO
+import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.RecordEntryDTO
 import io.github.capozziv.digitalbanking.accounts.application.usecase.ChangeAccountTypeUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.DebitOutcome
 import io.github.capozziv.digitalbanking.accounts.application.usecase.GetAccountUseCase
@@ -66,12 +66,12 @@ class AccountController(
             responseCode = "201",
             description = "Account opened",
             headers = [Header(name = "Location", description = "/accounts/{id}")],
-            content = [Content(mediaType = "application/json", schema = Schema(implementation = AccountResponse::class))],
+            content = [Content(mediaType = "application/json", schema = Schema(implementation = AccountDTO::class))],
         ),
         ApiResponse(
             responseCode = "200",
             description = "Retry with the same key: the account opened by the first request",
-            content = [Content(mediaType = "application/json", schema = Schema(implementation = AccountResponse::class))],
+            content = [Content(mediaType = "application/json", schema = Schema(implementation = AccountDTO::class))],
         ),
         ApiResponse(
             responseCode = "400",
@@ -93,11 +93,11 @@ class AccountController(
     fun open(
         @Parameter(description = ApiDocs.IDEMPOTENCY_KEY)
         @RequestHeader(IdempotencyKeyHeader.NAME) idempotencyKey: String,
-        @Valid @RequestBody request: OpenAccountRequest,
-    ): ResponseEntity<AccountResponse> {
+        @Valid @RequestBody request: OpenAccountDTO,
+    ): ResponseEntity<AccountDTO> {
         val key = IdempotencyKeyHeader.require(idempotencyKey)
         val result = openAccount.execute(OpenAccountCommand(checkNotNull(request.customerId), key))
-        val body = AccountResponse.from(getAccount.execute(result.account.id))
+        val body = AccountDTO.from(getAccount.execute(result.account.id))
         return if (result.created) {
             ResponseEntity.created(URI.create("/accounts/${body.id}")).body(body)
         } else {
@@ -110,7 +110,7 @@ class AccountController(
         ApiResponse(
             responseCode = "200",
             description = "The account",
-            content = [Content(mediaType = "application/json", schema = Schema(implementation = AccountResponse::class))],
+            content = [Content(mediaType = "application/json", schema = Schema(implementation = AccountDTO::class))],
         ),
         ApiResponse(
             responseCode = "400",
@@ -126,19 +126,19 @@ class AccountController(
     @GetMapping("/{id}")
     fun get(
         @PathVariable id: UUID,
-    ): AccountResponse = AccountResponse.from(getAccount.execute(id))
+    ): AccountDTO = AccountDTO.from(getAccount.execute(id))
 
     @Operation(summary = "Record a credit")
     @ApiResponses(
         ApiResponse(
             responseCode = "201",
             description = "Credit recorded",
-            content = [Content(mediaType = "application/json", schema = Schema(implementation = LedgerEntryResponse::class))],
+            content = [Content(mediaType = "application/json", schema = Schema(implementation = LedgerEntryDTO::class))],
         ),
         ApiResponse(
             responseCode = "200",
             description = "Retry with the same key: the entry recorded by the first request, the same body",
-            content = [Content(mediaType = "application/json", schema = Schema(implementation = LedgerEntryResponse::class))],
+            content = [Content(mediaType = "application/json", schema = Schema(implementation = LedgerEntryDTO::class))],
         ),
         ApiResponse(
             responseCode = "400",
@@ -167,20 +167,20 @@ class AccountController(
         @PathVariable id: UUID,
         @Parameter(description = ApiDocs.IDEMPOTENCY_KEY)
         @RequestHeader(IdempotencyKeyHeader.NAME) idempotencyKey: String,
-        @Valid @RequestBody request: RecordEntryRequest,
-    ): ResponseEntity<LedgerEntryResponse> = entryResponse(recordCredit.execute(command(id, idempotencyKey, request)))
+        @Valid @RequestBody request: RecordEntryDTO,
+    ): ResponseEntity<LedgerEntryDTO> = entryResponse(recordCredit.execute(command(id, idempotencyKey, request)))
 
     @Operation(summary = "Record a debit, allowed down to the overdraft limit of the account type")
     @ApiResponses(
         ApiResponse(
             responseCode = "201",
             description = "Debit recorded",
-            content = [Content(mediaType = "application/json", schema = Schema(implementation = LedgerEntryResponse::class))],
+            content = [Content(mediaType = "application/json", schema = Schema(implementation = LedgerEntryDTO::class))],
         ),
         ApiResponse(
             responseCode = "200",
             description = "Retry with the same key: the entry recorded by the first request, the same body",
-            content = [Content(mediaType = "application/json", schema = Schema(implementation = LedgerEntryResponse::class))],
+            content = [Content(mediaType = "application/json", schema = Schema(implementation = LedgerEntryDTO::class))],
         ),
         ApiResponse(
             responseCode = "400",
@@ -212,8 +212,8 @@ class AccountController(
         @PathVariable id: UUID,
         @Parameter(description = ApiDocs.IDEMPOTENCY_KEY)
         @RequestHeader(IdempotencyKeyHeader.NAME) idempotencyKey: String,
-        @Valid @RequestBody request: RecordEntryRequest,
-    ): ResponseEntity<LedgerEntryResponse> =
+        @Valid @RequestBody request: RecordEntryDTO,
+    ): ResponseEntity<LedgerEntryDTO> =
         when (val outcome = recordDebit.execute(command(id, idempotencyKey, request))) {
             is DebitOutcome.Recorded -> {
                 entryResponse(outcome.result)
@@ -231,7 +231,7 @@ class AccountController(
         ApiResponse(
             responseCode = "200",
             description = "The account with its new type and overdraft limit",
-            content = [Content(mediaType = "application/json", schema = Schema(implementation = AccountResponse::class))],
+            content = [Content(mediaType = "application/json", schema = Schema(implementation = AccountDTO::class))],
         ),
         ApiResponse(
             responseCode = "400",
@@ -253,16 +253,16 @@ class AccountController(
     @PutMapping("/{id}/type")
     fun changeType(
         @PathVariable id: UUID,
-        @Valid @RequestBody request: ChangeAccountTypeRequest,
-    ): AccountResponse {
+        @Valid @RequestBody request: ChangeAccountTypeDTO,
+    ): AccountDTO {
         changeAccountType.execute(id, checkNotNull(request.type))
-        return AccountResponse.from(getAccount.execute(id))
+        return AccountDTO.from(getAccount.execute(id))
     }
 
     private fun command(
         accountId: UUID,
         idempotencyKey: String,
-        request: RecordEntryRequest,
+        request: RecordEntryDTO,
     ) = RecordEntryCommand(
         accountId = accountId,
         amount = Money(checkNotNull(request.amount)),
@@ -270,10 +270,10 @@ class AccountController(
         idempotencyKey = IdempotencyKeyHeader.require(idempotencyKey),
     )
 
-    private fun entryResponse(result: RecordEntryResult): ResponseEntity<LedgerEntryResponse> =
+    private fun entryResponse(result: RecordEntryResult): ResponseEntity<LedgerEntryDTO> =
         ResponseEntity
             .status(if (result.created) HttpStatus.CREATED else HttpStatus.OK)
-            .body(LedgerEntryResponse.from(result.entry))
+            .body(LedgerEntryDTO.from(result.entry))
 
     private companion object {
         val log = LoggerFactory.getLogger(AccountController::class.java)

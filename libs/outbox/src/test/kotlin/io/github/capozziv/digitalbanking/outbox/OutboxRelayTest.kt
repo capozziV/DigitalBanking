@@ -124,8 +124,8 @@ class OutboxRelayTest {
         val error = logs.list.single { it.level == Level.ERROR }
         assertThat(error.formattedMessage).contains("eventId=${eventId(1)}", "aggregateId=A", "attempts=10")
         assertThat(error.throwableProxy.message).isEqualTo("sns down for 1")
-        assertThat(error.mdcPropertyMap).containsEntry(OutboxEnvelope.CORRELATION_ID_MDC_KEY, "corr-1")
-        assertThat(MDC.get(OutboxEnvelope.CORRELATION_ID_MDC_KEY)).isNull()
+        assertThat(error.mdcPropertyMap).containsEntry(OutboxEventEnvelope.CORRELATION_ID_MDC_KEY, "corr-1")
+        assertThat(MDC.get(OutboxEventEnvelope.CORRELATION_ID_MDC_KEY)).isNull()
     }
 
     @Test

@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit
  * End-to-end proof of the balance under concurrency and of idempotency (criteria 3 and 4 of the stage 1 spec):
  * parallel HTTP requests on one account, then the ledger and the outbox inspected as the owner user.
  */
-class ConcurrencyIT : AccountsIntegrationTest() {
+class ConcurrencyIntegrationTest : AccountsIntegrationTest() {
     @LocalServerPort
     private var port: Int = 0
 

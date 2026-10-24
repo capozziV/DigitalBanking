@@ -17,7 +17,7 @@ dependencies {
     integrationTestImplementation(libs.testcontainers.junit.jupiter)
 }
 
-// OutboxRelayIT runs LocalStack with the same init scripts as the local compose. The directory is a
+// OutboxRelayIntegrationTest runs LocalStack with the same init scripts as the local compose. The directory is a
 // relative-path input, so the absolute path of the clone does not enter the build cache key.
 abstract class LocalStackInitScripts : CommandLineArgumentProvider {
     @get:InputDirectory

@@ -75,7 +75,7 @@ for _ in $(seq 1 30); do
     | @tsv')
   # Para no terceiro evento: uma duplicata que chegasse depois nao seria vista. Aceitavel porque a
   # deduplicacao do FIFO (MessageDeduplicationId = eventId) e a exclusividade do relay ja sao testadas
-  # no OutboxRelayIT; o smoke so confere a entrega ponta a ponta e a ordem.
+  # no OutboxRelayIntegrationTest; o smoke so confere a entrega ponta a ponta e a ordem.
   [ "$(echo "$events" | wc -w)" -lt 3 ] || break
 done
 

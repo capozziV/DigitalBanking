@@ -5,7 +5,7 @@ import software.amazon.awssdk.services.sns.model.MessageAttributeValue
 import java.time.Duration
 
 /**
- * Publishes to an SNS FIFO topic: the body is the [OutboxEnvelope], the message group is the aggregate
+ * Publishes to an SNS FIFO topic: the body is the [OutboxEventEnvelope], the message group is the aggregate
  * (order per aggregate) and the deduplication id is the event id. `eventType` and `correlationId` also
  * go as message attributes, so subscriptions with raw message delivery can read them without the body.
  * Each call is limited to [publishTimeout] (use [OutboxRelaySettings.publishTimeout]).
@@ -24,7 +24,7 @@ class SnsEventPublisher(
         snsClient.publish {
             it
                 .topicArn(topicArn)
-                .message(OutboxEnvelope.toJson(event))
+                .message(OutboxEventEnvelope.toJson(event))
                 .messageGroupId(event.aggregateId)
                 .messageDeduplicationId(event.eventId.toString())
                 .messageAttributes(attributes)

@@ -20,7 +20,7 @@ import java.time.Instant
  * order per MessageGroupId, deduplication by MessageDeduplicationId and message attributes
  * carried in the SNS envelope (RawMessageDelivery=false).
  */
-class LocalStackFifoIT {
+class LocalStackFifoIntegrationTest {
     private val jsonMapper = JsonMapper.builder().build()
 
     @Test

@@ -9,7 +9,7 @@ import java.time.Instant
 import java.util.UUID
 
 /** Amounts in cents. */
-data class AccountResponse(
+data class AccountDTO(
     val id: UUID,
     val customerId: UUID,
     val type: AccountType,
@@ -19,7 +19,7 @@ data class AccountResponse(
 ) {
     companion object {
         fun from(view: AccountView) =
-            AccountResponse(
+            AccountDTO(
                 id = view.account.id,
                 customerId = view.account.customerId,
                 type = view.account.type,
@@ -31,7 +31,7 @@ data class AccountResponse(
 }
 
 /** Amounts in cents. The idempotency key is not echoed back. */
-data class LedgerEntryResponse(
+data class LedgerEntryDTO(
     val id: UUID,
     val accountId: UUID,
     val sequence: Long,
@@ -43,7 +43,7 @@ data class LedgerEntryResponse(
 ) {
     companion object {
         fun from(entry: LedgerEntry) =
-            LedgerEntryResponse(
+            LedgerEntryDTO(
                 id = entry.id,
                 accountId = entry.accountId,
                 sequence = entry.sequence,
@@ -57,12 +57,12 @@ data class LedgerEntryResponse(
 }
 
 /** Overdraft limit in cents. */
-data class AccountTypeLimitResponse(
+data class AccountTypeLimitDTO(
     val type: AccountType,
     val overdraftLimit: Long,
     val updatedAt: Instant,
 ) {
     companion object {
-        fun from(limit: AccountTypeLimit) = AccountTypeLimitResponse(limit.type, limit.overdraftLimit.cents, limit.updatedAt)
+        fun from(limit: AccountTypeLimit) = AccountTypeLimitDTO(limit.type, limit.overdraftLimit.cents, limit.updatedAt)
     }
 }

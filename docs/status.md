@@ -56,7 +56,7 @@ Débito técnico do bloco 1 da etapa 1 (das revisões; nenhum bloqueia; detalhes
 - Desbloqueio manual de conta presa no relay.
 - Relay sem backoff: com o broker fora do ar, o limiar de 10 tentativas chega em ~5 s e cada ciclo loga um `ERROR` com stack trace por conta presa; trocar por backoff por evento ou `ERROR` só na transição.
 - `libs/outbox` expõe AWS SDK e Micrometer como `api`; separar o relay num módulo próprio quando chegar o 2º serviço (etapa 2).
-- Testes do relay: `get()` no `finally` do `OutboxRelayIT` pode encobrir a exceção original; KDoc do `OutboxRelayUnreachableBrokerIT` não diz que ele também cobre a ligação com o agendador.
+- Testes do relay: `get()` no `finally` do `OutboxRelayIntegrationTest` pode encobrir a exceção original; KDoc do `OutboxRelayUnreachableBrokerIntegrationTest` não diz que ele também cobre a ligação com o agendador.
 - Encerrar ou bloquear conta: sem regra definida.
 - Resposta de crédito/débito/troca de tipo montada com um `getAccount` fora da transação da escrita; `GetAccountUseCase` lê fora de transação.
 - `V5__app_grants.sql`: limitar `UPDATE` em `account` a `(type, updated_at)`; toda tabela nova precisa de `grant` próprio (sem `ALTER DEFAULT PRIVILEGES`).
@@ -64,7 +64,7 @@ Débito técnico do bloco 1 da etapa 1 (das revisões; nenhum bloqueia; detalhes
 - Duplicata de lançamento logada como `ERROR` duas vezes (repositório e handler).
 - ArchUnit: regra de sufixo `UseCase` cobre só o pacote `usecase`; isenções por sufixo; `domain`/`application` sem regra contra infraestrutura (o Gradle já impede); `@Controller` + `@ResponseBody` fora da regra.
 - OpenAPI: `ProblemDetail` repetido nas anotações (customizer global); `X-Correlation-Id` fora dos parâmetros.
-- Testes: comparar entidade inteira no débito do domínio; teste de limite exato no caso de uso; testes de `OverdraftLimit`/`AvailableBalance` em arquivos próprios; `Thread.sleep` no IT de corrida; literais repetidos.
+- Testes: comparar entidade inteira no débito do domínio; teste de limite exato no caso de uso; testes de `OverdraftLimit`/`AvailableBalance` em arquivos próprios; `Thread.sleep` no teste de integração de corrida; literais repetidos.
 - nginx: `proxy_set_header` repetido nos `location`; Bruno: teste do `02-consultar-conta.bru` só confere presença; `actionlint` fora do CI (etapa 8).
 - Glossário: "valor" no sentido de enum conflita com o termo Valor (`Money`).
 

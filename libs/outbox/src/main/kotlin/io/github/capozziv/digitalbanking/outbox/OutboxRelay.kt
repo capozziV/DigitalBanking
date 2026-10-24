@@ -77,19 +77,19 @@ class OutboxRelay(
         correlationId: String?,
         block: () -> Unit,
     ) {
-        val previous = MDC.get(OutboxEnvelope.CORRELATION_ID_MDC_KEY)
+        val previous = MDC.get(OutboxEventEnvelope.CORRELATION_ID_MDC_KEY)
         if (correlationId == null) {
-            MDC.remove(OutboxEnvelope.CORRELATION_ID_MDC_KEY)
+            MDC.remove(OutboxEventEnvelope.CORRELATION_ID_MDC_KEY)
         } else {
-            MDC.put(OutboxEnvelope.CORRELATION_ID_MDC_KEY, correlationId)
+            MDC.put(OutboxEventEnvelope.CORRELATION_ID_MDC_KEY, correlationId)
         }
         try {
             block()
         } finally {
             if (previous == null) {
-                MDC.remove(OutboxEnvelope.CORRELATION_ID_MDC_KEY)
+                MDC.remove(OutboxEventEnvelope.CORRELATION_ID_MDC_KEY)
             } else {
-                MDC.put(OutboxEnvelope.CORRELATION_ID_MDC_KEY, previous)
+                MDC.put(OutboxEventEnvelope.CORRELATION_ID_MDC_KEY, previous)
             }
         }
     }

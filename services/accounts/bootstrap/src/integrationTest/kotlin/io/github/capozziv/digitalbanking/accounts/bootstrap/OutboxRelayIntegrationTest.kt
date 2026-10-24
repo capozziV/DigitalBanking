@@ -53,8 +53,8 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 @TestPropertySource(properties = ["accounts.outbox.relay-enabled=true", "accounts.outbox.poll-interval=100ms"])
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-@Import(OutboxRelayIT.RecordingPublisherConfiguration::class)
-class OutboxRelayIT : AccountsIntegrationTest() {
+@Import(OutboxRelayIntegrationTest.RecordingPublisherConfiguration::class)
+class OutboxRelayIntegrationTest : AccountsIntegrationTest() {
     @LocalServerPort
     private var port: Int = 0
 

@@ -35,7 +35,7 @@ accounts:
 
 logging:
   pattern:
-    # Correlation id of the request (MDC key of OutboxEnvelope.CORRELATION_ID_MDC_KEY) on every log line.
+    # Correlation id of the request (MDC key of OutboxEventEnvelope.CORRELATION_ID_MDC_KEY) on every log line.
     correlation: "[%X{correlationId:-}] "
 
 server:

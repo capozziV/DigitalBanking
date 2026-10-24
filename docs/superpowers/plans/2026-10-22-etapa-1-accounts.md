@@ -38,7 +38,7 @@
 **Files:**
 - Create: `build-logic/src/main/kotlin/digitalbanking.integration-test.gradle.kts`
 - Modify: `build-logic/src/main/kotlin/digitalbanking.spring-boot-app.gradle.kts`, `gradle/libs.versions.toml`, `services/accounts/bootstrap/build.gradle.kts`
-- Move: `services/accounts/bootstrap/src/test/kotlin/.../AccountsApplicationIT.kt` → `services/accounts/bootstrap/src/integrationTest/kotlin/.../AccountsApplicationIT.kt`
+- Move: `services/accounts/bootstrap/src/test/kotlin/.../AccountsApplicationIntegrationTest.kt` → `services/accounts/bootstrap/src/integrationTest/kotlin/.../AccountsApplicationIntegrationTest.kt`
 - Create: `docs/superpowers/research/2026-10-22-versoes-etapa-1.md`
 
 **Interfaces:**
@@ -46,7 +46,7 @@
 
 - [ ] **Step 1:** Pesquisar em fonte primária (`mattpocock-skills:research`): versão do springdoc compatível com Spring Boot 4.1.x; versão estável do `java-uuid-generator`; versão do AWS SDK for Java v2 BOM; módulo `org.testcontainers:testcontainers-localstack` na linha do BOM do Boot. Registrar no arquivo de research com links. **Se não houver springdoc compatível, registrar e seguir: a Task 10 usa o plano B (YAML).**
 - [ ] **Step 2:** Criar o plugin com `testing.suites.register<JvmTestSuite>("integrationTest") { useJUnitJupiter(); dependencies { implementation(project()) } }`, `configurations["integrationTestImplementation"].extendsFrom(configurations["testImplementation"])` (idem `RuntimeOnly`), e `tasks.check { dependsOn(testing.suites.named("integrationTest")) }`.
-- [ ] **Step 3:** Mover o `AccountsApplicationIT`. Rodar `./gradlew :services:accounts:bootstrap:test` → passa **sem** Docker e não executa o IT; `./gradlew :services:accounts:bootstrap:integrationTest` → roda o IT e passa.
+- [ ] **Step 3:** Mover o `AccountsApplicationIntegrationTest`. Rodar `./gradlew :services:accounts:bootstrap:test` → passa **sem** Docker e não executa o IT; `./gradlew :services:accounts:bootstrap:integrationTest` → roda o IT e passa.
 - [ ] **Step 4:** `./gradlew build` verde.
 - [ ] **Step 5:** Commit `build: source set integrationTest e versões da etapa 1`.
 
@@ -176,15 +176,15 @@
 **Files:**
 - Modify: `settings.gradle.kts` (incluir `:libs:outbox`)
 - Create: `libs/outbox/build.gradle.kts` (plugins `digitalbanking.spring-module` e `digitalbanking.integration-test`; `spring-boot-starter-jdbc`, `java-uuid-generator`, `slf4j-api`)
-- Create em `libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/`: `OutboxMessage.kt`, `JdbcOutboxWriter.kt`, `OutboxEnvelope.kt`
+- Create em `libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/`: `OutboxMessage.kt`, `JdbcOutboxWriter.kt`, `OutboxEventEnvelope.kt`
 - Create: `libs/outbox/src/main/resources/outbox/outbox-table.sql` (DDL modelo; os serviços copiam para uma migration)
-- Test: `libs/outbox/src/integrationTest/kotlin/.../outbox/JdbcOutboxWriterIT.kt` (Testcontainers PostgreSQL aplicando o DDL modelo)
+- Test: `libs/outbox/src/integrationTest/kotlin/.../outbox/JdbcOutboxWriterIntegrationTest.kt` (Testcontainers PostgreSQL aplicando o DDL modelo)
 
 **Interfaces:**
 - Produces:
   - `data class OutboxMessage(val eventType: String, val eventVersion: Int, val aggregateId: String, val payloadJson: String)`.
   - `class JdbcOutboxWriter(private val jdbcClient: JdbcClient, private val clock: Clock) { fun write(message: OutboxMessage) }` — gera `event_id` UUID v7 (JUG `Generators.timeBasedEpochGenerator()`), `occurred_at = clock.instant()`, `correlation_id = MDC.get("correlationId")` (pode ser nulo).
-  - `object OutboxEnvelope { fun toJson(row: …): String }` fica para o bloco 2; nesta task só a constante `const val CORRELATION_ID_MDC_KEY = "correlationId"` em `OutboxEnvelope`.
+  - `object OutboxEventEnvelope { fun toJson(row: …): String }` fica para o bloco 2; nesta task só a constante `const val CORRELATION_ID_MDC_KEY = "correlationId"` em `OutboxEventEnvelope`.
   - DDL: tabela `outbox` exatamente como a spec, seção 3 (`position bigserial` PK, `event_id uuid unique`, `aggregate_id text`, `event_type text`, `event_version int`, `payload jsonb`, `correlation_id text`, `occurred_at timestamptz`, `published_at timestamptz null`, `attempts int not null default 0`, `last_error text`) + `create index outbox_unpublished_idx on outbox (position) where published_at is null`.
 
 - [ ] **Step 1:** IT: `write` grava uma linha com `published_at` nulo, `attempts 0`, `payload` igual ao JSON (comparar como JSON), `correlation_id` igual ao valor posto no MDC; duas escritas seguidas → `position` crescente e `event_id` diferentes e com versão 7 (`UUID.version() == 7`).
@@ -198,8 +198,8 @@
 - Create em `services/accounts/adapters/src/main/kotlin/.../adapters/persistence/`: `JdbcAccountRepository.kt`, `JdbcLedgerEntryRepository.kt`, `JdbcAccountTypeRepository.kt`, `SpringTransactionRunner.kt`, `UuidV7IdGenerator.kt`, `OutboxEventAppender.kt`
 - Modify: `services/accounts/adapters/build.gradle.kts` (+ `:libs:outbox`, `java-uuid-generator`, `spring-boot-starter-jackson`), `services/accounts/bootstrap/src/main/resources/application.yml`, `infra/local/postgres/init/01-create-service-databases.sh`, `infra/local/.env.example`, `infra/local/docker-compose.yml`
 - Create: `services/accounts/bootstrap/src/integrationTest/kotlin/.../bootstrap/AccountsIntegrationTest.kt` (base), `services/accounts/bootstrap/src/integrationTest/resources/db/create-app-role.sql`
-- Modify: `AccountsApplicationIT.kt` (estende a base)
-- Test: `.../bootstrap/persistence/JdbcRepositoriesIT.kt`
+- Modify: `AccountsApplicationIntegrationTest.kt` (estende a base)
+- Test: `.../bootstrap/persistence/JdbcRepositoriesIntegrationTest.kt`
 
 **Interfaces:**
 - Consumes: Tasks 4 e 7.
@@ -211,7 +211,7 @@
   - Init do PostgreSQL: cria `accounts_owner` (dono do banco `accounts`) e `accounts_app` (só `LOGIN`), senhas de `ACCOUNTS_DB_OWNER_PASSWORD` e `ACCOUNTS_DB_PASSWORD`. `V5` dá `USAGE` no schema, `SELECT, INSERT` em `ledger_entry`, `SELECT, INSERT, UPDATE` em `account`, `account_type` e `outbox`, `USAGE` na sequência de `outbox.position`.
   - `AccountsIntegrationTest` (abstrata, `@SpringBootTest(RANDOM_PORT)`): container `postgres:17-alpine` com `withInitScript("db/create-app-role.sql")` (cria `accounts_app` com senha `app`) e `@DynamicPropertySource` apontando datasource para `accounts_app` e Flyway para o usuário do container. Usada por todos os ITs do `accounts`.
 
-- [ ] **Step 1:** ITs (`JdbcRepositoriesIT`): `account_type` vem semeada com os cinco limites da spec (0 / 50000 / 200000 / 1000000 / 5000000); inserir conta e reler; segunda conta do mesmo cliente → `DUPLICATE_CUSTOMER`; mesma chave → `DUPLICATE_OPENING_KEY`; `findLast` devolve o de maior `sequence`; **`UPDATE ledger_entry` e `DELETE FROM ledger_entry` executados com `accounts_app` falham** (permissão negada); `lockById` com a conta travada por outra transação → `AccountBusyException` em menos de 3 s; `OutboxEventAppender` grava `LedgerEntryRecorded` com o payload esperado.
+- [ ] **Step 1:** ITs (`JdbcRepositoriesIntegrationTest`): `account_type` vem semeada com os cinco limites da spec (0 / 50000 / 200000 / 1000000 / 5000000); inserir conta e reler; segunda conta do mesmo cliente → `DUPLICATE_CUSTOMER`; mesma chave → `DUPLICATE_OPENING_KEY`; `findLast` devolve o de maior `sequence`; **`UPDATE ledger_entry` e `DELETE FROM ledger_entry` executados com `accounts_app` falham** (permissão negada); `lockById` com a conta travada por outra transação → `AccountBusyException` em menos de 3 s; `OutboxEventAppender` grava `LedgerEntryRecorded` com o payload esperado.
 - [ ] **Step 2:** `./gradlew :services:accounts:bootstrap:integrationTest` → falha. **Step 3:** Implementar. **Step 4:** Passa; `./gradlew build` verde; `docker compose -f infra/local/docker-compose.yml down -v && … up --wait` saudável e `bootRun` sobe com os dois usuários.
 - [ ] **Step 5:** Commit `feat(accounts): esquema, usuários de banco e repositórios JDBC`.
 
@@ -221,11 +221,11 @@
 - Create em `services/accounts/adapters/src/main/kotlin/.../adapters/web/`: `AccountController.kt`, `AccountTypeAdminController.kt`, `ProblemDetailsExceptionHandler.kt`, `CorrelationIdFilter.kt`, `dto/*.kt`
 - Create: `services/accounts/bootstrap/src/main/kotlin/.../bootstrap/UseCaseConfiguration.kt` (`@Bean` de cada `*UseCase` e do `Clock.systemUTC()`)
 - Modify: `services/accounts/adapters/build.gradle.kts` (+ `spring-boot-starter-validation`)
-- Test: `.../bootstrap/web/AccountApiIT.kt`, `AccountTypeAdminApiIT.kt`
+- Test: `.../bootstrap/web/AccountApiIntegrationTest.kt`, `AccountTypeAdminApiIntegrationTest.kt`
 
 **Interfaces:**
 - Consumes: Tasks 4–8.
-- Produces: os endpoints, status e slugs da spec, seção 6, exatamente. `type` do Problem Details = `/problems/<slug>`. `422 insufficient-available-balance` com a propriedade `availableBalance`. `503 account-busy` com `Retry-After: 1`. `400 validation-error` com a propriedade `errors: [{field, message}]`. `CorrelationIdFilter` usa a chave `OutboxEnvelope.CORRELATION_ID_MDC_KEY`, lê/gera `X-Correlation-Id` e o devolve na resposta.
+- Produces: os endpoints, status e slugs da spec, seção 6, exatamente. `type` do Problem Details = `/problems/<slug>`. `422 insufficient-available-balance` com a propriedade `availableBalance`. `503 account-busy` com `Retry-After: 1`. `400 validation-error` com a propriedade `errors: [{field, message}]`. `CorrelationIdFilter` usa a chave `OutboxEventEnvelope.CORRELATION_ID_MDC_KEY`, lê/gera `X-Correlation-Id` e o devolve na resposta.
 
 - [ ] **Step 1:** ITs cobrindo cada linha da tabela da spec, seção 6 (status e `type` do problema), mais os itens 1, 2, 4 e 5 do Review Focus; resposta traz `X-Correlation-Id` igual ao enviado, ou um gerado; o `correlation_id` gravado no outbox é o do header.
 - [ ] **Step 2:** Rodar → falha. **Step 3:** Implementar. **Step 4:** Passa; `./gradlew build` verde.
@@ -235,23 +235,23 @@
 
 **Files:**
 - Modify: `services/accounts/adapters/build.gradle.kts` e `application.yml` (springdoc, se a Task 1 confirmou; senão `services/accounts/adapters/src/main/resources/openapi/accounts.yaml` + teste que valida as rotas contra o YAML)
-- Test: `.../bootstrap/ConcurrencyIT.kt`, `.../bootstrap/OpenApiIT.kt`
+- Test: `.../bootstrap/ConcurrencyIntegrationTest.kt`, `.../bootstrap/OpenApiIntegrationTest.kt`
 
 **Interfaces:**
 - Consumes: Task 9.
 
-- [ ] **Step 1:** `ConcurrencyIT`:
+- [ ] **Step 1:** `ConcurrencyIntegrationTest`:
   - conta `FREE` com crédito de 3700; 100 débitos de 100 em paralelo (virtual threads, chaves distintas) → exatamente 37 respostas `201` e 63 `422`; saldo final 0; `sequence` 1..38 sem buraco (1 do crédito + 37);
   - 20 débitos paralelos com a **mesma** chave → um `201`, dezenove `200`, um único lançamento;
   - número de linhas `LedgerEntryRecorded` no outbox = número de lançamentos.
-- [ ] **Step 2:** `OpenApiIT`: `GET /v3/api-docs` (ou o YAML) contém os sete caminhos/métodos da spec.
+- [ ] **Step 2:** `OpenApiIntegrationTest`: `GET /v3/api-docs` (ou o YAML) contém os sete caminhos/métodos da spec.
 - [ ] **Step 3:** Rodar → falha onde ainda faltar; implementar; passa; `./gradlew build` verde.
 - [ ] **Step 4:** Commit `test(accounts): concorrência, idempotência e contrato openapi`.
 
 ### Task 11: Regras ArchUnit e melhorias da etapa 0 (Marina, `dev-kotlin`)
 
 **Files:**
-- Modify: `services/accounts/bootstrap/src/test/kotlin/.../bootstrap/ArchitectureTest.kt`, `services/accounts/bootstrap/build.gradle.kts` (+ `:libs:outbox` no classpath de teste), `AccountsApplicationIT.kt`
+- Modify: `services/accounts/bootstrap/src/test/kotlin/.../bootstrap/ArchitectureTest.kt`, `services/accounts/bootstrap/build.gradle.kts` (+ `:libs:outbox` no classpath de teste), `AccountsApplicationIntegrationTest.kt`
 - Test: o próprio `ArchitectureTest`
 
 - [ ] **Step 1:** Regras (sem `allowEmptyShould`): `domain` sem Spring/application/adapters; `application` sem Spring/adapters; `adapters.web` → `adapters.persistence` (um teste); `adapters.persistence` → `adapters.web` (outro teste); classes em `..application.usecase..` cujo nome não termina em `Command`, `Result`, `Outcome` ou `View` e que não são `internal` terminam em `UseCase`; classes com `@RestController` terminam em `Controller`; `io.github.capozziv.digitalbanking.outbox..` não depende de `io.github.capozziv.digitalbanking.accounts..`.
@@ -302,7 +302,7 @@
 **Files:**
 - Create: `libs/testing-localstack` (módulo `:libs:testing-localstack`, sem Spring, consumido só por `integrationTestImplementation`): `LocalStackTestSupport` com `IMAGE` (`localstack/localstack:2026.10.2`), `authToken(env)` (sem token: pula fora do CI e falha com `CI=true`), `container(services, env)`, `snsClient` e `sqsClient`; expõe em `api` o SDK `sns`/`sqs` e o `testcontainers-localstack`
 - Modify: `libs/outbox/build.gradle.kts` (`integrationTestImplementation(project(":libs:testing-localstack"))`), `settings.gradle.kts`, `build-logic/.../digitalbanking.integration-test.gradle.kts` (presença do token e `CI` como entradas do `integrationTest`, sem guardar o valor)
-- Test: `libs/outbox/src/integrationTest/kotlin/.../outbox/LocalStackFifoIT.kt`, `libs/testing-localstack/src/test/.../LocalStackTestSupportTest.kt`
+- Test: `libs/outbox/src/integrationTest/kotlin/.../outbox/LocalStackFifoIntegrationTest.kt`, `libs/testing-localstack/src/test/.../LocalStackTestSupportTest.kt`
 
 - [x] **Step 1:** IT com `LocalStackContainer` (imagem fixa da Task 1, token por variável de ambiente): cria tópico `t.fifo` e fila `q.fifo` com assinatura `RawMessageDelivery=false`; publica A1, B1, A2, B2, A3 (`MessageGroupId` A/B) e A2 repetido com o mesmo `MessageDeduplicationId`; lê a fila → por grupo, ordem A1, A2, A3 e B1, B2; sem duplicata de A2; atributos `eventType` e `correlationId` presentes.
 - [x] **Step 2:** Rodar. **Se falhar por falta de suporte do LocalStack, parar e reportar ao coordenador** (decisão do usuário). Resultado: o LocalStack `2026.10.2` suporta SNS FIFO → SQS FIFO.
@@ -311,16 +311,16 @@
 ### Task 15: Relay e publicador SNS (Marina, `dev-kotlin`)
 
 **Files:**
-- Create em `libs/outbox/src/main/kotlin/.../outbox/`: `PendingEvent.kt`, `EventPublisher.kt`, `SnsEventPublisher.kt`, `OutboxStore.kt`, `JdbcOutboxStore.kt`, `OutboxRelay.kt`, `OutboxRelaySettings.kt`, `OutboxMetrics.kt`; completar `OutboxEnvelope.kt` (`toJson`); índice `outbox_stuck_idx` no DDL modelo
+- Create em `libs/outbox/src/main/kotlin/.../outbox/`: `PendingEvent.kt`, `EventPublisher.kt`, `SnsEventPublisher.kt`, `OutboxStore.kt`, `JdbcOutboxStore.kt`, `OutboxRelay.kt`, `OutboxRelaySettings.kt`, `OutboxMetrics.kt`; completar `OutboxEventEnvelope.kt` (`toJson`); índice `outbox_stuck_idx` no DDL modelo
 - Create: `services/accounts/.../db/migration/V6__outbox_stuck_idx.sql` (o `V4` já está aplicado)
-- Test: `libs/outbox/src/test/kotlin/.../outbox/OutboxRelayTest.kt` (fakes de `OutboxStore` e `EventPublisher`), `OutboxRelaySettingsTest.kt`, `OutboxEnvelopeTest.kt`, `OutboxMetricsTest.kt`, `SnsEventPublisherTest.kt`; `libs/outbox/src/integrationTest/kotlin/.../outbox/JdbcOutboxStoreIT.kt`, `SnsEventPublisherIT.kt`
+- Test: `libs/outbox/src/test/kotlin/.../outbox/OutboxRelayTest.kt` (fakes de `OutboxStore` e `EventPublisher`), `OutboxRelaySettingsTest.kt`, `OutboxEventEnvelopeTest.kt`, `OutboxMetricsTest.kt`, `SnsEventPublisherTest.kt`; `libs/outbox/src/integrationTest/kotlin/.../outbox/JdbcOutboxStoreIntegrationTest.kt`, `SnsEventPublisherIntegrationTest.kt`
 
 **Interfaces:**
 - Consumes: Tasks 7 e 14.
 - Produces:
   - `data class PendingEvent(val position: Long, val eventId: UUID, val aggregateId: String, val eventType: String, val eventVersion: Int, val payloadJson: String, val correlationId: String?, val occurredAt: Instant, val attempts: Int)`.
   - `interface EventPublisher { fun publish(event: PendingEvent) }` — lança exceção em falha.
-  - `class SnsEventPublisher(snsClient: SnsClient, topicArn: String, publishTimeout: Duration) : EventPublisher` — corpo = `OutboxEnvelope.toJson(event)` (campos da spec, seção 5), `MessageGroupId = aggregateId`, `MessageDeduplicationId = eventId`, atributos `eventType` e `correlationId` (este só se não nulo); `apiCallTimeout = publishTimeout` em cada `PublishRequest`; `publishTimeout` sem padrão.
+  - `class SnsEventPublisher(snsClient: SnsClient, topicArn: String, publishTimeout: Duration) : EventPublisher` — corpo = `OutboxEventEnvelope.toJson(event)` (campos da spec, seção 5), `MessageGroupId = aggregateId`, `MessageDeduplicationId = eventId`, atributos `eventType` e `correlationId` (este só se não nulo); `apiCallTimeout = publishTimeout` em cada `PublishRequest`; `publishTimeout` sem padrão.
   - `interface OutboxStore { fun <T : Any> asLeader(lockKey: Long, block: () -> T): T?; fun fetchPending(limit: Int): List<PendingEvent>; fun markPublished(position: Long, at: Instant); fun markFailed(position: Long, error: String); fun backlog(now: Instant): OutboxBacklog }` — `asLeader` abre transação, tenta `pg_try_advisory_xact_lock(lockKey)` e devolve `null` sem executar `block` se não conseguir. `fetchPending` lê os pendentes em ordem de `position` e pula os eventos de conta presa (conta com evento pendente anterior e `attempts > 0`); só a cabeça da conta presa entra no lote. `markFailed` incrementa `attempts` e grava `last_error`. `backlog` conta todos os pendentes e a idade do mais antigo, fora da transação de líder.
   - `data class OutboxBacklog(val pending: Long, val oldestAge: Duration?)`.
   - `class JdbcOutboxStore(jdbcClient: JdbcClient, transactions: TransactionOperations) : OutboxStore` — leitura do lote com `not exists` apoiada nos índices parciais `outbox_unpublished_idx` e `outbox_stuck_idx (aggregate_id, position) where published_at is null and attempts > 0`.
@@ -340,9 +340,9 @@
 - Create: `.../bootstrap/OutboxRelayScheduler.kt` — `@Scheduled(fixedDelayString = "\${accounts.outbox.poll-interval:500ms}")` chamando `runCycle`; desligamento gracioso próprio (`DisposableBean`: nenhum ciclo novo e espera o ciclo em andamento por `maxCycleDuration + publishTimeout + 1 s`); bean com `@DependsOn("taskScheduler")`, para ser destruído antes do agendador do Boot e antes do pool de conexões
 - Modify: `application.yml` (`accounts.outbox.*` com `relay-enabled`, `batch-size`, `alert-after-attempts`, `publish-timeout`, `max-cycle-duration`, `poll-interval`; `accounts.aws.endpoint`, `accounts.aws.region`, `accounts.aws.topic-arn`; `management.endpoints.web.exposure.include: health,metrics`), `services/accounts/bootstrap/build.gradle.kts` (`libs/outbox` em `implementation`, `libs/testing-localstack` no `integrationTest`, scripts de init do LocalStack como entrada com caminho relativo), `infra/local/docker-compose.yml` (+ `localstack`, imagem fixa, `LOCALSTACK_AUTH_TOKEN`, healthcheck em `python3` pelo `/_localstack/init/ready`), `infra/local/localstack/init/ready.d/01-accounts-topic.sh` (tópico `accounts-events.fifo`, fila `accounts-events-inspection.fifo`, assinatura com `RawMessageDelivery=true`), `infra/local/.env.example`, `infra/local/smoke.sh` (lê a fila de inspeção e confere `AccountOpened` e dois `LedgerEntryRecorded`, em ordem), `.github/workflows/ci.yml` (segredo no `build` e no `smoke`), `docs/rodando-localmente.md`
 - Modify: `AccountsIntegrationTest` (`accounts.outbox.relay-enabled=false` nos ITs que não exercitam o relay)
-- Test: `.../bootstrap/OutboxRelayIT.kt` (base `AccountsIntegrationTest` + LocalStack), `.../bootstrap/OutboxRelayUnreachableBrokerIT.kt` (endpoint inválido, sem LocalStack), `.../bootstrap/OutboxRelaySchedulerTest.kt` (unitário)
+- Test: `.../bootstrap/OutboxRelayIntegrationTest.kt` (base `AccountsIntegrationTest` + LocalStack), `.../bootstrap/OutboxRelayUnreachableBrokerIntegrationTest.kt` (endpoint inválido, sem LocalStack), `.../bootstrap/OutboxRelaySchedulerTest.kt` (unitário)
 
-- [x] **Step 1:** `OutboxRelayIT`: operações em duas contas → na fila de inspeção, por conta, os eventos na ordem de `sequence`, com `eventType` e `correlationId`; **dois `OutboxRelay` rodando `runCycle` em paralelo em loop** → nenhum evento duplicado nem fora de ordem; métricas do relay no actuator. `OutboxRelayUnreachableBrokerIT`: com o endpoint do SNS inválido, `attempts` cresce e o `/actuator/health` continua `UP`; o agendador do relay depende do `taskScheduler`.
+- [x] **Step 1:** `OutboxRelayIntegrationTest`: operações em duas contas → na fila de inspeção, por conta, os eventos na ordem de `sequence`, com `eventType` e `correlationId`; **dois `OutboxRelay` rodando `runCycle` em paralelo em loop** → nenhum evento duplicado nem fora de ordem; métricas do relay no actuator. `OutboxRelayUnreachableBrokerIntegrationTest`: com o endpoint do SNS inválido, `attempts` cresce e o `/actuator/health` continua `UP`; o agendador do relay depende do `taskScheduler`.
 - [x] **Step 2:** Rodar → falha; implementar; passa; `./gradlew build` verde; compose saudável com LocalStack; `actionlint` sem erros.
 - [x] **Step 3:** Commit `feat(accounts): relay do outbox publicando no sns fifo`.
 

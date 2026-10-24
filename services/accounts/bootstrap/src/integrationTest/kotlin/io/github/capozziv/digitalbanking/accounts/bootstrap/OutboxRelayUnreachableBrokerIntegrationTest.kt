@@ -22,7 +22,7 @@ import java.util.UUID
     ],
 )
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class OutboxRelayUnreachableBrokerIT : AccountsIntegrationTest() {
+class OutboxRelayUnreachableBrokerIntegrationTest : AccountsIntegrationTest() {
     @LocalServerPort
     private var port: Int = 0
 
