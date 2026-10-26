@@ -2,7 +2,7 @@
 
 ## Stack
 - **Backend:** Kotlin + Spring Boot 4.1, JDK 21, Spring MVC com virtual threads, Spring JDBC (`JdbcClient`) na persistência, Gradle Kotlin DSL multi-módulo, monorepo.
-- **Arquitetura por serviço:** Clean Architecture (`domain` → `application` → `adapters` → `bootstrap`), regras validadas com ArchUnit.
+- **Arquitetura por serviço:** Clean Architecture (`domain` → `application` → `adapters` → `bootstrap`), um módulo Gradle por camada, regras validadas com ArchUnit. Pacote raiz `io.github.capozziv.digitalbanking`.
 - **AWS:** RDS PostgreSQL, DynamoDB, SNS, SQS + DLQ, ElastiCache (Redis), Cognito, API Gateway (HTTP API), ECS Fargate.
 - **Lint:** ktlint.
 - **Infraestrutura como código:** Terraform.
@@ -93,7 +93,7 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 - (ver [ADR 0005](adr/0005-frontend-angular-e-bff-nestjs.md))
 
 ## Em aberto
-Fonte única das decisões pendentes. Ao decidir, registre no ADR indicado (ou crie um) e remova o item daqui.
+Fonte única das decisões pendentes; cada item tem um cartão `Decision` no [board](https://github.com/users/capozziV/projects/2). Ao decidir, registre no ADR indicado (ou crie um), remova o item daqui e feche o cartão.
 
 **Antes das etapas 2 a 7**
 - Avaliar ADRs próprios para a saga orquestrada com compensação (`transfers`) e para ECS Service Connect.

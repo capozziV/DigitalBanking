@@ -1,95 +1,42 @@
 # Status do projeto
 
-> Atualizado pelo agente coordenador ao fim de cada tarefa.
+> Resumo do projeto, atualizado pelo agente coordenador ao fim de cada tarefa. Tasks, débito técnico, decisões pendentes e tarefas do usuário ficam no board.
 
-**Última atualização:** 2026-10-23
-**Fase atual:** etapa 1 concluída (PRs #3, #4 e #5 com merge na `main`); trabalho movido para o Mac do usuário, guia local executado do zero lá.
-**Próxima etapa:** 2 (`transfers` + saga), começando pelo brainstorming.
+**Última atualização:** 2026-10-26
+**Board:** [Digital Banking no GitHub Projects](https://github.com/users/capozziV/projects/2)
+**Fase atual:** etapa 1 concluída (PRs #2 a #6 com merge na `main`); trabalho no Mac do usuário.
+**Próxima etapa:** 2 (`transfers` + saga), começando pelo brainstorming (cartão #9 do board).
+
+## Como usar o board
+- Colunas: **Backlog** (tem pendência técnica ou de regra de negócio sem resposta, ou a etapa anterior ainda não está em Done), **Ready** (sem pendência e com a etapa anterior em Done), **In progress**, **In review** (revisão da Beatriz) e **Done** (revisado, build, testes e lint verdes, merge feito).
+- Campos: Stage (0–9), Service, Item type (Stage, Task, Tech debt, Decision) e Priority.
+- Cada etapa do roadmap é um cartão (`Stage N · …`), bloqueado pela etapa anterior; as tasks e o débito técnico da etapa são sub-issues dele.
+- Cada issue tem a seção "Open questions" com a checklist das pendências. A resposta do usuário fica anotada e o item marcado; pendência nova devolve o cartão ao Backlog.
+- O board é em inglês. Documentação, ADRs e commits seguem em português.
 
 ## Concluído
-- Planejamento: arquitetura, roadmap, ADRs 0001–0014, glossário `CONTEXT.md`, agentes e fluxo com os plugins Superpowers e Matt Pocock; papéis do fluxo mapeados para os agentes do projeto no `CLAUDE.md`, com nomes: Helena (coordenação), Marina (`dev-kotlin`), Rafael (`infra`), Lucas (`dev-frontend`), Beatriz (`revisor`), Clara (`documentador`).
-- Código Kotlin em inglês, com os nomes de código do glossário `CONTEXT.md`; docs e commits em português.
-- Decisões de 2026-10-21: Terraform, ArchUnit, Spring MVC com virtual threads, Spring Boot 4.1, ktlint, um módulo Gradle por camada, pacote raiz `io.github.capozziv.digitalbanking`, LocalStack fora da etapa 0.
-- Etapa 0 ([spec](superpowers/specs/2026-10-21-etapa-0-fundacao-design.md), [plano](superpowers/plans/2026-10-21-etapa-0-fundacao.md)), cada task revisada:
-  - build: Gradle 9.8.2, catálogo de versões, `build-logic` com 3 plugins de convenção, ktlint;
-  - regras ArchUnit no `bootstrap`;
-  - `accounts` com Spring Boot 4.1.1, virtual threads, Flyway e teste Testcontainers do `/actuator/health` (db `UP`);
-  - docker-compose em `infra/local/` (PostgreSQL 17, Redis, nginx);
-  - CI no GitHub Actions (jobs `build` e `smoke`).
-- Decisões de 2026-10-22 (antes da etapa 1): saldo no lançamento (`sequence` e `balance_after`) com trava pessimista `FOR UPDATE` na conta ([ADR 0012](adr/0012-saldo-no-lancamento-e-trava-pessimista.md)); Spring JDBC com `JdbcClient` ([ADR 0013](adr/0013-persistencia-com-spring-jdbc.md)); cheque especial por tipo de conta, com limites numa tabela alterável por `/admin/account-types/{type}` ([ADR 0014](adr/0014-tipo-de-conta-e-cheque-especial.md)); glossário com Tipo de conta, Limite de cheque especial e Saldo disponível; limite diário único no MVP.
-- PR #1 da etapa 0 com merge na `main` (2026-10-22). PR #2 (ADRs 0012–0014) com merge na `main` (2026-10-22).
-- Etapa 1, bloco 1 ([spec](superpowers/specs/2026-10-22-etapa-1-accounts-design.md), [plano](superpowers/plans/2026-10-22-etapa-1-accounts.md)), Tasks 1–13, cada uma revisada pela Beatriz e a branch inteira na revisão final:
-  - domínio (`Account`, `LedgerEntry`, valores em centavos, cheque especial por tipo), casos de uso com idempotência por chave no lançamento e na abertura;
-  - persistência JDBC com `FOR UPDATE` e `lock_timeout`, dois usuários de banco (`accounts_app` sem `UPDATE`/`DELETE` no ledger), relógio de microssegundos;
-  - API HTTP com Problem Details, correlation ID, OpenAPI (springdoc 3.1.1), log e métrica de débito recusado;
-  - `libs/outbox` (envelope e writer JDBC; o relay é do bloco 2);
-  - source set `integrationTest`, 7 regras ArchUnit vistas falhando, nginx com os caminhos da API, smoke com operações, coleção Bruno e [guia para rodar localmente](rodando-localmente.md);
-  - critérios de pronto: 100 débitos paralelos com exatamente 37 aprovados; 20 repetições com a mesma chave geram um lançamento; `./gradlew build --rerun-tasks` verde (174 testes, 2026-10-23);
-  - decisões da etapa: ADR 0015 (outbox, relay líder e SNS FIFO) e as tomadas nas revisões, registradas na spec.
-- Bloco 1 com merge na `main` (PR #3, 2026-10-23).
-- Etapa 1, bloco 2 (Tasks 14–16, cada uma revisada pela Beatriz e a branch inteira na revisão final, 2026-10-23):
-  - SNS FIFO validado no LocalStack `2026.10.2`; helper de teste `libs/testing-localstack` (token, imagem fixa, falha no CI sem token);
-  - `OutboxRelay` em `libs/outbox`: líder por `pg_try_advisory_xact_lock`, publicador SNS FIFO (`MessageGroupId` = conta, `MessageDeduplicationId` = `eventId`), conta presa não ocupa o lote das outras (índice `outbox_stuck_idx`, `V6`), limites de 2 s por publicação e 10 s por ciclo, métricas `outbox.pending`, idade do mais antigo e `outbox.relay.cycles`;
-  - relay ligado no `accounts` (`OutboxRelayScheduler` com desligamento gracioso), LocalStack no docker-compose com tópico e fila de inspeção (`RawMessageDelivery=true`), segredo `LOCALSTACK_AUTH_TOKEN` nos jobs `build` e `smoke`, smoke conferindo os eventos na fila;
-  - `./gradlew build --rerun-tasks` verde com o token (231 testes, 0 pulados), compose e smoke OK, actionlint e shellcheck sem erros; CI do PR #4 (`build` e `smoke`) verde com o segredo;
-  - convenções de nome: testes `*IntegrationTest`, `OutboxEventEnvelope`, corpos da API com sufixo `DTO` em `adapters/web/dto/` (regra ArchUnit).
-- PR #4 do bloco 2 com merge na `main` (2026-10-23).
-- Guia local executado do zero no Mac do usuário (2026-10-23; Mac Intel `x86_64`, macOS 26.7.1, Docker Desktop 29.9.2): compose com os 4 contêineres saudáveis em 31 s (porta 80 sem ajuste); `./gradlew build` verde em 2m05s (231 testes, 0 falhas, 0 pulados, com LocalStack); `bootRun` com as 6 migrations; health `UP`, smoke OK (saldo 700 e os 3 eventos na fila); sequência manual com idempotência (`201` e depois `200`) e `X-Correlation-Id` até o evento; fila de inspeção e `outbox.pending` = 0; Bruno 7/7; `down -v`. Guia corrigido: Homebrew só existe para Apple Silicon (caminhos sem Homebrew para JDK, jq, Node e uv), `jq` em `/usr/bin` a partir do macOS 15, graphify com `graphifyy[sql]` e a skill do Claude. Sem teste no Mac: o caminho com uv (instalador do uv e `uv tool install "graphifyy[sql]"`), porque o graphify do Mac já estava instalado pelo pip e recebeu o `tree-sitter-sql` pelo pip; o `.pkg` do Temurin (o JDK já estava instalado).
-- graphify configurado (2026-10-22): `graphify-out/` versionado, skill, hook do Claude antes de buscas e hook do git que reconstrói o grafo a cada commit.
-- Verificação (ambiente de nuvem, 2026-10-21): `./gradlew build --rerun-tasks` verde (5 testes, 0 falhas); compose saudável com e sem `--env-file`; rota `/accounts/actuator/health` pelo nginx `UP`; actionlint sem erros.
-- CI no GitHub (PR #1, 2026-10-21): `build` e `smoke` verdes. O `smoke` falhou na primeira execução porque o healthcheck do nginx usava `localhost`, que no runner resolve para IPv6 enquanto o nginx escuta só em IPv4; corrigido para `127.0.0.1` (sem `listen [::]:80`, que derruba o nginx em máquinas sem IPv6).
+- **Planejamento:** arquitetura, roadmap, ADRs 0001–0015, glossário `CONTEXT.md`, agentes do projeto e fluxo com os plugins Superpowers e Matt Pocock (mapa de papéis no `CLAUDE.md`).
+- **Etapa 0, fundação** ([spec](superpowers/specs/2026-10-21-etapa-0-fundacao-design.md), [plano](superpowers/plans/2026-10-21-etapa-0-fundacao.md); PR #1, 2026-10-22): Gradle 9.8.2 com `build-logic` e ktlint, regras ArchUnit, `accounts` com Spring Boot 4.1.1 e virtual threads, docker-compose (PostgreSQL 17, Redis, nginx), CI com os jobs `build` e `smoke`.
+- **Decisões de 2026-10-22** (PR #2): saldo no lançamento com trava `FOR UPDATE` ([ADR 0012](adr/0012-saldo-no-lancamento-e-trava-pessimista.md)), Spring JDBC com `JdbcClient` ([ADR 0013](adr/0013-persistencia-com-spring-jdbc.md)), cheque especial por tipo de conta ([ADR 0014](adr/0014-tipo-de-conta-e-cheque-especial.md)).
+- **Etapa 1, `accounts`** ([spec](superpowers/specs/2026-10-22-etapa-1-accounts-design.md), [plano](superpowers/plans/2026-10-22-etapa-1-accounts.md); PRs #3 e #4, 2026-10-23), cada task revisada pela Beatriz:
+  - ledger imutável, idempotência por chave, cheque especial por tipo, API com Problem Details, correlation ID e OpenAPI;
+  - `libs/outbox` com `OutboxRelay` (líder por trava consultiva, SNS FIFO no LocalStack, conta presa não ocupa o lote das outras) ([ADR 0015](adr/0015-outbox-relay-lider-e-sns-fifo.md));
+  - critérios de pronto: 100 débitos paralelos com exatamente 37 aprovados; 20 repetições com a mesma chave geram um lançamento; `./gradlew build --rerun-tasks` verde (231 testes, 0 pulados, com LocalStack); CI do PR #4 verde.
+- **Guia local no Mac** (PR #6, 2026-10-23): executado do zero num Mac Intel (build verde, smoke OK, Bruno 7/7) e corrigido para caminhos sem Homebrew.
+- **graphify** (2026-10-22): `graphify-out/` versionado, hook do Claude antes de buscas e hook do git que reconstrói o grafo a cada commit.
+- **Board no GitHub Projects** (2026-10-26): tasks, débito técnico, decisões de "Em aberto" e tarefas do usuário migrados deste arquivo para o board.
 
 ## Como rodar localmente
-Guia completo, para macOS (zsh) e Linux: [`docs/rodando-localmente.md`](rodando-localmente.md). Resumo: JDK 21 e Docker Desktop; `cp infra/local/.env.example infra/local/.env`; compose `up --wait`; `./gradlew build` (ou `./gradlew test` sem Docker); `bootRun`; `infra/local/smoke.sh`; coleção Bruno em `api/bruno/accounts/`. Executado do zero num Mac Intel em 2026-10-23.
+Guia completo, para macOS (zsh) e Linux: [`docs/rodando-localmente.md`](rodando-localmente.md). Resumo: JDK 21 e Docker Desktop; `cp infra/local/.env.example infra/local/.env`; compose `up --wait`; `./gradlew build` (ou `./gradlew test` sem Docker); `bootRun`; `infra/local/smoke.sh`; coleção Bruno em `api/bruno/accounts/`.
 
-## Em andamento
-- PR `docs/guia-local-mac` (guia local corrigido no Mac e status), revisado pela Beatriz.
-
-## Próximos passos
-1. Usuário: atualizar o segredo `LOCALSTACK_AUTH_TOKEN` no GitHub com o token novo (o `infra/local/.env` do Mac já tem o token novo, validado).
-2. Etapa 2 (`transfers` + saga), começando pelo brainstorming.
-
-## Pendências e decisões em aberto
-Decisões: fonte única na seção "Em aberto" de `docs/arquitetura.md`.
-
-Débito técnico do bloco 1 da etapa 1 (das revisões; nenhum bloqueia; detalhes nos relatórios das tasks):
-- Cache no Redis com TTL das respostas de idempotência (mesma resposta para recusa repetida), se algum consumidor precisar.
-- Desbloqueio manual de conta presa no relay.
-- Relay sem backoff: com o broker fora do ar, o limiar de 10 tentativas chega em ~5 s e cada ciclo loga um `ERROR` com stack trace por conta presa; trocar por backoff por evento ou `ERROR` só na transição.
-- `libs/outbox` expõe AWS SDK e Micrometer como `api`; separar o relay num módulo próprio quando chegar o 2º serviço (etapa 2).
-- Testes do relay: `get()` no `finally` do `OutboxRelayIntegrationTest` pode encobrir a exceção original; KDoc do `OutboxRelayUnreachableBrokerIntegrationTest` não diz que ele também cobre a ligação com o agendador.
-- Encerrar ou bloquear conta: sem regra definida.
-- Resposta de crédito/débito/troca de tipo montada com um `getAccount` fora da transação da escrita; `GetAccountUseCase` lê fora de transação.
-- `V5__app_grants.sql`: limitar `UPDATE` em `account` a `(type, updated_at)`; toda tabela nova precisa de `grant` próprio (sem `ALTER DEFAULT PRIVILEGES`).
-- Teste de igualdade entre o esquema das migrations `V4` + `V6` e o DDL modelo de `libs/outbox`.
-- Duplicata de lançamento logada como `ERROR` duas vezes (repositório e handler).
-- ArchUnit: regra de sufixo `UseCase` cobre só o pacote `usecase`; isenções por sufixo; `domain`/`application` sem regra contra infraestrutura (o Gradle já impede); `@Controller` + `@ResponseBody` fora da regra.
-- OpenAPI: `ProblemDetail` repetido nas anotações (customizer global); `X-Correlation-Id` fora dos parâmetros.
-- Testes: comparar entidade inteira no débito do domínio; teste de limite exato no caso de uso; testes de `OverdraftLimit`/`AvailableBalance` em arquivos próprios; `Thread.sleep` no teste de integração de corrida; literais repetidos.
-- nginx: `proxy_set_header` repetido nos `location`; Bruno: teste do `02-consultar-conta.bru` só confere presença; `actionlint` fora do CI (etapa 8).
-- Glossário: "valor" no sentido de enum conflita com o termo Valor (`Money`).
-
-Débito técnico de produto, fora do MVP (decidido em 2026-10-22):
-- Juros e tarifa sobre saldo negativo.
-- Histórico de troca de tipo de conta.
-- Auditoria com autor das alterações de limite por tipo (junto da etapa 7).
-- Limite diário variando por tipo de conta.
-
-Melhorias técnicas adiadas na revisão da etapa 0 (nenhuma bloqueia):
-- **Etapa 2 (2º serviço):** `repositoriesMode = FAIL_ON_PROJECT_REPOS`; avaliar remover `pluginManagement.repositories` da raiz (só `includeBuild`); extrair o `val libs = ...` repetido nos plugins de convenção se crescer; documentar o fluxo de adicionar banco no init; init com senha via `psql -v` e idempotente; volume nomeado para o PostgreSQL.
-- **Etapa 7:** restringir `management.endpoint.health.show-details` (hoje `always`, sem autenticação); headers `X-Forwarded-Proto`/`X-Real-IP` no nginx; Swagger UI e `/v3/api-docs` abertos (proteger ou desligar por perfil); exceções de segurança e desconexão do cliente fora do handler genérico de 500; mover o filtro de correlation ID e a constante do MDC para `libs/observabilidade` (hoje o adapter web depende de `libs/outbox` só por ela); `/actuator/metrics` aberto sem autenticação e pelo nginx (bloco 2).
-- **Etapa 8:** endpoint AWS padrão `http://localhost:4566` no `application.yml` (na AWS, variável vazia ou perfil `local`); nome do jar por serviço (`accounts.jar`), smoke reaproveitando o jar do job `build`, step `if: failure()` no smoke com `docker compose logs` e o `State.Health` dos contêineres, detectar morte do processo no laço do smoke, `cancel-in-progress` só em PRs, actions fixadas por SHA, shellcheck nos blocos `run`.
-- **Quando incomodar:** ruído de CDS da JVM nos testes (agente do Mockito); `webmvc` explícito no `bootstrap`. Healthchecks e curls dentro de contêineres: usar `127.0.0.1`, nunca `localhost` (IPv6 no runner).
-
-## Com o usuário (fora do código)
-- Abrir PRs: com o `gh` do Mac (logado como `capozziV`).
-- Proteger a `main` no GitHub exigindo CI verde para merge.
+## Convenções que já custaram caro
+- Healthchecks e curls dentro de contêineres usam `127.0.0.1`, nunca `localhost`: no runner do GitHub, `localhost` resolve para IPv6 e o nginx escuta só em IPv4 (sem `listen [::]:80`, que derruba o nginx em máquinas sem IPv6).
+- Toda tabela nova do `accounts` precisa de `grant` próprio para o `accounts_app` (sem `ALTER DEFAULT PRIVILEGES`).
 
 ## Ambiente do Claude
-- **Mac do usuário (a partir da etapa 2):** Mac Intel (`x86_64`), sem Homebrew (não suporta Intel). Sessão do Claude Code local com JDK 21 (Temurin), Docker Desktop, plugins `superpowers` e `mattpocock-skills` (marketplace `claude-plugins-official`, escopo do usuário), graphify 0.9.94 via pip no Python 3.15 com `tree-sitter-sql` e a skill em `~/.claude/skills/graphify`; Node v24.22.1 em `~/.local/node` (com a CLI `bru`) e `gh` 2.103.2 em `~/.local/bin`, ambos no PATH pelo `~/.zshrc`. O `infra/local/.env` (fora do git) guarda o `LOCALSTACK_AUTH_TOKEN`. Push e PRs pelo `gh` (`gh auth login` e `gh auth setup-git`, credencial no keyring do macOS; push testado com `--dry-run`); o `.git/github-token` da VM não é usado no Mac. Os itens abaixo sobre a nuvem valem só se o trabalho voltar para lá.
+- **Mac do usuário (a partir da etapa 2):** Mac Intel (`x86_64`), sem Homebrew (não suporta Intel). Sessão do Claude Code local com JDK 21 (Temurin), Docker Desktop, plugins `superpowers` e `mattpocock-skills` (marketplace `claude-plugins-official`, escopo do usuário), graphify 0.9.94 via pip no Python 3.15 com `tree-sitter-sql` e a skill em `~/.claude/skills/graphify`; Node v24.22.1 em `~/.local/node` (com a CLI `bru`) e `gh` 2.103.2 em `~/.local/bin`, ambos no PATH pelo `~/.zshrc`. O `infra/local/.env` (fora do git) guarda o `LOCALSTACK_AUTH_TOKEN`. Push, PRs e board pelo `gh` logado como `capozziV` (escopos `repo`, `workflow`, `project`; credencial no keyring do macOS); o `.git/github-token` da VM não é usado no Mac. Os itens abaixo sobre a nuvem valem só se o trabalho voltar para lá.
 - **Nuvem:** JDK 21 e Docker. Maven Central e Docker Hub limitam o IP compartilhado (`429`): usar o init script do Gradle com o espelho `maven-central.storage-download.googleapis.com` e `registry-mirrors: ["https://mirror.gcr.io"]` no `dockerd` (configuração do ambiente, fora do repo).
-- **Push:** pela VM do Mac, com um token fine-grained do GitHub em `.git/github-token` (fora do controle de versão), lido por um `credential.helper` configurado só no `.git/config` local. Sem esse arquivo, o push pela VM falha; pela nuvem funciona quando o repositório está conectado à sessão.
-- **VM do Mac:** sem Docker, sem acesso ao Docker Desktop do Mac e só com Java 11; serve para editar arquivos da pasta do usuário. Por isso o build e os testes rodam no clone da nuvem.
+- **Push pela VM do Mac:** token fine-grained do GitHub em `.git/github-token` (fora do controle de versão), lido por um `credential.helper` configurado só no `.git/config` local. Sem esse arquivo, o push pela VM falha; pela nuvem funciona quando o repositório está conectado à sessão.
+- **VM do Mac:** sem Docker, sem acesso ao Docker Desktop do Mac e só com Java 11; serve para editar arquivos da pasta do usuário.
 - **LocalStack na nuvem:** o proxy da sessão só escuta em 127.0.0.1, então o LocalStack sai com código 55 (licença) sem um encaminhador TCP e as variáveis `LOCALSTACK_HTTPS_PROXY`/`LOCALSTACK_CA_BUNDLE` do helper; o compose usa um override fora do repo. A porta do proxy muda a cada reinício do container: recriar o encaminhador com a porta atual de `$HTTPS_PROXY`. `actionlint` e `shellcheck` não vêm instalados.
 - **Nuvem (etapa 1):** o `dockerd` é iniciado à mão (`dockerd` em segundo plano) e para a cada reinício da sessão; o graphify fica em `~/.local/bin` (`uv tool install "graphifyy[sql]"`).
-- **Painel lateral do Claude (mod `equipe-etapa-1`):** não aparece no app usado pelo usuário (sem superfície de desenho); o acompanhamento é pela página "Equipe da Etapa 1" e pela lista de tarefas.
