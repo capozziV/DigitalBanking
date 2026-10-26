@@ -492,9 +492,9 @@
     "semantic_hash": ""
   },
   ".claude/agents/coordenador.md": {
-    "mtime": 1792680867.5821722,
-    "seen": 1792810560.9212968,
-    "ast_hash": "5d7a51ea96e357d4dc306b4386e92f4f",
+    "mtime": 1793035723.6682582,
+    "seen": 1793035914.990388,
+    "ast_hash": "0e6c74f15b21498d67365ddabcb1b89d",
     "semantic_hash": ""
   },
   ".claude/agents/dev-frontend.md": {
@@ -534,9 +534,9 @@
     "semantic_hash": ""
   },
   "CLAUDE.md": {
-    "mtime": 1792806339.9203558,
-    "seen": 1792810560.9213061,
-    "ast_hash": "295966b20ceeeaa931a7e076d4b44b4d",
+    "mtime": 1793035723.6213105,
+    "seen": 1793035914.9904058,
+    "ast_hash": "31fac407697605d6909f5746365adae6",
     "semantic_hash": ""
   },
   "CONTEXT.md": {
@@ -642,9 +642,9 @@
     "semantic_hash": ""
   },
   "docs/arquitetura.md": {
-    "mtime": 1792806339.9245558,
-    "seen": 1792810560.921332,
-    "ast_hash": "cd4100352e628d7ae4c12e624fc3fe95",
+    "mtime": 1793035910.8405104,
+    "seen": 1793035914.9904482,
+    "ast_hash": "b7e1df6f91301a0b409f07039aefb85d",
     "semantic_hash": ""
   },
   "docs/roadmap.md": {
@@ -654,9 +654,9 @@
     "semantic_hash": ""
   },
   "docs/status.md": {
-    "mtime": 1793035601.5021484,
-    "seen": 1793035603.0273101,
-    "ast_hash": "952644077270e78241c822768c467bc7",
+    "mtime": 1793035667.5646539,
+    "seen": 1793035914.9904552,
+    "ast_hash": "f9715481d75d86db203fdc0a7aae80c9",
     "semantic_hash": ""
   },
   "docs/superpowers/plans/2026-10-21-etapa-0-fundacao.md": {
