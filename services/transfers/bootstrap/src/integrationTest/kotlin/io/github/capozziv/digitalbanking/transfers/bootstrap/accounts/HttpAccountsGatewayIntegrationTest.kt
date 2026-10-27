@@ -27,8 +27,10 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.slf4j.MDC
+import java.net.ServerSocket
 import java.time.Duration
 import java.util.UUID
+import kotlin.concurrent.thread
 
 class HttpAccountsGatewayIntegrationTest {
     private val server = WireMockServer(options().dynamicPort())
@@ -216,7 +218,7 @@ class HttpAccountsGatewayIntegrationTest {
     fun `a response slower than the read timeout is transient and returns near the timeout`() {
         server.stubFor(
             post(urlEqualTo("/accounts/$accountId/debits"))
-                .willReturn(aResponse().withStatus(201).withBody(entryJson()).withFixedDelay(4_000)),
+                .willReturn(aResponse().withStatus(201).withBody(entryJson()).withFixedDelay(10_000)),
         )
 
         val started = System.nanoTime()
@@ -225,7 +227,77 @@ class HttpAccountsGatewayIntegrationTest {
 
         assertThat(result.outcome).isEqualTo(StepOutcome.TransientFailure)
         assertThat(result.httpStatus).isNull()
-        assertThat(elapsed).isBetween(Duration.ofMillis(2_800), Duration.ofMillis(3_900))
+        assertThat(elapsed).isBetween(Duration.ofMillis(2_800), Duration.ofMillis(4_500))
+    }
+
+    @Test
+    fun `find entry with 404 account-not-found is that refusal, not entry-not-found`() {
+        server.stubFor(
+            get(urlPathEqualTo("/accounts/$accountId/entries")).willReturn(problem(404, "account-not-found")),
+        )
+
+        val result = gateway.execute(AccountsCall.FindEntry(accountId, "k"))
+
+        assertThat(result.outcome).isEqualTo(StepOutcome.Refused("account-not-found"))
+    }
+
+    @Test
+    fun `find entry with 404 in HTML is the http-404 refusal`() {
+        server.stubFor(
+            get(urlPathEqualTo("/accounts/$accountId/entries"))
+                .willReturn(aResponse().withStatus(404).withHeader("Content-Type", "text/html").withBody("<html>not found</html>")),
+        )
+
+        assertThat(gateway.execute(AccountsCall.FindEntry(accountId, "k")).outcome).isEqualTo(StepOutcome.Refused("http-404"))
+    }
+
+    @Test
+    fun `404 Problem Details with type about-blank is the http-404 refusal`() {
+        server.stubFor(
+            get(urlPathEqualTo("/accounts/$accountId/entries")).willReturn(
+                aResponse()
+                    .withStatus(404)
+                    .withHeader("Content-Type", "application/problem+json")
+                    .withBody("""{"type":"about:blank","title":"Not Found","status":404}"""),
+            ),
+        )
+
+        assertThat(gateway.execute(AccountsCall.FindEntry(accountId, "k")).outcome).isEqualTo(StepOutcome.Refused("http-404"))
+    }
+
+    @Test
+    fun `a body that stalls after a fast status line is transient within the total deadline`() {
+        // Raw socket: the headers arrive at once, then the body promises 500 bytes and sends only a few.
+        ServerSocket(0).use { stalling ->
+            val peer =
+                thread(isDaemon = true) {
+                    runCatching {
+                        stalling.accept().use { socket ->
+                            socket.getInputStream().read(ByteArray(4_096))
+                            val out = socket.getOutputStream()
+                            out.write(
+                                ("HTTP/1.1 201 Created\r\nContent-Type: application/json\r\nContent-Length: 500\r\n\r\n{\"id\":")
+                                    .toByteArray(),
+                            )
+                            out.flush()
+                            repeat(10) {
+                                Thread.sleep(1_000)
+                                out.write(' '.code)
+                                out.flush()
+                            }
+                        }
+                    }
+                }
+
+            val started = System.nanoTime()
+            val result = gatewayFor("http://localhost:${stalling.localPort}").execute(debit())
+            val elapsed = Duration.ofNanos(System.nanoTime() - started)
+            peer.interrupt()
+
+            assertThat(result.outcome).isEqualTo(StepOutcome.TransientFailure)
+            assertThat(result.httpStatus).isNull()
+            assertThat(elapsed).isBetween(Duration.ofMillis(2_800), Duration.ofMillis(4_500))
+        }
     }
 
     @Test

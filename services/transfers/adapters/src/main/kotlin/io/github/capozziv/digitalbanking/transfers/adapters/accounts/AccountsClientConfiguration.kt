@@ -21,6 +21,7 @@ class AccountsClientConfiguration {
                 .version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(properties.connectTimeout)
                 .build()
+        // The read timeout is a total deadline per call: headers and body (proved by the stalled-body integration test).
         val requestFactory = JdkClientHttpRequestFactory(httpClient).apply { setReadTimeout(properties.readTimeout) }
         return RestClient
             .builder()

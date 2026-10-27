@@ -148,12 +148,7 @@ class HttpAccountsGateway(
     /** Last segment of the Problem Details `type`, or null when the body is not a Problem Details JSON. */
     private fun problemType(body: ByteArray): String? =
         try {
-            mapper
-                .readValue(body, AccountsProblemDTO::class.java)
-                .type
-                ?.trimEnd('/')
-                ?.substringAfterLast('/')
-                ?.takeIf { it.isNotBlank() }
+            AccountsResponseClassifier.problemSlug(mapper.readValue(body, AccountsProblemDTO::class.java).type)
         } catch (_: tools.jackson.core.JacksonException) {
             null
         }

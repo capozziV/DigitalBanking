@@ -48,6 +48,14 @@ class AccountsResponseClassifierTest {
         assertThat(classifier.classify(404, null)).isEqualTo(StepOutcome.Refused("http-404"))
     }
 
+    @Test
+    fun `problem type slug ignores about-blank and keeps the last path segment`() {
+        assertThat(AccountsResponseClassifier.problemSlug("about:blank")).isNull()
+        assertThat(AccountsResponseClassifier.problemSlug("/problems/account-busy/")).isEqualTo("account-busy")
+        assertThat(AccountsResponseClassifier.problemSlug(null)).isNull()
+        assertThat(AccountsResponseClassifier.problemSlug("")).isNull()
+    }
+
     @ParameterizedTest
     @ValueSource(ints = [408, 429])
     fun `request timeout and too many requests are transient`(status: Int) {

@@ -46,12 +46,24 @@ class AccountsResponseClassifier {
             }
         }
 
-    private companion object {
-        val HTTP_OK_RANGE = 200..299
-        val HTTP_CLIENT_ERROR_RANGE = 400..499
-        const val HTTP_NOT_FOUND = 404
-        const val HTTP_REQUEST_TIMEOUT = 408
-        const val HTTP_UNPROCESSABLE = 422
-        const val HTTP_TOO_MANY_REQUESTS = 429
+    companion object {
+        /**
+         * Last path segment of a Problem Details `type`, or null when it carries no information: absent, blank or
+         * `about:blank` (what Spring answers for routes it does not map).
+         */
+        fun problemSlug(type: String?): String? =
+            type
+                ?.takeUnless { it == ABOUT_BLANK }
+                ?.trimEnd('/')
+                ?.substringAfterLast('/')
+                ?.takeIf { it.isNotBlank() }
+
+        private const val ABOUT_BLANK = "about:blank"
+        private val HTTP_OK_RANGE = 200..299
+        private val HTTP_CLIENT_ERROR_RANGE = 400..499
+        private const val HTTP_NOT_FOUND = 404
+        private const val HTTP_REQUEST_TIMEOUT = 408
+        private const val HTTP_UNPROCESSABLE = 422
+        private const val HTTP_TOO_MANY_REQUESTS = 429
     }
 }
