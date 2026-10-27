@@ -7,6 +7,7 @@ import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.OpenAccountDT
 import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.RecordEntryDTO
 import io.github.capozziv.digitalbanking.accounts.application.usecase.ChangeAccountTypeUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.DebitOutcome
+import io.github.capozziv.digitalbanking.accounts.application.usecase.FindEntryByIdempotencyKeyUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.GetAccountUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.OpenAccountCommand
 import io.github.capozziv.digitalbanking.accounts.application.usecase.OpenAccountUseCase
@@ -36,6 +37,7 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.net.URI
 import java.util.UUID
@@ -47,6 +49,7 @@ class AccountController(
     private val getAccount: GetAccountUseCase,
     private val recordCredit: RecordCreditUseCase,
     private val recordDebit: RecordDebitUseCase,
+    private val findEntryByIdempotencyKey: FindEntryByIdempotencyKeyUseCase,
     private val changeAccountType: ChangeAccountTypeUseCase,
     meterRegistry: MeterRegistry,
 ) {
@@ -225,6 +228,37 @@ class AccountController(
                 throw InsufficientAvailableBalanceException(id, outcome.availableBalance)
             }
         }
+
+    @Operation(summary = "Find the entry recorded with an idempotency key; reads only, records nothing")
+    @ApiResponses(
+        ApiResponse(
+            responseCode = "200",
+            description = "The entry, the same body as the credit or debit that recorded it",
+            content = [Content(mediaType = "application/json", schema = Schema(implementation = LedgerEntryDTO::class))],
+        ),
+        ApiResponse(
+            responseCode = "400",
+            description = "/problems/validation-error: the id is not a UUID, or idempotencyKey is missing, blank or over 255 characters",
+            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
+        ),
+        ApiResponse(
+            responseCode = "404",
+            description =
+                "/problems/account-not-found. " +
+                    "/problems/entry-not-found: no entry was recorded on this account with the key",
+            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
+        ),
+    )
+    @GetMapping("/{id}/entries")
+    fun findEntry(
+        @PathVariable id: UUID,
+        @Parameter(description = "Idempotency key of the credit or debit, 1 to 255 characters", required = true)
+        @RequestParam(required = false) idempotencyKey: String?,
+    ): LedgerEntryDTO {
+        val key = IdempotencyKeyHeader.require("idempotencyKey", idempotencyKey)
+        val entry = findEntryByIdempotencyKey.execute(id, key) ?: throw EntryNotFoundException(id)
+        return LedgerEntryDTO.from(entry)
+    }
 
     @Operation(summary = "Change the account type, which sets its overdraft limit")
     @ApiResponses(

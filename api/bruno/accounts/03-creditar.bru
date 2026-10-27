@@ -11,7 +11,11 @@ post {
 }
 
 headers {
-  Idempotency-Key: {{$guid}}
+  Idempotency-Key: {{creditKey}}
+}
+
+script:pre-request {
+  bru.setVar("creditKey", "bruno-credit-" + Date.now());
 }
 
 body:json {

@@ -1,0 +1,19 @@
+meta {
+  name: Consultar lancamento por chave
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/accounts/{{accountId}}/entries?idempotencyKey={{creditKey}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("200 com o lancamento do credito (rode depois do 03)", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.kind).to.equal("CREDIT");
+    expect(res.body.amount).to.equal(1000);
+  });
+}

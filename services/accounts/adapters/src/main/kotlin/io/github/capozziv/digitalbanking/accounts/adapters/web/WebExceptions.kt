@@ -21,3 +21,7 @@ class InsufficientAvailableBalanceException(
     val accountId: UUID,
     val availableBalance: AvailableBalance,
 ) : RuntimeException("available balance of account $accountId does not cover the debit")
+
+class EntryNotFoundException(
+    val accountId: UUID,
+) : RuntimeException("no entry with the given idempotency key on account $accountId")

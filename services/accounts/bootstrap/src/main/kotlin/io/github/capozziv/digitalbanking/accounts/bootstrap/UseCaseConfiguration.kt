@@ -8,6 +8,7 @@ import io.github.capozziv.digitalbanking.accounts.application.port.LedgerEntryRe
 import io.github.capozziv.digitalbanking.accounts.application.port.TransactionRunner
 import io.github.capozziv.digitalbanking.accounts.application.usecase.ChangeAccountTypeUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.ChangeOverdraftLimitUseCase
+import io.github.capozziv.digitalbanking.accounts.application.usecase.FindEntryByIdempotencyKeyUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.GetAccountUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.ListAccountTypesUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.OpenAccountUseCase
@@ -42,6 +43,12 @@ class UseCaseConfiguration {
         entries: LedgerEntryRepository,
         types: AccountTypeRepository,
     ) = GetAccountUseCase(accounts, entries, types)
+
+    @Bean
+    fun findEntryByIdempotencyKeyUseCase(
+        accounts: AccountRepository,
+        entries: LedgerEntryRepository,
+    ) = FindEntryByIdempotencyKeyUseCase(accounts, entries)
 
     @Bean
     fun recordCreditUseCase(
