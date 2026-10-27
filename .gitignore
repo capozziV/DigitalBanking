@@ -8,3 +8,4 @@ infra/local/.env
 .superpowers/
 .DS_Store
 graphify-out/cache/
+.claude/worktrees/

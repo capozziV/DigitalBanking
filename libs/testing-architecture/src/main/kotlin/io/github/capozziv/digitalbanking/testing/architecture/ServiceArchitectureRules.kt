@@ -12,7 +12,8 @@ import kotlin.reflect.KVisibility
 /**
  * Architecture rules every service must satisfy, parametrized by the service root package
  * (for example `io.github.capozziv.digitalbanking.transfers`). Each service checks them with
- * `ServiceArchitectureRules.all(ROOT).forEach { it.check(classes) }`.
+ * a `@TestFactory` that creates one `DynamicTest` per rule:
+ * `ServiceArchitectureRules.all(ROOT).map { rule -> DynamicTest.dynamicTest(rule.description) { rule.check(classes) } }`.
  *
  * No rule allows an empty `should`: each one must match classes, so a renamed package makes the rule fail
  * instead of passing silently.
