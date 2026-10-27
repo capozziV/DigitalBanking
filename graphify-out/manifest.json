@@ -492,8 +492,8 @@
     "semantic_hash": ""
   },
   ".claude/agents/coordenador.md": {
-    "mtime": 1792680867.5821722,
-    "seen": 1792810560.9212968,
+    "mtime": 1793075967.9589949,
+    "seen": 1793075970.6005929,
     "ast_hash": "5d7a51ea96e357d4dc306b4386e92f4f",
     "semantic_hash": ""
   },
@@ -534,8 +534,8 @@
     "semantic_hash": ""
   },
   "CLAUDE.md": {
-    "mtime": 1792806339.9203558,
-    "seen": 1792810560.9213061,
+    "mtime": 1793075967.9615467,
+    "seen": 1793075970.600609,
     "ast_hash": "295966b20ceeeaa931a7e076d4b44b4d",
     "semantic_hash": ""
   },
@@ -642,8 +642,8 @@
     "semantic_hash": ""
   },
   "docs/arquitetura.md": {
-    "mtime": 1792806339.9245558,
-    "seen": 1792810560.921332,
+    "mtime": 1793075967.9631505,
+    "seen": 1793075970.6006458,
     "ast_hash": "cd4100352e628d7ae4c12e624fc3fe95",
     "semantic_hash": ""
   },
@@ -654,8 +654,8 @@
     "semantic_hash": ""
   },
   "docs/status.md": {
-    "mtime": 1792810548.4714842,
-    "seen": 1792810560.9213371,
+    "mtime": 1793075967.9651473,
+    "seen": 1793075970.600652,
     "ast_hash": "952644077270e78241c822768c467bc7",
     "semantic_hash": ""
   },
@@ -762,8 +762,8 @@
     "semantic_hash": ""
   },
   "docs/rodando-localmente.md": {
-    "mtime": 1792810548.4710991,
-    "seen": 1792810560.921335,
+    "mtime": 1793035601.5017068,
+    "seen": 1793075970.600651,
     "ast_hash": "f485106139b2346c5dbbd52abc74e4fc",
     "semantic_hash": ""
   },
@@ -1011,6 +1011,12 @@
     "mtime": 1792806340.008718,
     "seen": 1792810560.92126,
     "ast_hash": "8cf8544c717f76bfb09ded16747382eb",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/specs/2026-10-27-etapa-2-transfers-design.md": {
+    "mtime": 1793076063.215289,
+    "seen": 1793076076.358363,
+    "ast_hash": "e0aa34314a449f7c3b59b06c46495809",
     "semantic_hash": ""
   }
 }
