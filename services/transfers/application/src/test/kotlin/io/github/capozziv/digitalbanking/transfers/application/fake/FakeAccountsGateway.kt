@@ -15,6 +15,9 @@ class FakeAccountsGateway(
     val calls = mutableListOf<AccountsCall>()
     var lookup = AccountLookup.EXISTS
 
+    /** Runs on every [execute] after the call is recorded, e.g. to advance a test clock by the call's duration. */
+    var onCall: (AccountsCall) -> Unit = {}
+
     fun reply(vararg results: CallResult) {
         script.addAll(results)
     }
@@ -24,6 +27,7 @@ class FakeAccountsGateway(
     override fun execute(call: AccountsCall): CallResult {
         check(transactions?.open != true) { "accounts called inside a database transaction" }
         calls += call
+        onCall(call)
         return script.removeFirstOrNull() ?: error("no scripted reply for call #${calls.size}: $call")
     }
 

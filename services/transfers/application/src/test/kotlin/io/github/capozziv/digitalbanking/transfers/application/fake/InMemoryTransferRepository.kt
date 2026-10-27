@@ -19,6 +19,12 @@ class InMemoryTransferRepository : TransferRepository {
     var saveCount = 0
         private set
 
+    /** Every `leaseUntil` passed to a successful [saveIfOwner], in order. */
+    val renewedLeases = mutableListOf<Instant>()
+
+    /** When true, [releaseLease] throws, leaving the lease in place as a crash would. */
+    var failOnRelease = false
+
     fun nextAttemptAt(id: UUID): Instant? = nextAttempts[id]
 
     fun leaseOwner(id: UUID): String? = leases[id]?.owner
@@ -62,6 +68,7 @@ class InMemoryTransferRepository : TransferRepository {
         transfer: Transfer,
         owner: String,
         nextAttemptAt: Instant?,
+        leaseUntil: Instant,
     ): Boolean {
         val remaining = savesUntilLeaseLoss
         if (remaining != null) {
@@ -73,6 +80,8 @@ class InMemoryTransferRepository : TransferRepository {
         if (leases[transfer.id]?.owner != owner) return false
         transfers[transfer.id] = transfer
         nextAttempts[transfer.id] = nextAttemptAt
+        leases[transfer.id] = Lease(owner, leaseUntil)
+        renewedLeases += leaseUntil
         saveCount++
         return true
     }
@@ -81,9 +90,11 @@ class InMemoryTransferRepository : TransferRepository {
         id: UUID,
         owner: String,
     ) {
+        check(!failOnRelease) { "release failed" }
         if (leases[id]?.owner == owner) leases.remove(id)
     }
 
+    /** Same semantics as the port: a transfer whose `nextAttemptAt` is null is never due. */
     override fun findDue(
         now: Instant,
         limit: Int,
@@ -91,7 +102,7 @@ class InMemoryTransferRepository : TransferRepository {
         transfers.values
             .filter { it.step.call(it) != null }
             .filter { leases[it.id]?.until?.isAfter(now) != true }
-            .filter { nextAttempts[it.id]?.isAfter(now) != true }
+            .filter { nextAttempts[it.id]?.isAfter(now) == false }
             .take(limit)
             .map { it.id }
 }

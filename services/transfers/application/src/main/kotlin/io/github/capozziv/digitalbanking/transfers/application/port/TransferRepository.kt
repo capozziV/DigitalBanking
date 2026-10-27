@@ -22,13 +22,18 @@ interface TransferRepository {
 
     /**
      * Saves [transfer] only if [owner] still holds the lease; returns false otherwise (nothing is written).
-     * [nextAttemptAt] is when the scheduler may pick the transfer up again; null when no retry is scheduled
-     * (terminal transfers, or a step that continues immediately). The domain `Transfer` does not carry it.
+     * The same write renews the lease to [leaseUntil] (`locked_until`).
+     *
+     * [nextAttemptAt] is when the scheduler may pick the transfer up again; the domain `Transfer` does not carry it.
+     * It is null only for a terminal transfer. A non-terminal transfer always gets a value, even when the saga goes on
+     * right away (then it is the save instant): the lease keeps other instances away while it holds, and if the process
+     * dies before the next save the scheduler resumes the transfer once the lease expires.
      */
     fun saveIfOwner(
         transfer: Transfer,
         owner: String,
         nextAttemptAt: Instant?,
+        leaseUntil: Instant,
     ): Boolean
 
     fun releaseLease(
@@ -36,6 +41,7 @@ interface TransferRepository {
         owner: String,
     )
 
+    /** Pending transfers with `nextAttemptAt <= now` and no valid lease; a null `nextAttemptAt` is never due. */
     fun findDue(
         now: Instant,
         limit: Int,

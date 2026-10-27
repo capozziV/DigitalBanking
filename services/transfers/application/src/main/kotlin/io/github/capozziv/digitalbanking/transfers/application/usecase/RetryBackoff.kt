@@ -5,7 +5,7 @@ import java.time.Duration
 /** Exponential wait between saga retries: `initial` * 2^(attempt-1), capped at `max`. */
 class RetryBackoff(
     private val initial: Duration,
-    private val max: Duration,
+    val max: Duration,
 ) {
     fun delayBeforeRetry(attempt: Int): Duration {
         require(attempt >= 1) { "attempt must be >= 1, was $attempt" }

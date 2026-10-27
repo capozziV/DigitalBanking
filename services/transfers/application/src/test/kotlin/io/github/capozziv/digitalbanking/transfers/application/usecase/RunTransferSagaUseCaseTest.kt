@@ -18,6 +18,7 @@ import io.github.capozziv.digitalbanking.transfers.domain.TransferEvent
 import io.github.capozziv.digitalbanking.transfers.domain.TransferStatus
 import io.github.capozziv.digitalbanking.transfers.domain.TransferStep
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import java.time.Duration
 import java.time.Instant
@@ -141,7 +142,7 @@ class RunTransferSagaUseCaseTest {
         givenTransfer()
         accounts.reply(busy, busy, created, created)
 
-        val result = useCase.execute(id, "owner-a", busyRetries = 3)
+        val result = useCase.execute(id, "owner-a", busyAttempts = 3)
 
         assertThat(result!!.status).isEqualTo(TransferStatus.COMPLETED)
         assertThat(repository.nextAttemptAt(id)).isNull()
@@ -151,17 +152,86 @@ class RunTransferSagaUseCaseTest {
     }
 
     @Test
-    fun `busy beyond the immediate retries counts one attempt and schedules a retry`() {
+    fun `three busy attempts in total count one attempt and schedule a retry`() {
         givenTransfer()
-        accounts.reply(busy, busy, busy, busy)
+        accounts.reply(busy, busy, busy)
 
-        val result = useCase.execute(id, "owner-a", busyRetries = 3)
+        val result = useCase.execute(id, "owner-a", busyAttempts = 3)
 
         assertThat(result!!.step).isEqualTo(TransferStep.Debit)
         assertThat(result.attempts).isEqualTo(1)
-        assertThat(accounts.calls).hasSize(4)
-        assertThat(stepLog.records).hasSize(4)
+        assertThat(accounts.calls).hasSize(3)
+        assertThat(stepLog.records.map { it.httpStatus }).containsExactly(503, 503, 503)
         assertThat(repository.nextAttemptAt(id)).isEqualTo(start.plusSeconds(1))
+    }
+
+    @Test
+    fun `busy step records are not written when the lease is lost`() {
+        givenTransfer()
+        accounts.reply(busy, created)
+        repository.loseLeaseOnSave(1)
+
+        val result = useCase.execute(id, "owner-a", busyAttempts = 3)
+
+        assertThat(result).isNull()
+        assertThat(accounts.calls).hasSize(2)
+        assertThat(stepLog.records).isEmpty()
+    }
+
+    @Test
+    fun `a step that continues right away keeps the transfer due so it resumes after a crash`() {
+        givenTransfer()
+        accounts.reply(created)
+        repository.failOnRelease = true
+
+        assertThatThrownBy { useCase.execute(id, "owner-a") }
+            .isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("no scripted reply")
+
+        assertThat(repository.findById(id)!!.step).isEqualTo(TransferStep.Credit)
+        assertThat(repository.nextAttemptAt(id)).isEqualTo(start)
+        assertThat(repository.findDue(start.plusSeconds(10), 50)).isEmpty()
+        assertThat(repository.findDue(start.plus(SagaSettings().lease).plusSeconds(1), 50)).containsExactly(id)
+    }
+
+    @Test
+    fun `each saved step renews the lease`() {
+        givenTransfer()
+        accounts.reply(created, created)
+        accounts.onCall = { clock.advance(Duration.ofSeconds(5)) }
+
+        useCase.execute(id, "owner-a")
+
+        assertThat(repository.renewedLeases).containsExactly(start.plusSeconds(35), start.plusSeconds(40))
+    }
+
+    @Test
+    fun `stops before a call that could outlive the lease and writes nothing`() {
+        givenTransfer()
+        accounts.reply(busy, busy, busy)
+        accounts.onCall = { clock.advance(Duration.ofSeconds(13)) }
+
+        val result = useCase.execute(id, "owner-a", busyAttempts = 3)
+
+        assertThat(accounts.calls).hasSize(2)
+        assertThat(result!!.step).isEqualTo(TransferStep.Debit)
+        assertThat(result.attempts).isZero()
+        assertThat(repository.saveCount).isZero()
+        assertThat(stepLog.records).isEmpty()
+        assertThat(repository.leaseOwner(id)).isNull()
+    }
+
+    @Test
+    fun `renewed lease lets the next step run`() {
+        givenTransfer()
+        accounts.reply(created, created)
+        // 27 s: past the first lease's call budget (30 s - 4 s), so the credit only runs if the debit save renewed it.
+        accounts.onCall = { clock.advance(Duration.ofSeconds(27)) }
+
+        val result = useCase.execute(id, "owner-a")
+
+        assertThat(result!!.status).isEqualTo(TransferStatus.COMPLETED)
+        assertThat(accounts.calls).hasSize(2)
     }
 
     @Test
@@ -233,13 +303,23 @@ class RunTransferSagaUseCaseTest {
     }
 
     @Test
-    fun `refused compensation stays in compensate and is scheduled again`() {
+    fun `refused compensation stays in compensate and is scheduled after the maximum wait`() {
         givenTransfer(TransferStep.Compensate)
         accounts.reply(refused("account-not-found"))
 
         val result = useCase.execute(id, "owner-a")
 
         assertThat(result!!.step).isEqualTo(TransferStep.Compensate)
+        assertThat(repository.nextAttemptAt(id)).isEqualTo(start.plusSeconds(15))
+    }
+
+    @Test
+    fun `transient failure in compensation keeps the normal backoff`() {
+        givenTransfer(TransferStep.Compensate)
+        accounts.reply(timeout)
+
+        useCase.execute(id, "owner-a")
+
         assertThat(repository.nextAttemptAt(id)).isEqualTo(start.plusSeconds(1))
     }
 
@@ -287,9 +367,22 @@ class RunTransferSagaUseCaseTest {
     fun `lease is released when the gateway throws`() {
         givenTransfer()
 
-        runCatching { useCase.execute(id, "owner-a") }
+        assertThatThrownBy { useCase.execute(id, "owner-a") }
+            .isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("no scripted reply")
 
         assertThat(repository.leaseOwner(id)).isNull()
+    }
+
+    @Test
+    fun `a failing lease release does not hide the original exception`() {
+        givenTransfer()
+        repository.failOnRelease = true
+
+        assertThatThrownBy { useCase.execute(id, "owner-a") }
+            .isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("no scripted reply")
+            .hasNoSuppressedExceptions()
     }
 
     @Test

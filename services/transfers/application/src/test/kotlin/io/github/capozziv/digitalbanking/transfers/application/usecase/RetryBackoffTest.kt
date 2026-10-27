@@ -20,6 +20,11 @@ class RetryBackoffTest {
     }
 
     @Test
+    fun `exposes the maximum wait`() {
+        assertThat(backoff.max).isEqualTo(Duration.ofSeconds(15))
+    }
+
+    @Test
     fun `attempt zero is rejected`() {
         assertThatThrownBy { backoff.delayBeforeRetry(0) }.isInstanceOf(IllegalArgumentException::class.java)
     }
