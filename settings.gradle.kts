@@ -1,12 +1,9 @@
 pluginManagement {
-    repositories {
-        mavenCentral()
-        gradlePluginPortal()
-    }
     includeBuild("build-logic")
 }
 
 dependencyResolutionManagement {
+    repositoriesMode = RepositoriesMode.FAIL_ON_PROJECT_REPOS
     repositories {
         mavenCentral()
     }
