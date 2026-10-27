@@ -3,10 +3,11 @@
 Backend de banco digital **simulado** para portfólio. Sem dinheiro real e sem dados pessoais reais.
 O valor do projeto está em resolver bem consistência, idempotência, mensageria confiável, cache e observabilidade.
 
-Responder sempre em português.
+Responder sempre em português. O board no GitHub Projects é escrito em inglês.
 
 ## Contexto (leia antes de qualquer tarefa)
-- @docs/status.md — onde estamos agora, bloqueios e condições do ambiente
+- [Board no GitHub Projects](https://github.com/users/capozziV/projects/2) — fonte das tasks, do débito técnico, das decisões pendentes e das tarefas do usuário; regras de colunas e campos em "Como usar o board" do `docs/status.md`
+- @docs/status.md — resumo: fase atual, histórico, como rodar, convenções e ambiente
 - @docs/arquitetura.md — stack, serviços, decisões e a lista "Em aberto"
 - @docs/roadmap.md — etapas do projeto
 - @CONTEXT.md — linguagem do domínio; o glossário dá o termo em português (docs e conversa) e o nome em inglês usado no código
@@ -22,7 +23,7 @@ Responder sempre em português.
 - Não compartilhar classes de domínio entre serviços. Bibliotecas compartilhadas só de infraestrutura (outbox, observabilidade).
 - Saldo para autorizar débito nunca vem de cache.
 - Eventos só via Transactional Outbox; consumidores sempre idempotentes.
-- Decisão difícil de reverter, surpreendente sem contexto e fruto de um trade-off real vira um ADR curto em `docs/adr/`. Pendências ficam só na seção "Em aberto" de `docs/arquitetura.md`.
+- Decisão difícil de reverter, surpreendente sem contexto e fruto de um trade-off real vira um ADR curto em `docs/adr/`. Decisões pendentes ficam na seção "Em aberto" de `docs/arquitetura.md`, com um cartão `Decision` no board; débito técnico e tasks ficam só no board.
 - Se faltar algo necessário (acesso, segredo, ferramenta, decisão), dizer o que falta e parar. Nunca simular nem adivinhar.
 
 ## Fluxo de trabalho (skills)
@@ -60,7 +61,7 @@ Quem executa cada papel do fluxo acima são os agentes de `.claude/agents/`, cha
 | Implementar task de frontend e BFF (etapa 9) | Lucas | `dev-frontend` |
 | Revisar task, re-revisar correção, revisar a branch | Beatriz | `revisor` |
 | ADR, `CONTEXT.md`, README, docs de arquitetura | Clara | `documentador` |
-| Coordenar, delegar, manter `docs/status.md` | Helena | sessão principal (`coordenador`) |
+| Coordenar, delegar, manter o board e `docs/status.md` | Helena | sessão principal (`coordenador`) |
 
 - Nas mensagens ao usuário, chame cada agente pelo nome (com o identificador entre parênteses quando ajudar); nos despachos, use o identificador em `subagent_type`.
 - Task que mistura papéis vai para o agente da maior parte do diff; o prompt cita o resto.
@@ -71,7 +72,7 @@ Quem executa cada papel do fluxo acima são os agentes de `.claude/agents/`, cha
 Commits e pushes saem só com o autor do usuário (capozziV <vitorcapozzi4@gmail.com>), sem trailers `Co-Authored-By` ou `Claude-Session`.
 
 ## Ao terminar uma tarefa
-Atualizar `docs/status.md` (o coordenador faz isso; especialistas reportam o que mudou).
+Atualizar o board e o `docs/status.md` (o coordenador faz isso; especialistas reportam o que mudou).
 
 ## Grafo do código (graphify)
 - Com `graphify-out/graph.json` presente, toda pergunta sobre o código começa por `graphify query "<pergunta>"`; use `graphify path "<A>" "<B>"` para a relação entre dois pontos e `graphify explain "<conceito>"` para um conceito. Leia arquivos de código só nas linhas que o grafo já localizou, e repita esta regra no prompt de todo agente que explore código.
