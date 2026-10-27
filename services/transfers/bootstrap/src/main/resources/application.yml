@@ -1,0 +1,37 @@
+spring:
+  application:
+    name: transfers
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${TRANSFERS_DB_URL:jdbc:postgresql://localhost:5432/transfers}
+    username: ${TRANSFERS_DB_USER:transfers_app}
+    password: ${TRANSFERS_DB_PASSWORD:transfers_app}
+  jackson:
+    deserialization:
+      # Amounts are whole cents: 1.5 must be rejected, never truncated to 1.
+      accept-float-as-int: false
+  flyway:
+    user: ${TRANSFERS_DB_OWNER_USER:transfers_owner}
+    password: ${TRANSFERS_DB_OWNER_PASSWORD:transfers_owner}
+    placeholders:
+      appUser: ${TRANSFERS_DB_USER:transfers_app}
+
+logging:
+  pattern:
+    # Correlation id of the request on every log line.
+    correlation: "[%X{correlationId:-}] "
+
+server:
+  port: 8082
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
