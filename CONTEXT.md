@@ -84,6 +84,32 @@ Etapa da saga que desfaz o efeito de uma etapa anterior quando a transferência 
 _Código_: `Compensation`
 _Evite_: rollback, estorno
 
+**Status da transferência**:
+Situação da transferência; valores `PENDING`, `COMPLETED`, `FAILED` e `COMPENSATED`.
+_Código_: `TransferStatus`
+_Evite_: estado (sem qualificador, para não confundir com o passo)
+
+**Pendente**:
+A transferência ainda não terminou; valor de Status da transferência.
+_Código_: `TransferStatus.PENDING`
+
+**Concluída**:
+O valor saiu da origem e chegou ao destino; valor de Status da transferência.
+_Código_: `TransferStatus.COMPLETED`
+
+**Falhou**:
+A transferência foi recusada antes de tirar valor da origem; valor de Status da transferência.
+_Código_: `TransferStatus.FAILED`
+
+**Compensada**:
+O valor chegou a sair da origem, não pôde chegar ao destino e voltou para a origem; valor de Status da transferência.
+_Código_: `TransferStatus.COMPENSATED`
+
+**Passo da saga**:
+Etapa da saga de transferência em andamento (débito, crédito, consulta, compensação) ou terminal; define o status da transferência.
+_Código_: `TransferStep`
+_Evite_: estágio, fase
+
 **Limite diário**:
 Valor máximo que uma conta pode transferir num mesmo dia.
 _Código_: `DailyLimit`

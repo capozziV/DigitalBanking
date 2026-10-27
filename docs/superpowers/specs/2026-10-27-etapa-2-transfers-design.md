@@ -1,7 +1,7 @@
 # Etapa 2 — `transfers` + saga: design
 
 - **Data:** 2026-10-27
-- **Status:** design aprovado em conversa (2026-10-27); spec aguardando revisão do usuário
+- **Status:** aprovada (2026-10-27)
 - **Roadmap:** etapa 2 de [`docs/roadmap.md`](../../roadmap.md)
 - **Board:** cartão [#9](https://github.com/capozziV/DigitalBanking/issues/9) (Stage 2 · Transfers + saga)
 
@@ -13,7 +13,7 @@ Entregar o 2º serviço, `transfers`, que recebe uma transferência (`Transfer`)
 |---|---|
 | 1 | O `transfers` fala com o `accounts` por **HTTP síncrono**, usando os endpoints de crédito e débito que já existem. |
 | 2 | `POST /transfers` roda a saga na requisição e responde com o resultado; falha passageira devolve `202 PENDING` e o agendador termina depois. |
-| 3 | Falha definitiva no crédito compensa na hora; falha passageira é tentada de novo até um **prazo de 2 minutos** desde a criação; vencido o prazo, compensa. |
+| 3 | Falha definitiva no crédito compensa na hora; falha passageira é tentada de novo até um **prazo de 2 minutos** desde a criação; vencido o prazo, a saga consulta o lançamento pela chave (decisão 10) e compensa só se o crédito não aconteceu. |
 | 4 | A saga ganha ADR próprio (ADR 0016). ECS Service Connect fica para a etapa 8 (novo cartão `Decision`). |
 | 5 | Valor mínimo de 1 centavo, sem máximo até o limite diário (etapa 6). A origem pode usar o cheque especial, com a regra do débito comum. |
 | 6 | Origem igual ao destino, ou conta inexistente: `422`, nada gravado. |
