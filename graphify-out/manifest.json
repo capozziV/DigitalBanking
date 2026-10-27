@@ -492,9 +492,9 @@
     "semantic_hash": ""
   },
   ".claude/agents/coordenador.md": {
-    "mtime": 1793075967.9589949,
-    "seen": 1793075970.6005929,
-    "ast_hash": "5d7a51ea96e357d4dc306b4386e92f4f",
+    "mtime": 1793116394.4378755,
+    "seen": 1793116422.635063,
+    "ast_hash": "0e6c74f15b21498d67365ddabcb1b89d",
     "semantic_hash": ""
   },
   ".claude/agents/dev-frontend.md": {
@@ -534,9 +534,9 @@
     "semantic_hash": ""
   },
   "CLAUDE.md": {
-    "mtime": 1793075967.9615467,
-    "seen": 1793075970.600609,
-    "ast_hash": "295966b20ceeeaa931a7e076d4b44b4d",
+    "mtime": 1793116394.4393132,
+    "seen": 1793116422.635078,
+    "ast_hash": "31fac407697605d6909f5746365adae6",
     "semantic_hash": ""
   },
   "CONTEXT.md": {
@@ -642,9 +642,9 @@
     "semantic_hash": ""
   },
   "docs/arquitetura.md": {
-    "mtime": 1793075967.9631505,
-    "seen": 1793075970.6006458,
-    "ast_hash": "cd4100352e628d7ae4c12e624fc3fe95",
+    "mtime": 1793116394.4408233,
+    "seen": 1793116422.635114,
+    "ast_hash": "b7e1df6f91301a0b409f07039aefb85d",
     "semantic_hash": ""
   },
   "docs/roadmap.md": {
@@ -654,9 +654,9 @@
     "semantic_hash": ""
   },
   "docs/status.md": {
-    "mtime": 1793075967.9651473,
-    "seen": 1793075970.600652,
-    "ast_hash": "952644077270e78241c822768c467bc7",
+    "mtime": 1793116394.441961,
+    "seen": 1793116422.6351192,
+    "ast_hash": "f9715481d75d86db203fdc0a7aae80c9",
     "semantic_hash": ""
   },
   "docs/superpowers/plans/2026-10-21-etapa-0-fundacao.md": {
@@ -763,7 +763,7 @@
   },
   "docs/rodando-localmente.md": {
     "mtime": 1793035601.5017068,
-    "seen": 1793075970.600651,
+    "seen": 1793035603.027308,
     "ast_hash": "f485106139b2346c5dbbd52abc74e4fc",
     "semantic_hash": ""
   },
@@ -1015,7 +1015,7 @@
   },
   "docs/superpowers/specs/2026-10-27-etapa-2-transfers-design.md": {
     "mtime": 1793076063.215289,
-    "seen": 1793076076.358363,
+    "seen": 1793116422.6351318,
     "ast_hash": "e0aa34314a449f7c3b59b06c46495809",
     "semantic_hash": ""
   }
