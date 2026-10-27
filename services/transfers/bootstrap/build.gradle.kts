@@ -3,6 +3,7 @@ plugins { id("digitalbanking.spring-boot-app") }
 dependencies {
     implementation(project(":services:transfers:adapters"))
     implementation(project(":services:transfers:domain"))
+    implementation(project(":services:transfers:application"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
     testImplementation(project(":libs:testing-architecture"))
@@ -12,4 +13,5 @@ dependencies {
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-jdbc")
     integrationTestImplementation(libs.testcontainers.postgresql)
     integrationTestImplementation(libs.testcontainers.junit.jupiter)
+    integrationTestImplementation(libs.wiremock.standalone)
 }

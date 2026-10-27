@@ -2,6 +2,7 @@ plugins { id("digitalbanking.spring-module") }
 
 dependencies {
     implementation(project(":services:transfers:domain"))
+    implementation(project(":services:transfers:application"))
 
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
