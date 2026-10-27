@@ -278,6 +278,35 @@ class TransferApiIntegrationTest : TransfersIntegrationTest() {
         assertThat(accountsServer.allServeEvents).isEmpty()
     }
 
+    @Test
+    fun `a description of exactly 140 characters is accepted and 141 is 400 validation-error`() {
+        stubEntry("/accounts/$source/debits", 201)
+        stubEntry("/accounts/$destination/credits", 201)
+        val exact = "d".repeat(140)
+
+        val accepted = api.post("/transfers", transferJson(amount = "10", description = exact), key())
+
+        assertThat(accepted.status).describedAs(accepted.rawBody).isEqualTo(201)
+        assertThat(accepted.body!!.get("description").asString()).isEqualTo(exact)
+
+        val refused = api.post("/transfers", transferJson(amount = "10", description = "d".repeat(141)), key())
+
+        assertProblem(refused, 400, "validation-error")
+        assertThat(refused.errorFields()).contains("description")
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["", "   "])
+    fun `a blank description is stored as null`(description: String) {
+        stubEntry("/accounts/$source/debits", 201)
+        stubEntry("/accounts/$destination/credits", 201)
+
+        val response = api.post("/transfers", transferJson(amount = "10", description = description), key())
+
+        assertThat(response.status).describedAs(response.rawBody).isEqualTo(201)
+        assertThat(response.body!!.get("description").isNull).isTrue()
+    }
+
     // --- GET /transfers/{id} ---
 
     @Test
