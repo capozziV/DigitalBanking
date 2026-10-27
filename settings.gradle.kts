@@ -21,4 +21,6 @@ include(
     ":services:accounts:adapters",
     ":services:accounts:bootstrap",
     ":services:transfers:domain",
+    ":services:transfers:adapters",
+    ":services:transfers:bootstrap",
 )
