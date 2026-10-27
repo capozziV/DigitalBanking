@@ -34,6 +34,10 @@ class ProblemDetailsExceptionHandler : ResponseEntityExceptionHandler() {
     fun handle(e: AccountNotFoundException) = problem(HttpStatus.NOT_FOUND, "account-not-found", "Account not found", e.message)
 
     @ExceptionHandler
+    fun handle(e: EntryNotFoundException) =
+        problem(HttpStatus.NOT_FOUND, "entry-not-found", "Entry not found", "No entry with the given idempotency key on this account")
+
+    @ExceptionHandler
     fun handle(e: AccountTypeNotFoundException) =
         problem(HttpStatus.NOT_FOUND, "account-type-not-found", "Account type not found", e.message)
 
