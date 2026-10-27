@@ -36,6 +36,8 @@ class RunTransferSagaUseCase(
     /**
      * Returns the transfer as persisted by the last step, or `null` when the lease could not be taken,
      * the transfer does not exist, or the lease was lost mid-run (another instance now owns it; nothing more is written).
+     * A non-null return is also the persisted state when the run stops for lack of lease margin before a call
+     * (nothing is written then; the scheduler resumes the transfer once the lease expires).
      *
      * [busyAttempts] is the total number of calls (the first included) a step makes in a row on `503` transient
      * failures; the default `1` means no immediate repeat. Every call is logged in the step log, but only the final

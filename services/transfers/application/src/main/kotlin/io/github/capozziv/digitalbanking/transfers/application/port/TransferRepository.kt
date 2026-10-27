@@ -9,7 +9,11 @@ interface TransferRepository {
 
     fun findByIdempotencyKey(key: String): Transfer?
 
-    /** Returns false when the idempotency key already exists. */
+    /**
+     * Returns false when the idempotency key already exists. A new row is written with
+     * `next_attempt_at = transfer.createdAt`, so the scheduler finds it even if the process dies before the first
+     * [saveIfOwner].
+     */
     fun insert(transfer: Transfer): Boolean
 
     /** Takes the lease when it is free, expired at [now] or already held by [owner]. */

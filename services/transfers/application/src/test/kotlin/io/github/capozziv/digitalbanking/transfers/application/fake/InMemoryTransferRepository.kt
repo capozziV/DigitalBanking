@@ -49,6 +49,7 @@ class InMemoryTransferRepository : TransferRepository {
     override fun insert(transfer: Transfer): Boolean {
         if (findByIdempotencyKey(transfer.idempotencyKey) != null) return false
         transfers[transfer.id] = transfer
+        nextAttempts[transfer.id] = transfer.createdAt
         return true
     }
 
