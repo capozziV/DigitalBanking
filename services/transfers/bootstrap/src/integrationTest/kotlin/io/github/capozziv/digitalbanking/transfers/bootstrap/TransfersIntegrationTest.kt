@@ -1,5 +1,7 @@
 package io.github.capozziv.digitalbanking.transfers.bootstrap
 
+import com.github.tomakehurst.wiremock.WireMockServer
+import com.github.tomakehurst.wiremock.core.WireMockConfiguration.options
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.jdbc.datasource.DriverManagerDataSource
@@ -11,7 +13,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer
  * Base of every integration test of the transfers service. One PostgreSQL container is shared by all subclasses
  * (singleton container, so the cached Spring context keeps a valid connection). The application connects as
  * [APP_USER]; Flyway runs as the container's owner user, mirroring transfers_owner / transfers_app of the
- * local environment.
+ * local environment. A shared WireMock server stands in for `accounts`; tests that use it reset it first.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 abstract class TransfersIntegrationTest {
@@ -30,6 +32,10 @@ abstract class TransfersIntegrationTest {
                 .withInitScript("db/create-app-role.sql")
                 .apply { start() }
 
+        /** Stands in for the accounts service; `transfers.accounts.url` points to it. */
+        @JvmStatic
+        val accountsServer: WireMockServer = WireMockServer(options().dynamicPort()).apply { start() }
+
         @JvmStatic
         @DynamicPropertySource
         fun databaseProperties(registry: DynamicPropertyRegistry) {
@@ -39,6 +45,7 @@ abstract class TransfersIntegrationTest {
             registry.add("spring.flyway.user") { postgres.username }
             registry.add("spring.flyway.password") { postgres.password }
             registry.add("spring.flyway.placeholders.appUser") { APP_USER }
+            registry.add("transfers.accounts.url") { "http://localhost:${accountsServer.port()}" }
         }
     }
 }
