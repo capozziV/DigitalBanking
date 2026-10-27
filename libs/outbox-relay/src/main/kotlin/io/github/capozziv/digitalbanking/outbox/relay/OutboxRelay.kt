@@ -1,5 +1,7 @@
-package io.github.capozziv.digitalbanking.outbox
+package io.github.capozziv.digitalbanking.outbox.relay
 
+import io.github.capozziv.digitalbanking.outbox.OutboxEventEnvelope
+import io.github.capozziv.digitalbanking.outbox.PendingEvent
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import java.time.Clock

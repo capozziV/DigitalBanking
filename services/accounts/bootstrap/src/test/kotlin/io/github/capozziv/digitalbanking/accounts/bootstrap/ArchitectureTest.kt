@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test
 import kotlin.reflect.KVisibility
 
 /**
- * Architecture rules of the accounts service and of the outbox library. No rule allows an empty
+ * Architecture rules of the accounts service and of the outbox libraries (outbox and outbox-relay). No rule allows an empty
  * `should`: each one must match classes, so a renamed package makes the rule fail instead of passing silently.
  */
 class ArchitectureTest {

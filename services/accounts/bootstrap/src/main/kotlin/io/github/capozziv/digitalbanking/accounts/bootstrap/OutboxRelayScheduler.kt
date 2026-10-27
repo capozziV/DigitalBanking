@@ -1,6 +1,6 @@
 package io.github.capozziv.digitalbanking.accounts.bootstrap
 
-import io.github.capozziv.digitalbanking.outbox.OutboxRelay
+import io.github.capozziv.digitalbanking.outbox.relay.OutboxRelay
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.DisposableBean
 import org.springframework.scheduling.annotation.Scheduled

@@ -1,5 +1,7 @@
-package io.github.capozziv.digitalbanking.outbox
+package io.github.capozziv.digitalbanking.outbox.relay
 
+import io.github.capozziv.digitalbanking.outbox.OutboxEventEnvelope
+import io.github.capozziv.digitalbanking.outbox.PendingEvent
 import io.github.capozziv.digitalbanking.testing.localstack.LocalStackTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy

@@ -13,6 +13,7 @@ rootProject.name = "digitalbanking"
 
 include(
     ":libs:outbox",
+    ":libs:outbox-relay",
     ":libs:testing-localstack",
     ":services:accounts:domain",
     ":services:accounts:application",

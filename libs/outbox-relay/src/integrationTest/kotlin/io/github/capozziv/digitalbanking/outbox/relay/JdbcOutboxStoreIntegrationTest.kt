@@ -1,5 +1,8 @@
-package io.github.capozziv.digitalbanking.outbox
+package io.github.capozziv.digitalbanking.outbox.relay
 
+import io.github.capozziv.digitalbanking.outbox.JdbcOutboxWriter
+import io.github.capozziv.digitalbanking.outbox.OutboxEventEnvelope
+import io.github.capozziv.digitalbanking.outbox.OutboxMessage
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
