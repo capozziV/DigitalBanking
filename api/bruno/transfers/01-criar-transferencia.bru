@@ -1,0 +1,56 @@
+meta {
+  name: Criar transferencia
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/transfers
+  body: json
+  auth: none
+}
+
+headers {
+  Idempotency-Key: {{transferKey}}
+}
+
+body:json {
+  {
+    "sourceAccountId": "{{sourceAccountId}}",
+    "destinationAccountId": "{{destinationAccountId}}",
+    "amount": 300,
+    "description": "bruno transferencia"
+  }
+}
+
+script:pre-request {
+  // A chave fica guardada para a requisicao 02 repetir exatamente a mesma.
+  const axios = require("axios");
+  bru.setVar("transferKey", bru.interpolate("{{$guid}}"));
+
+  // Abre origem (com saldo 1000) e destino pelo accounts, para a colecao rodar sozinha.
+  const base = bru.getEnvVar("baseUrl");
+  async function openAccount() {
+    const r = await axios.post(`${base}/accounts`, { customerId: bru.interpolate("{{$guid}}") },
+      { headers: { "Idempotency-Key": bru.interpolate("{{$guid}}") } });
+    return r.data.id;
+  }
+  const source = await openAccount();
+  const destination = await openAccount();
+  await axios.post(`${base}/accounts/${source}/credits`, { amount: 1000, description: "bruno credito" },
+    { headers: { "Idempotency-Key": bru.interpolate("{{$guid}}") } });
+  bru.setVar("sourceAccountId", source);
+  bru.setVar("destinationAccountId", destination);
+}
+
+script:post-response {
+  bru.setVar("transferId", res.body.id);
+}
+
+tests {
+  test("201 com a transferencia criada", function () {
+    expect(res.status).to.equal(201);
+    expect(res.body.amount).to.equal(300);
+    expect(res.headers["location"]).to.contain("/transfers/");
+  });
+}

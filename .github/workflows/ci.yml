@@ -151,8 +151,8 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v6
-      - name: Gerar o jar executavel
-        run: ./gradlew :services:accounts:bootstrap:bootJar
+      - name: Gerar os jars executaveis
+        run: ./gradlew :services:accounts:bootstrap:bootJar :services:transfers:bootstrap:bootJar
       - name: Subir a infra local (PostgreSQL, Redis, nginx, LocalStack)
         env:
           LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
@@ -162,29 +162,37 @@ jobs:
             exit 1
           fi
           docker compose --env-file infra/local/.env.example -f infra/local/docker-compose.yml up --wait
-      - name: Subir o servico accounts
+      - name: Subir os servicos accounts e transfers
         run: |
           set -a
           . infra/local/.env.example
           set +a
           java -jar services/accounts/bootstrap/build/libs/bootstrap.jar > accounts.log 2>&1 &
-      - name: Health via nginx
+          java -jar services/transfers/bootstrap/build/libs/bootstrap.jar > transfers.log 2>&1 &
+      - name: Health dos dois servicos via nginx
         run: |
-          for _ in $(seq 1 60); do
-            if body=$(curl -fsS http://127.0.0.1/accounts/actuator/health) && echo "$body" | grep -q '"status":"UP"'; then
-              echo "$body"
-              exit 0
+          for service in accounts transfers; do
+            ok=false
+            for _ in $(seq 1 60); do
+              if body=$(curl -fsS "http://127.0.0.1/$service/actuator/health") && echo "$body" | grep -q '"status":"UP"'; then
+                echo "$service: $body"
+                ok=true
+                break
+              fi
+              sleep 1
+            done
+            if [ "$ok" != true ]; then
+              echo "health do $service nao ficou UP em 60 s" >&2
+              exit 1
             fi
-            sleep 1
           done
-          echo "health nao ficou UP em 60 s" >&2
-          exit 1
       - name: Operacoes via nginx e eventos na fila de inspecao do LocalStack
         run: bash infra/local/smoke.sh http://127.0.0.1
-      - name: Log do servico e do LocalStack em caso de falha
+      - name: Log dos servicos e do LocalStack em caso de falha
         if: failure()
         run: |
           cat accounts.log || true
+          cat transfers.log || true
           docker compose --env-file infra/local/.env.example -f infra/local/docker-compose.yml logs localstack || true
       - name: Derrubar a infra local
         if: always()
