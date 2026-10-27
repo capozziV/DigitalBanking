@@ -14,4 +14,5 @@ dependencies {
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-jdbc")
     integrationTestImplementation(libs.testcontainers.postgresql)
     integrationTestImplementation(libs.testcontainers.junit.jupiter)
+    integrationTestImplementation(libs.wiremock.standalone)
 }
