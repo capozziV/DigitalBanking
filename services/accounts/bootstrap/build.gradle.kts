@@ -8,7 +8,7 @@ dependencies {
     implementation(project(":libs:outbox-relay"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
-    testImplementation(libs.archunit)
+    testImplementation(project(":libs:testing-architecture"))
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 
     integrationTestImplementation(testFixtures(project(":libs:outbox")))
