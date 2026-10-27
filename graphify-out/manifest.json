@@ -1,1016 +1,1124 @@
 {
   ".claude/settings.json": {
-    "mtime": 1792806339.9191065,
-    "seen": 1792810560.921091,
+    "mtime": 1793117826.3954778,
+    "seen": 1793118352.338924,
     "ast_hash": "aadc3f1f71abfdf7cfc1bb7025830c65",
     "semantic_hash": ""
   },
   "build-logic/build.gradle.kts": {
-    "mtime": 1792680867.6106007,
-    "seen": 1792810560.921103,
+    "mtime": 1793117826.391979,
+    "seen": 1793118352.33895,
     "ast_hash": "ac30a54cc493763c02c7883a1c5b2882",
     "semantic_hash": ""
   },
   "build-logic/settings.gradle.kts": {
-    "mtime": 1792680867.612543,
-    "seen": 1792810560.921105,
+    "mtime": 1793117826.3927815,
+    "seen": 1793118352.338955,
     "ast_hash": "1c383ce065d6a614abeb3aa5c5619afd",
     "semantic_hash": ""
   },
   "build-logic/src/main/kotlin/digitalbanking.integration-test.gradle.kts": {
-    "mtime": 1792806339.9225044,
-    "seen": 1792810560.921107,
+    "mtime": 1793117826.3935235,
+    "seen": 1793118352.33896,
     "ast_hash": "4b6d00013d0049cba270e0f23de26467",
     "semantic_hash": ""
   },
   "build-logic/src/main/kotlin/digitalbanking.kotlin-library.gradle.kts": {
-    "mtime": 1792680867.6181781,
-    "seen": 1792810560.921108,
+    "mtime": 1793117826.3944812,
+    "seen": 1793118352.338963,
     "ast_hash": "5405eebb6bf26841163d68c7f95c6ce6",
     "semantic_hash": ""
   },
   "build-logic/src/main/kotlin/digitalbanking.spring-boot-app.gradle.kts": {
-    "mtime": 1792806339.922706,
-    "seen": 1792810560.92111,
+    "mtime": 1793117826.3956041,
+    "seen": 1793118352.338967,
     "ast_hash": "5c722aff11fa15d46ba722af49ecb083",
     "semantic_hash": ""
   },
   "build-logic/src/main/kotlin/digitalbanking.spring-module.gradle.kts": {
-    "mtime": 1792680867.6220005,
-    "seen": 1792810560.921111,
+    "mtime": 1793117826.39644,
+    "seen": 1793118352.338971,
     "ast_hash": "f04c39bf1cf47eb29acbfe012d3e760a",
     "semantic_hash": ""
   },
   "gradlew": {
-    "mtime": 1792680867.6475909,
-    "seen": 1792810560.921113,
+    "mtime": 1793117826.4000337,
+    "seen": 1793118352.338974,
     "ast_hash": "a43be8432bac3ffd05b3769aa42fe996",
     "semantic_hash": ""
   },
   "infra/local/postgres/init/01-create-service-databases.sh": {
-    "mtime": 1792806339.9740593,
-    "seen": 1792810560.9211159,
+    "mtime": 1793117826.3960161,
+    "seen": 1793118352.3389828,
     "ast_hash": "bf9bad9dc32aac2d689449e305dbf540",
     "semantic_hash": ""
   },
   "libs/outbox/build.gradle.kts": {
-    "mtime": 1792806339.9745708,
-    "seen": 1792810560.921119,
+    "mtime": 1793117826.3971872,
+    "seen": 1793118352.33899,
     "ast_hash": "f11ea92c7a7a6626dd29fab67d94a7b3",
     "semantic_hash": ""
   },
   "libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/JdbcOutboxWriter.kt": {
-    "mtime": 1792806339.9780893,
-    "seen": 1792810560.921129,
+    "mtime": 1793117826.4056206,
+    "seen": 1793118352.3390179,
     "ast_hash": "ac2e90062aed8cc7b62858f592608499",
     "semantic_hash": ""
   },
   "libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/OutboxMessage.kt": {
-    "mtime": 1792806339.9784248,
-    "seen": 1792810560.921133,
+    "mtime": 1793117826.407614,
+    "seen": 1793118352.339026,
     "ast_hash": "7fcad02274c93f5df26b7b24ad95b7ca",
     "semantic_hash": ""
   },
   "services/accounts/adapters/build.gradle.kts": {
-    "mtime": 1792806339.9869814,
-    "seen": 1792810560.9211578,
+    "mtime": 1793117826.4056196,
+    "seen": 1793118352.3390899,
     "ast_hash": "3f10eb4a7b2896a9d39a4de4a2008a2a",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/adapters/persistence/JdbcAccountRepository.kt": {
-    "mtime": 1792806339.988438,
-    "seen": 1792810560.92116,
+    "mtime": 1793117826.389331,
+    "seen": 1793118352.339094,
     "ast_hash": "ff3d4893a9b4a1b21a9a58b789e135c3",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/adapters/persistence/JdbcAccountTypeRepository.kt": {
-    "mtime": 1792806339.9886394,
-    "seen": 1792810560.921161,
+    "mtime": 1793117826.3899333,
+    "seen": 1793118352.3390982,
     "ast_hash": "51cba01902dd758f13daa98ef333cd2a",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/adapters/persistence/JdbcLedgerEntryRepository.kt": {
-    "mtime": 1792806339.9889202,
-    "seen": 1792810560.921162,
+    "mtime": 1793117826.3906133,
+    "seen": 1793118352.339102,
     "ast_hash": "cc08314a3d137592af0e28c6226c5fa1",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/adapters/persistence/OutboxEventAppender.kt": {
-    "mtime": 1792806339.9891686,
-    "seen": 1792810560.921164,
+    "mtime": 1793117826.3914812,
+    "seen": 1793118352.339106,
     "ast_hash": "27408569884023c35cb3e8f8c690dd99",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/adapters/persistence/OutboxWriterConfiguration.kt": {
-    "mtime": 1792806339.989422,
-    "seen": 1792810560.921165,
+    "mtime": 1793117826.3920937,
+    "seen": 1793118352.33911,
     "ast_hash": "2d5409879a7e6c16410216dde44375a5",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/adapters/persistence/SpringTransactionRunner.kt": {
-    "mtime": 1792806339.9897027,
-    "seen": 1792810560.9211662,
+    "mtime": 1793117826.393115,
+    "seen": 1793118352.339114,
     "ast_hash": "38c5153f016dc1a085d05c97e9fdd1ad",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/adapters/persistence/UuidV7IdGenerator.kt": {
-    "mtime": 1792806339.9899986,
-    "seen": 1792810560.9211679,
+    "mtime": 1793117826.3940403,
+    "seen": 1793118352.339118,
     "ast_hash": "f30d7ba56c73d544998b6acced0f2d3d",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/adapters/web/AccountController.kt": {
-    "mtime": 1792806339.9904592,
-    "seen": 1792810560.9211688,
+    "mtime": 1793117826.3951967,
+    "seen": 1793118352.3391218,
     "ast_hash": "8a4b847a715b8ef544a5cc72dac5e425",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/adapters/web/AccountTypeAdminController.kt": {
-    "mtime": 1792806339.990662,
-    "seen": 1792810560.92117,
+    "mtime": 1793117826.3958638,
+    "seen": 1793118352.339125,
     "ast_hash": "2db90b7f4932e251b748e131a1006d29",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/adapters/web/CorrelationIdFilter.kt": {
-    "mtime": 1792806339.9909368,
-    "seen": 1792810560.921172,
+    "mtime": 1793117826.3964016,
+    "seen": 1793118352.339129,
     "ast_hash": "859df5771e6b440c70f02f326123ccfe",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/adapters/web/IdempotencyKeyHeader.kt": {
-    "mtime": 1792806339.9916384,
-    "seen": 1792810560.921173,
+    "mtime": 1793117826.397844,
+    "seen": 1793118352.339133,
     "ast_hash": "6a1cd6662c507e7f3f5b539228d478f0",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/adapters/web/ProblemDetailsExceptionHandler.kt": {
-    "mtime": 1792806339.9924366,
-    "seen": 1792810560.921176,
+    "mtime": 1793117826.4017467,
+    "seen": 1793118352.3391411,
     "ast_hash": "67032b21796b2a909a1dc335b56ac375",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/adapters/web/WebExceptions.kt": {
-    "mtime": 1792806339.9926906,
-    "seen": 1792810560.921178,
+    "mtime": 1793117826.4025886,
+    "seen": 1793118352.339144,
     "ast_hash": "c1d3cc532803b7249e524385fa963eec",
     "semantic_hash": ""
   },
   "services/accounts/application/build.gradle.kts": {
-    "mtime": 1792680867.689159,
-    "seen": 1792810560.921191,
+    "mtime": 1793117826.3985617,
+    "seen": 1793118352.33918,
     "ast_hash": "0201d71319f64d6810a8a9e0c567297a",
     "semantic_hash": ""
   },
   "services/accounts/application/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/application/ApplicationExceptions.kt": {
-    "mtime": 1792806339.99566,
-    "seen": 1792810560.921192,
+    "mtime": 1793117826.4004333,
+    "seen": 1793118352.339183,
     "ast_hash": "b7336b850cca59fb478f3186a37cbc6c",
     "semantic_hash": ""
   },
   "services/accounts/application/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/application/port/AccountRepository.kt": {
-    "mtime": 1792806339.9960017,
-    "seen": 1792810560.921194,
+    "mtime": 1793117826.4016502,
+    "seen": 1793118352.339187,
     "ast_hash": "4f3992d1d2900a4ebacc2755824ed3af",
     "semantic_hash": ""
   },
   "services/accounts/application/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/application/port/AccountTypeRepository.kt": {
-    "mtime": 1792806339.9962063,
-    "seen": 1792810560.921195,
+    "mtime": 1793117826.402688,
+    "seen": 1793118352.339191,
     "ast_hash": "507f31023b8f07718dfca0e4f5f0e4aa",
     "semantic_hash": ""
   },
   "services/accounts/application/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/application/port/EventOutbox.kt": {
-    "mtime": 1792806339.9964046,
-    "seen": 1792810560.921197,
+    "mtime": 1793117826.4036555,
+    "seen": 1793118352.3391948,
     "ast_hash": "87458a8d0c64cc388422ef3d9cb0de13",
     "semantic_hash": ""
   },
   "services/accounts/application/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/application/port/IdGenerator.kt": {
-    "mtime": 1792806339.996599,
-    "seen": 1792810560.9211981,
+    "mtime": 1793117826.4045,
+    "seen": 1793118352.339199,
     "ast_hash": "2d321a88410c531fb8e87cb210336fdd",
     "semantic_hash": ""
   },
   "services/accounts/application/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/application/port/LedgerEntryRepository.kt": {
-    "mtime": 1792806339.9967875,
-    "seen": 1792810560.921199,
+    "mtime": 1793117826.4057236,
+    "seen": 1793118352.3392022,
     "ast_hash": "2a4f1effd6f8168ad9c6c7ceebebf264",
     "semantic_hash": ""
   },
   "services/accounts/application/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/application/port/TransactionRunner.kt": {
-    "mtime": 1792806339.996984,
-    "seen": 1792810560.921201,
+    "mtime": 1793117826.4066093,
+    "seen": 1793118352.339206,
     "ast_hash": "137ef590a403f84176130030f9bca9d8",
     "semantic_hash": ""
   },
   "services/accounts/application/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/application/usecase/ChangeAccountTypeUseCase.kt": {
-    "mtime": 1792806339.9973083,
-    "seen": 1792810560.921205,
+    "mtime": 1793117826.4077425,
+    "seen": 1793118352.3392088,
     "ast_hash": "2b21ff78f74d37b47d8e4d18ef61b297",
     "semantic_hash": ""
   },
   "services/accounts/application/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/application/usecase/ChangeOverdraftLimitUseCase.kt": {
-    "mtime": 1792806339.9975436,
-    "seen": 1792810560.921207,
+    "mtime": 1793117826.409263,
+    "seen": 1793118352.3392131,
     "ast_hash": "5dfdba1769b5ea15848f2aa0ead89c32",
     "semantic_hash": ""
   },
   "services/accounts/application/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/application/usecase/GetAccountUseCase.kt": {
-    "mtime": 1792806339.9977186,
-    "seen": 1792810560.9212081,
+    "mtime": 1793117826.3983047,
+    "seen": 1793118352.339217,
     "ast_hash": "1d71c46fc5aec0b3bdcf7f96cf730b33",
     "semantic_hash": ""
   },
   "services/accounts/application/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/application/usecase/IdempotentEntryLookup.kt": {
-    "mtime": 1792806339.997885,
-    "seen": 1792810560.92121,
+    "mtime": 1793117826.399497,
+    "seen": 1793118352.339221,
     "ast_hash": "29487f1432491a376a35613d5c8af620",
     "semantic_hash": ""
   },
   "services/accounts/application/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/application/usecase/ListAccountTypesUseCase.kt": {
-    "mtime": 1792806339.9981198,
-    "seen": 1792810560.9212108,
+    "mtime": 1793117826.4007006,
+    "seen": 1793118352.339225,
     "ast_hash": "ca80f10502dc25120c78ad6432aa6ec9",
     "semantic_hash": ""
   },
   "services/accounts/application/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/application/usecase/OpenAccountUseCase.kt": {
-    "mtime": 1792806339.9983277,
-    "seen": 1792810560.921212,
+    "mtime": 1793117826.4017646,
+    "seen": 1793118352.339228,
     "ast_hash": "734638670da35bfb8a9ffc6d953223c7",
     "semantic_hash": ""
   },
   "services/accounts/application/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/application/usecase/RecordCreditUseCase.kt": {
-    "mtime": 1792806339.99852,
-    "seen": 1792810560.9212139,
+    "mtime": 1793117826.402697,
+    "seen": 1793118352.339232,
     "ast_hash": "ec89bf7f86c6d667a75e8cc101a74c5b",
     "semantic_hash": ""
   },
   "services/accounts/application/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/application/usecase/RecordDebitUseCase.kt": {
-    "mtime": 1792806339.9988346,
-    "seen": 1792810560.921215,
+    "mtime": 1793117826.4041276,
+    "seen": 1793118352.339235,
     "ast_hash": "1d331a82f832fde9ca49121d30b116a5",
     "semantic_hash": ""
   },
   "services/accounts/application/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/application/usecase/RecordEntryCommand.kt": {
-    "mtime": 1792806339.9990568,
-    "seen": 1792810560.921217,
+    "mtime": 1793117826.4045887,
+    "seen": 1793118352.339239,
     "ast_hash": "6a01ae1d35c2d09da29fb339ef03d67d",
     "semantic_hash": ""
   },
   "services/accounts/application/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/application/fake/CallLog.kt": {
-    "mtime": 1792806340.0003443,
-    "seen": 1792810560.9212182,
+    "mtime": 1793117826.4057176,
+    "seen": 1793118352.339243,
     "ast_hash": "6bbc8554c5f80e6d0331e23752f7baa4",
     "semantic_hash": ""
   },
   "services/accounts/application/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/application/fake/DirectTransactionRunner.kt": {
-    "mtime": 1792806340.0005946,
-    "seen": 1792810560.921219,
+    "mtime": 1793117826.4064686,
+    "seen": 1793118352.339246,
     "ast_hash": "05fd095b99421baee36f041285edf6e5",
     "semantic_hash": ""
   },
   "services/accounts/application/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/application/fake/InMemoryAccountRepository.kt": {
-    "mtime": 1792806340.0008478,
-    "seen": 1792810560.921221,
+    "mtime": 1793117826.4086456,
+    "seen": 1793118352.3392498,
     "ast_hash": "da098578a8c68dfa432405d1bdfee40c",
     "semantic_hash": ""
   },
   "services/accounts/application/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/application/fake/InMemoryAccountRepositoryTest.kt": {
-    "mtime": 1792806340.0011415,
-    "seen": 1792810560.921222,
+    "mtime": 1793117826.4094791,
+    "seen": 1793118352.339255,
     "ast_hash": "936a834b2bb0bc3eab838b8cf5939218",
     "semantic_hash": ""
   },
   "services/accounts/application/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/application/fake/InMemoryAccountTypeRepository.kt": {
-    "mtime": 1792806340.001386,
-    "seen": 1792810560.921223,
+    "mtime": 1793117826.4102266,
+    "seen": 1793118352.3392582,
     "ast_hash": "750eaeb821ac994b58c1a3bf7368a34b",
     "semantic_hash": ""
   },
   "services/accounts/application/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/application/fake/InMemoryLedgerEntryRepository.kt": {
-    "mtime": 1792806340.0015857,
-    "seen": 1792810560.921225,
+    "mtime": 1793117826.4109092,
+    "seen": 1793118352.339262,
     "ast_hash": "1aa32411898fcff6a193c0effd7ba4fe",
     "semantic_hash": ""
   },
   "services/accounts/application/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/application/fake/RecordingEventOutbox.kt": {
-    "mtime": 1792806340.0017843,
-    "seen": 1792810560.921226,
+    "mtime": 1793117826.4115374,
+    "seen": 1793118352.339266,
     "ast_hash": "429495499c3f9d8f0214a9fa44a16e47",
     "semantic_hash": ""
   },
   "services/accounts/application/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/application/fake/SequentialIdGenerator.kt": {
-    "mtime": 1792806340.0019948,
-    "seen": 1792810560.921228,
+    "mtime": 1793117826.4119534,
+    "seen": 1793118352.3392699,
     "ast_hash": "936589f6dabcdaeb42ac08efd3d8a73d",
     "semantic_hash": ""
   },
   "services/accounts/application/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/application/usecase/ChangeAccountTypeUseCaseTest.kt": {
-    "mtime": 1792806340.0025113,
-    "seen": 1792810560.9212291,
+    "mtime": 1793117826.413764,
+    "seen": 1793118352.339273,
     "ast_hash": "53221b194acf2eda330222fc11006889",
     "semantic_hash": ""
   },
   "services/accounts/application/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/application/usecase/ChangeOverdraftLimitUseCaseTest.kt": {
-    "mtime": 1792806340.0027153,
-    "seen": 1792810560.92123,
+    "mtime": 1793117826.3977768,
+    "seen": 1793118352.339277,
     "ast_hash": "eab98a1011b6b41cacffda2acb547c23",
     "semantic_hash": ""
   },
   "services/accounts/application/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/application/usecase/GetAccountUseCaseTest.kt": {
-    "mtime": 1792806340.0029197,
-    "seen": 1792810560.921232,
+    "mtime": 1793117826.4000714,
+    "seen": 1793118352.33928,
     "ast_hash": "28b9427323f51ab9dfe00073baa5f368",
     "semantic_hash": ""
   },
   "services/accounts/application/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/application/usecase/ListAccountTypesUseCaseTest.kt": {
-    "mtime": 1792806340.0031087,
-    "seen": 1792810560.921233,
+    "mtime": 1793117826.4015102,
+    "seen": 1793118352.339284,
     "ast_hash": "62960b325d1e01b4d0f1ba4cdc0bc4a4",
     "semantic_hash": ""
   },
   "services/accounts/application/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/application/usecase/OpenAccountUseCaseTest.kt": {
-    "mtime": 1792806340.0033302,
-    "seen": 1792810560.921234,
+    "mtime": 1793117826.4030192,
+    "seen": 1793118352.339288,
     "ast_hash": "7d946a7798a7fce172cc7084ebf11ddf",
     "semantic_hash": ""
   },
   "services/accounts/application/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/application/usecase/RecordCreditUseCaseTest.kt": {
-    "mtime": 1792806340.0036361,
-    "seen": 1792810560.921236,
+    "mtime": 1793117826.4041703,
+    "seen": 1793118352.3392918,
     "ast_hash": "fe1c81c8fb8f893a028cecc3dc8df7cf",
     "semantic_hash": ""
   },
   "services/accounts/application/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/application/usecase/RecordDebitUseCaseTest.kt": {
-    "mtime": 1792806340.0039926,
-    "seen": 1792810560.921237,
+    "mtime": 1793117826.4050372,
+    "seen": 1793118352.339296,
     "ast_hash": "ee16275f0b2791bde75a7477e7531185",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/build.gradle.kts": {
-    "mtime": 1792806340.0043023,
-    "seen": 1792810560.9212391,
+    "mtime": 1793117826.4058676,
+    "seen": 1793118352.3393002,
     "ast_hash": "5b15472d017c01afde8810793ce9f991",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/AccountsIntegrationTest.kt": {
-    "mtime": 1792806340.0051577,
-    "seen": 1792810560.921242,
+    "mtime": 1793117826.407473,
+    "seen": 1793118352.339308,
     "ast_hash": "9e27e911e10a709bb9592b9cd2137294",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/web/ApiClient.kt": {
-    "mtime": 1792806340.0081012,
-    "seen": 1792810560.9212558,
+    "mtime": 1793117826.4124322,
+    "seen": 1793118352.339348,
     "ast_hash": "cca9428b1ddb04e0adf4c64755a55a12",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/AccountsApplication.kt": {
-    "mtime": 1792680867.7204852,
-    "seen": 1792810560.9212632,
+    "mtime": 1793117826.4163203,
+    "seen": 1793118352.339367,
     "ast_hash": "0debb6f1d80745b0a9f84b58493b2686",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/UseCaseConfiguration.kt": {
-    "mtime": 1792806340.01011,
-    "seen": 1792810560.921268,
+    "mtime": 1793117826.4178517,
+    "seen": 1793118352.339388,
     "ast_hash": "f862e3452c107554889b68d314472ec0",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/ArchitectureTest.kt": {
-    "mtime": 1792806340.011238,
-    "seen": 1792810560.921269,
+    "mtime": 1793117826.4190013,
+    "seen": 1793118352.339392,
     "ast_hash": "4c38973d7edba7d30bd05f177db84bf1",
     "semantic_hash": ""
   },
   "services/accounts/domain/build.gradle.kts": {
-    "mtime": 1792680867.7615201,
-    "seen": 1792810560.921272,
+    "mtime": 1793117826.4203913,
+    "seen": 1793118352.3393989,
     "ast_hash": "97fd5683846c68c7d2434a966b6ac3f1",
     "semantic_hash": ""
   },
   "services/accounts/domain/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/domain/Account.kt": {
-    "mtime": 1792806340.0130951,
-    "seen": 1792810560.921273,
+    "mtime": 1793117826.4211845,
+    "seen": 1793118352.339403,
     "ast_hash": "b1d041007743b7a18ace82118e770e5a",
     "semantic_hash": ""
   },
   "services/accounts/domain/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/domain/AccountEvent.kt": {
-    "mtime": 1792806340.0133274,
-    "seen": 1792810560.921275,
+    "mtime": 1793117826.413795,
+    "seen": 1793118352.3394072,
     "ast_hash": "687f420894ce7e6125e9b21fa190e390",
     "semantic_hash": ""
   },
   "services/accounts/domain/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/domain/AccountType.kt": {
-    "mtime": 1792806340.013586,
-    "seen": 1792810560.9212759,
+    "mtime": 1793117826.4144082,
+    "seen": 1793118352.339411,
     "ast_hash": "217da092d5af6c54a6a24034de0936f5",
     "semantic_hash": ""
   },
   "services/accounts/domain/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/domain/AccountTypeLimit.kt": {
-    "mtime": 1792806340.0137231,
-    "seen": 1792810560.921277,
+    "mtime": 1793117826.4151733,
+    "seen": 1793118352.339415,
     "ast_hash": "27f67e3ad48b65cf80fabb369594052d",
     "semantic_hash": ""
   },
   "services/accounts/domain/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/domain/AvailableBalance.kt": {
-    "mtime": 1792806340.0138512,
-    "seen": 1792810560.921279,
+    "mtime": 1793117826.4158375,
+    "seen": 1793118352.3394182,
     "ast_hash": "51683463dfb3b5fd02154d073657c2e5",
     "semantic_hash": ""
   },
   "services/accounts/domain/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/domain/Balance.kt": {
-    "mtime": 1792806340.013991,
-    "seen": 1792810560.92128,
+    "mtime": 1793117826.4163663,
+    "seen": 1793118352.339422,
     "ast_hash": "ddd3580779482c813d736e24255477e3",
     "semantic_hash": ""
   },
   "services/accounts/domain/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/domain/BalanceOverflowException.kt": {
-    "mtime": 1792806340.0141344,
-    "seen": 1792810560.921282,
+    "mtime": 1793117826.4169695,
+    "seen": 1793118352.339425,
     "ast_hash": "d9978fffd5870e229e86a6cb74a42905",
     "semantic_hash": ""
   },
   "services/accounts/domain/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/domain/DebitResult.kt": {
-    "mtime": 1792806340.0142767,
-    "seen": 1792810560.921283,
+    "mtime": 1793117826.4173625,
+    "seen": 1793118352.3394291,
     "ast_hash": "f1772bd2d77a1ce7ffbb56e487137d07",
     "semantic_hash": ""
   },
   "services/accounts/domain/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/domain/EntryKind.kt": {
-    "mtime": 1792806340.0145109,
-    "seen": 1792810560.9212842,
+    "mtime": 1793117826.4178548,
+    "seen": 1793118352.339433,
     "ast_hash": "44a25a58caca7d227d8d662379336f24",
     "semantic_hash": ""
   },
   "services/accounts/domain/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/domain/LedgerEntry.kt": {
-    "mtime": 1792806340.014727,
-    "seen": 1792810560.9212859,
+    "mtime": 1793117826.418322,
+    "seen": 1793118352.339437,
     "ast_hash": "74bb999584d5c4507c4a8b6c346a33ca",
     "semantic_hash": ""
   },
   "services/accounts/domain/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/domain/Money.kt": {
-    "mtime": 1792806340.0148957,
-    "seen": 1792810560.9212868,
+    "mtime": 1793117826.418698,
+    "seen": 1793118352.3394408,
     "ast_hash": "c6742ff11ecbbf63987636faa1e69bbc",
     "semantic_hash": ""
   },
   "services/accounts/domain/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/domain/OverdraftLimit.kt": {
-    "mtime": 1792806340.0150256,
-    "seen": 1792810560.921288,
+    "mtime": 1793117826.4191368,
+    "seen": 1793118352.3394449,
     "ast_hash": "31ca1c935f728c993bde1ab3c8348f41",
     "semantic_hash": ""
   },
   "services/accounts/domain/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/domain/AccountTest.kt": {
-    "mtime": 1792806340.0158048,
-    "seen": 1792810560.92129,
+    "mtime": 1793117826.4197688,
+    "seen": 1793118352.339448,
     "ast_hash": "d5b1e9b195c9d9efe6048fa0c12c5f03",
     "semantic_hash": ""
   },
   "services/accounts/domain/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/domain/BalanceTest.kt": {
-    "mtime": 1792806340.0161514,
-    "seen": 1792810560.921291,
+    "mtime": 1793117826.4201334,
+    "seen": 1793118352.3394518,
     "ast_hash": "f148baaee15ef563de3fa6edacb3282d",
     "semantic_hash": ""
   },
   "services/accounts/domain/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/domain/LedgerEntryTest.kt": {
-    "mtime": 1792806340.0164433,
-    "seen": 1792810560.921292,
+    "mtime": 1793117826.4205246,
+    "seen": 1793118352.339456,
     "ast_hash": "16867c19d47117680011d0af824bfd2b",
     "semantic_hash": ""
   },
   "services/accounts/domain/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/domain/MoneyTest.kt": {
-    "mtime": 1792806340.0166454,
-    "seen": 1792810560.921294,
+    "mtime": 1793117826.420924,
+    "seen": 1793118352.3394601,
     "ast_hash": "c84ff547e234ef801b631ec9f2fb7d56",
     "semantic_hash": ""
   },
   "settings.gradle.kts": {
-    "mtime": 1792806340.0169003,
-    "seen": 1792810560.9212952,
-    "ast_hash": "ade01cd814abc520073b6e4eac6f88c7",
+    "mtime": 1793117909.055188,
+    "seen": 1793118352.339547,
+    "ast_hash": "bd88d34acb967b8acc7639a3295dbd2b",
     "semantic_hash": ""
   },
   ".claude/agents/coordenador.md": {
-    "mtime": 1793035723.6682582,
-    "seen": 1793035914.990388,
+    "mtime": 1793117826.389863,
+    "seen": 1793118352.339551,
     "ast_hash": "0e6c74f15b21498d67365ddabcb1b89d",
     "semantic_hash": ""
   },
   ".claude/agents/dev-frontend.md": {
-    "mtime": 1792680867.5847647,
-    "seen": 1792810560.921298,
+    "mtime": 1793117826.3917038,
+    "seen": 1793118352.339556,
     "ast_hash": "c824da45a13395f2f959f541d3dfd0e5",
     "semantic_hash": ""
   },
   ".claude/agents/dev-kotlin.md": {
-    "mtime": 1792680867.587292,
-    "seen": 1792810560.921299,
+    "mtime": 1793117826.3923893,
+    "seen": 1793118352.3395588,
     "ast_hash": "b251119761c923882961c8523bd858b4",
     "semantic_hash": ""
   },
   ".claude/agents/documentador.md": {
-    "mtime": 1792680867.5897346,
-    "seen": 1792810560.921301,
+    "mtime": 1793117826.3931231,
+    "seen": 1793118352.339563,
     "ast_hash": "33cdb5535d575c0a0e2a781349047a2a",
     "semantic_hash": ""
   },
   ".claude/agents/infra.md": {
-    "mtime": 1792680867.5924344,
-    "seen": 1792810560.921302,
+    "mtime": 1793117826.3939521,
+    "seen": 1793118352.3395681,
     "ast_hash": "e276e3077158a9e845cf7c9c2be4e098",
     "semantic_hash": ""
   },
   ".claude/agents/revisor.md": {
-    "mtime": 1792680867.5948718,
-    "seen": 1792810560.921304,
+    "mtime": 1793117826.39474,
+    "seen": 1793118352.339571,
     "ast_hash": "88f947b10d4160224b96ec3f2216f1a1",
     "semantic_hash": ""
   },
   ".github/workflows/ci.yml": {
-    "mtime": 1792806339.9196506,
-    "seen": 1792810560.9213052,
+    "mtime": 1793117826.3969257,
+    "seen": 1793118352.339575,
     "ast_hash": "b65b2601841cca45e4323d8234cd90e9",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
-    "mtime": 1793035723.6213105,
-    "seen": 1793035914.9904058,
+    "mtime": 1793117826.4007459,
+    "seen": 1793118352.3395789,
     "ast_hash": "31fac407697605d6909f5746365adae6",
     "semantic_hash": ""
   },
   "CONTEXT.md": {
-    "mtime": 1792806339.92062,
-    "seen": 1792810560.9213078,
+    "mtime": 1793117826.4026845,
+    "seen": 1793118352.339583,
     "ast_hash": "a4c65d056a54f0f0985b4f4d5b0d0533",
     "semantic_hash": ""
   },
   "docs/adr/0001-stack-kotlin-spring-boot-aws.md": {
-    "mtime": 1792806339.9229743,
-    "seen": 1792810560.921309,
+    "mtime": 1793117826.3972886,
+    "seen": 1793118352.339587,
     "ast_hash": "66816e2410d3da39ce517ded0f62ef25",
     "semantic_hash": ""
   },
   "docs/adr/0002-clean-architecture-por-servico.md": {
-    "mtime": 1792621878.1334143,
-    "seen": 1792810560.921311,
+    "mtime": 1793117826.400444,
+    "seen": 1793118352.339591,
     "ast_hash": "18ea88c2d29b0ff1f6f601a574b8b9ef",
     "semantic_hash": ""
   },
   "docs/adr/0003-transactional-outbox-e-mensageria.md": {
-    "mtime": 1792806339.9232366,
-    "seen": 1792810560.921313,
+    "mtime": 1793117826.4013317,
+    "seen": 1793118352.339594,
     "ast_hash": "d4886baefdc9fd9d2e8ac92279e3dd49",
     "semantic_hash": ""
   },
   "docs/adr/0004-api-gateway-http-api-na-borda.md": {
-    "mtime": 1792621878.140132,
-    "seen": 1792810560.921314,
+    "mtime": 1793117826.4038055,
+    "seen": 1793118352.3395991,
     "ast_hash": "f3f03af610156029f0d34d04f2e34fa7",
     "semantic_hash": ""
   },
   "docs/adr/0005-frontend-angular-e-bff-nestjs.md": {
-    "mtime": 1792621878.1438577,
-    "seen": 1792810560.921315,
+    "mtime": 1793117826.4053273,
+    "seen": 1793118352.339603,
     "ast_hash": "29d92ed03511eb519af0e09ac4ffb4d3",
     "semantic_hash": ""
   },
   "docs/adr/0006-observabilidade-com-correlation-id.md": {
-    "mtime": 1792621878.1473475,
-    "seen": 1792810560.921317,
+    "mtime": 1793117826.4072087,
+    "seen": 1793118352.339606,
     "ast_hash": "f275535f202d0e84d99dfa1ef585f813",
     "semantic_hash": ""
   },
   "docs/adr/0007-conta-e-ledger-no-accounts.md": {
-    "mtime": 1792682044.3434067,
-    "seen": 1792810560.9213178,
+    "mtime": 1793117826.3922615,
+    "seen": 1793118352.33961,
     "ast_hash": "19d23f258f358a05cf0a894947f38a25",
     "semantic_hash": ""
   },
   "docs/adr/0008-statement-cqrs-dynamodb.md": {
-    "mtime": 1792621878.1548033,
-    "seen": 1792810560.92132,
+    "mtime": 1793117826.3943305,
+    "seen": 1793118352.339614,
     "ast_hash": "ff9b6c1ad14a9106979c8f9754d4e39b",
     "semantic_hash": ""
   },
   "docs/adr/0009-cache-do-extrato.md": {
-    "mtime": 1792621878.158168,
-    "seen": 1792810560.921321,
+    "mtime": 1793117826.3955293,
+    "seen": 1793118352.339617,
     "ast_hash": "a049d5a88bf7fb2d88739890c2b6766c",
     "semantic_hash": ""
   },
   "docs/adr/0010-limite-diario-redis-lua.md": {
-    "mtime": 1792621878.161415,
-    "seen": 1792810560.921323,
+    "mtime": 1793117826.39803,
+    "seen": 1793118352.339621,
     "ast_hash": "6e334f8ffcd8a53721acdc0f828ac994",
     "semantic_hash": ""
   },
   "docs/adr/0011-contratos-de-api.md": {
-    "mtime": 1792621878.1646307,
-    "seen": 1792810560.921324,
+    "mtime": 1793117826.4009213,
+    "seen": 1793118352.339626,
     "ast_hash": "6f0a3e3dbb8ccb02322a91c1ff77c689",
     "semantic_hash": ""
   },
   "docs/adr/0012-saldo-no-lancamento-e-trava-pessimista.md": {
-    "mtime": 1792682044.347333,
-    "seen": 1792810560.921325,
+    "mtime": 1793117826.4026206,
+    "seen": 1793118352.3396301,
     "ast_hash": "3438e05963d5db4e226a8bf808ce0791",
     "semantic_hash": ""
   },
   "docs/adr/0013-persistencia-com-spring-jdbc.md": {
-    "mtime": 1792682044.3514538,
-    "seen": 1792810560.921327,
+    "mtime": 1793117826.4050689,
+    "seen": 1793118352.339633,
     "ast_hash": "c33f5abff7d3ea83c3de4a7c5e739f71",
     "semantic_hash": ""
   },
   "docs/adr/0014-tipo-de-conta-e-cheque-especial.md": {
-    "mtime": 1792806339.9234958,
-    "seen": 1792810560.921328,
+    "mtime": 1793117826.405858,
+    "seen": 1793118352.339637,
     "ast_hash": "29af68d76ed59ee806852c122d37677d",
     "semantic_hash": ""
   },
   "docs/adr/0015-outbox-relay-lider-e-sns-fifo.md": {
-    "mtime": 1792806339.9236653,
-    "seen": 1792810560.9213288,
+    "mtime": 1793117826.4068274,
+    "seen": 1793118352.339641,
     "ast_hash": "62e083e20723bc8a122750f3eaf0b108",
     "semantic_hash": ""
   },
   "docs/adr/README.md": {
-    "mtime": 1792806339.9239159,
-    "seen": 1792810560.921331,
+    "mtime": 1793117826.4074843,
+    "seen": 1793118352.339645,
     "ast_hash": "55aacd1bd4b0d6b76d7a95c8c99542f1",
     "semantic_hash": ""
   },
   "docs/arquitetura.md": {
-    "mtime": 1793035910.8405104,
-    "seen": 1793035914.9904482,
+    "mtime": 1793117826.4098458,
+    "seen": 1793118352.339839,
     "ast_hash": "b7e1df6f91301a0b409f07039aefb85d",
     "semantic_hash": ""
   },
   "docs/roadmap.md": {
-    "mtime": 1792806339.9248402,
-    "seen": 1792810560.921334,
+    "mtime": 1793117826.410786,
+    "seen": 1793118352.33985,
     "ast_hash": "0b983cf3b410843313ca2b75d23c1167",
     "semantic_hash": ""
   },
   "docs/status.md": {
-    "mtime": 1793035667.5646539,
-    "seen": 1793035914.9904552,
+    "mtime": 1793117826.4140007,
+    "seen": 1793118352.339864,
     "ast_hash": "f9715481d75d86db203fdc0a7aae80c9",
     "semantic_hash": ""
   },
   "docs/superpowers/plans/2026-10-21-etapa-0-fundacao.md": {
-    "mtime": 1792806339.9261284,
-    "seen": 1792810560.921338,
+    "mtime": 1793117826.4158916,
+    "seen": 1793118352.33987,
     "ast_hash": "6ff90d47fea001ad4c8c2b32f230e5eb",
     "semantic_hash": ""
   },
   "docs/superpowers/plans/2026-10-22-etapa-1-accounts.md": {
-    "mtime": 1792806339.9270852,
-    "seen": 1792810560.92134,
+    "mtime": 1793117826.417053,
+    "seen": 1793118352.3398762,
     "ast_hash": "5e5a312b290d268733bb0052b3161330",
     "semantic_hash": ""
   },
   "docs/superpowers/research/2026-10-22-versoes-etapa-1.md": {
-    "mtime": 1792806339.9274364,
-    "seen": 1792810560.921341,
+    "mtime": 1793117826.4179933,
+    "seen": 1793118352.339882,
     "ast_hash": "61ac06b522b9d5735f9015bd5c9c410a",
     "semantic_hash": ""
   },
   "docs/superpowers/specs/2026-10-21-etapa-0-fundacao-design.md": {
-    "mtime": 1792680867.6306489,
-    "seen": 1792810560.921342,
+    "mtime": 1793117826.3904896,
+    "seen": 1793118352.339888,
     "ast_hash": "d407a7478827dcacb0837b5e3a2511c9",
     "semantic_hash": ""
   },
   "docs/superpowers/specs/2026-10-22-etapa-1-accounts-design.md": {
-    "mtime": 1792806339.9280179,
-    "seen": 1792810560.921344,
+    "mtime": 1793117826.3920412,
+    "seen": 1793118352.339894,
     "ast_hash": "8dac00b3d4a442bdf86b4192c305e7e3",
     "semantic_hash": ""
   },
   "infra/local/docker-compose.yml": {
-    "mtime": 1792806339.9730294,
-    "seen": 1792810560.921345,
+    "mtime": 1793117826.3929162,
+    "seen": 1793118352.3399,
     "ast_hash": "e3f8ee3ddf7af1a5c9df3a7277c6af99",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/main/resources/application.yml": {
-    "mtime": 1792806340.010602,
-    "seen": 1792810560.921346,
+    "mtime": 1793117826.4183636,
+    "seen": 1793118352.339906,
     "ast_hash": "9bd7c9245b23034e8054a137d7183bb1",
     "semantic_hash": ""
   },
   "libs/outbox/src/main/resources/outbox/outbox-table.sql": {
-    "mtime": 1792806339.9801583,
-    "seen": 1792810560.921144,
+    "mtime": 1793117826.3935921,
+    "seen": 1793118352.339054,
     "ast_hash": "1289ce3901e16d951823733964154997",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/resources/db/migration/V1__account_type.sql": {
-    "mtime": 1792806339.9936094,
-    "seen": 1792810560.921182,
+    "mtime": 1793117826.3923314,
+    "seen": 1793118352.339157,
     "ast_hash": "cb062d287b127116d75683f4a5d85e78",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/resources/db/migration/V2__account.sql": {
-    "mtime": 1792806339.9937546,
-    "seen": 1792810560.921184,
+    "mtime": 1793117826.3930745,
+    "seen": 1793118352.3391612,
     "ast_hash": "f1bc5a25d1292f79badc6fd05b6c69a9",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/resources/db/migration/V3__ledger_entry.sql": {
-    "mtime": 1792806339.9939198,
-    "seen": 1792810560.921185,
+    "mtime": 1793117826.3937657,
+    "seen": 1793118352.339165,
     "ast_hash": "db449e66c96282cb967de23109b34ce9",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/resources/db/migration/V4__outbox.sql": {
-    "mtime": 1792806339.9940996,
-    "seen": 1792810560.9211872,
+    "mtime": 1793117826.3946395,
+    "seen": 1793118352.339168,
     "ast_hash": "edcf172b02fedf9537558468fb375349",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/resources/db/migration/V5__app_grants.sql": {
-    "mtime": 1792806339.9942844,
-    "seen": 1792810560.921188,
+    "mtime": 1793117826.3957508,
+    "seen": 1793118352.3391721,
     "ast_hash": "a6d3797f51842c49dd6f36d4f1209c43",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/integrationTest/resources/db/create-app-role.sql": {
-    "mtime": 1792806340.009189,
-    "seen": 1792810560.921262,
+    "mtime": 1793117826.4154732,
+    "seen": 1793118352.339363,
     "ast_hash": "32883bce6c42a0f81587dbea95b9dba9",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/adapters/web/OpenApiConfiguration.kt": {
-    "mtime": 1792806339.9919603,
-    "seen": 1792810560.921174,
+    "mtime": 1793117826.4005187,
+    "seen": 1793118352.339137,
     "ast_hash": "5085637e57a1c1ff6a2c2b6d53522ff5",
     "semantic_hash": ""
   },
   "api/bruno/accounts/bruno.json": {
-    "mtime": 1792806339.922071,
-    "seen": 1792810560.921099,
+    "mtime": 1793117826.3908005,
+    "seen": 1793118352.338942,
     "ast_hash": "b5926122e3d2d976acdfa2bf3470917e",
     "semantic_hash": ""
   },
   "infra/local/smoke.sh": {
-    "mtime": 1792806339.9742389,
-    "seen": 1792810560.9211168,
+    "mtime": 1793117826.3965917,
+    "seen": 1793118352.338987,
     "ast_hash": "89c195445257eec04594f238d28ca66a",
     "semantic_hash": ""
   },
   "docs/rodando-localmente.md": {
-    "mtime": 1793035601.5017068,
-    "seen": 1793035603.027308,
+    "mtime": 1793117826.4124331,
+    "seen": 1793118352.3398569,
     "ast_hash": "f485106139b2346c5dbbd52abc74e4fc",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/web/RetryWhileAccountBusy.kt": {
-    "mtime": 1792806340.0083163,
-    "seen": 1792810560.921257,
+    "mtime": 1793117826.413078,
+    "seen": 1793118352.3393521,
     "ast_hash": "b11b9d27bfa786497e33d9cb96eb62b4",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/web/RetryWhileAccountBusyTest.kt": {
-    "mtime": 1792806340.0085163,
-    "seen": 1792810560.921259,
+    "mtime": 1793117826.4134614,
+    "seen": 1793118352.339356,
     "ast_hash": "7e7b60cd7e10271759046c5c20918b96",
     "semantic_hash": ""
   },
   "libs/testing-localstack/build.gradle.kts": {
-    "mtime": 1792806339.9836311,
-    "seen": 1792810560.921154,
+    "mtime": 1793117826.4012208,
+    "seen": 1793118352.339079,
     "ast_hash": "0192d15958d4eabf9792cd117848a23b",
     "semantic_hash": ""
   },
   "libs/testing-localstack/src/main/kotlin/io/github/capozziv/digitalbanking/testing/localstack/LocalStackTestSupport.kt": {
-    "mtime": 1792806339.9851542,
-    "seen": 1792810560.921155,
+    "mtime": 1793117826.4033816,
+    "seen": 1793118352.339082,
     "ast_hash": "ef41ce1b9e1f647470fb1468462315e3",
     "semantic_hash": ""
   },
   "libs/testing-localstack/src/test/kotlin/io/github/capozziv/digitalbanking/testing/localstack/LocalStackTestSupportTest.kt": {
-    "mtime": 1792806339.986579,
-    "seen": 1792810560.9211571,
+    "mtime": 1793117826.4044983,
+    "seen": 1793118352.339086,
     "ast_hash": "71cb3232a12b386e945d4042a966f604",
     "semantic_hash": ""
   },
   "libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/EventPublisher.kt": {
-    "mtime": 1792806339.9776824,
-    "seen": 1792810560.9211268,
+    "mtime": 1793117826.4038525,
+    "seen": 1793118352.339011,
     "ast_hash": "60654ec9b4ddaa23add87ea0f5fb78bc",
     "semantic_hash": ""
   },
   "libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/JdbcOutboxStore.kt": {
-    "mtime": 1792806339.9779093,
-    "seen": 1792810560.921128,
+    "mtime": 1793117826.4046752,
+    "seen": 1793118352.339015,
     "ast_hash": "d74de1fcfb636172f88b2466860aee6f",
     "semantic_hash": ""
   },
   "libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/OutboxMetrics.kt": {
-    "mtime": 1792806339.9786358,
-    "seen": 1792810560.921134,
+    "mtime": 1793117826.389507,
+    "seen": 1793118352.339031,
     "ast_hash": "443add7a1519fc1acaf94326bf0c3e9f",
     "semantic_hash": ""
   },
   "libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/OutboxRelay.kt": {
-    "mtime": 1792806339.9789085,
-    "seen": 1792810560.9211361,
+    "mtime": 1793117826.3899903,
+    "seen": 1793118352.3390348,
     "ast_hash": "d104e828ba75658298c6ea28352caa08",
     "semantic_hash": ""
   },
   "libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/OutboxRelaySettings.kt": {
-    "mtime": 1792806339.979091,
-    "seen": 1792810560.9211369,
+    "mtime": 1793117826.3908036,
+    "seen": 1793118352.339039,
     "ast_hash": "16f99bd68c2076be0d44547e494dc25c",
     "semantic_hash": ""
   },
   "libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/OutboxStore.kt": {
-    "mtime": 1792806339.9792614,
-    "seen": 1792810560.921139,
+    "mtime": 1793117826.3912718,
+    "seen": 1793118352.3390431,
     "ast_hash": "5fe9070057071e7ab37b25776d0072e9",
     "semantic_hash": ""
   },
   "libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/PendingEvent.kt": {
-    "mtime": 1792806339.9794517,
-    "seen": 1792810560.921141,
+    "mtime": 1793117826.3921244,
+    "seen": 1793118352.339046,
     "ast_hash": "e01835a8622129f11bee44415ad2b596",
     "semantic_hash": ""
   },
   "libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/SnsEventPublisher.kt": {
-    "mtime": 1792806339.979644,
-    "seen": 1792810560.921142,
+    "mtime": 1793117826.392936,
+    "seen": 1793118352.33905,
     "ast_hash": "529909245e55589fa25d587444c6649f",
     "semantic_hash": ""
   },
   "libs/outbox/src/test/kotlin/io/github/capozziv/digitalbanking/outbox/OutboxMetricsTest.kt": {
-    "mtime": 1792806339.9819992,
-    "seen": 1792810560.9211469,
+    "mtime": 1793117826.3952184,
+    "seen": 1793118352.339062,
     "ast_hash": "1f50073020bba93d1877a6ccf8cbaded",
     "semantic_hash": ""
   },
   "libs/outbox/src/test/kotlin/io/github/capozziv/digitalbanking/outbox/OutboxRelayTest.kt": {
-    "mtime": 1792806339.9828475,
-    "seen": 1792810560.92115,
+    "mtime": 1793117826.397772,
+    "seen": 1793118352.339071,
     "ast_hash": "59e191dc8a5fe2a8bd4fe3e88c6c97c0",
     "semantic_hash": ""
   },
   "libs/outbox/src/test/kotlin/io/github/capozziv/digitalbanking/outbox/OutboxRelaySettingsTest.kt": {
-    "mtime": 1792806339.982343,
-    "seen": 1792810560.921149,
+    "mtime": 1793117826.3964365,
+    "seen": 1793118352.339067,
     "ast_hash": "054376f346d1385a20595fe2c1e302e8",
     "semantic_hash": ""
   },
   "libs/outbox/src/test/kotlin/io/github/capozziv/digitalbanking/outbox/SnsEventPublisherTest.kt": {
-    "mtime": 1792806339.9831765,
-    "seen": 1792810560.921152,
+    "mtime": 1793117826.3996463,
+    "seen": 1793118352.339075,
     "ast_hash": "547a8f2a0a91f8f3fefdc1265035cb11",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/resources/db/migration/V6__outbox_stuck_idx.sql": {
-    "mtime": 1792806339.9944608,
-    "seen": 1792810560.9211898,
+    "mtime": 1793117826.3970847,
+    "seen": 1793118352.339176,
     "ast_hash": "207b7628e1fdba76b7b65988deee47ae",
     "semantic_hash": ""
   },
   "infra/local/localstack/init/ready.d/01-accounts-topic.sh": {
-    "mtime": 1792806339.9734533,
-    "seen": 1792810560.9211142,
+    "mtime": 1793117826.393403,
+    "seen": 1793118352.338979,
     "ast_hash": "0e607a430d892e191b47d668402da84a",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/OutboxRelayConfiguration.kt": {
-    "mtime": 1792806340.0096102,
-    "seen": 1792810560.921265,
+    "mtime": 1793117826.4168787,
+    "seen": 1793118352.339371,
     "ast_hash": "110583f5ce9d877a5bd1c7e3a0d0fe77",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/OutboxRelayScheduler.kt": {
-    "mtime": 1792806340.009863,
-    "seen": 1792810560.9212658,
+    "mtime": 1793117826.4172952,
+    "seen": 1793118352.3393831,
     "ast_hash": "b22f123f6232b4dd7846ea0b2ecb18b2",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/test/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/OutboxRelaySchedulerTest.kt": {
-    "mtime": 1792806340.0118618,
-    "seen": 1792810560.9212701,
+    "mtime": 1793117826.4199739,
+    "seen": 1793118352.339396,
     "ast_hash": "978c3c499a69d37d946c32a51ec7dc40",
     "semantic_hash": ""
   },
   "libs/outbox/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/outbox/JdbcOutboxStoreIntegrationTest.kt": {
-    "mtime": 1792806339.975572,
-    "seen": 1792810560.92112,
+    "mtime": 1793117826.3989553,
+    "seen": 1793118352.338994,
     "ast_hash": "4821ca2a91d9a5bd075e043038393c71",
     "semantic_hash": ""
   },
   "libs/outbox/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/outbox/JdbcOutboxWriterIntegrationTest.kt": {
-    "mtime": 1792806339.9759026,
-    "seen": 1792810560.921122,
+    "mtime": 1793117826.4009504,
+    "seen": 1793118352.338998,
     "ast_hash": "63d497279612b0b29653741b12db09ec",
     "semantic_hash": ""
   },
   "libs/outbox/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/outbox/LocalStackFifoIntegrationTest.kt": {
-    "mtime": 1792806339.9763124,
-    "seen": 1792810560.921123,
+    "mtime": 1793117826.4021838,
+    "seen": 1793118352.3390028,
     "ast_hash": "04c968b356008331026a566d4f4e82bc",
     "semantic_hash": ""
   },
   "libs/outbox/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/outbox/SnsEventPublisherIntegrationTest.kt": {
-    "mtime": 1792806339.9768403,
-    "seen": 1792810560.9211252,
+    "mtime": 1793117826.403063,
+    "seen": 1793118352.339007,
     "ast_hash": "808816467e51118cd83906766fb2a258",
     "semantic_hash": ""
   },
   "libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/OutboxEventEnvelope.kt": {
-    "mtime": 1792806339.978259,
-    "seen": 1792810560.921131,
+    "mtime": 1793117826.4062378,
+    "seen": 1793118352.3390222,
     "ast_hash": "47d15b2738d92ccb1c83df911694bf61",
     "semantic_hash": ""
   },
   "libs/outbox/src/test/kotlin/io/github/capozziv/digitalbanking/outbox/OutboxEventEnvelopeTest.kt": {
-    "mtime": 1792806339.981501,
-    "seen": 1792810560.9211462,
+    "mtime": 1793117826.3945215,
+    "seen": 1793118352.339058,
     "ast_hash": "ee09e1b974d3c135c56d17e6fb36e0a5",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/adapters/web/dto/AccountRequestDTOs.kt": {
-    "mtime": 1792806339.9930336,
-    "seen": 1792810560.9211788,
+    "mtime": 1793117826.4033504,
+    "seen": 1793118352.339148,
     "ast_hash": "f64f8fcaa3b7dad17a3ab8dbbc8c67b4",
     "semantic_hash": ""
   },
   "services/accounts/adapters/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/adapters/web/dto/AccountResponseDTOs.kt": {
-    "mtime": 1792806339.993257,
-    "seen": 1792810560.921181,
+    "mtime": 1793117826.4041975,
+    "seen": 1793118352.3391528,
     "ast_hash": "18eb0b549ce60bb115abbc6acfa68ccc",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/AccountsApplicationIntegrationTest.kt": {
-    "mtime": 1792806340.0049736,
-    "seen": 1792810560.92124,
+    "mtime": 1793117826.4070013,
+    "seen": 1793118352.339304,
     "ast_hash": "cce4309b4a7672bcd19ff6d600b5dd73",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/ClockWiringIntegrationTest.kt": {
-    "mtime": 1792806340.0053313,
-    "seen": 1792810560.921243,
+    "mtime": 1793117826.407771,
+    "seen": 1793118352.3393111,
     "ast_hash": "9ee36c54535de88d020451adbc36403a",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/ConcurrencyIntegrationTest.kt": {
-    "mtime": 1792806340.0056238,
-    "seen": 1792810560.9212449,
+    "mtime": 1793117826.408538,
+    "seen": 1793118352.339316,
     "ast_hash": "5f20a0e1fc9551ce02bd34f04ae11a9b",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/OpenApiIntegrationTest.kt": {
-    "mtime": 1792806340.005955,
-    "seen": 1792810560.921246,
+    "mtime": 1793117826.4093826,
+    "seen": 1793118352.3393202,
     "ast_hash": "432fe072e2599508ba4da074bf102d47",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/OutboxRelayIntegrationTest.kt": {
-    "mtime": 1792806340.0062,
-    "seen": 1792810560.921247,
+    "mtime": 1793117826.4103117,
+    "seen": 1793118352.339324,
     "ast_hash": "35543bb51cebb38924224f3f43f30b4c",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/OutboxRelayUnreachableBrokerIntegrationTest.kt": {
-    "mtime": 1792806340.0064375,
-    "seen": 1792810560.921249,
+    "mtime": 1793117826.4108622,
+    "seen": 1793118352.3393269,
     "ast_hash": "201314c5fb652905f13ab0ad98df43f8",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/UseCaseConfigurationIntegrationTest.kt": {
-    "mtime": 1792806340.0066423,
-    "seen": 1792810560.92125,
+    "mtime": 1793117826.4113655,
+    "seen": 1793118352.3393312,
     "ast_hash": "8ab75c3f94bf1864b6781a63073e04ed",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/persistence/JdbcRepositoriesIntegrationTest.kt": {
-    "mtime": 1792806340.007031,
-    "seen": 1792810560.921252,
+    "mtime": 1793117826.4124343,
+    "seen": 1793118352.339336,
     "ast_hash": "96433fb44ee16ff5931bb35d921dc613",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/web/AccountApiIntegrationTest.kt": {
-    "mtime": 1792806340.0075035,
-    "seen": 1792810560.9212532,
+    "mtime": 1793117826.4090917,
+    "seen": 1793118352.33934,
     "ast_hash": "a9eaa70950740b3de696f49fe20ac3c3",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/web/AccountTypeAdminApiIntegrationTest.kt": {
-    "mtime": 1792806340.0078688,
-    "seen": 1792810560.921254,
+    "mtime": 1793117826.4101806,
+    "seen": 1793118352.3393438,
     "ast_hash": "935e5ddde8572a99db4bc8873110ff23",
     "semantic_hash": ""
   },
   "services/accounts/bootstrap/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/web/UnexpectedErrorApiIntegrationTest.kt": {
-    "mtime": 1792806340.008718,
-    "seen": 1792810560.92126,
+    "mtime": 1793117826.4141102,
+    "seen": 1793118352.339359,
     "ast_hash": "8cf8544c717f76bfb09ded16747382eb",
+    "semantic_hash": ""
+  },
+  "services/transfers/domain/build.gradle.kts": {
+    "mtime": 1793117909.043032,
+    "seen": 1793118352.339464,
+    "ast_hash": "97fd5683846c68c7d2434a966b6ac3f1",
+    "semantic_hash": ""
+  },
+  "services/transfers/domain/src/main/kotlin/io/github/capozziv/digitalbanking/transfers/domain/AccountsCall.kt": {
+    "mtime": 1793118076.7222686,
+    "seen": 1793118352.339469,
+    "ast_hash": "a05d54ee6ed89825890540bddf38c0b3",
+    "semantic_hash": ""
+  },
+  "services/transfers/domain/src/main/kotlin/io/github/capozziv/digitalbanking/transfers/domain/Money.kt": {
+    "mtime": 1793118076.609755,
+    "seen": 1793118352.339478,
+    "ast_hash": "24fabe31e4479b752aa875790fd03e20",
+    "semantic_hash": ""
+  },
+  "services/transfers/domain/src/main/kotlin/io/github/capozziv/digitalbanking/transfers/domain/StepOutcome.kt": {
+    "mtime": 1793118076.6921318,
+    "seen": 1793118352.339482,
+    "ast_hash": "82197abe8834edc5e7269e1fb8d4e945",
+    "semantic_hash": ""
+  },
+  "services/transfers/domain/src/main/kotlin/io/github/capozziv/digitalbanking/transfers/domain/Transfer.kt": {
+    "mtime": 1793118099.2467062,
+    "seen": 1793118352.339485,
+    "ast_hash": "1efd38c3d3f98ef12a070f385954a28b",
+    "semantic_hash": ""
+  },
+  "services/transfers/domain/src/main/kotlin/io/github/capozziv/digitalbanking/transfers/domain/TransferEvent.kt": {
+    "mtime": 1793118076.751474,
+    "seen": 1793118352.339489,
+    "ast_hash": "0388bcf77b92e5d36f82f122bf82982f",
+    "semantic_hash": ""
+  },
+  "services/transfers/domain/src/main/kotlin/io/github/capozziv/digitalbanking/transfers/domain/TransferStatus.kt": {
+    "mtime": 1793118076.6644185,
+    "seen": 1793118352.339492,
+    "ast_hash": "cadfe4b779736b47dd288be47d8f1b99",
+    "semantic_hash": ""
+  },
+  "services/transfers/domain/src/main/kotlin/io/github/capozziv/digitalbanking/transfers/domain/TransferStep.kt": {
+    "mtime": 1793118076.7783175,
+    "seen": 1793118352.339495,
+    "ast_hash": "b873b8f680af68a3b052680c6f99bda3",
+    "semantic_hash": ""
+  },
+  "services/transfers/domain/src/test/kotlin/io/github/capozziv/digitalbanking/transfers/domain/CompensateStepTest.kt": {
+    "mtime": 1793117965.742728,
+    "seen": 1793118352.339499,
+    "ast_hash": "a1c7866c59a686298498ee7cd10ff4d7",
+    "semantic_hash": ""
+  },
+  "services/transfers/domain/src/test/kotlin/io/github/capozziv/digitalbanking/transfers/domain/CreditStepTest.kt": {
+    "mtime": 1793117965.4091203,
+    "seen": 1793118352.339502,
+    "ast_hash": "adf2f439e79f9b6acf7e62a9bd9dad88",
+    "semantic_hash": ""
+  },
+  "services/transfers/domain/src/test/kotlin/io/github/capozziv/digitalbanking/transfers/domain/DebitStepTest.kt": {
+    "mtime": 1793117965.232848,
+    "seen": 1793118352.339505,
+    "ast_hash": "b619876ae392724de8c409a7197252ee",
+    "semantic_hash": ""
+  },
+  "services/transfers/domain/src/test/kotlin/io/github/capozziv/digitalbanking/transfers/domain/MoneyTest.kt": {
+    "mtime": 1793117965.1533778,
+    "seen": 1793118352.339509,
+    "ast_hash": "f599bcc16eecbbf3aba9cc4aa8627551",
+    "semantic_hash": ""
+  },
+  "services/transfers/domain/src/test/kotlin/io/github/capozziv/digitalbanking/transfers/domain/ResolveCreditStepTest.kt": {
+    "mtime": 1793117965.5524282,
+    "seen": 1793118352.339512,
+    "ast_hash": "afe01d428f834963ba337ea52f15b0b2",
+    "semantic_hash": ""
+  },
+  "services/transfers/domain/src/test/kotlin/io/github/capozziv/digitalbanking/transfers/domain/ResolveDebitStepTest.kt": {
+    "mtime": 1793117965.3412733,
+    "seen": 1793118352.339516,
+    "ast_hash": "c0f91d9dbb88f1bb67b53a04d455accd",
+    "semantic_hash": ""
+  },
+  "services/transfers/domain/src/test/kotlin/io/github/capozziv/digitalbanking/transfers/domain/TerminalStepsTest.kt": {
+    "mtime": 1793117965.8014688,
+    "seen": 1793118352.339519,
+    "ast_hash": "846817cc634b9105f5ce6ccf42535f7b",
+    "semantic_hash": ""
+  },
+  "services/transfers/domain/src/test/kotlin/io/github/capozziv/digitalbanking/transfers/domain/TransferFixtures.kt": {
+    "mtime": 1793117965.075267,
+    "seen": 1793118352.339523,
+    "ast_hash": "acf58991a1520e3b8a7b635e25d14f15",
+    "semantic_hash": ""
+  },
+  "services/transfers/domain/src/test/kotlin/io/github/capozziv/digitalbanking/transfers/domain/TransferSagaPathsTest.kt": {
+    "mtime": 1793117965.9221473,
+    "seen": 1793118352.339531,
+    "ast_hash": "c5d4d9e88a1f289c8093898f438a66af",
+    "semantic_hash": ""
+  },
+  "services/transfers/domain/src/test/kotlin/io/github/capozziv/digitalbanking/transfers/domain/TransferTest.kt": {
+    "mtime": 1793117965.863614,
+    "seen": 1793118352.339543,
+    "ast_hash": "aeffe55a2fc5e31ad00650e806c6c8c3",
     "semantic_hash": ""
   }
 }
