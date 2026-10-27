@@ -18,4 +18,5 @@ include(
     ":services:accounts:application",
     ":services:accounts:adapters",
     ":services:accounts:bootstrap",
+    ":services:transfers:domain",
 )
