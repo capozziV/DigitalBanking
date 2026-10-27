@@ -540,9 +540,9 @@
     "semantic_hash": ""
   },
   "CONTEXT.md": {
-    "mtime": 1792806339.92062,
-    "seen": 1792810560.9213078,
-    "ast_hash": "a4c65d056a54f0f0985b4f4d5b0d0533",
+    "mtime": 1793116542.117957,
+    "seen": 1793117110.772872,
+    "ast_hash": "c200eb1188289707829a677afa6242d6",
     "semantic_hash": ""
   },
   "docs/adr/0001-stack-kotlin-spring-boot-aws.md": {
@@ -636,21 +636,21 @@
     "semantic_hash": ""
   },
   "docs/adr/README.md": {
-    "mtime": 1792806339.9239159,
-    "seen": 1792810560.921331,
-    "ast_hash": "55aacd1bd4b0d6b76d7a95c8c99542f1",
+    "mtime": 1793116542.0688343,
+    "seen": 1793117110.772903,
+    "ast_hash": "cb2c5ee16c305802c2a4d506c5b9a37b",
     "semantic_hash": ""
   },
   "docs/arquitetura.md": {
-    "mtime": 1793116394.4408233,
-    "seen": 1793116422.635114,
-    "ast_hash": "b7e1df6f91301a0b409f07039aefb85d",
+    "mtime": 1793116542.211637,
+    "seen": 1793117110.7729049,
+    "ast_hash": "a28a6b5d3df9adc531e63d3f892bb020",
     "semantic_hash": ""
   },
   "docs/roadmap.md": {
-    "mtime": 1792806339.9248402,
-    "seen": 1792810560.921334,
-    "ast_hash": "0b983cf3b410843313ca2b75d23c1167",
+    "mtime": 1793116542.2521653,
+    "seen": 1793117110.772906,
+    "ast_hash": "0c16060f06ac8c0e93edff67077774f1",
     "semantic_hash": ""
   },
   "docs/status.md": {
@@ -1014,9 +1014,21 @@
     "semantic_hash": ""
   },
   "docs/superpowers/specs/2026-10-27-etapa-2-transfers-design.md": {
-    "mtime": 1793076063.215289,
-    "seen": 1793116422.6351318,
-    "ast_hash": "e0aa34314a449f7c3b59b06c46495809",
+    "mtime": 1793116710.3157475,
+    "seen": 1793117110.772921,
+    "ast_hash": "f48574b1ea7e0e0990a1070b2d93927f",
+    "semantic_hash": ""
+  },
+  "docs/adr/0016-saga-orquestrada-por-http.md": {
+    "mtime": 1793116541.9585013,
+    "seen": 1793117110.7728992,
+    "ast_hash": "03dd1b38ca8adb75eff37e87ae91a664",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/plans/2026-10-27-etapa-2-transfers.md": {
+    "mtime": 1793116710.3169038,
+    "seen": 1793117110.772915,
+    "ast_hash": "181572516bd8db6278c0a2d54436faea",
     "semantic_hash": ""
   }
 }
