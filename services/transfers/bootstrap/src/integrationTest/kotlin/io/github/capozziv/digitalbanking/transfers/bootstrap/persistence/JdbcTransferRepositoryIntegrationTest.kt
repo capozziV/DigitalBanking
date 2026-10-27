@@ -252,6 +252,19 @@ class JdbcTransferRepositoryIntegrationTest : TransfersIntegrationTest() {
         assertThat(repository.findDue(now.plusSeconds(31), 10)).containsExactly(transfer.id)
     }
 
+    /** Same boundary as tryAcquireLease (`locked_until < now`): a lease that ends exactly now still holds. */
+    @Test
+    fun `findDue does not return a transfer whose lease ends exactly now`() {
+        val now = microsNow()
+        val transfer = aTransfer(createdAt = now.minusSeconds(30))
+        repository.insert(transfer)
+        repository.tryAcquireLease(transfer.id, "a", now, now.minusSeconds(1))
+
+        assertThat(repository.tryAcquireLease(transfer.id, "b", now.plusSeconds(30), now)).isFalse()
+        assertThat(repository.findDue(now, 10)).isEmpty()
+        assertThat(repository.findDue(now.plusNanos(1_000), 10)).containsExactly(transfer.id)
+    }
+
     private fun nextAttemptAt(transfer: Transfer): Instant? =
         ownerJdbc
             .sql("select next_attempt_at from transfer where id = :id")

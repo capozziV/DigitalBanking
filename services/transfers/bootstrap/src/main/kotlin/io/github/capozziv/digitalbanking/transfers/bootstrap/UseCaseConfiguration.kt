@@ -1,6 +1,8 @@
 package io.github.capozziv.digitalbanking.transfers.bootstrap
 
+import io.github.capozziv.digitalbanking.transfers.application.RetryBackoff
 import io.github.capozziv.digitalbanking.transfers.application.port.AccountsGateway
+import io.github.capozziv.digitalbanking.transfers.application.port.CorrelationContext
 import io.github.capozziv.digitalbanking.transfers.application.port.EventOutbox
 import io.github.capozziv.digitalbanking.transfers.application.port.IdGenerator
 import io.github.capozziv.digitalbanking.transfers.application.port.TransactionRunner
@@ -9,7 +11,6 @@ import io.github.capozziv.digitalbanking.transfers.application.port.TransferStep
 import io.github.capozziv.digitalbanking.transfers.application.usecase.GetTransferUseCase
 import io.github.capozziv.digitalbanking.transfers.application.usecase.RequestTransferUseCase
 import io.github.capozziv.digitalbanking.transfers.application.usecase.ResumeDueTransfersUseCase
-import io.github.capozziv.digitalbanking.transfers.application.usecase.RetryBackoff
 import io.github.capozziv.digitalbanking.transfers.application.usecase.RunTransferSagaUseCase
 import io.github.capozziv.digitalbanking.transfers.application.usecase.SagaSettings
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -17,7 +18,6 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import java.time.Clock
 import java.time.Duration
-import java.util.UUID
 
 /** Wires the use cases (plain Kotlin, no Spring) to the adapters. */
 @Configuration(proxyBeanMethods = false)
@@ -61,12 +61,16 @@ class UseCaseConfiguration {
     @Bean
     fun getTransferUseCase(transfers: TransferRepository) = GetTransferUseCase(transfers)
 
-    /** The lease owner of the scheduler is unique per process; the scheduler itself is wired in a later task. */
+    /** Every saga run of the scheduler takes the lease under a new owner (see [SchedulerLeaseOwners]). */
     @Bean
     fun resumeDueTransfersUseCase(
         transfers: TransferRepository,
         runSaga: RunTransferSagaUseCase,
         settings: SagaSettings,
         clock: Clock,
-    ) = ResumeDueTransfersUseCase(transfers, runSaga, settings, clock, "scheduler-${UUID.randomUUID()}")
+        correlation: CorrelationContext,
+    ): ResumeDueTransfersUseCase {
+        val owners = SchedulerLeaseOwners()
+        return ResumeDueTransfersUseCase(transfers, runSaga, settings, clock, correlation, owners::next)
+    }
 }

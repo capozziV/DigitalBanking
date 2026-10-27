@@ -16,7 +16,7 @@ class FakeAccountsGatewayTest {
     fun `calling accounts inside a transaction is detected`() {
         gateway.reply(FakeAccountsGateway.created)
 
-        assertThatThrownBy { tx.inTransaction { gateway.execute(call) } }
+        assertThatThrownBy { tx.inTransaction { gateway.perform(call) } }
             .isInstanceOf(IllegalStateException::class.java)
             .hasMessageContaining("accounts called inside a database transaction")
         assertThat(gateway.calls).isEmpty()
@@ -26,6 +26,6 @@ class FakeAccountsGatewayTest {
     fun `calling accounts outside a transaction is allowed`() {
         gateway.reply(FakeAccountsGateway.created)
 
-        assertThat(gateway.execute(call)).isEqualTo(FakeAccountsGateway.created)
+        assertThat(gateway.perform(call)).isEqualTo(FakeAccountsGateway.created)
     }
 }

@@ -16,19 +16,15 @@ class ArchitectureTest {
     private val classes =
         ClassFileImporter()
             .withImportOption(ImportOption.DoNotIncludeTests())
-            .importPackages(TRANSFERS_PACKAGE, ACCOUNTS_PACKAGE)
+            .importPackages(TRANSFERS_PACKAGE)
 
-    // No shared rule accepts an empty package, so only the rules whose packages already hold classes run here. The
-    // rest join as the task that creates each package lands; the last one replaces this list by
-    // ServiceArchitectureRules.all(TRANSFERS_PACKAGE):
-    //  - application rules (independence, use case suffix, execute) -> when `application` holds use cases;
-    //  - web / persistence separation, controller and DTO suffix -> when `adapters.web` and `adapters.persistence` exist.
     @TestFactory
     fun `transfers respects the shared service rules`(): List<DynamicTest> =
-        listOf(ServiceArchitectureRules.domainIsIndependent(TRANSFERS_PACKAGE)).map { rule ->
+        ServiceArchitectureRules.all(TRANSFERS_PACKAGE).map { rule ->
             DynamicTest.dynamicTest(rule.description) { rule.check(classes) }
         }
 
+    /** Dependencies are checked by package name, so the accounts classes need not be imported. */
     @Test
     fun `transfers does not depend on the accounts service`() {
         noClasses()
