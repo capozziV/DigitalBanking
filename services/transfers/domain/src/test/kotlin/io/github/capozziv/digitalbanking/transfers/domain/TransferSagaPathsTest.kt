@@ -44,7 +44,7 @@ class TransferSagaPathsTest {
     fun `debit times out until the deadline and no entry so failed`() {
         val t = run(timeout to afterDeadline, timeout to afterDeadline, notFound to afterDeadline)
         assertThat(t.status).isEqualTo(TransferStatus.FAILED)
-        assertThat(t.failureReason).isEqualTo(StepOutcome.ENTRY_NOT_FOUND)
+        assertThat(t.failureReason).isEqualTo(StepOutcome.DEBIT_NOT_CONFIRMED)
     }
 
     @Test

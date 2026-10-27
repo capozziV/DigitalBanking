@@ -13,5 +13,8 @@ sealed interface StepOutcome {
     companion object {
         const val INSUFFICIENT_AVAILABLE_BALANCE = "insufficient-available-balance"
         const val ENTRY_NOT_FOUND = "entry-not-found"
+
+        /** Failure reason exposed when the debit could not be confirmed (not the internal [ENTRY_NOT_FOUND]). */
+        const val DEBIT_NOT_CONFIRMED = "debit-not-confirmed"
     }
 }

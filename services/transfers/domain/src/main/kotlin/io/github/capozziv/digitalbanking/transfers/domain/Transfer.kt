@@ -35,7 +35,7 @@ data class Transfer(
                 StepOutcome.TransientFailure -> step.onTransientFailure(this, now)
             }
         val reason =
-            if (outcome is StepOutcome.Refused && next == TransferStep.Failed) outcome.reason else failureReason
+            if (outcome is StepOutcome.Refused && next == TransferStep.Failed) publicReason(outcome.reason) else failureReason
         return copy(
             step = next,
             failureReason = reason,
@@ -43,6 +43,10 @@ data class Transfer(
             updatedAt = now,
         )
     }
+
+    /** `entry-not-found` is internal to the resolve step; the API and the event say the debit was not confirmed. */
+    private fun publicReason(reason: String): String =
+        if (step == TransferStep.ResolveDebit && reason == StepOutcome.ENTRY_NOT_FOUND) StepOutcome.DEBIT_NOT_CONFIRMED else reason
 
     fun terminalEvent(): TransferEvent? =
         when (step) {
