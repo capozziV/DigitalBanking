@@ -8,6 +8,8 @@
 
 **Tech Stack:** Kotlin 2.3.21, Spring Boot 4.1.1 (MVC, virtual threads, `JdbcClient`, `RestClient`, Flyway), PostgreSQL 17, AWS SDK for Java v2 (SNS), LocalStack, Testcontainers, WireMock, ArchUnit 1.5.1, JUnit 6, AssertJ, ktlint, GitHub Actions.
 
+**Rulings da execução** (ledger SDD, 2026-10-27): arrendamento renovado em cada passo e parada antes de chamada sem margem (`callBudget`); `next_attempt_at` só nulo em terminal; compensação recusada espera o máximo; `busyAttempts` = chamadas no total; `failureReason` `debit-not-confirmed`.
+
 **Spec:** [`docs/superpowers/specs/2026-10-27-etapa-2-transfers-design.md`](../specs/2026-10-27-etapa-2-transfers-design.md) — leia antes de qualquer task. ADR: [`docs/adr/0016-…`](../../adr/) (saga).
 
 ## Global Constraints
@@ -54,7 +56,7 @@
 ### Task 2: Relay em módulo próprio e teste de esquema (Marina, `dev-kotlin`) — cartões #25 e #30
 
 **Files:**
-- Create: `libs/outbox-relay/build.gradle.kts`; mover de `libs/outbox` para `libs/outbox-relay/src/{main,test,integrationTest}/kotlin/io/github/capozziv/digitalbanking/outbox/relay/`: `OutboxRelay`, `OutboxRelaySettings`, `OutboxStore`, `JdbcOutboxStore`, `PendingEvent`, `EventPublisher`, `SnsEventPublisher`, `OutboxMetrics` e os testes deles
+- Create: `libs/outbox-relay/build.gradle.kts`; mover de `libs/outbox` para `libs/outbox-relay/src/{main,test,integrationTest}/kotlin/io/github/capozziv/digitalbanking/outbox/relay/`: `OutboxRelay`, `OutboxRelaySettings`, `OutboxStore`, `JdbcOutboxStore`, `EventPublisher`, `SnsEventPublisher`, `OutboxMetrics` e os testes deles (`PendingEvent` fica em `libs/outbox`, porque `OutboxEventEnvelope.toJson` depende dele)
 - Create: `libs/outbox/src/testFixtures/…/outbox/OutboxSchemaAssertions.kt` (ou classe em `libs/outbox` de teste exportada para os serviços) e `services/accounts/bootstrap/src/integrationTest/kotlin/…/bootstrap/OutboxSchemaIntegrationTest.kt`
 - Modify: `settings.gradle.kts`, `libs/outbox/build.gradle.kts` (sem AWS SDK nem Micrometer), `services/accounts/bootstrap/build.gradle.kts`, imports no `accounts`, regra ArchUnit `outbox library does not depend on the accounts service` (cobre as duas libs)
 
@@ -167,15 +169,15 @@
 **Interfaces:**
 - Consumes: Task 8.
 - Produces:
-  - `interface TransferRepository { fun findById(id: UUID): Transfer?; fun findByIdempotencyKey(key: String): Transfer?; fun insert(transfer: Transfer): Boolean /* false = chave já existe */; fun tryAcquireLease(id: UUID, owner: String, until: Instant, now: Instant): Boolean; fun saveIfOwner(transfer: Transfer, owner: String): Boolean; fun releaseLease(id: UUID, owner: String); fun findDue(now: Instant, limit: Int): List<UUID> }`.
+  - `interface TransferRepository { fun findById(id: UUID): Transfer?; fun findByIdempotencyKey(key: String): Transfer?; fun insert(transfer: Transfer): Boolean /* false = chave já existe */; fun tryAcquireLease(id: UUID, owner: String, until: Instant, now: Instant): Boolean; fun saveIfOwner(transfer: Transfer, owner: String, nextAttemptAt: Instant?, leaseUntil: Instant): Boolean /* renova o arrendamento; nextAttemptAt nulo só em terminal */; fun releaseLease(id: UUID, owner: String); fun findDue(now: Instant, limit: Int): List<UUID> }`.
   - `interface TransferStepLog { fun append(record: StepRecord) }`; `data class StepRecord(val transferId: UUID, val step: String, val outcome: String, val httpStatus: Int?, val detail: String?, val at: Instant)`.
   - `interface AccountsGateway { fun lookupAccount(id: UUID): AccountLookup; fun execute(call: AccountsCall): CallResult }`; `enum class AccountLookup { EXISTS, NOT_FOUND, UNAVAILABLE }`; `data class CallResult(val outcome: StepOutcome, val httpStatus: Int?, val detail: String?)`.
   - `interface EventOutbox { fun append(event: TransferEvent) }`; `TransactionRunner` e `IdGenerator` como no `accounts`.
   - `class RetryBackoff(initial: Duration, max: Duration) { fun delayBeforeRetry(attempt: Int): Duration }` — sem interface.
-  - `data class SagaSettings(val deadline: Duration = 2.minutes, val lease: Duration = 30.seconds, val busyRetries: Int = 3, val dueBatchSize: Int = 50)`.
-  - `class RunTransferSagaUseCase(transfers, stepLog, accounts, outbox, tx, backoff, settings, clock) { fun execute(transferId: UUID, owner: String, busyRetries: Int = 0): Transfer? }` — `null` se não tomou o arrendamento. Laço: `call` do passo → `accounts.execute` (fora de transação; `TransientFailure` com HTTP 503 repete até `busyRetries` vezes sem gravar) → numa transação: `stepLog.append`, `transfer.advance`, se terminal `outbox.append(terminalEvent)`, em falha passageira grava `next_attempt_at = now + backoff.delayBeforeRetry(attempts)`, `saveIfOwner` (false → para sem efeito). Para em terminal ou falha passageira; solta o arrendamento no `finally`.
+  - `data class SagaSettings(val deadline: Duration = 2.minutes, val lease: Duration = 30.seconds, val busyAttempts: Int = 3 /* chamadas no total para 503 */, val dueBatchSize: Int = 50, val callBudget: Duration = 4.seconds)`.
+  - `class RunTransferSagaUseCase(transfers, stepLog, accounts, outbox, tx, backoff, settings, clock) { fun execute(transferId: UUID, owner: String, busyAttempts: Int = 1): Transfer? }` — `null` se não tomou o arrendamento. Laço: `call` do passo → `accounts.execute` (fora de transação; `TransientFailure` com HTTP 503 repete até completar `busyAttempts` chamadas no total) → numa transação: `stepLog.append`, `transfer.advance`, se terminal `outbox.append(terminalEvent)`, em falha passageira grava `next_attempt_at = now + backoff.delayBeforeRetry(attempts)`, `saveIfOwner` (false → para sem efeito). Para em terminal ou falha passageira; solta o arrendamento no `finally`.
 
-- [ ] **Step 1:** `RetryBackoffTest`: tentativas 1..6 → 1, 2, 4, 8, 15, 15 s; `attempt` 0 lança. `RunTransferSagaUseCaseTest` (relógio controlado): caminho feliz grava 2 `StepRecord` e 1 `TransferCompleted`; 503 duas vezes e depois 201 com `busyRetries = 3` → `COMPLETED` sem nova tentativa agendada; timeout no crédito → `PENDING`, `next_attempt_at = now + 1 s`, arrendamento solto; arrendamento ocupado → `null` e nenhuma chamada ao gateway; `saveIfOwner` falso (arrendamento perdido) → laço para e nenhum evento gravado; as chaves e descrições enviadas são exatamente as da spec.
+- [ ] **Step 1:** `RetryBackoffTest`: tentativas 1..6 → 1, 2, 4, 8, 15, 15 s; `attempt` 0 lança. `RunTransferSagaUseCaseTest` (relógio controlado): caminho feliz grava 2 `StepRecord` e 1 `TransferCompleted`; 503 duas vezes e depois 201 com `busyAttempts = 3` → `COMPLETED` sem nova tentativa agendada; timeout no crédito → `PENDING`, `next_attempt_at = now + 1 s`, arrendamento solto; arrendamento ocupado → `null` e nenhuma chamada ao gateway; `saveIfOwner` falso (arrendamento perdido) → laço para e nenhum evento gravado; as chaves e descrições enviadas são exatamente as da spec.
 - [ ] **Step 2:** Rodar → falha; implementar; passa; `./gradlew build` verde.
 - [ ] **Step 3:** Commit `feat(transfers): execução da saga com arrendamento e novas tentativas`.
 
@@ -190,7 +192,7 @@
 - Produces:
   - `data class RequestTransferCommand(val sourceAccountId: UUID, val destinationAccountId: UUID, val amount: Money, val description: String?, val idempotencyKey: String, val correlationId: String?)`.
   - `sealed interface RequestTransferOutcome { data class Created(val transfer: Transfer); data class Existing(val transfer: Transfer); data object SameAccount; data class AccountNotFound(val accountId: UUID); data object AccountsUnavailable }`.
-  - `class RequestTransferUseCase(transfers, accounts, runSaga: RunTransferSagaUseCase, ids, settings, clock) { fun execute(command: RequestTransferCommand): RequestTransferOutcome }` — fluxo da spec, seção 4, passos 1–5; repetição compara origem, destino e valor (não a descrição); pedido diferente lança `IdempotencyKeyReusedException`; conflito no `insert` relê e trata como repetição; roda a saga com `owner = "request-<uuid>"` e `busyRetries = settings.busyRetries`; devolve o estado depois da saga.
+  - `class RequestTransferUseCase(transfers, accounts, runSaga: RunTransferSagaUseCase, ids, settings, clock) { fun execute(command: RequestTransferCommand): RequestTransferOutcome }` — fluxo da spec, seção 4, passos 1–5; repetição compara origem, destino e valor (não a descrição); pedido diferente lança `IdempotencyKeyReusedException`; conflito no `insert` relê e trata como repetição; roda a saga com `owner = "request-<uuid>"` e `busyAttempts = settings.busyAttempts`; devolve o estado depois da saga.
   - `class GetTransferUseCase(transfers) { fun execute(id: UUID): Transfer? }`.
   - `class ResumeDueTransfersUseCase(transfers, runSaga, settings, clock, owner: String) { fun execute(): Int }` — roda a saga para cada id de `findDue(now, dueBatchSize)`; devolve quantas tomou.
 
@@ -207,7 +209,7 @@
 
 **Interfaces:**
 - Consumes: Tasks 2, 8, 9.
-- Produces: esquema da spec, seção 5 (colunas, `CHECK`s, índice parcial `transfer_due_idx (next_attempt_at) WHERE status = 'PENDING'`); `transfers_app` com `SELECT, INSERT, UPDATE` em `transfer` e `outbox`, `SELECT, INSERT` em `transfer_step` e `USAGE` na sequência; `tryAcquireLease` com o `UPDATE … WHERE … (locked_until IS NULL OR locked_until < :now)` da spec; `saveIfOwner` com `WHERE id = :id AND lock_owner = :owner AND locked_until >= :now`; `findDue` com `FOR UPDATE SKIP LOCKED` só na seleção dos ids; `OutboxEventAppender` com `aggregateId = transferId` e os payloads da spec, seção 6.
+- Produces: esquema da spec, seção 5 (colunas, `CHECK`s, índice parcial `transfer_due_idx (next_attempt_at) WHERE status = 'PENDING'`); `transfers_app` com `SELECT, INSERT, UPDATE` em `transfer` e `outbox`, `SELECT, INSERT` em `transfer_step` e `USAGE` na sequência; `tryAcquireLease` com o `UPDATE … WHERE … (locked_until IS NULL OR locked_until < :now)` da spec; `saveIfOwner` com `WHERE id = :id AND lock_owner = :owner AND locked_until >= :now`, gravando `next_attempt_at` e `locked_until = :leaseUntil` (renovação); `findDue` nunca casa `next_attempt_at` nulo; `findDue` com `FOR UPDATE SKIP LOCKED` só na seleção dos ids; `OutboxEventAppender` com `aggregateId = transferId` e os payloads da spec, seção 6.
 
 - [ ] **Step 1:** ITs: dois `tryAcquireLease` concorrentes → só um `true`; arrendamento vencido → outro dono toma; `saveIfOwner` com dono errado → `false` e nada muda; `insert` com chave repetida → `false`; `findDue` ignora não vencidas, terminais e arrendadas; `transfers_app` não consegue `UPDATE`/`DELETE` em `transfer_step` (erro de permissão); `assertOutboxSchemaMatchesModel` passa; ida e volta de `Transfer` (todos os campos, os 8 passos).
 - [ ] **Step 2:** Rodar → falha; implementar; passa; `./gradlew build` verde.
@@ -245,7 +247,7 @@
 ### Task 14: Agendador, relay e eventos no `transfers` (Marina, `dev-kotlin`)
 
 **Files:**
-- Create em `services/transfers/bootstrap/src/main/kotlin/…/bootstrap/`: `UseCaseConfiguration.kt`, `SagaProperties.kt` (`transfers.saga.*`: `deadline`, `lease`, `busy-retries`, `due-batch-size`, `retry-initial`, `retry-max`, `poll-interval`, `scheduler-enabled`), `TransferSagaScheduler.kt` (`@Scheduled(fixedDelayString = "\${transfers.saga.poll-interval:1s}")`, desligamento gracioso como o `OutboxRelayScheduler`), `OutboxRelayConfiguration.kt` e `OutboxRelayScheduler.kt` (como no `accounts`, chave de trava própria, `transfers.outbox.*`, `transfers.aws.*`)
+- Create em `services/transfers/bootstrap/src/main/kotlin/…/bootstrap/`: `UseCaseConfiguration.kt`, `SagaProperties.kt` (`transfers.saga.*`: `deadline`, `lease`, `busy-attempts`, `call-budget`, `due-batch-size`, `retry-initial`, `retry-max`, `poll-interval`, `scheduler-enabled`), `TransferSagaScheduler.kt` (`@Scheduled(fixedDelayString = "\${transfers.saga.poll-interval:1s}")`, desligamento gracioso como o `OutboxRelayScheduler`), `OutboxRelayConfiguration.kt` e `OutboxRelayScheduler.kt` (como no `accounts`, chave de trava própria, `transfers.outbox.*`, `transfers.aws.*`)
 - Modify: `application.yml`
 - Test: `services/transfers/bootstrap/src/integrationTest/kotlin/…/bootstrap/TransferSagaResumeIntegrationTest.kt`, `TransferLeaseContentionIntegrationTest.kt`, `TransferEventsIntegrationTest.kt` (LocalStack), `TransferSagaSchedulerTest.kt` (unitário)
 

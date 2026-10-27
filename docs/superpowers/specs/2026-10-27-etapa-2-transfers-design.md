@@ -91,7 +91,7 @@ api/bruno/transfers/        # coleção Bruno
   ```kotlin
   sealed interface TransferStep {
       fun onSuccess(transfer: Transfer): TransferStep
-      fun onRefused(transfer: Transfer, reason: RefusalReason): TransferStep
+      fun onRefused(transfer: Transfer, reason: String): TransferStep
       fun onTransientFailure(transfer: Transfer, now: Instant): TransferStep
   }
   ```
@@ -100,7 +100,7 @@ api/bruno/transfers/        # coleção Bruno
 | Passo | Chamada ao `accounts` | Sucesso | Recusa definitiva | Falha passageira no prazo | Falha passageira após o prazo |
 |---|---|---|---|---|---|
 | `Debit` | `POST /accounts/{source}/debits`, chave `transfer-<id>-debit` | `Credit` | `Failed` (motivo da recusa) | `Debit` | `ResolveDebit` |
-| `ResolveDebit` | `GET /accounts/{source}/entries?idempotencyKey=transfer-<id>-debit` | `Compensate` | `ENTRY_NOT_FOUND` → `Failed` | `ResolveDebit` | `ResolveDebit` |
+| `ResolveDebit` | `GET /accounts/{source}/entries?idempotencyKey=transfer-<id>-debit` | `Compensate` | `ENTRY_NOT_FOUND` → `Failed` (motivo `debit-not-confirmed`) | `ResolveDebit` | `ResolveDebit` |
 | `Credit` | `POST /accounts/{destination}/credits`, chave `transfer-<id>-credit` | `Completed` | `Compensate` | `Credit` | `ResolveCredit` |
 | `ResolveCredit` | `GET /accounts/{destination}/entries?idempotencyKey=transfer-<id>-credit` | `Completed` | `ENTRY_NOT_FOUND` → `Compensate` | `ResolveCredit` | `ResolveCredit` |
 | `Compensate` | `POST /accounts/{source}/credits`, chave `transfer-<id>-compensation` | `Compensated` | `Compensate` (recusa indica bug: log `ERROR`, nova tentativa com a espera máxima) | `Compensate` | `Compensate` |
