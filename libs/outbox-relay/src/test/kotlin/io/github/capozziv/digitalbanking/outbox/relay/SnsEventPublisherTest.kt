@@ -1,5 +1,6 @@
-package io.github.capozziv.digitalbanking.outbox
+package io.github.capozziv.digitalbanking.outbox.relay
 
+import io.github.capozziv.digitalbanking.outbox.PendingEvent
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import software.amazon.awssdk.services.sns.SnsClient

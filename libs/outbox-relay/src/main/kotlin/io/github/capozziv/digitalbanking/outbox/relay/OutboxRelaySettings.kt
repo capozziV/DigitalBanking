@@ -1,4 +1,4 @@
-package io.github.capozziv.digitalbanking.outbox
+package io.github.capozziv.digitalbanking.outbox.relay
 
 import java.time.Duration
 

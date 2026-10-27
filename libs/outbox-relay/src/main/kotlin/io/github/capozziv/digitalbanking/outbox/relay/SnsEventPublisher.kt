@@ -1,5 +1,7 @@
-package io.github.capozziv.digitalbanking.outbox
+package io.github.capozziv.digitalbanking.outbox.relay
 
+import io.github.capozziv.digitalbanking.outbox.OutboxEventEnvelope
+import io.github.capozziv.digitalbanking.outbox.PendingEvent
 import software.amazon.awssdk.services.sns.SnsClient
 import software.amazon.awssdk.services.sns.model.MessageAttributeValue
 import java.time.Duration

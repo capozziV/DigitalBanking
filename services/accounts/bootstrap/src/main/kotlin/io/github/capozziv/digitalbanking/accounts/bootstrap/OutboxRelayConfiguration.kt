@@ -1,12 +1,12 @@
 package io.github.capozziv.digitalbanking.accounts.bootstrap
 
-import io.github.capozziv.digitalbanking.outbox.EventPublisher
-import io.github.capozziv.digitalbanking.outbox.JdbcOutboxStore
-import io.github.capozziv.digitalbanking.outbox.OutboxMetrics
-import io.github.capozziv.digitalbanking.outbox.OutboxRelay
-import io.github.capozziv.digitalbanking.outbox.OutboxRelaySettings
-import io.github.capozziv.digitalbanking.outbox.OutboxStore
-import io.github.capozziv.digitalbanking.outbox.SnsEventPublisher
+import io.github.capozziv.digitalbanking.outbox.relay.EventPublisher
+import io.github.capozziv.digitalbanking.outbox.relay.JdbcOutboxStore
+import io.github.capozziv.digitalbanking.outbox.relay.OutboxMetrics
+import io.github.capozziv.digitalbanking.outbox.relay.OutboxRelay
+import io.github.capozziv.digitalbanking.outbox.relay.OutboxRelaySettings
+import io.github.capozziv.digitalbanking.outbox.relay.OutboxStore
+import io.github.capozziv.digitalbanking.outbox.relay.SnsEventPublisher
 import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty
 import org.springframework.boot.context.properties.ConfigurationProperties

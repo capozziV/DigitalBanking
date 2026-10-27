@@ -1,5 +1,6 @@
-package io.github.capozziv.digitalbanking.outbox
+package io.github.capozziv.digitalbanking.outbox.relay
 
+import io.github.capozziv.digitalbanking.outbox.PendingEvent
 import java.time.Duration
 import java.time.Instant
 
