@@ -125,7 +125,7 @@ A coleção fica em `api/bruno/accounts/`, com uma requisição por endpoint e `
   ```bash
   (cd api/bruno/accounts && bru run --env local)
   ```
-  Esperado: `Requests 7 (7 Passed)`. A requisição de limite grava o valor da migration (`GOLD` = 200000), sem alterar o ambiente.
+  Esperado: `Requests 8 (8 Passed)`. A requisição de limite grava o valor da migration (`GOLD` = 200000), sem alterar o ambiente.
 
 ## 8. Derrubar tudo
 Pare o `bootRun` com Ctrl+C no terminal dele. Depois derrube os contêineres; o `-v` apaga os dados:
