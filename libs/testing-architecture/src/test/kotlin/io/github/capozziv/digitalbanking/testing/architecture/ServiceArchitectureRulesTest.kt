@@ -81,6 +81,17 @@ class ServiceArchitectureRulesTest {
         assertViolatedBy(ServiceArchitectureRules::useCasePackageHoldsOnlyUseCases, "PlaceOrderHandler")
 
     @Test
+    fun `use case package rule rejects a class with a data suffix but with behavior`() =
+        assertViolatedBy(ServiceArchitectureRules::useCasePackageHoldsOnlyUseCases, "PlaceOrderHandlerResult")
+
+    @Test
+    fun `rules ignore top-level functions, whose file facade kotlin-reflect cannot inspect`() {
+        assertThat(good.contain("$GOOD_ROOT.application.usecase.OrderFunctionsKt")).isTrue()
+        assertPasses(ServiceArchitectureRules::useCasePackageHoldsOnlyUseCases)
+        assertPasses(ServiceArchitectureRules::executeClassesAreUseCases)
+    }
+
+    @Test
     fun `execute rule passes for a use case named UseCase`() = assertPasses(ServiceArchitectureRules::executeClassesAreUseCases)
 
     @Test
