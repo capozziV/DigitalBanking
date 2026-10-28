@@ -7,6 +7,7 @@ import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.jdbc.datasource.DriverManagerDataSource
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.context.TestPropertySource
 import org.testcontainers.postgresql.PostgreSQLContainer
 
 /**
@@ -14,8 +15,11 @@ import org.testcontainers.postgresql.PostgreSQLContainer
  * (singleton container, so the cached Spring context keeps a valid connection). The application connects as
  * [APP_USER]; Flyway runs as the container's owner user, mirroring transfers_owner / transfers_app of the
  * local environment. A shared WireMock server stands in for `accounts`; tests that use it reset it first.
+ * The saga scheduler and the outbox relay are off, so transfers and outbox rows stay as the requests left them; the
+ * tests that exercise them turn them on (a subclass @TestPropertySource overrides this one).
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@TestPropertySource(properties = ["transfers.saga.scheduler-enabled=false", "transfers.outbox.relay-enabled=false"])
 abstract class TransfersIntegrationTest {
     /** JdbcClient connected as the owner user, for setup and inspection outside the application's grants. */
     protected val ownerJdbc: JdbcClient by lazy {

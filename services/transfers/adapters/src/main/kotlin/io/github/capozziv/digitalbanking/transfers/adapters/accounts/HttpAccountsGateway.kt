@@ -1,5 +1,6 @@
 package io.github.capozziv.digitalbanking.transfers.adapters.accounts
 
+import io.github.capozziv.digitalbanking.outbox.OutboxEventEnvelope.CORRELATION_ID_MDC_KEY
 import io.github.capozziv.digitalbanking.transfers.adapters.accounts.dto.AccountsAccountResponseDTO
 import io.github.capozziv.digitalbanking.transfers.adapters.accounts.dto.AccountsEntryRequestDTO
 import io.github.capozziv.digitalbanking.transfers.adapters.accounts.dto.AccountsEntryResponseDTO
@@ -59,7 +60,7 @@ class HttpAccountsGateway(
         }
     }
 
-    override fun execute(call: AccountsCall): CallResult =
+    override fun perform(call: AccountsCall): CallResult =
         when (call) {
             is AccountsCall.Debit -> {
                 record(call.accountId, "debits", call.idempotencyKey, call.amount.cents, call.description)
@@ -168,9 +169,6 @@ class HttpAccountsGateway(
     private companion object {
         const val IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"
         const val CORRELATION_ID_HEADER = "X-Correlation-Id"
-
-        // Same key JdbcOutboxWriter and the correlation filter use; not imported to keep this adapter free of the outbox lib.
-        const val CORRELATION_ID_MDC_KEY = "correlationId"
         const val ACCOUNT_NOT_FOUND = "account-not-found"
         const val MAX_BODY_BYTES = 64 * 1024
         val SUCCESS_RANGE = 200..299

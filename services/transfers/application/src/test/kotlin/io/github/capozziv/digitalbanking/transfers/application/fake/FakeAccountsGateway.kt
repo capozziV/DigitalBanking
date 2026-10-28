@@ -19,7 +19,7 @@ class FakeAccountsGateway(
     val lookupResults = mutableMapOf<UUID, AccountLookup>()
     val lookups = mutableListOf<UUID>()
 
-    /** Runs on every [execute] after the call is recorded, e.g. to advance a test clock by the call's duration. */
+    /** Runs on every [perform] after the call is recorded, e.g. to advance a test clock by the call's duration. */
     var onCall: (AccountsCall) -> Unit = {}
 
     fun reply(vararg results: CallResult) {
@@ -31,7 +31,7 @@ class FakeAccountsGateway(
         return lookupResults[id] ?: lookup
     }
 
-    override fun execute(call: AccountsCall): CallResult {
+    override fun perform(call: AccountsCall): CallResult {
         check(transactions?.open != true) { "accounts called inside a database transaction" }
         calls += call
         onCall(call)

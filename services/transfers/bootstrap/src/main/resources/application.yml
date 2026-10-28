@@ -18,9 +18,34 @@ spring:
     placeholders:
       appUser: ${TRANSFERS_DB_USER:transfers_app}
 
+transfers:
+  saga:
+    scheduler-enabled: true
+    poll-interval: 1s
+    due-batch-size: 50
+    deadline: 2m
+    lease: 30s
+    busy-attempts: 3
+    call-budget: 4s
+    retry-initial: 1s
+    retry-max: 15s
+  outbox:
+    relay-enabled: true
+    poll-interval: 500ms
+    batch-size: 100
+    alert-after-attempts: 10
+    publish-timeout: 2s
+    max-cycle-duration: 10s
+  aws:
+    # LocalStack by default; an empty TRANSFERS_AWS_ENDPOINT uses the real AWS endpoint and credential chain.
+    endpoint: ${TRANSFERS_AWS_ENDPOINT:http://localhost:4566}
+    region: ${TRANSFERS_AWS_REGION:us-east-1}
+    topic-arn: ${TRANSFERS_TOPIC_ARN:arn:aws:sns:us-east-1:000000000000:transfers-events.fifo}
+
 logging:
   pattern:
-    # Correlation id of the request on every log line.
+    # Correlation id (MDC key of OutboxEventEnvelope.CORRELATION_ID_MDC_KEY) on every log line, from the request
+    # filter or, for the saga scheduler, from the transfer being resumed.
     correlation: "[%X{correlationId:-}] "
 
 server:

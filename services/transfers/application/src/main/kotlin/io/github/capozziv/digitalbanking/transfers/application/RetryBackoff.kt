@@ -1,4 +1,4 @@
-package io.github.capozziv.digitalbanking.transfers.application.usecase
+package io.github.capozziv.digitalbanking.transfers.application
 
 import java.time.Duration
 
