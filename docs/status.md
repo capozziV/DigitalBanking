@@ -2,10 +2,10 @@
 
 > Resumo do projeto, atualizado pelo agente coordenador ao fim de cada tarefa. Tasks, débito técnico, decisões pendentes e tarefas do usuário ficam no board.
 
-**Última atualização:** 2026-10-26
+**Última atualização:** 2026-10-27
 **Board:** [Digital Banking no GitHub Projects](https://github.com/users/capozziV/projects/2)
-**Fase atual:** etapa 1 concluída (PRs #2 a #6 com merge na `main`); trabalho no Mac do usuário.
-**Próxima etapa:** 2 (`transfers` + saga), começando pelo brainstorming (cartão #9 do board).
+**Fase atual:** etapa 2 em execução ([spec](superpowers/specs/2026-10-27-etapa-2-transfers-design.md), [plano](superpowers/plans/2026-10-27-etapa-2-transfers.md), [ADR 0016](adr/0016-saga-orquestrada-por-http.md)). Bloco 1 (preparação para o 2º serviço, mais o domínio do `transfers`) revisado, no PR da branch `etapa-2-transfers`; bloco 2 (`transfers` com a saga) em andamento.
+**Próximo passo:** merge do PR do bloco 1 pelo usuário; depois, Tasks 10 a 16 do bloco 2.
 
 ## Como usar o board
 - Colunas: **Backlog** (tem pendência técnica ou de regra de negócio sem resposta, ou a etapa anterior ainda não está em Done), **Ready** (sem pendência e com a etapa anterior em Done), **In progress**, **In review** (revisão da Beatriz) e **Done** (revisado, build, testes e lint verdes, merge feito).
@@ -25,11 +25,21 @@
 - **Guia local no Mac** (PR #6, 2026-10-23): executado do zero num Mac Intel (build verde, smoke OK, Bruno 7/7) e corrigido para caminhos sem Homebrew.
 - **graphify** (2026-10-22): `graphify-out/` versionado, hook do Claude antes de buscas e hook do git que reconstrói o grafo a cada commit.
 - **Board no GitHub Projects** (2026-10-26): tasks, débito técnico, decisões de "Em aberto" e tarefas do usuário migrados deste arquivo para o board.
+- **Etapa 2, bloco 1** (2026-10-27; Tasks 1–6 e 8 do plano, cada uma revisada pela Beatriz e a branch inteira na revisão final):
+  - relay em `libs/outbox-relay` (o `libs/outbox` ficou sem AWS SDK e Micrometer) e asserção de igualdade do esquema do outbox nos `testFixtures`;
+  - regras ArchUnit compartilhadas em `libs/testing-architecture` (`ServiceArchitectureRules`), com as lacunas antigas fechadas (isenção só para tipos de dados);
+  - `GET /accounts/{id}/entries?idempotencyKey=` para a saga consultar um lançamento sem gravar;
+  - Gradle com `FAIL_ON_PROJECT_REPOS`; init do PostgreSQL idempotente, banco `transfers` e volume nomeado;
+  - CI seletivo por serviço com o job agregador `ci-ok` (é ele que a proteção da `main` deve exigir);
+  - domínio do `transfers` com os passos da saga no padrão State;
+  - `./gradlew build --rerun-tasks` verde com o token do LocalStack (319 testes, 0 falhas, 0 pulados).
+- Execução da etapa 2 com implementadores em paralelo, cada um num worktree em `.claude/worktrees/` (fora do git), juntados na branch de integração depois da revisão.
 
 ## Como rodar localmente
 Guia completo, para macOS (zsh) e Linux: [`docs/rodando-localmente.md`](rodando-localmente.md). Resumo: JDK 21 e Docker Desktop; `cp infra/local/.env.example infra/local/.env`; compose `up --wait`; `./gradlew build` (ou `./gradlew test` sem Docker); `bootRun`; `infra/local/smoke.sh`; coleção Bruno em `api/bruno/accounts/`.
 
 ## Convenções que já custaram caro
+- Agentes em worktree não regeneram nem commitam `graphify-out/`; a coordenadora regenera o grafo depois de juntar as branches.
 - Healthchecks e curls dentro de contêineres usam `127.0.0.1`, nunca `localhost`: no runner do GitHub, `localhost` resolve para IPv6 e o nginx escuta só em IPv4 (sem `listen [::]:80`, que derruba o nginx em máquinas sem IPv6).
 - Toda tabela nova do `accounts` precisa de `grant` próprio para o `accounts_app` (sem `ALTER DEFAULT PRIVILEGES`).
 

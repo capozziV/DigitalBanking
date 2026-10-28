@@ -46,6 +46,13 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 - `statement` no DynamoDB, chave `accountId` + `timestamp#entryId`, gravação idempotente com `PutItem` condicional.
 - (ver [ADR 0007](adr/0007-conta-e-ledger-no-accounts.md), [ADR 0008](adr/0008-statement-cqrs-dynamodb.md), [ADR 0012](adr/0012-saldo-no-lancamento-e-trava-pessimista.md), [ADR 0013](adr/0013-persistencia-com-spring-jdbc.md) e [ADR 0014](adr/0014-tipo-de-conta-e-cheque-especial.md))
 
+### Saga de transferência
+- O `transfers` orquestra a saga: débito na origem, crédito no destino e, se o crédito não sai, compensação (crédito de volta na origem, tentado até conseguir). Cada passo é um objeto do padrão State.
+- Chamadas HTTP síncronas ao `accounts`, com chaves de idempotência derivadas do `transferId` (uma por passo). `POST /transfers` roda a saga na requisição e devolve `202` com a transferência `PENDING` em falha passageira; um agendador termina depois.
+- Prazo de 2 minutos para falha passageira em débito e crédito. Depois dele, o `transfers` consulta o lançamento pela chave (`GET /accounts/{id}/entries?idempotencyKey=…`) em vez de repetir a chamada.
+- Arrendamento (`locked_until`) no lugar de trava de banco durante a chamada HTTP.
+- (ver [ADR 0016](adr/0016-saga-orquestrada-por-http.md) e a [spec da etapa 2](superpowers/specs/2026-10-27-etapa-2-transfers-design.md))
+
 ### Cache
 - Extrato: cache-aside só da primeira página, TTL curto com jitter, invalidação ao consumir evento, fallback para DynamoDB se o Redis cair.
 - Saldo para autorizar débito nunca vem de cache.
@@ -96,10 +103,12 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 Fonte única das decisões pendentes; cada item tem um cartão `Decision` no [board](https://github.com/users/capozziV/projects/2). Ao decidir, registre no ADR indicado (ou crie um), remova o item daqui e feche o cartão.
 
 **Antes das etapas 2 a 7**
-- Avaliar ADRs próprios para a saga orquestrada com compensação (`transfers`) e para ECS Service Connect.
 - Cache local (Caffeine) na frente do Redis ou só Redis ([ADR 0009](adr/0009-cache-do-extrato.md)).
 - Valor padrão do limite diário, único para todas as contas no MVP, a definir antes da etapa 6; variação por tipo de conta fica para depois do MVP ([ADR 0010](adr/0010-limite-diario-redis-lua.md)).
 - Estratégia de autenticação no ambiente local, sem Cognito ([ADR 0004](adr/0004-api-gateway-http-api-na-borda.md)).
+
+**Etapa 8**
+- ECS Service Connect para as chamadas entre serviços: decidir e registrar em ADR próprio (cartão [#55](https://github.com/capozziV/DigitalBanking/issues/55)).
 
 **Etapa 9**
 - Angular Material ou PrimeNG ([ADR 0005](adr/0005-frontend-angular-e-bff-nestjs.md)).
