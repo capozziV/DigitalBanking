@@ -36,6 +36,8 @@ transfers:
     alert-after-attempts: 10
     publish-timeout: 2s
     max-cycle-duration: 10s
+    retry-backoff: 1s
+    max-retry-backoff: 30s
   aws:
     # LocalStack by default; an empty TRANSFERS_AWS_ENDPOINT uses the real AWS endpoint and credential chain.
     endpoint: ${TRANSFERS_AWS_ENDPOINT:http://localhost:4566}

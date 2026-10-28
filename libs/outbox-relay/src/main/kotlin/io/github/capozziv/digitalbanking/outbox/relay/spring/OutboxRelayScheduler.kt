@@ -17,7 +17,7 @@ import java.util.concurrent.locks.ReentrantLock
 class OutboxRelayScheduler(
     private val relay: OutboxRelay,
     private val shutdownTimeout: Duration,
-    private val pollInterval: Duration = Duration.ofMillis(500),
+    private val pollInterval: Duration,
 ) : SchedulingConfigurer,
     DisposableBean {
     private val cycleLock = ReentrantLock()

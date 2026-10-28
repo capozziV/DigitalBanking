@@ -33,7 +33,7 @@ class OutboxRelaySchedulerTest {
 
     @Test
     fun `shutdown waits for the cycle in progress to finish`() {
-        val scheduler = OutboxRelayScheduler(relay, shutdownTimeout = Duration.ofSeconds(5))
+        val scheduler = OutboxRelayScheduler(relay, shutdownTimeout = Duration.ofSeconds(5), pollInterval = POLL_INTERVAL)
         store.blockNextCycle()
         val cycle = Thread.ofPlatform().start { scheduler.runCycle() }
         assertThat(store.cycleEntered.await(5, TimeUnit.SECONDS)).isTrue()
@@ -50,7 +50,7 @@ class OutboxRelaySchedulerTest {
 
     @Test
     fun `no cycle starts after shutdown`() {
-        val scheduler = OutboxRelayScheduler(relay, shutdownTimeout = Duration.ofSeconds(5))
+        val scheduler = OutboxRelayScheduler(relay, shutdownTimeout = Duration.ofSeconds(5), pollInterval = POLL_INTERVAL)
 
         scheduler.destroy()
         scheduler.runCycle()
@@ -60,7 +60,7 @@ class OutboxRelaySchedulerTest {
 
     @Test
     fun `shutdown gives up after the timeout when a cycle does not finish`() {
-        val scheduler = OutboxRelayScheduler(relay, shutdownTimeout = Duration.ofMillis(200))
+        val scheduler = OutboxRelayScheduler(relay, shutdownTimeout = Duration.ofMillis(200), pollInterval = POLL_INTERVAL)
         store.blockNextCycle()
         val cycle = Thread.ofPlatform().start { scheduler.runCycle() }
         assertThat(store.cycleEntered.await(5, TimeUnit.SECONDS)).isTrue()
@@ -83,6 +83,10 @@ class OutboxRelaySchedulerTest {
 
         assertThat(registrar.fixedDelayTaskList).hasSize(1)
         assertThat(registrar.fixedDelayTaskList.single().intervalDuration).isEqualTo(Duration.ofMillis(250))
+    }
+
+    private companion object {
+        val POLL_INTERVAL: Duration = Duration.ofMillis(500)
     }
 
     private class BlockingStore : OutboxStore {
