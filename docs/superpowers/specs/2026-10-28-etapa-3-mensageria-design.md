@@ -1,7 +1,7 @@
 # Etapa 3 — Mensageria e `notification`: design
 
 - **Data:** 2026-10-28
-- **Status:** em revisão pelo usuário
+- **Status:** aprovada (2026-10-28)
 - **Roadmap:** etapa 3 de [`docs/roadmap.md`](../../roadmap.md)
 - **Board:** cartão [#10](https://github.com/capozziV/DigitalBanking/issues/10) (Stage 3 · Messaging)
 

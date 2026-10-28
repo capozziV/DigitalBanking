@@ -492,8 +492,8 @@
     "semantic_hash": ""
   },
   ".claude/agents/coordenador.md": {
-    "mtime": 1793157436.8103037,
-    "seen": 1793157470.749398,
+    "mtime": 1793157668.2878284,
+    "seen": 1793157671.0461829,
     "ast_hash": "690394414a7bb2fd22e6ca2476f5d2ed",
     "semantic_hash": ""
   },
@@ -534,9 +534,9 @@
     "semantic_hash": ""
   },
   "CLAUDE.md": {
-    "mtime": 1793157436.739494,
-    "seen": 1793157470.749411,
-    "ast_hash": "92eb36864395355df292e2ae9ee51493",
+    "mtime": 1793158103.5608938,
+    "seen": 1793158129.5106711,
+    "ast_hash": "88ec17a3c1896738ee128b361d248161",
     "semantic_hash": ""
   },
   "CONTEXT.md": {
@@ -654,8 +654,8 @@
     "semantic_hash": ""
   },
   "docs/status.md": {
-    "mtime": 1793157433.468065,
-    "seen": 1793157470.7494469,
+    "mtime": 1793157668.2892132,
+    "seen": 1793157671.04624,
     "ast_hash": "c28a3df7ec07fc4fcd980a31fbea53dd",
     "semantic_hash": ""
   },
@@ -2019,6 +2019,12 @@
     "mtime": 1793154543.4857557,
     "seen": 1793157470.749464,
     "ast_hash": "11417e920b0223db5115463903ddf828",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/specs/2026-10-28-etapa-3-mensageria-design.md": {
+    "mtime": 1793158644.4530885,
+    "seen": 1793158654.045856,
+    "ast_hash": "7a8835e38005f46c444ad8b0c2bf141f",
     "semantic_hash": ""
   }
 }
