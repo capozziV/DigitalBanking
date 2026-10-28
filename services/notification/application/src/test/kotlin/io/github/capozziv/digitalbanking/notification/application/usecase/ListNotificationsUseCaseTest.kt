@@ -63,6 +63,32 @@ class ListNotificationsUseCaseTest {
         assertThat(page.nextCursor).isNull()
     }
 
+    @Test
+    fun `notifications with the same creation time are listed by id descending`() {
+        val tied = (1..3).map { tied(it) }
+        repository.saveAll(tied)
+
+        val page = useCase.list(customer, null)
+
+        assertThat(page.items.map { it.id }).isEqualTo(tied.sortedByDescending { it.id.toString() }.map { it.id })
+    }
+
+    @Test
+    fun `paging across a tie on the page boundary neither repeats nor skips`() {
+        val tied = (1..2).map { tied(it) }
+        val older = store(19)
+        repository.saveAll(tied)
+        val expected = (tied + older).sortedWith(compareByDescending<Notification> { it.createdAt }.thenByDescending { it.id.toString() })
+
+        val first = useCase.list(customer, null)
+        val second = useCase.list(customer, first.nextCursor)
+
+        assertThat(first.items.map { it.id } + second.items.map { it.id }).isEqualTo(expected.map { it.id })
+        assertThat(second.nextCursor).isNull()
+    }
+
+    private fun tied(index: Int) = notification(customer, 100 + index).copy(createdAt = start.plusSeconds(1000))
+
     private fun store(count: Int): List<Notification> {
         val created = (0 until count).map { notification(customer, it) }
         repository.saveAll(created)

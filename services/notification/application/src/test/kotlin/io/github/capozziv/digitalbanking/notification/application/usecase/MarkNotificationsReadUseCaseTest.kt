@@ -72,6 +72,21 @@ class MarkNotificationsReadUseCaseTest {
             .isInstanceOf(NotificationNotFoundException::class.java)
     }
 
+    @Test
+    fun `with a tie on creation time marking up to the smaller id leaves the larger one unread`() {
+        val tied = store(customer, 2, firstIndex = 0).map { it.copy(createdAt = start) }
+        val tiedStore = InMemoryNotificationRepository()
+        tiedStore.saveAll(tied)
+        val tieUseCase = MarkNotificationsReadUseCase(tiedStore, transactions, MutableClock(readAt))
+        val (smaller, larger) = tied.sortedBy { it.id.toString() }
+
+        val marked = tieUseCase.markRead(customer, smaller.id)
+
+        assertThat(marked).isEqualTo(1)
+        assertThat(tiedStore.find(smaller.id)!!.readAt).isEqualTo(readAt)
+        assertThat(tiedStore.find(larger.id)!!.readAt).isNull()
+    }
+
     private fun store(
         owner: UUID,
         count: Int,

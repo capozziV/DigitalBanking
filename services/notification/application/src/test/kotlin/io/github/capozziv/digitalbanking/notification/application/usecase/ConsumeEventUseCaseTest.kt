@@ -173,6 +173,30 @@ class ConsumeEventUseCaseTest {
     }
 
     @Test
+    fun `an unsupported event delivered again is a duplicate`() {
+        val event = ReceivedEvent.Unsupported(UUID.randomUUID(), "AccountClosed")
+        useCase.consume(event)
+
+        val outcome = useCase.consume(event)
+
+        assertThat(outcome).isEqualTo(ConsumeOutcome.DUPLICATE)
+        assertThat(notifications.all).isEmpty()
+    }
+
+    @Test
+    fun `a transfer completed delivered again is a duplicate and creates no notification`() {
+        openAccounts()
+        val event = transferCompleted(aliceAccount, bobAccount, 500)
+        useCase.consume(event)
+        val before = notifications.all.size
+
+        val outcome = useCase.consume(event)
+
+        assertThat(outcome).isEqualTo(ConsumeOutcome.DUPLICATE)
+        assertThat(notifications.all).hasSize(before)
+    }
+
+    @Test
     fun `an unknown destination account fails and records nothing`() {
         openAccounts()
         val unknown = UUID.randomUUID()
