@@ -48,8 +48,10 @@ script:post-response {
 }
 
 tests {
-  test("201 com a transferencia criada", function () {
-    expect(res.status).to.equal(201);
+  // 201 se a saga terminou na propria requisicao; 202 se o agendador tomou a transferencia antes (ainda PENDING).
+  test("201 ou 202 com a transferencia criada", function () {
+    expect(res.status).to.be.oneOf([201, 202]);
+    expect(res.body.status).to.equal(res.status === 201 ? "COMPLETED" : "PENDING");
     expect(res.body.amount).to.equal(300);
     expect(res.headers["location"]).to.contain("/transfers/");
   });

@@ -23,9 +23,15 @@ import java.io.IOException
 import java.util.UUID
 
 /**
- * Calls `accounts` over HTTP and classifies every answer. Never throws for anything the network or the peer can
- * do (timeout, cut connection, HTML from a proxy, a 2xx whose body is not what `accounts` sends): those are
- * [StepOutcome.TransientFailure], so the saga retries instead of skipping a step or compensating.
+ * Calls `accounts` over HTTP and classifies every answer.
+ *
+ * [perform] never throws for anything the network or the peer can do (timeout, cut connection, HTML from a proxy, a
+ * 2xx whose body is not what `accounts` sends, an unexpected 4xx): those are [StepOutcome.TransientFailure] or a
+ * classified [StepOutcome.Refused], so the saga retries instead of skipping a step or compensating.
+ *
+ * [lookupAccount] follows the same rule for the network and the peer (they become [AccountLookup.UNAVAILABLE]), but
+ * throws [IllegalStateException] on a 4xx other than "account not found": that is a bug in this client or a
+ * misrouted request, and it must not be taken for a missing account.
  */
 class HttpAccountsGateway(
     private val restClient: RestClient,

@@ -185,6 +185,25 @@ class ResumeDueTransfersUseCaseTest {
         assertThat(accounts.calls).hasSize(1)
     }
 
+    @Test
+    fun `an interrupt flag left by a transient failure ends the batch`() {
+        val first = pending(1)
+        val second = pending(2)
+        accounts.onCall = { Thread.currentThread().interrupt() }
+        accounts.reply(FakeAccountsGateway.timeout, created, created, created)
+
+        try {
+            useCase.execute()
+            assertThat(Thread.currentThread().isInterrupted).isTrue()
+        } finally {
+            Thread.interrupted()
+        }
+
+        assertThat(repository.findById(first.id)!!.status).isEqualTo(TransferStatus.PENDING)
+        assertThat(repository.findById(second.id)!!.status).isEqualTo(TransferStatus.PENDING)
+        assertThat(accounts.calls).hasSize(1)
+    }
+
     private fun Transfer.accountIds() = setOf(sourceAccountId, destinationAccountId)
 
     private fun AccountsCall.accountId(): UUID =
