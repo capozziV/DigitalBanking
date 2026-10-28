@@ -10,6 +10,7 @@ springdoc = "3.1.1"
 java-uuid-generator = "5.2.0"
 aws-sdk = "2.57.1"
 wiremock = "3.13.2"
+spring-cloud-aws = "4.2.1"
 
 [libraries]
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
@@ -27,6 +28,10 @@ aws-sdk-bom = { module = "software.amazon.awssdk:bom", version.ref = "aws-sdk" }
 aws-sdk-sns = { module = "software.amazon.awssdk:sns" }
 wiremock-standalone = { module = "org.wiremock:wiremock-standalone", version.ref = "wiremock" }
 aws-sdk-sqs = { module = "software.amazon.awssdk:sqs" }
+# Spring Cloud AWS BOM (starters have no version). Import aws-sdk-bom next to it: Gradle picks the higher SDK version,
+# so the project's aws-sdk wins over the one the Spring Cloud AWS BOM brings.
+spring-cloud-aws-bom = { module = "io.awspring.cloud:spring-cloud-aws-dependencies", version.ref = "spring-cloud-aws" }
+spring-cloud-aws-starter-sqs = { module = "io.awspring.cloud:spring-cloud-aws-starter-sqs" }
 
 # Dependencias de plugin para o build-logic
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
