@@ -82,7 +82,7 @@ set -a; . infra/local/.env; set +a
 ```
 O serviço sobe na porta 8081 e aplica as migrations (Flyway) ao iniciar. A cada 500 ms o relay publica os eventos pendentes do outbox no tópico SNS do LocalStack. Deixe esse terminal aberto.
 
-O `transfers` precisa do `accounts` no ar e roda num segundo terminal, com o mesmo `.env` carregado. Ele lê `TRANSFERS_DB_*` e `TRANSFERS_ACCOUNTS_URL` (padrão `http://localhost:8081`, o `accounts` chamado direto, sem o nginx):
+O `transfers` precisa do `accounts` no ar e roda num segundo terminal, com o mesmo `.env` carregado. Ele lê `TRANSFERS_DB_*`, `TRANSFERS_ACCOUNTS_URL` (padrão `http://localhost:8081`, o `accounts` chamado direto, sem o nginx) e `TRANSFERS_AWS_*` (LocalStack). As métricas `transfers.pending` e `transfers.oldest.pending.age` ficam em `/transfers/actuator/metrics`:
 ```bash
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 set -a; . infra/local/.env; set +a

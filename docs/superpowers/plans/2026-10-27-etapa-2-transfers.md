@@ -163,15 +163,15 @@
 ### Task 9: Portas e execução da saga (Marina, `dev-kotlin`)
 
 **Files:**
-- Create em `services/transfers/application/src/main/kotlin/…/transfers/application/`: `port/TransferRepository.kt`, `port/TransferStepLog.kt`, `port/AccountsGateway.kt`, `port/EventOutbox.kt`, `port/TransactionRunner.kt`, `port/IdGenerator.kt`, `usecase/RetryBackoff.kt`, `usecase/SagaSettings.kt`, `usecase/RunTransferSagaUseCase.kt`
-- Test: `application/src/test/kotlin/…/fake/` (`InMemoryTransferRepository`, `InMemoryTransferStepLog`, `FakeAccountsGateway` com roteiro de respostas por chamada, `FakeEventOutbox`, `ImmediateTransactionRunner`), `usecase/RetryBackoffTest.kt`, `usecase/RunTransferSagaUseCaseTest.kt`
+- Create em `services/transfers/application/src/main/kotlin/…/transfers/application/`: `port/TransferRepository.kt`, `port/TransferStepLog.kt`, `port/AccountsGateway.kt`, `port/EventOutbox.kt`, `port/TransactionRunner.kt`, `port/IdGenerator.kt`, `RetryBackoff.kt` (no pacote `application`, fora de `usecase`), `usecase/SagaSettings.kt`, `usecase/RunTransferSagaUseCase.kt`
+- Test: `application/src/test/kotlin/…/fake/` (`InMemoryTransferRepository`, `InMemoryTransferStepLog`, `FakeAccountsGateway` com roteiro de respostas por chamada, `FakeEventOutbox`, `ImmediateTransactionRunner`), `RetryBackoffTest.kt`, `usecase/RunTransferSagaUseCaseTest.kt`
 
 **Interfaces:**
 - Consumes: Task 8.
 - Produces:
   - `interface TransferRepository { fun findById(id: UUID): Transfer?; fun findByIdempotencyKey(key: String): Transfer?; fun insert(transfer: Transfer): Boolean /* false = chave já existe */; fun tryAcquireLease(id: UUID, owner: String, until: Instant, now: Instant): Boolean; fun saveIfOwner(transfer: Transfer, owner: String, nextAttemptAt: Instant?, leaseUntil: Instant): Boolean /* renova o arrendamento; nextAttemptAt nulo só em terminal */; fun releaseLease(id: UUID, owner: String); fun findDue(now: Instant, limit: Int): List<UUID> }`.
   - `interface TransferStepLog { fun append(record: StepRecord) }`; `data class StepRecord(val transferId: UUID, val step: String, val outcome: String, val httpStatus: Int?, val detail: String?, val at: Instant)`.
-  - `interface AccountsGateway { fun lookupAccount(id: UUID): AccountLookup; fun execute(call: AccountsCall): CallResult }`; `enum class AccountLookup { EXISTS, NOT_FOUND, UNAVAILABLE }`; `data class CallResult(val outcome: StepOutcome, val httpStatus: Int?, val detail: String?)`.
+  - `interface AccountsGateway { fun lookupAccount(id: UUID): AccountLookup; fun perform(call: AccountsCall): CallResult }`; `enum class AccountLookup { EXISTS, NOT_FOUND, UNAVAILABLE }`; `data class CallResult(val outcome: StepOutcome, val httpStatus: Int?, val detail: String?)`.
   - `interface EventOutbox { fun append(event: TransferEvent) }`; `TransactionRunner` e `IdGenerator` como no `accounts`.
   - `class RetryBackoff(initial: Duration, max: Duration) { fun delayBeforeRetry(attempt: Int): Duration }` — sem interface.
   - `data class SagaSettings(val deadline: Duration = 2.minutes, val lease: Duration = 30.seconds, val busyAttempts: Int = 3 /* chamadas no total para 503 */, val dueBatchSize: Int = 50, val callBudget: Duration = 4.seconds)`.
@@ -184,7 +184,7 @@
 ### Task 10: Pedir, consultar e retomar transferências (Marina, `dev-kotlin`)
 
 **Files:**
-- Create em `…/application/usecase/`: `RequestTransferCommand.kt`, `RequestTransferUseCase.kt`, `GetTransferUseCase.kt`, `ResumeDueTransfersUseCase.kt`; `…/application/ApplicationExceptions.kt`
+- Create em `…/application/usecase/`: `RequestTransferCommand.kt`, `RequestTransferUseCase.kt`, `GetTransferUseCase.kt`, `ResumeDueTransfersUseCase.kt`; `…/application/IdempotencyKeyReusedException.kt`
 - Test: `RequestTransferUseCaseTest.kt`, `GetTransferUseCaseTest.kt`, `ResumeDueTransfersUseCaseTest.kt`
 
 **Interfaces:**
@@ -253,7 +253,7 @@
 
 **Interfaces:**
 - Consumes: Tasks 2, 9–13.
-- Produces: aplicação completa; `owner` do agendador = `scheduler-<hostname>-<pid>`.
+- Produces: aplicação completa; `owner` do agendador único por execução = `scheduler-<hostname>-<pid>-<uuid>` (o `tryAcquireLease` aceita de novo o mesmo dono).
   - Métricas Micrometer `transfers.pending` (gauge) e `transfers.oldest.pending.age` (segundos), para enxergar compensação recusada em laço (spec, Riscos).
 
 - [ ] **Step 1:** ITs: WireMock falha o crédito 2 vezes com `503` e depois aceita → transferência `PENDING` na resposta e `COMPLETED` pelo agendador; crédito falhando até o prazo (prazo de 3 s no teste) e consulta `404 entry-not-found` → `COMPENSATED`, com a chamada de compensação na chave certa; requisição e agendador disputando a mesma transferência → cada chamada ao WireMock acontece no máximo uma vez por tentativa registrada em `transfer_step`; contexto reiniciado com transferência `PENDING` e arrendamento vencido → o novo contexto termina; eventos `TransferCompleted`, `TransferFailed` e `TransferCompensated` na fila `transfers-events-inspection.fifo` com `correlationId`; `transfers.pending` e `transfers.oldest.pending.age` no `/actuator/metrics` refletem uma transferência `PENDING`.
@@ -278,7 +278,7 @@
 **Interfaces:**
 - Consumes: Tasks 4, 14.
 
-- [ ] **Step 1:** Testes dos critérios de pronto 3 a 7 da spec, com os números exatos: 50 × 200 a partir de 5000 → 25 `COMPLETED`, 25 `FAILED`, origem 0, soma constante; 20 pedidos com a mesma chave → 1 transferência, 1 débito, 1 crédito (conferidos pela consulta por chave e pelo saldo); `accounts` parado depois do débito (prazo de 5 s por configuração): volta antes → `COMPLETED`; volta depois → `COMPENSATED`, destino sem crédito; `transfers` morto no meio e reiniciado → termina; eventos na fila de inspeção.
+- [ ] **Step 1:** Testes dos critérios de pronto 3 a 7 da spec, com os números exatos: 50 × 200 a partir de 5000 → 25 `COMPLETED`, 25 `FAILED`, origem 0, soma constante; 20 pedidos com a mesma chave → 1 transferência, 1 débito, 1 crédito (conferidos pela consulta por chave e pelo saldo); `accounts` parado depois do débito (prazo de 30 s por configuração; o reinício real do `accounts` leva de 6 a 10 s): volta antes → `COMPLETED`; volta depois → `COMPENSATED`, destino sem crédito; `transfers` morto no meio e reiniciado → termina; eventos na fila de inspeção.
 - [ ] **Step 2:** Rodar → falha; implementar; passa; `./gradlew build` verde; tempo do job `e2e` no relato.
 - [ ] **Step 3:** Commit `test(e2e): saga de transferência ponta a ponta`.
 

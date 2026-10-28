@@ -134,12 +134,12 @@ Corpo da transferência: `{id, sourceAccountId, destinationAccountId, amount, de
 
 **`RunTransferSagaUseCase`** (laço até um passo terminal ou uma espera):
 1. Chama o `accounts` conforme o passo atual (sem transação aberta).
-2. Numa transação: grava a linha em `transfer_step`; calcula o próximo passo pelo objeto do passo; atualiza a transferência; se chegou a um terminal, grava o evento no outbox; em falha passageira, `attempts + 1` e `next_attempt_at = agora + RetryBackoff`.
+2. Numa transação: atualiza a transferência só se ainda for o dono (`saveIfOwner`), renovando o arrendamento; depois grava as linhas em `transfer_step` e, se chegou a um terminal, o evento no outbox. Em falha passageira, `attempts + 1` e `next_attempt_at = agora + RetryBackoff` (compensação recusada usa a espera máxima); em passo que segue direto, `next_attempt_at = agora`; só em terminal `next_attempt_at` fica nulo. O `insert` já grava `next_attempt_at = created_at`, para a transferência nova ser retomada se o processo cair antes da primeira execução.
 3. Mudou de passo: `attempts = 0` e segue o laço. Falha passageira: solta o arrendamento e para.
 
 **Arrendamento (uma saga roda em um lugar só):**
-- Tomada: `UPDATE transfer SET locked_until = now() + :lease, lock_owner = :owner WHERE id = :id AND status = 'PENDING' AND (locked_until IS NULL OR locked_until < now())`; 1 linha = posse.
-- Cada gravação de passo confere `lock_owner`; se perdeu a posse (arrendamento venceu), a gravação é descartada e o laço para. A chamada repetida pelo novo dono é segura porque as chaves são idempotentes.
+- Tomada: `UPDATE transfer SET locked_until = :now + :lease, lock_owner = :owner WHERE id = :id AND status = 'PENDING' AND (locked_until IS NULL OR locked_until < :now OR lock_owner = :owner)`; 1 linha = posse. Como o mesmo dono pode tomar de novo, cada execução usa um dono próprio: `request-<uuid>` na requisição e `scheduler-<host>-<pid>-<uuid>` no agendador.
+- Cada gravação de passo confere `lock_owner` e `locked_until >= agora` e RENOVA o arrendamento (`locked_until = agora + lease`); se perdeu a posse, a gravação é descartada e o laço para. Antes de cada chamada ao `accounts` (inclusive as repetições de `503`), o laço para sem chamar nem gravar se sobra menos que `call-budget` (4 s; precisa cobrir conexão + leitura do cliente, conferido na partida) até o fim do arrendamento. A chamada repetida pelo novo dono é segura porque as chaves são idempotentes.
 - Arrendamento padrão 30 s (configurável), maior que o pior caso de um passo (3 tentativas × 4 s de chamada).
 - Nenhuma transação do banco fica aberta durante chamada HTTP.
 
@@ -152,7 +152,7 @@ Corpo da transferência: `{id, sourceAccountId, destinationAccountId, amount, de
 - `422 insufficient-available-balance` → recusa com motivo `INSUFFICIENT_AVAILABLE_BALANCE`;
 - `404 entry-not-found` na consulta → `ENTRY_NOT_FOUND`;
 - outros `4xx` (`404 account-not-found`, `400`, `422 idempotency-key-reused`) → recusa definitiva com o `type` do Problem Details como motivo;
-- `5xx` (inclui `503 account-busy`), timeout, conexão recusada → falha passageira.
+- `5xx` (inclui `503 account-busy`), `408`, `429`, timeout, conexão recusada, corpo `2xx` inesperado → falha passageira; `4xx` sem Problem Details legível → recusa com motivo `http-<status>`.
 
 ## 5. Esquema do banco (`transfers`)
 **`transfer`**
