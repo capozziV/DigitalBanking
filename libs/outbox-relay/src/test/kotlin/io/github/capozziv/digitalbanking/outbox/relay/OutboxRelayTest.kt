@@ -172,11 +172,27 @@ class OutboxRelayTest {
     fun `an account in backoff does not hold back other accounts`() {
         store.add(event(1, "A"), event(2, "B"))
         publisher.failOn(1)
-
-        relay.runCycle()
         relay.runCycle()
 
-        assertThat(publisher.attempted.map { it.position }).containsExactly(1, 2)
+        store.add(event(3, "B"), event(4, "A"))
+        relay.runCycle()
+
+        assertThat(publisher.published.map { it.position }).containsExactly(2, 3)
+        assertThat(publisher.attempted.map { it.position }).containsExactly(1, 2, 3)
+    }
+
+    @Test
+    fun `losing the leadership clears the backoff, so the next leadership retries at once`() {
+        store.add(event(1, "A"))
+        publisher.failOn(1)
+        relay.runCycle()
+        store.leader = false
+        relay.runCycle()
+        store.leader = true
+
+        relay.runCycle()
+
+        assertThat(publisher.attempted).hasSize(2)
     }
 
     @Test

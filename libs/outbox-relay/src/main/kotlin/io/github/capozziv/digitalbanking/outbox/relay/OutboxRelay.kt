@@ -26,7 +26,10 @@ class OutboxRelay(
 
     fun runCycle() {
         val ranAsLeader = store.asLeader(settings.lockKey) { publishBatch() }
-        if (ranAsLeader == null) log.debug("Outbox relay lock held by another instance; skipping cycle")
+        if (ranAsLeader == null) {
+            retryNotBefore.clear()
+            log.debug("Outbox relay lock held by another instance; skipping cycle")
+        }
         metrics.recordCycle()
         metrics.recordBacklog(store.backlog(clock.instant()))
     }

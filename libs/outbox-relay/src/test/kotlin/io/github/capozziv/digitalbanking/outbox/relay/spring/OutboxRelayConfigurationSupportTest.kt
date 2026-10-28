@@ -68,6 +68,7 @@ class OutboxRelayConfigurationSupportTest {
         runner.run { context ->
             assertThat(context).hasFailed()
             assertThat(context.startupFailure).hasStackTraceContaining("demo.aws")
+            assertThat(context.startupFailure).hasStackTraceContaining("demo.aws.region and demo.aws.topic-arn are required")
         }
     }
 
