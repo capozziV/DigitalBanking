@@ -5,13 +5,18 @@ O valor do projeto está em resolver bem consistência, idempotência, mensageri
 
 Responder sempre em português. O board no GitHub Projects é escrito em inglês.
 
-## Contexto (leia antes de qualquer tarefa)
-- [Board no GitHub Projects](https://github.com/users/capozziV/projects/2) — fonte das tasks, do débito técnico, das decisões pendentes e das tarefas do usuário; regras de colunas e campos em "Como usar o board" do `docs/status.md`
-- @docs/status.md — resumo: fase atual, histórico, como rodar, convenções e ambiente
-- @docs/arquitetura.md — stack, serviços, decisões e a lista "Em aberto"
-- @docs/roadmap.md — etapas do projeto
-- @CONTEXT.md — linguagem do domínio; o glossário dá o termo em português (docs e conversa) e o nome em inglês usado no código
-- ADRs em `docs/adr/` — o porquê de cada decisão
+## Contexto
+Carregados sempre:
+- @docs/status.md — fase atual, histórico, como rodar, convenções, ambiente e regras do board
+- @CONTEXT.md — glossário: termo em português (docs e conversa) e nome em inglês (código)
+
+Leia sob demanda:
+- [docs/arquitetura.md](docs/arquitetura.md) — stack, serviços, decisões e a lista "Em aberto"; leia antes de tarefa que toque stack, serviços, decisões técnicas ou "Em aberto".
+- [docs/roadmap.md](docs/roadmap.md) — etapas; leia ao planejar ou começar uma etapa.
+- ADRs em `docs/adr/` — o porquê de cada decisão.
+- [Board no GitHub Projects](https://github.com/users/capozziV/projects/2) — fonte das tasks, do débito técnico, das decisões pendentes e das tarefas do usuário.
+
+Agentes recebem do coordenador o trecho de cada documento que precisam.
 
 ## Regras inegociáveis
 - Código Kotlin (classes, funções, variáveis, pacotes, testes, comentários e mensagens de log) sempre em inglês, com os nomes de código do `CONTEXT.md`. Documentação, ADRs e commits seguem em português.
@@ -27,7 +32,7 @@ Responder sempre em português. O board no GitHub Projects é escrito em inglês
 - Se faltar algo necessário (acesso, segredo, ferramenta, decisão), dizer o que falta e parar. Nunca simular nem adivinhar.
 
 ## Fluxo de trabalho (skills)
-Todo trabalho no projeto passa pelos skills dos plugins **Superpowers** e **Matt Pocock**, sessão principal e agentes. Antes de agir, identifique a situação abaixo e carregue o skill dela com a ferramenta `Skill`; um skill por situação, sem alternar entre equivalentes dos dois plugins.
+Todo trabalho, da sessão principal e dos agentes, passa pelos skills dos plugins **Superpowers** e **Matt Pocock**. Antes de agir, identifique a situação abaixo e carregue o skill dela com `Skill`; um skill por situação, sem alternar entre equivalentes dos dois plugins.
 
 | Situação | Skill |
 |---|---|
@@ -52,7 +57,7 @@ Todo trabalho no projeto passa pelos skills dos plugins **Superpowers** e **Matt
 | Editar `CLAUDE.md`, agentes ou skills | `mattpocock-skills:writing-for-agents` |
 
 ## Agentes do projeto
-Quem executa cada papel do fluxo acima são os agentes de `.claude/agents/`, chamados pelo identificador no `Agent`:
+Os papéis do fluxo são executados pelos agentes de `.claude/agents/`:
 
 | Papel | Nome | Agente |
 |---|---|---|
@@ -75,7 +80,7 @@ Commits e pushes saem só com o autor do usuário (capozziV <vitorcapozzi4@gmail
 Atualizar o board e o `docs/status.md` (o coordenador faz isso; especialistas reportam o que mudou).
 
 ## Grafo do código (graphify)
-- Com `graphify-out/graph.json` presente, toda pergunta sobre o código começa por `graphify query "<pergunta>"`; use `graphify path "<A>" "<B>"` para a relação entre dois pontos e `graphify explain "<conceito>"` para um conceito. Leia arquivos de código só nas linhas que o grafo já localizou, e repita esta regra no prompt de todo agente que explore código.
+- Com `graphify-out/graph.json` presente, toda pergunta sobre o código começa por `graphify query "<pergunta>"`; `graphify path "<A>" "<B>"` dá a relação entre dois pontos e `graphify explain "<conceito>"` explica um conceito. Leia código só nas linhas que o grafo localizou e repita esta regra no prompt de todo agente que explore código.
 - `graphify-out/GRAPH_REPORT.md` serve para revisão ampla de arquitetura, quando `query`, `path` e `explain` não bastam.
 - Depois de mudar código, rode `graphify update .` (só AST, sem custo de API); o hook do git também reconstrói o grafo a cada commit.
-- `graphify-out/` é versionado e reescrito inteiro a cada build: o diff grande dele faz parte de todo commit e PR que mexe em código.
+- `graphify-out/` é versionado e reescrito inteiro a cada build: seu diff grande faz parte de todo commit e PR que mexe em código.
