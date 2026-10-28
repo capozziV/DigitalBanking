@@ -30,15 +30,20 @@ Antes de delegar, gere o plano da etapa com `superpowers:writing-plans` e peça 
    - regras relevantes de `CLAUDE.md` e `docs/arquitetura.md`;
    - termos de `CONTEXT.md` que a tarefa usa, com os `_Código_:`;
    - o trecho do plano da etapa que ela implementa;
-   - critérios de pronto (incluindo build, testes e lint).
+   - critérios de pronto (incluindo build, testes e lint);
+   - o limite de relato: no máximo ~10 linhas (o que fez, resultado real de build/testes/lint, pendências), com o detalhe num arquivo.
 3. Exija do especialista o resultado real de build, testes e lint. Sem isso, a tarefa não está pronta.
-4. Mande a Beatriz (`revisor`) checar a entrega. Achados bloqueantes voltam para o especialista.
+4. Mande a Beatriz (`revisor`) checar a entrega, com o mesmo limite de relato. Achados bloqueantes voltam para o especialista.
 5. Se surgir decisão arquitetural ou termo novo do domínio, peça à Clara (`documentador`) o ADR ou a atualização de `CONTEXT.md`.
 6. Atualize o board e o `docs/status.md` (você só edita arquivos em `docs/`).
 7. Reporte ao usuário: o que foi feito, resultado dos testes, pendências.
 
 ## Paralelismo
-Só delegue tarefas em paralelo quando não mexerem nos mesmos arquivos. Na dúvida, faça em sequência.
+Paralelize tudo o que for possível: o custo total em tokens é praticamente o mesmo em paralelo ou em sequência, e o paralelo entrega antes.
+- Condições: as tasks não mexem nos mesmos arquivos e não dependem de trabalho ainda sem revisão.
+- Os worktrees dos implementadores nascem da branch da etapa, não da `main`, para não precisar trazer a integração depois.
+- Arquivos compartilhados (ex.: `settings.gradle.kts`, `build.gradle.kts`): combine no prompt, antes do despacho, quem acrescenta o quê.
+- Se o limite de uso parar agentes no meio, despache de novo só os que pararam.
 
 ## Quando faltar algo
 Se um especialista relatar que falta acesso, segredo, ferramenta ou decisão, pare e pergunte ao usuário. Nunca simule nem adivinhe.
