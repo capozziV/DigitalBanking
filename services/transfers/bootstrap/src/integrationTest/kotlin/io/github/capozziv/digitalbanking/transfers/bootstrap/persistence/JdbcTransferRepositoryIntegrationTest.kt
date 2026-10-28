@@ -152,7 +152,7 @@ class JdbcTransferRepositoryIntegrationTest : TransfersIntegrationTest() {
         val nextAttempt = now.plusSeconds(5)
         val renewed = now.plusSeconds(60)
 
-        assertThat(repository.saveIfOwner(next, "a", nextAttempt, renewed)).isTrue()
+        assertThat(repository.saveIfOwner(next, "a", nextAttempt, renewed, now)).isTrue()
 
         assertThat(repository.findById(transfer.id)).isEqualTo(next)
         assertThat(nextAttemptAt(transfer)).isEqualTo(nextAttempt)
@@ -166,7 +166,7 @@ class JdbcTransferRepositoryIntegrationTest : TransfersIntegrationTest() {
         val now = transfer.createdAt.plusSeconds(1)
         repository.tryAcquireLease(transfer.id, "a", now.plusSeconds(30), now)
 
-        val saved = repository.saveIfOwner(transfer.copy(step = TransferStep.Credit, updatedAt = now), "b", now, now.plusSeconds(60))
+        val saved = repository.saveIfOwner(transfer.copy(step = TransferStep.Credit, updatedAt = now), "b", now, now.plusSeconds(60), now)
 
         assertThat(saved).isFalse()
         assertThat(repository.findById(transfer.id)).isEqualTo(transfer)
@@ -182,10 +182,34 @@ class JdbcTransferRepositoryIntegrationTest : TransfersIntegrationTest() {
         repository.tryAcquireLease(transfer.id, "a", now.plusSeconds(30), now)
         val late = now.plusSeconds(31)
 
-        val saved = repository.saveIfOwner(transfer.copy(step = TransferStep.Credit, updatedAt = late), "a", late, late.plusSeconds(30))
+        val saved =
+            repository.saveIfOwner(
+                transfer.copy(step = TransferStep.Credit, updatedAt = late),
+                "a",
+                late,
+                late.plusSeconds(30),
+                late,
+            )
 
         assertThat(saved).isFalse()
         assertThat(repository.findById(transfer.id)).isEqualTo(transfer)
+    }
+
+    @Test
+    fun `saveIfOwner judges the lease at the given now, not at the transfer updatedAt`() {
+        val transfer = aTransfer()
+        repository.insert(transfer)
+        val start = transfer.createdAt
+        repository.tryAcquireLease(transfer.id, "a", start.plusSeconds(30), start)
+        val staleStamp = transfer.copy(step = TransferStep.Credit, updatedAt = start.plusSeconds(100))
+
+        // updatedAt is after the lease end, but the save happens while the lease still holds.
+        assertThat(repository.saveIfOwner(staleStamp, "a", start, start.plusSeconds(60), start.plusSeconds(5))).isTrue()
+
+        val earlyStamp = staleStamp.copy(step = TransferStep.ResolveCredit, updatedAt = start)
+        // updatedAt is inside the old lease, but the renewed lease (60 s) is over at the given now.
+        assertThat(repository.saveIfOwner(earlyStamp, "a", start, start.plusSeconds(120), start.plusSeconds(61))).isFalse()
+        assertThat(repository.findById(transfer.id)).isEqualTo(staleStamp)
     }
 
     @Test
@@ -193,7 +217,9 @@ class JdbcTransferRepositoryIntegrationTest : TransfersIntegrationTest() {
         val transfer = aTransfer()
         repository.insert(transfer)
 
-        assertThat(repository.saveIfOwner(transfer, "a", transfer.createdAt, transfer.createdAt.plusSeconds(30))).isFalse()
+        assertThat(
+            repository.saveIfOwner(transfer, "a", transfer.createdAt, transfer.createdAt.plusSeconds(30), transfer.createdAt),
+        ).isFalse()
     }
 
     @Test
@@ -204,9 +230,23 @@ class JdbcTransferRepositoryIntegrationTest : TransfersIntegrationTest() {
         repository.tryAcquireLease(transfer.id, "a", now.plusSeconds(1), now)
         val done = transfer.copy(step = TransferStep.Completed, updatedAt = now)
 
-        assertThat(repository.saveIfOwner(done, "a", null, now.plusSeconds(1))).isTrue()
+        assertThat(repository.saveIfOwner(done, "a", null, now.plusSeconds(1), now)).isTrue()
 
         assertThat(nextAttemptAt(transfer)).isNull()
+        assertThat(repository.findDue(now.plusSeconds(3600), 10)).isEmpty()
+    }
+
+    @Test
+    fun `a terminal transfer is never due even with a next attempt in the past`() {
+        val transfer = aTransfer()
+        repository.insert(transfer)
+        val now = transfer.createdAt
+        repository.tryAcquireLease(transfer.id, "a", now.plusSeconds(1), now)
+        val done = transfer.copy(step = TransferStep.Completed, updatedAt = now)
+
+        assertThat(repository.saveIfOwner(done, "a", now, now.plusSeconds(1), now)).isTrue()
+
+        assertThat(nextAttemptAt(transfer)).isEqualTo(now)
         assertThat(repository.findDue(now.plusSeconds(3600), 10)).isEmpty()
     }
 
@@ -225,17 +265,15 @@ class JdbcTransferRepositoryIntegrationTest : TransfersIntegrationTest() {
     }
 
     @Test
-    fun `findDue skips future, terminal, leased and null-next-attempt transfers and honours the limit`() {
+    fun `findDue skips future, terminal and leased transfers and honours the limit`() {
         val now = microsNow()
         val due1 = aTransfer(createdAt = now.minusSeconds(30))
         val due2 = aTransfer(createdAt = now.minusSeconds(20))
         val future = aTransfer(createdAt = now.plusSeconds(60))
         val terminal = aTransfer(createdAt = now.minusSeconds(30), step = TransferStep.Completed)
         val leased = aTransfer(createdAt = now.minusSeconds(30))
-        val nullNext = aTransfer(createdAt = now.minusSeconds(30))
-        listOf(due1, due2, future, terminal, leased, nullNext).forEach(repository::insert)
+        listOf(due1, due2, future, terminal, leased).forEach(repository::insert)
         repository.tryAcquireLease(leased.id, "a", now.plusSeconds(30), now)
-        ownerJdbc.sql("update transfer set next_attempt_at = null where id = :id").param("id", nullNext.id).update()
 
         assertThat(repository.findDue(now, 10)).containsExactly(due1.id, due2.id)
         assertThat(repository.findDue(now, 1)).containsExactly(due1.id)

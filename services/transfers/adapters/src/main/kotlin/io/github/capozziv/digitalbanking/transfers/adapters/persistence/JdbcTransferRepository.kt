@@ -84,12 +84,13 @@ class JdbcTransferRepository(
             .param("now", now.utc())
             .update() == 1
 
-    /** The lease is valid at the instant the saga stamped on the transfer (`updatedAt`). */
+    /** The lease must be valid at [now]; `updated_at` is only data, it takes no part in the decision. */
     override fun saveIfOwner(
         transfer: Transfer,
         owner: String,
         nextAttemptAt: Instant?,
         leaseUntil: Instant,
+        now: Instant,
     ): Boolean =
         jdbcClient
             .sql(
@@ -107,7 +108,7 @@ class JdbcTransferRepository(
             .param("updatedAt", transfer.updatedAt.utc())
             .param("id", transfer.id)
             .param("owner", owner)
-            .param("now", transfer.updatedAt.utc())
+            .param("now", now.utc())
             .update() == 1
 
     override fun releaseLease(

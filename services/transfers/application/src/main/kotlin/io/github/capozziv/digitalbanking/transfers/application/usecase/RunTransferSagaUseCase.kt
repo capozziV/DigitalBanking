@@ -97,7 +97,7 @@ class RunTransferSagaUseCase(
 
                 val saved =
                     tx.inTransaction {
-                        val owned = transfers.saveIfOwner(next, owner, nextAttemptAt, renewedUntil)
+                        val owned = transfers.saveIfOwner(next, owner, nextAttemptAt, renewedUntil, at)
                         if (owned) {
                             pending.forEach(stepLog::append)
                             if (event != null) outbox.append(event)
