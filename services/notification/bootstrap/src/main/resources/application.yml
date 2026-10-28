@@ -7,3 +7,12 @@ spring:
   threads:
     virtual:
       enabled: true
+  datasource:
+    url: ${NOTIFICATION_DB_URL:jdbc:postgresql://localhost:5432/notification}
+    username: ${NOTIFICATION_DB_USER:notification_app}
+    password: ${NOTIFICATION_DB_PASSWORD:notification_app}
+  flyway:
+    user: ${NOTIFICATION_DB_OWNER_USER:notification_owner}
+    password: ${NOTIFICATION_DB_OWNER_PASSWORD:notification_owner}
+    placeholders:
+      appUser: ${NOTIFICATION_DB_USER:notification_app}

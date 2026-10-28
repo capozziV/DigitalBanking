@@ -148,6 +148,8 @@ class SqsListenerFifoIntegrationTest {
                     )
                 }
             }
+            // The whole application starts, so it needs its database too.
+            NotificationIntegrationTest.databaseProperties(registry)
             registry.add("spring.cloud.aws.sqs.endpoint") { localStack.endpoint.toString() }
             registry.add("spring.cloud.aws.region.static") { localStack.region }
             registry.add("spring.cloud.aws.credentials.access-key") { localStack.accessKey }

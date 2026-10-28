@@ -4,6 +4,9 @@ dependencies {
     implementation(project(":services:notification:domain"))
     implementation(project(":services:notification:application"))
 
+    implementation("org.springframework.boot:spring-boot-starter-jdbc")
+    implementation(libs.java.uuid.generator)
+
     // The project's AWS SDK BOM sits next to the Spring Cloud AWS one so its (newer) SDK version wins.
     implementation(platform(libs.spring.cloud.aws.bom))
     implementation(platform(libs.aws.sdk.bom))
