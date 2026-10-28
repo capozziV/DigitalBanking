@@ -1,6 +1,7 @@
 package io.github.capozziv.digitalbanking.transfers.bootstrap.persistence
 
 import io.github.capozziv.digitalbanking.transfers.bootstrap.TransfersIntegrationTest
+import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -42,37 +43,48 @@ class TransferSchemaIntegrationTest : TransfersIntegrationTest() {
             .update()
     }
 
+    private fun assertViolates(
+        constraint: String,
+        insert: () -> Unit,
+    ) {
+        assertThatThrownBy(insert)
+            .isInstanceOf(DataIntegrityViolationException::class.java)
+            .hasMessageContaining("\"$constraint\"")
+    }
+
     @Test
     fun `a valid row is accepted`() {
         insertRaw()
         insertRaw(status = "COMPLETED", step = "COMPLETED", nextAttemptAt = null)
+
+        val rows = ownerJdbc.sql("select count(*) from transfer").query(Int::class.java).single()
+        assertThat(rows).isEqualTo(2)
     }
 
     @Test
     fun `rejects a zero or negative amount`() {
-        assertThatThrownBy { insertRaw(amount = 0) }.isInstanceOf(DataIntegrityViolationException::class.java)
-        assertThatThrownBy { insertRaw(amount = -5) }.isInstanceOf(DataIntegrityViolationException::class.java)
+        assertViolates("transfer_amount_check") { insertRaw(amount = 0) }
+        assertViolates("transfer_amount_check") { insertRaw(amount = -5) }
     }
 
     @Test
     fun `rejects the same source and destination`() {
         val account = UUID.randomUUID()
-        assertThatThrownBy { insertRaw(source = account, destination = account) }
-            .isInstanceOf(DataIntegrityViolationException::class.java)
+        assertViolates("transfer_check") { insertRaw(source = account, destination = account) }
     }
 
     @Test
     fun `rejects an unknown status`() {
-        assertThatThrownBy { insertRaw(status = "DONE") }.isInstanceOf(DataIntegrityViolationException::class.java)
+        assertViolates("transfer_status_check") { insertRaw(status = "DONE") }
     }
 
     @Test
     fun `rejects an unknown step`() {
-        assertThatThrownBy { insertRaw(step = "NOPE") }.isInstanceOf(DataIntegrityViolationException::class.java)
+        assertViolates("transfer_step_known") { insertRaw(step = "NOPE") }
     }
 
     @Test
     fun `rejects a pending transfer without a next attempt`() {
-        assertThatThrownBy { insertRaw(nextAttemptAt = null) }.isInstanceOf(DataIntegrityViolationException::class.java)
+        assertViolates("transfer_pending_has_next_attempt") { insertRaw(nextAttemptAt = null) }
     }
 }

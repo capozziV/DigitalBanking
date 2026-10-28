@@ -18,7 +18,7 @@ import java.io.IOException
 import java.lang.reflect.UndeclaredThrowableException
 
 /** A failure after the transfer save (step log, outbox) must undo everything the transaction wrote. */
-class TransactionRunnerIntegrationTest : TransfersIntegrationTest() {
+class SpringTransactionRunnerIntegrationTest : TransfersIntegrationTest() {
     @Autowired
     private lateinit var runner: TransactionRunner
 
@@ -59,7 +59,9 @@ class TransactionRunnerIntegrationTest : TransfersIntegrationTest() {
         transfer: Transfer,
         done: Transfer,
     ) {
-        repository.saveIfOwner(done, "a", null, done.updatedAt.plusSeconds(30), done.updatedAt)
+        check(repository.saveIfOwner(done, "a", null, done.updatedAt.plusSeconds(30), done.updatedAt)) {
+            "precondition: save must succeed before the failure"
+        }
         stepLog.append(StepRecord(transfer.id, "CREDIT", "SUCCESS", 201, null, done.updatedAt))
     }
 

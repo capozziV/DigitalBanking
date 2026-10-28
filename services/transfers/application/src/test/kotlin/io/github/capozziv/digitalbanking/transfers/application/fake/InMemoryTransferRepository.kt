@@ -79,7 +79,8 @@ class InMemoryTransferRepository : TransferRepository {
                 leases[transfer.id] = Lease("someone-else", Instant.MAX)
             }
         }
-        if (leases[transfer.id]?.owner != owner) return false
+        val lease = leases[transfer.id]
+        if (lease?.owner != owner || lease.until.isBefore(now)) return false
         transfers[transfer.id] = transfer
         nextAttempts[transfer.id] = nextAttemptAt
         leases[transfer.id] = Lease(owner, leaseUntil)
