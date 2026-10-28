@@ -4,8 +4,8 @@
 
 **Última atualização:** 2026-10-28
 **Board:** [Digital Banking no GitHub Projects](https://github.com/users/capozziV/projects/2)
-**Fase atual:** etapa 2 concluída no código ([spec](superpowers/specs/2026-10-27-etapa-2-transfers-design.md), [plano](superpowers/plans/2026-10-27-etapa-2-transfers.md), [ADR 0016](adr/0016-saga-orquestrada-por-http.md)): bloco 1 com merge no PR #91; bloco 2 (`transfers` com a saga) no PR da branch `etapa-2-bloco-2`.
-**Próximo passo:** merge do PR do bloco 2 (CI verde e revisão aprovada) e, depois, a etapa 3 (mensageria), começando pelo brainstorming.
+**Fase atual:** etapa 2 concluída ([spec](superpowers/specs/2026-10-27-etapa-2-transfers-design.md), [plano](superpowers/plans/2026-10-27-etapa-2-transfers.md), [ADR 0016](adr/0016-saga-orquestrada-por-http.md)): bloco 1 no PR #91 e bloco 2 no PR #97, ambos com merge na `main` e CI verde (inclusive o job `e2e` no GitHub).
+**Próximo passo:** etapa 3 (mensageria: filas SQS + DLQ, `notification`, consumidores idempotentes), começando pelo brainstorming (cartão #10).
 
 ## Como usar o board
 - Colunas: **Backlog** (tem pendência técnica ou de regra de negócio sem resposta, ou a etapa anterior ainda não está em Done), **Ready** (sem pendência e com a etapa anterior em Done), **In progress**, **In review** (revisão da Beatriz) e **Done** (revisado, build, testes e lint verdes, merge feito).
