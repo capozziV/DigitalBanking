@@ -58,7 +58,7 @@ Preencha `LOCALSTACK_AUTH_TOKEN` no `infra/local/.env`. Os outros valores do `.e
 ```bash
 docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml up --wait
 ```
-O comando volta quando os quatro contêineres estão saudáveis. Sem o token, o `up --wait` volta com erro porque o LocalStack encerra, mas PostgreSQL, Redis e nginx ficam de pé. O LocalStack só fica saudável depois que o script de `infra/local/localstack/init/ready.d/` cria o tópico `accounts-events.fifo` e a fila `accounts-events-inspection.fifo`, assinada nele. O script de init do PostgreSQL (`infra/local/postgres/init/01-create-service-databases.sh`) cria um banco por serviço, cada um com dois roles: `<serviço>_owner` (dono, usado pelo Flyway) e `<serviço>_app` (só `LOGIN`; as permissões vêm das migrations). Hoje são `accounts` e `transfers`. Os dados ficam no volume nomeado `postgres-data`, que sobrevive a `down` e `up`; o script só roda com volume novo, então, se mudar senhas ou o script, recrie com `down -v` (passo 8). O script é idempotente: para rodá-lo de novo sem apagar nada, execute `docker compose exec postgres /docker-entrypoint-initdb.d/01-create-service-databases.sh`. Ele cria só o que falta e não troca a senha de um role que já existe.
+O comando volta quando os quatro contêineres estão saudáveis. Sem o token, o `up --wait` volta com erro porque o LocalStack encerra, mas PostgreSQL, Redis e nginx ficam de pé. O LocalStack só fica saudável depois que os scripts de `infra/local/localstack/init/ready.d/` criam os tópicos `accounts-events.fifo` e `transfers-events.fifo`, cada um com sua fila de inspeção assinada (`accounts-events-inspection.fifo` e `transfers-events-inspection.fifo`). O script de init do PostgreSQL (`infra/local/postgres/init/01-create-service-databases.sh`) cria um banco por serviço, cada um com dois roles: `<serviço>_owner` (dono, usado pelo Flyway) e `<serviço>_app` (só `LOGIN`; as permissões vêm das migrations). Hoje são `accounts` e `transfers`. Os dados ficam no volume nomeado `postgres-data`, que sobrevive a `down` e `up`; o script só roda com volume novo, então, se mudar senhas ou o script, recrie com `down -v` (passo 8). O script é idempotente: para rodá-lo de novo sem apagar nada, execute `docker compose exec postgres /docker-entrypoint-initdb.d/01-create-service-databases.sh`. Ele cria só o que falta e não troca a senha de um role que já existe.
 
 Para adicionar o banco de um serviço novo: acrescente ao fim do script a linha `create_service_db <serviço> <SERVICO>_DB_OWNER_PASSWORD <SERVICO>_DB_PASSWORD` (os dois últimos argumentos são os nomes das variáveis com as senhas), declare essas duas variáveis no `environment` do `postgres` em `docker-compose.yml` e em `infra/local/.env.example`, e recrie o volume com `down -v`.
 
@@ -96,7 +96,7 @@ Primeiro o health, que deve responder `"status":"UP"`; depois o smoke, que abre 
 curl http://localhost/accounts/actuator/health
 infra/local/smoke.sh http://localhost
 ```
-O smoke é o mesmo que roda no CI e termina com `OK: eventos da conta <id> na fila accounts-events-inspection.fifo: AccountOpened LedgerEntryRecorded:1 LedgerEntryRecorded:2`. Ele apaga da fila só as mensagens da conta que criou; as de outras contas ficam escondidas por 2 minutos depois do smoke. Como a fila não tem consumidor, ela acumula: se o smoke não achar os próprios eventos, recrie o ambiente com `down -v`. A mesma sequência à mão:
+O smoke é o mesmo que roda no CI. Na parte do `accounts`, ele imprime `OK: eventos de <id> na fila accounts-events-inspection.fifo: AccountOpened LedgerEntryRecorded:1 LedgerEntryRecorded:2`; a última linha é a do `transfers`: `OK: eventos de <transferId> na fila transfers-events-inspection.fifo: TransferCompleted`. Ele apaga da fila só as mensagens da conta que criou; as de outras contas ficam escondidas por 2 minutos depois do smoke. Como a fila não tem consumidor, ela acumula: se o smoke não achar os próprios eventos, recrie o ambiente com `down -v`. A mesma sequência à mão:
 ```bash
 ACCOUNT_ID=$(curl -sS -X POST http://localhost/accounts \
   -H 'Content-Type: application/json' -H "Idempotency-Key: $(uuidgen)" \
@@ -115,7 +115,7 @@ curl -sS http://localhost/accounts/$ACCOUNT_ID
 A última resposta mostra `"balance":700`. Valores em centavos. `Idempotency-Key` é obrigatório nos `POST`; repetir a mesma chave devolve `200` com o resultado original. O header `X-Correlation-Id` é repassado pelo nginx e devolvido na resposta.
 
 ### Transferência
-O smoke acima também cobre o `transfers`: abre duas contas, credita 1000 na origem, transfere 400, espera o status `COMPLETED`, confere os saldos (600 na origem, 400 no destino) e o evento `TransferCompleted` na fila `transfers-events-inspection.fifo`. A mesma sequência à mão (reaproveita o `ACCOUNT_ID` do passo anterior como origem, com saldo 700):
+O smoke acima também cobre o `transfers`: abre duas contas, credita 1000 na origem, transfere 400, espera o status `COMPLETED`, confere os saldos (600 na origem, 400 no destino) e o evento `TransferCompleted` na fila `transfers-events-inspection.fifo`. A mesma sequência à mão (reaproveita o `ACCOUNT_ID` do passo anterior como origem, que precisa de saldo para os 400; com o saldo 700 do passo anterior, sobra 300):
 ```bash
 DESTINATION_ID=$(curl -sS -X POST http://localhost/accounts \
   -H 'Content-Type: application/json' -H "Idempotency-Key: $(uuidgen)" \
@@ -134,7 +134,7 @@ curl -sS http://localhost/accounts/$DESTINATION_ID | jq .balance
 O health do serviço sai em `http://localhost/transfers/actuator/health`.
 
 ## 6. Ver os eventos na fila de inspeção
-Cada evento publicado chega à fila `accounts-events-inspection.fifo`, que não tem consumidor. O corpo é o envelope do evento e `eventType` e `correlationId` vêm como atributos da mensagem. A CLI da AWS que vem na imagem do LocalStack lê a fila sem instalar nada no Mac:
+Cada evento do `accounts` chega à fila `accounts-events-inspection.fifo`, e cada evento do `transfers` à `transfers-events-inspection.fifo`; nenhuma das duas tem consumidor (troque o nome da fila nos comandos abaixo para ler a do `transfers`). O corpo é o envelope do evento e `eventType` e `correlationId` vêm como atributos da mensagem. A CLI da AWS que vem na imagem do LocalStack lê a fila sem instalar nada no Mac:
 ```bash
 docker compose -f infra/local/docker-compose.yml exec -T \
   -e AWS_ACCESS_KEY_ID=test -e AWS_SECRET_ACCESS_KEY=test -e AWS_DEFAULT_REGION=us-east-1 \

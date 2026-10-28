@@ -185,7 +185,7 @@ Corpo da transferência: `{id, sourceAccountId, destinationAccountId, amount, de
 - **Aplicação:** casos de uso com `AccountsGateway` falso (sucesso, recusa, falha passageira, timeout), relógio controlado e repositórios em memória; prazo vencido; perda do arrendamento.
 - **Integração do `transfers`** (Testcontainers PostgreSQL + WireMock no lugar do `accounts`): classificação de cada resposta; tentativas rápidas para `503`; `RESOLVE_*`; arrendamento disputado entre requisição e agendador; retomada depois de reiniciar o contexto; idempotência do `POST`; outbox e relay com LocalStack; ArchUnit pelas regras de `libs/testing-architecture`.
 - **`accounts`:** integração do endpoint de consulta por chave.
-- **Ponta a ponta (`tests/e2e`):** os dois serviços como processos (`java -jar` dos `bootJar`), PostgreSQL e LocalStack por Testcontainers; cobre os critérios 3 a 7. A queda é simulada matando e reiniciando o processo; o prazo é reduzido por configuração no teste (por exemplo, 5 s).
+- **Ponta a ponta (`tests/e2e`):** os dois serviços como processos (`java -jar` dos `bootJar`), PostgreSQL e LocalStack por Testcontainers; cobre os critérios 3 a 7. A queda é simulada matando e reiniciando o processo; o prazo é reduzido por configuração no teste para 30 s (arrendamento 16 s, `call-budget` 11 s), porque o reinício real do `accounts` leva de 6 a 10 s; um proxy HTTP de teste entre os dois serviços segura a chamada no passo em que o teste derruba um processo.
 - **Smoke do CI:** os dois jars, compose, transferência pelo nginx e eventos nas duas filas de inspeção.
 
 ## 9. Ambiente local e CI
