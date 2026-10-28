@@ -75,14 +75,17 @@ class ListNotificationsUseCaseTest {
 
     @Test
     fun `paging across a tie on the page boundary neither repeats nor skips`() {
-        val tied = (1..2).map { tied(it) }
-        val older = store(19)
+        val newer = store(19)
+        val tied = (1..3).map { notification(customer, 100 + it).copy(createdAt = start.minusSeconds(60)) }
         repository.saveAll(tied)
-        val expected = (tied + older).sortedWith(compareByDescending<Notification> { it.createdAt }.thenByDescending { it.id.toString() })
+        val expected = (newer + tied).sortedWith(compareByDescending<Notification> { it.createdAt }.thenByDescending { it.id.toString() })
 
         val first = useCase.list(customer, null)
         val second = useCase.list(customer, first.nextCursor)
 
+        assertThat(first.items).hasSize(20)
+        assertThat(second.items).hasSize(2)
+        assertThat(first.items.last().createdAt).isEqualTo(second.items.first().createdAt)
         assertThat(first.items.map { it.id } + second.items.map { it.id }).isEqualTo(expected.map { it.id })
         assertThat(second.nextCursor).isNull()
     }
