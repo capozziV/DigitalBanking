@@ -154,10 +154,12 @@ class OutboxRelayIntegrationTest : AccountsIntegrationTest() {
             } finally {
                 running.set(false)
                 loops.shutdown()
-                assertThat(loops.awaitTermination(30, TimeUnit.SECONDS)).isTrue()
-                // A cycle that threw ends its loop; get() rethrows it here instead of losing it.
-                loopResults.forEach { it.get() }
+                // Only waits: a failure here must not replace the exception that brought us to this finally.
+                loops.awaitTermination(30, TimeUnit.SECONDS)
             }
+        assertThat(loops.isTerminated).isTrue()
+        // A cycle that threw ends its loop; get() rethrows it here instead of losing it.
+        loopResults.forEach { it.get() }
         assertThat(cycles.map { it.get() }).allSatisfy { assertThat(it).isPositive() }
 
         val expectedPerAccount = CREDITS_PER_ACCOUNT + 1

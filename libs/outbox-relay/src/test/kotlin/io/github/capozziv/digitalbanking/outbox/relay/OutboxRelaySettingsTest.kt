@@ -17,6 +17,21 @@ class OutboxRelaySettingsTest {
     }
 
     @Test
+    fun `retry backoff defaults to one second doubling up to thirty`() {
+        val settings = OutboxRelaySettings(lockKey = 1)
+
+        assertThat(settings.retryBackoff).isEqualTo(Duration.ofSeconds(1))
+        assertThat(settings.maxRetryBackoff).isEqualTo(Duration.ofSeconds(30))
+    }
+
+    @Test
+    fun `the maximum backoff cannot be below the initial one`() {
+        assertThatThrownBy {
+            OutboxRelaySettings(lockKey = 1, retryBackoff = Duration.ofSeconds(5), maxRetryBackoff = Duration.ofSeconds(1))
+        }.isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
     fun `durations must be positive`() {
         assertThatThrownBy { OutboxRelaySettings(lockKey = 1, publishTimeout = Duration.ZERO) }
             .isInstanceOf(IllegalArgumentException::class.java)

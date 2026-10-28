@@ -51,7 +51,11 @@ abstract class OutboxRelayConfigurationSupport(
         Binder
             .get(environment)
             .bind("$propertyPrefix.aws", Bindable.of(AwsProperties::class.java))
-            .get()
+            .orElseThrow {
+                IllegalStateException(
+                    "Missing configuration: $propertyPrefix.aws.region and $propertyPrefix.aws.topic-arn are required",
+                )
+            }
 
     @Bean
     fun outboxRelaySettings(properties: OutboxRelayProperties) =
@@ -61,6 +65,8 @@ abstract class OutboxRelayConfigurationSupport(
             lockKey = lockKey,
             publishTimeout = properties.publishTimeout,
             maxCycleDuration = properties.maxCycleDuration,
+            retryBackoff = properties.retryBackoff,
+            maxRetryBackoff = properties.maxRetryBackoff,
         )
 
     /**
@@ -145,6 +151,8 @@ data class OutboxRelayProperties(
     val publishTimeout: Duration = Duration.ofSeconds(2),
     val maxCycleDuration: Duration = Duration.ofSeconds(10),
     val pollInterval: Duration = Duration.ofMillis(500),
+    val retryBackoff: Duration = Duration.ofSeconds(1),
+    val maxRetryBackoff: Duration = Duration.ofSeconds(30),
 )
 
 /** `<prefix>.aws.*`: where the events go. A blank [endpoint] means the real AWS endpoint of [region]. */
