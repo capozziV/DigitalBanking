@@ -105,7 +105,7 @@ Arquivos compartilhados entre as frentes (`settings.gradle.kts`, `gradle/libs.ve
 - Guia local ([`docs/rodando-localmente.md`](../../rodando-localmente.md)): como ver a DLQ e devolver as mensagens com `aws sqs start-message-move-task`.
 
 ## 9. Testes
-- **Prova inicial (primeira task):** o Spring Cloud AWS 4.2.1 é compilado contra o Spring Boot 4.0.7 e o AWS SDK 2.57.0; o projeto usa Boot 4.1.1 e SDK 2.57.1. Um teste de integração com LocalStack prova `@SqsListener` numa fila FIFO com confirmação manual antes do resto da frente A. Se falhar, a frente para e a decisão volta ao usuário.
+- **Prova inicial (primeira task):** o Spring Cloud AWS 4.2.1 é compilado contra o Spring Boot 4.0.7 e o AWS SDK 2.57.0; o projeto usa Boot 4.1.1 e SDK 2.57.1. Um teste de integração com LocalStack prova `@SqsListener` numa fila FIFO com confirmação no sucesso (`ON_SUCCESS`) antes do resto da frente A. Se falhar, a frente para e a decisão volta ao usuário.
 - **Unidade:** textos, mapeamento evento → notificações, regra de leitura até `upTo`.
 - **Integração (Testcontainers + LocalStack):** entrega repetida da mesma mensagem, ida para a DLQ na 5ª tentativa, evento desconhecido confirmado, conta desconhecida voltando para a fila, API.
 - **Ponta a ponta (`tests/e2e`):** critérios de pronto 1 a 6 com os três serviços como processos reais.
