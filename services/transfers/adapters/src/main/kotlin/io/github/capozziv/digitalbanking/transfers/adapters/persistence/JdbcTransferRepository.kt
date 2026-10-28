@@ -123,7 +123,8 @@ class JdbcTransferRepository(
 
     /**
      * FOR UPDATE SKIP LOCKED only guards the selection, so concurrent schedulers do not queue on the same rows; the
-     * lease, not this lock, keeps the transfer for the one that wins [tryAcquireLease].
+     * lease, not this lock, keeps the transfer for the one that wins [tryAcquireLease]. A lease is free with the same
+     * boundary as there: `locked_until < now`.
      */
     override fun findDue(
         now: Instant,
@@ -133,7 +134,7 @@ class JdbcTransferRepository(
             .sql(
                 """
                 select id from transfer
-                where status = 'PENDING' and next_attempt_at <= :now and (locked_until is null or locked_until <= :now)
+                where status = 'PENDING' and next_attempt_at <= :now and (locked_until is null or locked_until < :now)
                 order by next_attempt_at
                 limit :limit
                 for update skip locked

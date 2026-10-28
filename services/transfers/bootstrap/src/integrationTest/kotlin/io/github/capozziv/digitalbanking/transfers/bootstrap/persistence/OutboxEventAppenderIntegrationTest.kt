@@ -1,5 +1,6 @@
 package io.github.capozziv.digitalbanking.transfers.bootstrap.persistence
 
+import io.github.capozziv.digitalbanking.outbox.OutboxEventEnvelope
 import io.github.capozziv.digitalbanking.transfers.application.port.EventOutbox
 import io.github.capozziv.digitalbanking.transfers.bootstrap.TransfersIntegrationTest
 import io.github.capozziv.digitalbanking.transfers.domain.Money
@@ -7,6 +8,7 @@ import io.github.capozziv.digitalbanking.transfers.domain.TransferEvent
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Autowired
 import tools.jackson.databind.ObjectMapper
 import java.util.UUID
@@ -63,6 +65,19 @@ class OutboxEventAppenderIntegrationTest : TransfersIntegrationTest() {
         assertThat(row.eventType).isEqualTo("TransferCompensated")
         assertThat(row.aggregateId).isEqualTo(transferId.toString())
         assertThat(objectMapper.readTree(row.payload).get("amount").asLong()).isEqualTo(9L)
+    }
+
+    @Test
+    fun `the correlation id in the MDC goes to the correlation_id column`() {
+        MDC.put(OutboxEventEnvelope.CORRELATION_ID_MDC_KEY, "corr-outbox-1")
+        try {
+            eventOutbox.append(TransferEvent.TransferCompleted(transferId, source, destination, Money(1), null))
+        } finally {
+            MDC.remove(OutboxEventEnvelope.CORRELATION_ID_MDC_KEY)
+        }
+
+        val correlationId = ownerJdbc.sql("select correlation_id from outbox").query(String::class.java).single()
+        assertThat(correlationId).isEqualTo("corr-outbox-1")
     }
 
     private data class OutboxRow(

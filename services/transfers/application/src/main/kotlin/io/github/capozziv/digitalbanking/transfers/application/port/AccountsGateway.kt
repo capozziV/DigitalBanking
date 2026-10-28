@@ -17,5 +17,5 @@ data class CallResult(
 interface AccountsGateway {
     fun lookupAccount(id: UUID): AccountLookup
 
-    fun execute(call: AccountsCall): CallResult
+    fun perform(call: AccountsCall): CallResult
 }

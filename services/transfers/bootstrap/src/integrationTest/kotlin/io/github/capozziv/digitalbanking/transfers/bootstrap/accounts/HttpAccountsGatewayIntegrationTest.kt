@@ -78,7 +78,7 @@ class HttpAccountsGatewayIntegrationTest {
         )
         MDC.put("correlationId", "corr-123")
 
-        val result = gateway.execute(debit())
+        val result = gateway.perform(debit())
 
         assertThat(result.outcome).isEqualTo(StepOutcome.Success)
         assertThat(result.httpStatus).isEqualTo(201)
@@ -101,7 +101,7 @@ class HttpAccountsGatewayIntegrationTest {
                 .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json").withBody(entryJson())),
         )
 
-        val result = gateway.execute(AccountsCall.Credit(accountId, Money(1_000), "transfer-1-credit", "Transfer from x"))
+        val result = gateway.perform(AccountsCall.Credit(accountId, Money(1_000), "transfer-1-credit", "Transfer from x"))
 
         assertThat(result.outcome).isEqualTo(StepOutcome.Success)
         assertThat(result.httpStatus).isEqualTo(200)
@@ -117,7 +117,7 @@ class HttpAccountsGatewayIntegrationTest {
             post(urlEqualTo("/accounts/$accountId/debits")).willReturn(aResponse().withStatus(201).withBody(entryJson())),
         )
 
-        gateway.execute(debit())
+        gateway.perform(debit())
 
         server.verify(
             postRequestedFor(urlEqualTo("/accounts/$accountId/debits"))
@@ -132,7 +132,7 @@ class HttpAccountsGatewayIntegrationTest {
                 .willReturn(problem(422, "insufficient-available-balance")),
         )
 
-        val result = gateway.execute(debit())
+        val result = gateway.perform(debit())
 
         assertThat(result.outcome).isEqualTo(StepOutcome.Refused(StepOutcome.INSUFFICIENT_AVAILABLE_BALANCE))
         assertThat(result.httpStatus).isEqualTo(422)
@@ -144,7 +144,7 @@ class HttpAccountsGatewayIntegrationTest {
             post(urlEqualTo("/accounts/$accountId/credits")).willReturn(problem(404, "account-not-found")),
         )
 
-        val result = gateway.execute(AccountsCall.Credit(accountId, Money(5), "transfer-1-credit", "d"))
+        val result = gateway.perform(AccountsCall.Credit(accountId, Money(5), "transfer-1-credit", "d"))
 
         assertThat(result.outcome).isEqualTo(StepOutcome.Refused("account-not-found"))
     }
@@ -155,7 +155,7 @@ class HttpAccountsGatewayIntegrationTest {
             post(urlEqualTo("/accounts/$accountId/debits")).willReturn(problem(422, "idempotency-key-reused")),
         )
 
-        assertThat(gateway.execute(debit()).outcome).isEqualTo(StepOutcome.Refused("idempotency-key-reused"))
+        assertThat(gateway.perform(debit()).outcome).isEqualTo(StepOutcome.Refused("idempotency-key-reused"))
     }
 
     @Test
@@ -165,7 +165,7 @@ class HttpAccountsGatewayIntegrationTest {
                 .willReturn(problem(503, "account-busy").withHeader("Retry-After", "1")),
         )
 
-        val result = gateway.execute(debit())
+        val result = gateway.perform(debit())
 
         assertThat(result.outcome).isEqualTo(StepOutcome.TransientFailure)
         assertThat(result.httpStatus).isEqualTo(503)
@@ -179,7 +179,7 @@ class HttpAccountsGatewayIntegrationTest {
         )
         MDC.put("correlationId", "corr-9")
 
-        val result = gateway.execute(AccountsCall.FindEntry(accountId, "transfer-1-debit"))
+        val result = gateway.perform(AccountsCall.FindEntry(accountId, "transfer-1-debit"))
 
         assertThat(result.outcome).isEqualTo(StepOutcome.Success)
         server.verify(
@@ -194,7 +194,7 @@ class HttpAccountsGatewayIntegrationTest {
             get(urlPathEqualTo("/accounts/$accountId/entries")).willReturn(aResponse().withStatus(200).withBody(entryJson())),
         )
 
-        gateway.execute(AccountsCall.FindEntry(accountId, "a&b=c d"))
+        gateway.perform(AccountsCall.FindEntry(accountId, "a&b=c d"))
 
         server.verify(
             getRequestedFor(urlPathEqualTo("/accounts/$accountId/entries"))
@@ -208,7 +208,7 @@ class HttpAccountsGatewayIntegrationTest {
             get(urlPathEqualTo("/accounts/$accountId/entries")).willReturn(problem(404, "entry-not-found")),
         )
 
-        val result = gateway.execute(AccountsCall.FindEntry(accountId, "transfer-1-debit"))
+        val result = gateway.perform(AccountsCall.FindEntry(accountId, "transfer-1-debit"))
 
         assertThat(result.outcome).isEqualTo(StepOutcome.Refused(StepOutcome.ENTRY_NOT_FOUND))
         assertThat(result.httpStatus).isEqualTo(404)
@@ -222,7 +222,7 @@ class HttpAccountsGatewayIntegrationTest {
         )
 
         val started = System.nanoTime()
-        val result = gateway.execute(debit())
+        val result = gateway.perform(debit())
         val elapsed = Duration.ofNanos(System.nanoTime() - started)
 
         assertThat(result.outcome).isEqualTo(StepOutcome.TransientFailure)
@@ -236,7 +236,7 @@ class HttpAccountsGatewayIntegrationTest {
             get(urlPathEqualTo("/accounts/$accountId/entries")).willReturn(problem(404, "account-not-found")),
         )
 
-        val result = gateway.execute(AccountsCall.FindEntry(accountId, "k"))
+        val result = gateway.perform(AccountsCall.FindEntry(accountId, "k"))
 
         assertThat(result.outcome).isEqualTo(StepOutcome.Refused("account-not-found"))
     }
@@ -248,7 +248,7 @@ class HttpAccountsGatewayIntegrationTest {
                 .willReturn(aResponse().withStatus(404).withHeader("Content-Type", "text/html").withBody("<html>not found</html>")),
         )
 
-        assertThat(gateway.execute(AccountsCall.FindEntry(accountId, "k")).outcome).isEqualTo(StepOutcome.Refused("http-404"))
+        assertThat(gateway.perform(AccountsCall.FindEntry(accountId, "k")).outcome).isEqualTo(StepOutcome.Refused("http-404"))
     }
 
     @Test
@@ -262,7 +262,7 @@ class HttpAccountsGatewayIntegrationTest {
             ),
         )
 
-        assertThat(gateway.execute(AccountsCall.FindEntry(accountId, "k")).outcome).isEqualTo(StepOutcome.Refused("http-404"))
+        assertThat(gateway.perform(AccountsCall.FindEntry(accountId, "k")).outcome).isEqualTo(StepOutcome.Refused("http-404"))
     }
 
     @Test
@@ -290,7 +290,7 @@ class HttpAccountsGatewayIntegrationTest {
                 }
 
             val started = System.nanoTime()
-            val result = gatewayFor("http://localhost:${stalling.localPort}").execute(debit())
+            val result = gatewayFor("http://localhost:${stalling.localPort}").perform(debit())
             val elapsed = Duration.ofNanos(System.nanoTime() - started)
             peer.interrupt()
 
@@ -312,7 +312,7 @@ class HttpAccountsGatewayIntegrationTest {
                 ),
         )
 
-        val result = gateway.execute(debit())
+        val result = gateway.perform(debit())
 
         assertThat(result.outcome).isEqualTo(StepOutcome.TransientFailure)
         assertThat(result.httpStatus).isEqualTo(502)
@@ -325,7 +325,7 @@ class HttpAccountsGatewayIntegrationTest {
                 .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "text/html").withBody("<html>captive portal</html>")),
         )
 
-        val result = gateway.execute(debit())
+        val result = gateway.perform(debit())
 
         assertThat(result.outcome).isEqualTo(StepOutcome.TransientFailure)
         assertThat(result.httpStatus).isEqualTo(200)
@@ -339,8 +339,8 @@ class HttpAccountsGatewayIntegrationTest {
                 .willReturn(aResponse().withStatus(200).withBody("""{"unexpected":true}""")),
         )
 
-        assertThat(gateway.execute(debit()).outcome).isEqualTo(StepOutcome.TransientFailure)
-        assertThat(gateway.execute(AccountsCall.FindEntry(accountId, "k")).outcome).isEqualTo(StepOutcome.TransientFailure)
+        assertThat(gateway.perform(debit()).outcome).isEqualTo(StepOutcome.TransientFailure)
+        assertThat(gateway.perform(AccountsCall.FindEntry(accountId, "k")).outcome).isEqualTo(StepOutcome.TransientFailure)
     }
 
     @Test
@@ -350,7 +350,7 @@ class HttpAccountsGatewayIntegrationTest {
                 .willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER)),
         )
 
-        val result = gateway.execute(debit())
+        val result = gateway.perform(debit())
 
         assertThat(result.outcome).isEqualTo(StepOutcome.TransientFailure)
         assertThat(result.httpStatus).isNull()
@@ -365,8 +365,8 @@ class HttpAccountsGatewayIntegrationTest {
             post(urlEqualTo("/accounts/$accountId/credits")).willReturn(aResponse().withFault(Fault.MALFORMED_RESPONSE_CHUNK)),
         )
 
-        assertThat(gateway.execute(debit()).outcome).isEqualTo(StepOutcome.TransientFailure)
-        assertThat(gateway.execute(AccountsCall.Credit(accountId, Money(1), "k", "d")).outcome)
+        assertThat(gateway.perform(debit()).outcome).isEqualTo(StepOutcome.TransientFailure)
+        assertThat(gateway.perform(AccountsCall.Credit(accountId, Money(1), "k", "d")).outcome)
             .isEqualTo(StepOutcome.TransientFailure)
     }
 
@@ -375,7 +375,7 @@ class HttpAccountsGatewayIntegrationTest {
         val closedPort = server.port()
         server.stop()
 
-        val result = gatewayFor("http://localhost:$closedPort").execute(debit())
+        val result = gatewayFor("http://localhost:$closedPort").perform(debit())
 
         assertThat(result.outcome).isEqualTo(StepOutcome.TransientFailure)
         assertThat(result.httpStatus).isNull()
