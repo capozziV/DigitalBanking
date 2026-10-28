@@ -96,7 +96,7 @@ class ResumeDueTransfersUseCaseTest {
     fun `ignores transfers not yet due`() {
         val transfer = pending(1)
         repository.tryAcquireLease(transfer.id, "x", start.plusSeconds(1), start)
-        repository.saveIfOwner(transfer, "x", start.plusSeconds(60), start.plusSeconds(1))
+        repository.saveIfOwner(transfer, "x", start.plusSeconds(60), start.plusSeconds(1), start)
         repository.releaseLease(transfer.id, "x")
 
         assertThat(useCase.execute()).isEqualTo(0)

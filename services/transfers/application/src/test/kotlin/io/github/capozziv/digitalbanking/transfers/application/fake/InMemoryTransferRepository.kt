@@ -70,6 +70,7 @@ class InMemoryTransferRepository : TransferRepository {
         owner: String,
         nextAttemptAt: Instant?,
         leaseUntil: Instant,
+        now: Instant,
     ): Boolean {
         val remaining = savesUntilLeaseLoss
         if (remaining != null) {
