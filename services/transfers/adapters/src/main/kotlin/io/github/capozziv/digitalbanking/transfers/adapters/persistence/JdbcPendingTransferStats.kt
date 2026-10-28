@@ -11,7 +11,11 @@ data class PendingTransfers(
     val oldestCreatedAt: Instant?,
 )
 
-/** One aggregate query over the partial index of pending transfers; read on every metrics scrape. */
+/**
+ * One aggregate query per call (`count` and `min(created_at)` of the pending transfers). The partial index
+ * `transfer_due_idx` is on `next_attempt_at`, so the query reads the pending rows from the table; fine while few are
+ * pending. Each gauge calls it, so a metrics scrape costs two queries.
+ */
 @Repository
 class JdbcPendingTransferStats(
     private val jdbcClient: JdbcClient,

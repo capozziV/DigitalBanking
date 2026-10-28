@@ -21,18 +21,38 @@ class ResumeDueTransfersUseCase(
     private val correlation: CorrelationContext,
     private val newOwner: () -> String,
 ) {
-    /** Returns how many transfers this tick took (lease acquired and saga run to a stop without an exception). */
-    fun execute(): Int =
-        transfers
-            .findDue(clock.instant(), settings.dueBatchSize)
-            .count(::resume)
+    /**
+     * Returns how many transfers this tick took (lease acquired and saga run to a stop without an exception).
+     * [shouldContinue] is checked before each transfer: once it is false the rest of the batch is left for a later
+     * tick (shutdown). An interruption ends the batch too, with the interrupt flag restored.
+     */
+    fun execute(shouldContinue: () -> Boolean = { true }): Int {
+        var taken = 0
+        for (transferId in transfers.findDue(clock.instant(), settings.dueBatchSize)) {
+            if (!shouldContinue()) break
+            when (resume(transferId)) {
+                Outcome.TAKEN -> taken++
+                Outcome.SKIPPED -> Unit
+                Outcome.INTERRUPTED -> break
+            }
+        }
+        return taken
+    }
 
-    private fun resume(transferId: UUID): Boolean {
+    private enum class Outcome { TAKEN, SKIPPED, INTERRUPTED }
+
+    private fun resume(transferId: UUID): Outcome {
         var correlationId: String? = null
-        return runCatching {
+        return try {
             correlationId = transfers.findById(transferId)?.correlationId
-            correlation.withCorrelationId(correlationId) { runSaga.execute(transferId, newOwner()) } != null
-        }.getOrElse { error ->
+            val ran = correlation.withCorrelationId(correlationId) { runSaga.execute(transferId, newOwner()) }
+            if (ran != null) Outcome.TAKEN else Outcome.SKIPPED
+        } catch (error: Exception) {
+            if (error.causedByInterruption()) {
+                Thread.currentThread().interrupt()
+                LOG.log(System.Logger.Level.WARNING, "batch interrupted at transfer $transferId; stopping it")
+                return Outcome.INTERRUPTED
+            }
             correlation.withCorrelationId(correlationId) {
                 LOG.log(
                     System.Logger.Level.ERROR,
@@ -40,11 +60,15 @@ class ResumeDueTransfersUseCase(
                     error,
                 )
             }
-            false
+            Outcome.SKIPPED
         }
     }
 
+    private fun Throwable.causedByInterruption(): Boolean =
+        generateSequence(this) { it.cause?.takeIf { cause -> cause !== it } }.take(MAX_CAUSE_DEPTH).any { it is InterruptedException }
+
     private companion object {
+        const val MAX_CAUSE_DEPTH = 10
         val LOG: System.Logger = System.getLogger(ResumeDueTransfersUseCase::class.java.name)
     }
 }

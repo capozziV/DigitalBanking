@@ -2,6 +2,7 @@ package io.github.capozziv.digitalbanking.transfers.bootstrap
 
 import io.github.capozziv.digitalbanking.transfers.application.RetryBackoff
 import io.github.capozziv.digitalbanking.transfers.application.usecase.SagaSettings
+import jakarta.validation.constraints.AssertTrue
 import jakarta.validation.constraints.Positive
 import org.hibernate.validator.constraints.time.DurationMin
 import org.springframework.boot.context.properties.ConfigurationProperties
@@ -10,7 +11,7 @@ import java.time.Duration
 
 /**
  * Settings of the transfer saga (`transfers.saga.*`); the defaults are those of the spec. Validated at startup:
- * counts and durations must be positive. [pollInterval] is read by [TransferSagaScheduler]; [schedulerEnabled] turns
+ * counts and durations must be positive, [callBudget] shorter than [lease] and [retryInitial] at most [retryMax]. [pollInterval] is read by [TransferSagaScheduler]; [schedulerEnabled] turns
  * the scheduler off (integration tests that do not exercise it).
  */
 @ConfigurationProperties("transfers.saga")
@@ -34,6 +35,14 @@ data class SagaProperties(
     val pollInterval: Duration = Duration.ofSeconds(1),
     val schedulerEnabled: Boolean = true,
 ) {
+    @get:AssertTrue(message = "transfers.saga.call-budget must be shorter than transfers.saga.lease")
+    val callBudgetWithinLease: Boolean
+        get() = callBudget < lease
+
+    @get:AssertTrue(message = "transfers.saga.retry-initial must not exceed transfers.saga.retry-max")
+    val retryBoundsOrdered: Boolean
+        get() = retryInitial <= retryMax
+
     fun toSettings() =
         SagaSettings(
             deadline = deadline,

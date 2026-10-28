@@ -55,6 +55,27 @@ class SagaPropertiesTest {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(
+        strings = [
+            "transfers.saga.call-budget=30s",
+            "transfers.saga.call-budget=10s,transfers.saga.lease=10s",
+            "transfers.saga.retry-initial=20s",
+        ],
+    )
+    fun `inconsistent settings stop the startup`(properties: String) {
+        runner.withPropertyValues(*properties.split(',').toTypedArray()).run { context ->
+            assertThat(context).hasFailed()
+        }
+    }
+
+    @Test
+    fun `equal retry bounds and a call budget below the lease are accepted`() {
+        runner
+            .withPropertyValues("transfers.saga.retry-initial=5s", "transfers.saga.retry-max=5s")
+            .run { context -> assertThat(context).hasNotFailed() }
+    }
+
     private fun String.camelCase(): String {
         val parts = split('-')
         return parts.first() + parts.drop(1).joinToString("") { it.replaceFirstChar(Char::uppercase) }

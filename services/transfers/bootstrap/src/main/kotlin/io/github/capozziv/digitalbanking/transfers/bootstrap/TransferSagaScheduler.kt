@@ -9,7 +9,8 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 
 /**
- * Resumes the due transfers on a fixed delay. On shutdown no new tick starts and the one in progress is awaited
+ * Resumes the due transfers on a fixed delay. On shutdown no new tick starts, the one in progress finishes the transfer it is on without starting the next
+ * one, and is awaited
  * (up to [shutdownTimeout]), so its writes commit before the data source closes: this bean depends on the use case,
  * hence on the data source, and is destroyed first. A tick cut short is safe: every write is guarded by the lease,
  * and the calls to `accounts` are idempotent, so another run resumes the transfer once the lease expires.
@@ -28,7 +29,7 @@ class TransferSagaScheduler(
         if (stopping) return
         tickLock.lock()
         try {
-            if (!stopping) resumeDue.execute()
+            if (!stopping) resumeDue.execute { !stopping }
         } finally {
             tickLock.unlock()
         }

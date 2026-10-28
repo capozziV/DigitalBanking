@@ -82,6 +82,23 @@ class TransferSagaSchedulerTest {
         tick.join(5_000)
     }
 
+    @Test
+    fun `after shutdown the batch in progress does not start the next transfer`() {
+        val scheduler = TransferSagaScheduler(resumeDue, shutdownTimeout = Duration.ofSeconds(5))
+        repository.dueIds = listOf(UUID.randomUUID(), UUID.randomUUID())
+        repository.blockInFindById = true
+        val tick = Thread.ofPlatform().start { scheduler.runTick() }
+        assertThat(repository.findByIdEntered.await(5, TimeUnit.SECONDS)).isTrue()
+
+        val shutdown = Thread.ofPlatform().start { scheduler.destroy() }
+        shutdown.join(300)
+        repository.release.countDown()
+        tick.join(5_000)
+        shutdown.join(5_000)
+
+        assertThat(repository.findByIdCalls.get()).isEqualTo(1)
+    }
+
     /** Only [findDue] is reached: it returns no transfer, so the saga itself never runs. */
     private class BlockingRepository : TransferRepository {
         val findDueCalls = AtomicInteger()
@@ -90,6 +107,12 @@ class TransferSagaSchedulerTest {
         val release = CountDownLatch(1)
 
         @Volatile private var blockNext = false
+
+        @Volatile var dueIds: List<UUID> = emptyList()
+
+        @Volatile var blockInFindById = false
+        val findByIdCalls = AtomicInteger()
+        val findByIdEntered = CountDownLatch(1)
 
         fun blockNextTick() {
             blockNext = true
@@ -105,10 +128,17 @@ class TransferSagaSchedulerTest {
                 release.await(10, TimeUnit.SECONDS)
             }
             steps += "tick done"
-            return emptyList()
+            return dueIds
         }
 
-        override fun findById(id: UUID): Transfer? = unused()
+        override fun findById(id: UUID): Transfer? {
+            findByIdCalls.incrementAndGet()
+            if (blockInFindById) {
+                findByIdEntered.countDown()
+                release.await(10, TimeUnit.SECONDS)
+            }
+            return null
+        }
 
         override fun findByIdempotencyKey(key: String): Transfer? = unused()
 
@@ -119,7 +149,7 @@ class TransferSagaSchedulerTest {
             owner: String,
             until: Instant,
             now: Instant,
-        ): Boolean = unused()
+        ): Boolean = false
 
         override fun saveIfOwner(
             transfer: Transfer,

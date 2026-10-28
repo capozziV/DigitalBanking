@@ -152,6 +152,39 @@ class ResumeDueTransfersUseCaseTest {
         assertThat(correlation.current).isNull()
     }
 
+    @Test
+    fun `stops the batch when shouldContinue turns false`() {
+        val first = pending(1)
+        val second = pending(2)
+        accounts.reply(created, created, created, created)
+        var checks = 0
+
+        assertThat(useCase.execute { ++checks <= 1 }).isEqualTo(1)
+
+        assertThat(repository.findById(first.id)!!.status).isEqualTo(TransferStatus.COMPLETED)
+        assertThat(repository.findById(second.id)!!.status).isEqualTo(TransferStatus.PENDING)
+        assertThat(repository.leaseOwner(second.id)).isNull()
+    }
+
+    @Test
+    fun `an interruption ends the batch and restores the interrupt flag`() {
+        val first = pending(1)
+        val second = pending(2)
+        accounts.onCall = { throw InterruptedException("shutdown") }
+        accounts.reply(created, created, created, created)
+
+        try {
+            assertThat(useCase.execute()).isEqualTo(0)
+            assertThat(Thread.currentThread().isInterrupted).isTrue()
+        } finally {
+            Thread.interrupted()
+        }
+
+        assertThat(repository.findById(first.id)!!.status).isEqualTo(TransferStatus.PENDING)
+        assertThat(repository.findById(second.id)!!.status).isEqualTo(TransferStatus.PENDING)
+        assertThat(accounts.calls).hasSize(1)
+    }
+
     private fun Transfer.accountIds() = setOf(sourceAccountId, destinationAccountId)
 
     private fun AccountsCall.accountId(): UUID =

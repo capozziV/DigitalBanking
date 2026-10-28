@@ -11,7 +11,8 @@ import java.time.Duration
 /**
  * Gauges of the pending transfers, read from the database on each scrape: `transfers.pending` and
  * `transfers.oldest.pending.age` (seconds since the oldest pending transfer was created). A transfer stuck in a loop,
- * such as a compensation refused again and again (a bug), shows up as an old pending transfer.
+ * such as a compensation refused again and again (a bug), shows up as an old pending transfer. Each gauge runs its
+ * own query ([JdbcPendingTransferStats.pending]), so a scrape costs two queries.
  */
 class TransferMetrics(
     registry: MeterRegistry,
