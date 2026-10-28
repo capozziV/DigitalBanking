@@ -20,3 +20,4 @@ Registros de decisões arquiteturais. Formato: `NNNN-titulo-em-kebab-case.md`.
 | 0014 | Tipo de conta e cheque especial | aceito | [0014](0014-tipo-de-conta-e-cheque-especial.md) |
 | 0015 | Relay do outbox com líder único e SNS FIFO | aceito | [0015](0015-outbox-relay-lider-e-sns-fifo.md) |
 | 0016 | Saga de transferência orquestrada por HTTP síncrono | aceito | [0016](0016-saga-orquestrada-por-http.md) |
+| 0017 | `notification` com banco próprio e consumo SQS com Spring Cloud AWS | aceito | [0017](0017-notification-com-banco-e-consumo-sqs.md) |

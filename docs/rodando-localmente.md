@@ -88,7 +88,15 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 set -a; . infra/local/.env; set +a
 ./gradlew :services:transfers:bootstrap:bootRun
 ```
-O `transfers` sobe na porta 8082 e aplica as próprias migrations. Use um terceiro terminal para os passos seguintes.
+O `transfers` sobe na porta 8082 e aplica as próprias migrations.
+
+O `notification` consome os eventos dos dois serviços e roda num terceiro terminal, com o mesmo `.env` carregado. Ele lê as variáveis `NOTIFICATION_*` (banco e LocalStack) e consome as filas `notification-accounts.fifo` e `notification-transfers.fifo`:
+```bash
+export JAVA_HOME=$(/usr/libexec/java_home -v 21)
+set -a; . infra/local/.env; set +a
+./gradlew :services:notification:bootstrap:bootRun
+```
+O `notification` sobe na porta 8083 e aplica as próprias migrations; o nginx o expõe em `/notifications`. Use um quarto terminal para os passos seguintes.
 
 ## 5. Conferir a API pelo nginx
 Primeiro o health, que deve responder `"status":"UP"`; depois o smoke, que abre uma conta, credita 1000, debita 300, confere o saldo 700 e lê os eventos da conta na fila de inspeção:
@@ -144,6 +152,26 @@ docker compose -f infra/local/docker-compose.yml exec -T \
   | jq '.Messages[] | {eventType: .MessageAttributes.eventType.StringValue, body: (.Body | fromjson)}'
 ```
 A leitura não apaga as mensagens: elas voltam para a fila depois de 30 s. Numa fila FIFO, enquanto uma mensagem de uma conta está em leitura, as seguintes da mesma conta esperam. Com a CLI da AWS instalada no Mac (`brew install awscli`), o mesmo comando funciona direto com `aws --endpoint-url http://localhost:4566` e as mesmas variáveis `AWS_*`. O relay também expõe métricas em `http://localhost/accounts/actuator/metrics/outbox.pending` e `.../outbox.relay.cycles`.
+
+### DLQ do notification
+Cada fila do `notification` tem uma DLQ FIFO: `notification-accounts-dlq.fifo` e `notification-transfers-dlq.fifo`. A mensagem vai para lá na 5ª tentativa que falha (`NOTIFICATION_MAX_RECEIVE_COUNT`, visibilidade de 30 s em `NOTIFICATION_VISIBILITY_TIMEOUT_SECONDS`). A métrica `notification.dlq.messages` também mostra a quantidade. Os comandos usam a CLI da AWS da imagem do LocalStack.
+
+Para ver quantas mensagens estão paradas (troque o nome para a DLQ de `transfers`):
+```bash
+docker compose -f infra/local/docker-compose.yml exec -T \
+  -e AWS_ACCESS_KEY_ID=test -e AWS_SECRET_ACCESS_KEY=test -e AWS_DEFAULT_REGION=us-east-1 \
+  localstack aws --endpoint-url http://127.0.0.1:4566 sqs get-queue-attributes \
+  --queue-url http://127.0.0.1:4566/000000000000/notification-accounts-dlq.fifo \
+  --attribute-names ApproximateNumberOfMessages QueueArn
+```
+Depois de corrigir a causa, devolva as mensagens à fila de origem com o ARN da DLQ (campo `QueueArn` acima) e o da fila (`arn:aws:sqs:us-east-1:000000000000:notification-accounts.fifo`):
+```bash
+docker compose -f infra/local/docker-compose.yml exec -T \
+  -e AWS_ACCESS_KEY_ID=test -e AWS_SECRET_ACCESS_KEY=test -e AWS_DEFAULT_REGION=us-east-1 \
+  localstack aws --endpoint-url http://127.0.0.1:4566 sqs start-message-move-task \
+  --source-arn <arn da DLQ> --destination-arn <arn da fila>
+```
+O consumo é idempotente (`processed_events`), então devolver uma mensagem já processada não duplica a notificação.
 
 ## 7. Coleção Bruno
 A coleção fica em `api/bruno/accounts/`, com uma requisição por endpoint e `Idempotency-Key` nova a cada envio (`{{$guid}}`, ou uma chave gerada no script da requisição). A consulta de lançamento por chave (`08`) usa a chave do crédito (`03`): rode o `03` antes do `08`.

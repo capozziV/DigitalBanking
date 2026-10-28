@@ -130,3 +130,7 @@ _Evite_: histórico
 Aviso enviado ao cliente sobre algo que aconteceu na conta.
 _Código_: `Notification`
 _Evite_: alerta, mensagem
+
+**Tipo de notificação**:
+Categoria da notificação, que define o texto mostrado ao cliente; valores Boas-vindas, Tipo de conta alterado, Transferência enviada, Transferência recebida, Transferência recusada e Transferência devolvida.
+_Código_: `NotificationKind` (valores `WELCOME`, `ACCOUNT_TYPE_CHANGED`, `TRANSFER_SENT`, `TRANSFER_RECEIVED`, `TRANSFER_FAILED`, `TRANSFER_COMPENSATED`)
