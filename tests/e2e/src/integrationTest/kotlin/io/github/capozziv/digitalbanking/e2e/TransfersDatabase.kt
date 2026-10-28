@@ -50,6 +50,18 @@ class TransfersDatabase(
                 }
         }
 
+    /** The moment after which the saga stops retrying the credit and resolves it (`deadline_at`). */
+    fun deadline(transferId: String): Instant =
+        connection().use { connection ->
+            connection.prepareStatement("select deadline_at from transfer where id = ?::uuid").use { statement ->
+                statement.setString(1, transferId)
+                statement.executeQuery().use { rows ->
+                    check(rows.next()) { "transfer $transferId not found" }
+                    rows.getTimestamp("deadline_at").toInstant()
+                }
+            }
+        }
+
     /** When each step of the transfer was recorded, in order. */
     fun stepTimes(transferId: String): List<Instant> = steps(transferId).map { it.third }
 

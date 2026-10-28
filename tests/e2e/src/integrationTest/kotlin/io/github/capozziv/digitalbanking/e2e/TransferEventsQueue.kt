@@ -2,6 +2,7 @@ package io.github.capozziv.digitalbanking.e2e
 
 import software.amazon.awssdk.services.sqs.SqsClient
 import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName
+import tools.jackson.databind.json.JsonMapper
 import java.time.Duration
 import java.time.Instant
 
@@ -13,24 +14,31 @@ class TransferEventsQueue(
     private val sqs: SqsClient,
     private val queueUrl: String,
 ) {
+    /** An event as seen in the queue: its type and the correlation ID carried as message attribute and in the envelope. */
+    data class ReceivedEvent(
+        val eventType: String,
+        val attributeCorrelationId: String?,
+        val envelopeCorrelationId: String?,
+    )
+
     /**
      * Reads and deletes messages until each of [transferIds] has at least one event, then a little longer to catch
-     * duplicates. Returns the event types received per transfer, in arrival order.
+     * duplicates. Returns the events received per transfer, in arrival order.
      */
     fun awaitEvents(
         transferIds: Set<String>,
         timeout: Duration,
-    ): Map<String, List<String>> {
-        val received = transferIds.associateWith { mutableListOf<String>() }
+    ): Map<String, List<ReceivedEvent>> {
+        val received = transferIds.associateWith { mutableListOf<ReceivedEvent>() }
         val deadline = Instant.now().plus(timeout)
         while (Instant.now().isBefore(deadline) && received.values.any { it.isEmpty() }) {
-            receive(1).forEach { (groupId, eventType) -> received[groupId]?.add(eventType) }
+            receive(1).forEach { (groupId, event) -> received[groupId]?.add(event) }
         }
-        repeat(CONFIRMATION_POLLS) { receive(2).forEach { (groupId, eventType) -> received[groupId]?.add(eventType) } }
+        repeat(CONFIRMATION_POLLS) { receive(2).forEach { (groupId, event) -> received[groupId]?.add(event) } }
         return received
     }
 
-    private fun receive(waitSeconds: Int): List<Pair<String, String>> {
+    private fun receive(waitSeconds: Int): List<Pair<String, ReceivedEvent>> {
         val messages =
             sqs
                 .receiveMessage {
@@ -44,11 +52,25 @@ class TransferEventsQueue(
         messages.forEach { message -> sqs.deleteMessage { it.queueUrl(queueUrl).receiptHandle(message.receiptHandle()) } }
         return messages.map { message ->
             message.attributes().getValue(MessageSystemAttributeName.MESSAGE_GROUP_ID) to
-                message.messageAttributes().getValue(EVENT_TYPE_ATTRIBUTE).stringValue()
+                ReceivedEvent(
+                    eventType = message.messageAttributes().getValue(EVENT_TYPE_ATTRIBUTE).stringValue(),
+                    attributeCorrelationId = message.messageAttributes()[CORRELATION_ID_ATTRIBUTE]?.stringValue(),
+                    envelopeCorrelationId = envelopeCorrelationId(message.body()),
+                )
         }
     }
 
+    private fun envelopeCorrelationId(body: String): String? =
+        mapper
+            .readTree(body)
+            .get("correlationId")
+            ?.takeUnless { it.isNull }
+            ?.asString()
+
     private companion object {
+        val mapper: JsonMapper = JsonMapper.builder().build()
+        const val CORRELATION_ID_ATTRIBUTE = "correlationId"
+
         const val CONFIRMATION_POLLS = 2
 
         /** Message attribute set by the outbox relay (`SnsEventPublisher.EVENT_TYPE_ATTRIBUTE`). */

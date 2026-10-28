@@ -58,7 +58,8 @@ class ServiceProcess(
         val running = process ?: return
         running.destroy()
         if (!running.waitFor(STOP_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)) {
-            running.destroyForcibly().waitFor(STOP_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)
+            running.destroyForcibly()
+            check(running.waitFor(STOP_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)) { "$name did not die after SIGKILL" }
         }
         process = null
     }

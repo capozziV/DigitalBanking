@@ -26,7 +26,9 @@ import java.util.concurrent.Executors
  * under test, the test stops or kills a process while the call is held, and only then releases it. Every wait is a
  * condition polled with a time limit, never a blind sleep.
  *
- * The methods run in order: the last one checks the events of the transfers that the others finished.
+ * The methods run in order (`@Order`) and the last one depends on the others: it checks the events, and the correlation
+ * ID, of the transfers they finished. If it fails on its own precondition (a missing transfer or event type), the
+ * failure is in one of the earlier tests, so look at those first.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
@@ -41,6 +43,9 @@ class TransferSagaEndToEndIntegrationTest {
 
     /** Transfer id → event type its terminal status must publish, for the events test. */
     private val expectedEvents = ConcurrentHashMap<String, String>()
+
+    /** Transfer id → `X-Correlation-Id` sent with its request, for the events test. */
+    private val expectedCorrelationIds = ConcurrentHashMap<String, String>()
 
     @BeforeAll
     fun start() = environment.start()
@@ -98,6 +103,7 @@ class TransferSagaEndToEndIntegrationTest {
         assertThat(accounts.balance(source)).isEqualTo(800)
         assertThat(accounts.balance(destination)).isEqualTo(200)
         expectedEvents[id] = "TransferCompleted"
+        expectedCorrelationIds[id] = "e2e-$key"
     }
 
     @Test
@@ -106,8 +112,12 @@ class TransferSagaEndToEndIntegrationTest {
         val (source, destination) = fundedPair(1_000)
 
         val id = stopAccountsAfterDebit(source, destination)
+        val deadline = environment.transfersDatabase.deadline(id)
         environment.accounts.start()
 
+        assertThat(Instant.now())
+            .describedAs("accounts came back before the deadline of the transfer; otherwise this test proves nothing (slow environment)")
+            .isBefore(deadline)
         assertThat(transfers.awaitTerminal(id, SAGA_FINISH_TIMEOUT)).isEqualTo("COMPLETED")
         assertThat(accounts.entryStatus(destination, "transfer-$id-credit")).isEqualTo(200)
         assertThat(accounts.entryStatus(source, "transfer-$id-compensation")).isEqualTo(404)
@@ -154,6 +164,16 @@ class TransferSagaEndToEndIntegrationTest {
         hold.release()
         assertThat(hold.awaitForwarded(CALL_HELD_TIMEOUT)).isEqualTo(201)
         environment.transfers.start()
+        val restartedAt = Instant.now()
+        println(
+            "E2E lease margin: the restarted transfers was healthy ${Duration.between(
+                restartedAt,
+                lease.lockedUntil!!,
+            )} before the lease ended",
+        )
+        assertThat(restartedAt)
+            .describedAs("transfers restarted after the lease ended; the lease check would prove nothing (slow environment)")
+            .isBefore(lease.lockedUntil)
 
         assertThat(transfers.awaitTerminal(id, SAGA_FINISH_TIMEOUT)).isEqualTo("COMPLETED")
         val stepsAfterKill = environment.transfersDatabase.stepTimes(id).filter { it.isAfter(killedAt) }
@@ -196,7 +216,15 @@ class TransferSagaEndToEndIntegrationTest {
         val received = environment.transferEvents.awaitEvents(expectedEvents.keys, EVENTS_TIMEOUT)
 
         expectedEvents.forEach { (id, eventType) ->
-            assertThat(received[id]).describedAs("events of transfer $id").containsExactly(eventType)
+            assertThat(received[id]?.map { it.eventType }).describedAs("events of transfer $id").containsExactly(eventType)
+        }
+        assertThat(expectedCorrelationIds).describedAs("transfers with a known correlation ID").isNotEmpty
+        expectedCorrelationIds.forEach { (id, correlationId) ->
+            val events = checkNotNull(received[id])
+            assertThat(events).describedAs("events of transfer $id").allSatisfy {
+                assertThat(it.attributeCorrelationId).describedAs("correlationId attribute").isEqualTo(correlationId)
+                assertThat(it.envelopeCorrelationId).describedAs("correlationId in the envelope").isEqualTo(correlationId)
+            }
         }
     }
 
@@ -214,7 +242,11 @@ class TransferSagaEndToEndIntegrationTest {
         assertThat(accounts.entryStatus(source, "transfer-$id-debit")).isEqualTo(200)
 
         environment.accounts.stop()
+        assertThat(environment.accounts.isRunning).describedAs("accounts is down").isFalse()
         hold.release()
+        assertThat(
+            hold.awaitForwarded(CALL_HELD_TIMEOUT),
+        ).describedAs("the proxy answered the released call as a gateway with accounts down").isEqualTo(502)
 
         val response = request.get()
         assertThat(response.status).describedAs(response.body).isEqualTo(202)
