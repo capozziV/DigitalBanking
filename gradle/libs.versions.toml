@@ -9,6 +9,7 @@ assertj = "3.27.7"
 springdoc = "3.1.1"
 java-uuid-generator = "5.2.0"
 aws-sdk = "2.57.1"
+wiremock = "3.13.2"
 
 [libraries]
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
@@ -24,6 +25,7 @@ java-uuid-generator = { module = "com.fasterxml.uuid:java-uuid-generator", versi
 testcontainers-localstack = { module = "org.testcontainers:testcontainers-localstack" }
 aws-sdk-bom = { module = "software.amazon.awssdk:bom", version.ref = "aws-sdk" }
 aws-sdk-sns = { module = "software.amazon.awssdk:sns" }
+wiremock-standalone = { module = "org.wiremock:wiremock-standalone", version.ref = "wiremock" }
 aws-sdk-sqs = { module = "software.amazon.awssdk:sqs" }
 
 # Dependencias de plugin para o build-logic

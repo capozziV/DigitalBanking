@@ -66,7 +66,7 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 ### Mensageria
 - Eventos publicados via Transactional Outbox.
 - Um tópico SNS por produtor; uma fila SQS + DLQ por consumidor; consumidores idempotentes.
-- O tópico é SNS FIFO (`accounts-events.fifo`), com `MessageGroupId` = conta e `MessageDeduplicationId` = `eventId`: ordem garantida por conta.
+- Os tópicos são SNS FIFO: `accounts-events.fifo`, com `MessageGroupId` = conta (ordem garantida por conta), e `transfers-events.fifo`, com `MessageGroupId` = transferência (um evento final por transferência). Nos dois, `MessageDeduplicationId` = `eventId`.
 - Relay (`OutboxRelay`) dentro de cada serviço, com um relay ativo por vez (trava consultiva do PostgreSQL). Falha de publicação bloqueia só a conta afetada. Outbox guardado para sempre; envelope com `eventVersion`.
 - A leitura do lote pula os eventos seguintes de uma conta presa, que não ocupa o lote das outras. Limites de tempo: 2 s por publicação e 10 s por ciclo (configuráveis).
 - (ver [ADR 0003](adr/0003-transactional-outbox-e-mensageria.md) e [ADR 0015](adr/0015-outbox-relay-lider-e-sns-fifo.md))

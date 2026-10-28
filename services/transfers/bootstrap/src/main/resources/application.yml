@@ -1,0 +1,62 @@
+spring:
+  application:
+    name: transfers
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${TRANSFERS_DB_URL:jdbc:postgresql://localhost:5432/transfers}
+    username: ${TRANSFERS_DB_USER:transfers_app}
+    password: ${TRANSFERS_DB_PASSWORD:transfers_app}
+  jackson:
+    deserialization:
+      # Amounts are whole cents: 1.5 must be rejected, never truncated to 1.
+      accept-float-as-int: false
+  flyway:
+    user: ${TRANSFERS_DB_OWNER_USER:transfers_owner}
+    password: ${TRANSFERS_DB_OWNER_PASSWORD:transfers_owner}
+    placeholders:
+      appUser: ${TRANSFERS_DB_USER:transfers_app}
+
+transfers:
+  saga:
+    scheduler-enabled: true
+    poll-interval: 1s
+    due-batch-size: 50
+    deadline: 2m
+    lease: 30s
+    busy-attempts: 3
+    call-budget: 4s
+    retry-initial: 1s
+    retry-max: 15s
+  outbox:
+    relay-enabled: true
+    poll-interval: 500ms
+    batch-size: 100
+    alert-after-attempts: 10
+    publish-timeout: 2s
+    max-cycle-duration: 10s
+  aws:
+    # LocalStack by default; an empty TRANSFERS_AWS_ENDPOINT uses the real AWS endpoint and credential chain.
+    endpoint: ${TRANSFERS_AWS_ENDPOINT:http://localhost:4566}
+    region: ${TRANSFERS_AWS_REGION:us-east-1}
+    topic-arn: ${TRANSFERS_TOPIC_ARN:arn:aws:sns:us-east-1:000000000000:transfers-events.fifo}
+
+logging:
+  pattern:
+    # Correlation id (MDC key of OutboxEventEnvelope.CORRELATION_ID_MDC_KEY) on every log line, from the request
+    # filter or, for the saga scheduler, from the transfer being resumed.
+    correlation: "[%X{correlationId:-}] "
+
+server:
+  port: 8082
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics
+  endpoint:
+    health:
+      show-details: always
+      show-components: always

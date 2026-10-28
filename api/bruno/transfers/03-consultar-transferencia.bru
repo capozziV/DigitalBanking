@@ -1,0 +1,19 @@
+meta {
+  name: Consultar transferencia
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/transfers/{{transferId}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("200 com a transferencia", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.id).to.equal(bru.getVar("transferId"));
+    expect(res.body).to.have.property("status");
+  });
+}

@@ -1,2 +1,2 @@
-- [Gate de revisão por task](project_gate_revisao_task.md) — onde ficam brief/diff/relato da etapa 2; relato sem saída literal; fake x contrato de porta; células de exceção da spec; mudança de semântica de campo x todos os escritores da porta
-- [Revisão final de bloco](project_revisao_final_bloco.md) — escopo que muda de PR quebra rulings de CI; spec/plano atrás do ledger; .gitignore de worktrees
+- [Gate de revisão por task](project_gate_revisao_task.md) — onde ficam brief/diff/relato da etapa 2; relato sem saída literal; fake x contrato de porta; células de exceção da spec; semântica de campo x escritores da porta; porta x SQL da spec; "agora" implícito; lote sem checar desligamento; reinício simulado em IT; e2e com asserção de tempo vazia em ambiente lento
+- [Revisão final de bloco](project_revisao_final_bloco.md) — escopo que muda de PR quebra rulings de CI; job sem `build` pula ktlint; invariante entre propriedades sem validação; spec/plano atrás do ledger

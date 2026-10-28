@@ -1,0 +1,31 @@
+meta {
+  name: Repetir com a mesma chave
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/transfers
+  body: json
+  auth: none
+}
+
+headers {
+  Idempotency-Key: {{transferKey}}
+}
+
+body:json {
+  {
+    "sourceAccountId": "{{sourceAccountId}}",
+    "destinationAccountId": "{{destinationAccountId}}",
+    "amount": 300,
+    "description": "bruno transferencia"
+  }
+}
+
+tests {
+  test("200 com a mesma transferencia", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.id).to.equal(bru.getVar("transferId"));
+  });
+}

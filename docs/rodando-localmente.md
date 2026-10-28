@@ -1,6 +1,6 @@
 # Rodando o projeto localmente (macOS)
 
-Guia para subir a infraestrutura local, o serviço `accounts` e conferir a API pelo nginx.
+Guia para subir a infraestrutura local, os serviços `accounts` e `transfers` e conferir as APIs pelo nginx.
 Todos os comandos rodam na raiz do repositório e valem tanto para o zsh (o shell padrão do macOS) quanto para o bash. Os blocos de comando não têm comentários: as explicações ficam no texto antes e depois de cada bloco, porque o zsh do macOS, por padrão, não aceita `# comentário` na linha de comando.
 
 ## Pré-requisitos
@@ -52,13 +52,13 @@ Os comandos `brew` abaixo valem só para Mac com chip Apple (M1 em diante): o Ho
 ```bash
 cp infra/local/.env.example infra/local/.env
 ```
-Preencha `LOCALSTACK_AUTH_TOKEN` no `infra/local/.env`. Os outros valores do `.env.example` servem para desenvolvimento. Se a porta 80 ou 5432 já estiver em uso, troque `NGINX_PORT` ou `POSTGRES_PORT` no `infra/local/.env`. Ao trocar `POSTGRES_PORT`, ajuste a porta em `ACCOUNTS_DB_URL` no mesmo arquivo. Ao trocar `NGINX_PORT`, use a porta nova nas URLs abaixo (`http://localhost:<porta>`) e no `baseUrl` de `api/bruno/accounts/environments/local.bru`.
+Preencha `LOCALSTACK_AUTH_TOKEN` no `infra/local/.env`. Os outros valores do `.env.example` servem para desenvolvimento. Se a porta 80 ou 5432 já estiver em uso, troque `NGINX_PORT` ou `POSTGRES_PORT` no `infra/local/.env`. Ao trocar `POSTGRES_PORT`, ajuste a porta em `ACCOUNTS_DB_URL` e `TRANSFERS_DB_URL` no mesmo arquivo. Ao trocar `NGINX_PORT`, use a porta nova nas URLs abaixo (`http://localhost:<porta>`) e no `baseUrl` de `api/bruno/accounts/environments/local.bru` e `api/bruno/transfers/environments/local.bru`.
 
 ## 2. Subir a infraestrutura (PostgreSQL, Redis, nginx, LocalStack)
 ```bash
 docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml up --wait
 ```
-O comando volta quando os quatro contêineres estão saudáveis. Sem o token, o `up --wait` volta com erro porque o LocalStack encerra, mas PostgreSQL, Redis e nginx ficam de pé. O LocalStack só fica saudável depois que o script de `infra/local/localstack/init/ready.d/` cria o tópico `accounts-events.fifo` e a fila `accounts-events-inspection.fifo`, assinada nele. O script de init do PostgreSQL (`infra/local/postgres/init/01-create-service-databases.sh`) cria um banco por serviço, cada um com dois roles: `<serviço>_owner` (dono, usado pelo Flyway) e `<serviço>_app` (só `LOGIN`; as permissões vêm das migrations). Hoje são `accounts` e `transfers`. Os dados ficam no volume nomeado `postgres-data`, que sobrevive a `down` e `up`; o script só roda com volume novo, então, se mudar senhas ou o script, recrie com `down -v` (passo 8). O script é idempotente: para rodá-lo de novo sem apagar nada, execute `docker compose exec postgres /docker-entrypoint-initdb.d/01-create-service-databases.sh`. Ele cria só o que falta e não troca a senha de um role que já existe.
+O comando volta quando os quatro contêineres estão saudáveis. Sem o token, o `up --wait` volta com erro porque o LocalStack encerra, mas PostgreSQL, Redis e nginx ficam de pé. O LocalStack só fica saudável depois que os scripts de `infra/local/localstack/init/ready.d/` criam os tópicos `accounts-events.fifo` e `transfers-events.fifo`, cada um com sua fila de inspeção assinada (`accounts-events-inspection.fifo` e `transfers-events-inspection.fifo`). O script de init do PostgreSQL (`infra/local/postgres/init/01-create-service-databases.sh`) cria um banco por serviço, cada um com dois roles: `<serviço>_owner` (dono, usado pelo Flyway) e `<serviço>_app` (só `LOGIN`; as permissões vêm das migrations). Hoje são `accounts` e `transfers`. Os dados ficam no volume nomeado `postgres-data`, que sobrevive a `down` e `up`; o script só roda com volume novo, então, se mudar senhas ou o script, recrie com `down -v` (passo 8). O script é idempotente: para rodá-lo de novo sem apagar nada, execute `docker compose exec postgres /docker-entrypoint-initdb.d/01-create-service-databases.sh`. Ele cria só o que falta e não troca a senha de um role que já existe.
 
 Para adicionar o banco de um serviço novo: acrescente ao fim do script a linha `create_service_db <serviço> <SERVICO>_DB_OWNER_PASSWORD <SERVICO>_DB_PASSWORD` (os dois últimos argumentos são os nomes das variáveis com as senhas), declare essas duas variáveis no `environment` do `postgres` em `docker-compose.yml` e em `infra/local/.env.example`, e recrie o volume com `down -v`.
 
@@ -73,14 +73,22 @@ Para rodar só os testes unitários, sem Docker:
 ./gradlew test
 ```
 
-## 4. Subir o serviço `accounts`
+## 4. Subir os serviços `accounts` e `transfers`
 O serviço lê as variáveis `ACCOUNTS_DB_*` e `ACCOUNTS_AWS_ENDPOINT` do ambiente. Num terminal novo, carregue o `.env` no shell (e o `JAVA_HOME`, se não estiver no `~/.zshrc`) e rode:
 ```bash
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 set -a; . infra/local/.env; set +a
 ./gradlew :services:accounts:bootstrap:bootRun
 ```
-O serviço sobe na porta 8081 e aplica as migrations (Flyway) ao iniciar. A cada 500 ms o relay publica os eventos pendentes do outbox no tópico SNS do LocalStack. Deixe esse terminal aberto e use outro para os passos seguintes.
+O serviço sobe na porta 8081 e aplica as migrations (Flyway) ao iniciar. A cada 500 ms o relay publica os eventos pendentes do outbox no tópico SNS do LocalStack. Deixe esse terminal aberto.
+
+O `transfers` precisa do `accounts` no ar e roda num segundo terminal, com o mesmo `.env` carregado. Ele lê `TRANSFERS_DB_*`, `TRANSFERS_ACCOUNTS_URL` (padrão `http://localhost:8081`, o `accounts` chamado direto, sem o nginx) e `TRANSFERS_AWS_*` (LocalStack). As métricas `transfers.pending` e `transfers.oldest.pending.age` ficam em `/transfers/actuator/metrics`:
+```bash
+export JAVA_HOME=$(/usr/libexec/java_home -v 21)
+set -a; . infra/local/.env; set +a
+./gradlew :services:transfers:bootstrap:bootRun
+```
+O `transfers` sobe na porta 8082 e aplica as próprias migrations. Use um terceiro terminal para os passos seguintes.
 
 ## 5. Conferir a API pelo nginx
 Primeiro o health, que deve responder `"status":"UP"`; depois o smoke, que abre uma conta, credita 1000, debita 300, confere o saldo 700 e lê os eventos da conta na fila de inspeção:
@@ -88,7 +96,7 @@ Primeiro o health, que deve responder `"status":"UP"`; depois o smoke, que abre 
 curl http://localhost/accounts/actuator/health
 infra/local/smoke.sh http://localhost
 ```
-O smoke é o mesmo que roda no CI e termina com `OK: eventos da conta <id> na fila accounts-events-inspection.fifo: AccountOpened LedgerEntryRecorded:1 LedgerEntryRecorded:2`. Ele apaga da fila só as mensagens da conta que criou; as de outras contas ficam escondidas por 2 minutos depois do smoke. Como a fila não tem consumidor, ela acumula: se o smoke não achar os próprios eventos, recrie o ambiente com `down -v`. A mesma sequência à mão:
+O smoke é o mesmo que roda no CI. Na parte do `accounts`, ele imprime `OK: eventos de <id> na fila accounts-events-inspection.fifo: AccountOpened LedgerEntryRecorded:1 LedgerEntryRecorded:2`; a última linha é a do `transfers`: `OK: eventos de <transferId> na fila transfers-events-inspection.fifo: TransferCompleted`. Ele apaga da fila só as mensagens da conta que criou; as de outras contas ficam escondidas por 2 minutos depois do smoke. Como a fila não tem consumidor, ela acumula: se o smoke não achar os próprios eventos, recrie o ambiente com `down -v`. A mesma sequência à mão:
 ```bash
 ACCOUNT_ID=$(curl -sS -X POST http://localhost/accounts \
   -H 'Content-Type: application/json' -H "Idempotency-Key: $(uuidgen)" \
@@ -106,8 +114,27 @@ curl -sS http://localhost/accounts/$ACCOUNT_ID
 ```
 A última resposta mostra `"balance":700`. Valores em centavos. `Idempotency-Key` é obrigatório nos `POST`; repetir a mesma chave devolve `200` com o resultado original. O header `X-Correlation-Id` é repassado pelo nginx e devolvido na resposta.
 
+### Transferência
+O smoke acima também cobre o `transfers`: abre duas contas, credita 1000 na origem, transfere 400, espera o status `COMPLETED`, confere os saldos (600 na origem, 400 no destino) e o evento `TransferCompleted` na fila `transfers-events-inspection.fifo`. A mesma sequência à mão (reaproveita o `ACCOUNT_ID` do passo anterior como origem, que precisa de saldo para os 400; com o saldo 700 do passo anterior, sobra 300):
+```bash
+DESTINATION_ID=$(curl -sS -X POST http://localhost/accounts \
+  -H 'Content-Type: application/json' -H "Idempotency-Key: $(uuidgen)" \
+  -d "{\"customerId\":\"$(uuidgen)\"}" | jq -r .id)
+
+TRANSFER_KEY=$(uuidgen)
+curl -sS -i -X POST http://localhost/transfers \
+  -H 'Content-Type: application/json' -H "Idempotency-Key: $TRANSFER_KEY" \
+  -d "{\"sourceAccountId\":\"$ACCOUNT_ID\",\"destinationAccountId\":\"$DESTINATION_ID\",\"amount\":400,\"description\":\"transferencia\"}"
+```
+A primeira resposta é `201` com `"status":"COMPLETED"` (ou `202` se a saga ainda estiver em andamento; consulte `GET /transfers/<id>` até concluir). Repetir o mesmo comando com a mesma `Idempotency-Key` devolve `200` com a mesma transferência, sem novo débito. Os saldos ficam em 300 (origem) e 400 (destino):
+```bash
+curl -sS http://localhost/accounts/$ACCOUNT_ID | jq .balance
+curl -sS http://localhost/accounts/$DESTINATION_ID | jq .balance
+```
+O health do serviço sai em `http://localhost/transfers/actuator/health`.
+
 ## 6. Ver os eventos na fila de inspeção
-Cada evento publicado chega à fila `accounts-events-inspection.fifo`, que não tem consumidor. O corpo é o envelope do evento e `eventType` e `correlationId` vêm como atributos da mensagem. A CLI da AWS que vem na imagem do LocalStack lê a fila sem instalar nada no Mac:
+Cada evento do `accounts` chega à fila `accounts-events-inspection.fifo`, e cada evento do `transfers` à `transfers-events-inspection.fifo`; nenhuma das duas tem consumidor (troque o nome da fila nos comandos abaixo para ler a do `transfers`). O corpo é o envelope do evento e `eventType` e `correlationId` vêm como atributos da mensagem. A CLI da AWS que vem na imagem do LocalStack lê a fila sem instalar nada no Mac:
 ```bash
 docker compose -f infra/local/docker-compose.yml exec -T \
   -e AWS_ACCESS_KEY_ID=test -e AWS_SECRET_ACCESS_KEY=test -e AWS_DEFAULT_REGION=us-east-1 \
@@ -127,8 +154,17 @@ A coleção fica em `api/bruno/accounts/`, com uma requisição por endpoint e `
   ```
   Esperado: `Requests 8 (8 Passed)`. A requisição de limite grava o valor da migration (`GOLD` = 200000), sem alterar o ambiente.
 
+### Coleção do `transfers`
+A coleção `api/bruno/transfers/` roda sozinha, sem depender da coleção do `accounts`: o script da requisição `01` abre duas contas pelo `accounts`, credita 1000 na origem e guarda a `Idempotency-Key` e os ids em variáveis. Rode as requisições na ordem: `01` cria a transferência (`201`), `02` repete a mesma chave (`200`, mesma transferência) e `03` consulta pelo id. Os dois serviços precisam estar no ar.
+- **App do Bruno:** "Open Collection" → `api/bruno/transfers`, ambiente `local`.
+- **Terminal:**
+  ```bash
+  (cd api/bruno/transfers && bru run --env local)
+  ```
+  Esperado: `Requests 3 (3 Passed)`.
+
 ## 8. Derrubar tudo
-Pare o `bootRun` com Ctrl+C no terminal dele. Depois derrube os contêineres; o `-v` apaga os dados:
+Pare os dois `bootRun` com Ctrl+C nos terminais deles. Depois derrube os contêineres; o `-v` apaga os dados:
 ```bash
 docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml down -v
 ```
