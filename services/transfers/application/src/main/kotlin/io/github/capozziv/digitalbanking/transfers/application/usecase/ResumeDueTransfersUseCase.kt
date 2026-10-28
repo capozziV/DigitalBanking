@@ -24,12 +24,13 @@ class ResumeDueTransfersUseCase(
     /**
      * Returns how many transfers this tick took (lease acquired and saga run to a stop without an exception).
      * [shouldContinue] is checked before each transfer: once it is false the rest of the batch is left for a later
-     * tick (shutdown). An interruption ends the batch too, with the interrupt flag restored.
+     * tick (shutdown). An interruption ends the batch too, with the interrupt flag restored; so does a flag left set by a
+     * call that swallowed the interruption (the HTTP gateway turns it into a transient failure, not an exception).
      */
     fun execute(shouldContinue: () -> Boolean = { true }): Int {
         var taken = 0
         for (transferId in transfers.findDue(clock.instant(), settings.dueBatchSize)) {
-            if (!shouldContinue()) break
+            if (!shouldContinue() || Thread.currentThread().isInterrupted) break
             when (resume(transferId)) {
                 Outcome.TAKEN -> taken++
                 Outcome.SKIPPED -> Unit

@@ -122,9 +122,10 @@ class JdbcTransferRepository(
     }
 
     /**
-     * FOR UPDATE SKIP LOCKED only guards the selection, so concurrent schedulers do not queue on the same rows; the
-     * lease, not this lock, keeps the transfer for the one that wins [tryAcquireLease]. A lease is free with the same
-     * boundary as there: `locked_until < now`.
+     * FOR UPDATE SKIP LOCKED only guards the selection, so concurrent schedulers do not queue on the same rows. It
+     * holds only while this command runs (outside a transaction, in autocommit, the row locks are released when the
+     * statement ends): what keeps a transfer for the scheduler that wins [tryAcquireLease] is the lease, never this
+     * lock. A lease is free with the same boundary as there: `locked_until < now`.
      */
     override fun findDue(
         now: Instant,

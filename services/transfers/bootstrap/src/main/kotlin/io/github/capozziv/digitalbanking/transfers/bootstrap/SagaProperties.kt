@@ -11,8 +11,9 @@ import java.time.Duration
 
 /**
  * Settings of the transfer saga (`transfers.saga.*`); the defaults are those of the spec. Validated at startup:
- * counts and durations must be positive, [callBudget] shorter than [lease] and [retryInitial] at most [retryMax]. [pollInterval] is read by [TransferSagaScheduler]; [schedulerEnabled] turns
- * the scheduler off (integration tests that do not exercise it).
+ * counts and durations must be positive, [callBudget] shorter than [lease] and [retryInitial] at most [retryMax].
+ * [pollInterval] is read by [TransferSagaScheduler]; [schedulerEnabled] turns the scheduler off (integration tests
+ * that do not exercise it). The rule that spans `transfers.accounts.*` is checked by [SagaTimeoutsValidator].
  */
 @ConfigurationProperties("transfers.saga")
 @Validated

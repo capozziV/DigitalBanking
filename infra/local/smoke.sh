@@ -17,13 +17,16 @@ corr="smoke-$(date +%s)"
 out=$(mktemp)
 trap 'rm -f "$out"' EXIT
 
+# UUID aleatorio: /proc no Linux, uuidgen no macOS.
+uuid() { cat /proc/sys/kernel/random/uuid 2>/dev/null || uuidgen; }
+
 # Faz a requisicao, confere o status e imprime o corpo. O status esperado pode ser uma lista
 # separada por barra vertical (ex.: 201|202).
 call() {
   local expected="$1" method="$2" path="$3" body="${4:-}"
   local args=(-sS -o "$out" -w '%{http_code}' -X "$method" -H "X-Correlation-Id: $corr")
   if [ -n "$body" ]; then
-    args+=(-H 'Content-Type: application/json' -H "Idempotency-Key: $(cat /proc/sys/kernel/random/uuid 2>/dev/null || uuidgen)" -d "$body")
+    args+=(-H 'Content-Type: application/json' -H "Idempotency-Key: $(uuid)" -d "$body")
   fi
   local status
   : > "$out"
@@ -42,7 +45,7 @@ call() {
   cat "$out"
 }
 
-customer=$(cat /proc/sys/kernel/random/uuid 2>/dev/null || uuidgen)
+customer=$(uuid)
 account=$(call 201 POST /accounts "{\"customerId\":\"$customer\"}")
 id=$(echo "$account" | jq -r .id)
 
@@ -100,8 +103,8 @@ check_events "$queue_name" .aggregateId "$id" \
   "AccountOpened LedgerEntryRecorded:1 LedgerEntryRecorded:2" 3
 
 # --- transfers ---
-source_id=$(call 201 POST /accounts "{\"customerId\":\"$(cat /proc/sys/kernel/random/uuid 2>/dev/null || uuidgen)\"}" | jq -r .id)
-destination_id=$(call 201 POST /accounts "{\"customerId\":\"$(cat /proc/sys/kernel/random/uuid 2>/dev/null || uuidgen)\"}" | jq -r .id)
+source_id=$(call 201 POST /accounts "{\"customerId\":\"$(uuid)\"}" | jq -r .id)
+destination_id=$(call 201 POST /accounts "{\"customerId\":\"$(uuid)\"}" | jq -r .id)
 call 201 POST "/accounts/$source_id/credits" '{"amount":1000,"description":"smoke credito"}' > /dev/null
 
 # 201 concluida na hora, 202 ainda em andamento (a saga termina em segundo plano).

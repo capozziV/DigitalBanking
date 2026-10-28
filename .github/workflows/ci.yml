@@ -223,7 +223,7 @@ jobs:
         env:
           # Sem o segredo, o teste falha no CI em vez de ser pulado.
           LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
-        run: ./gradlew :tests:e2e:integrationTest
+        run: ./gradlew :tests:e2e:build
       - name: Publicar relatorios e logs dos processos
         if: failure()
         uses: actions/upload-artifact@v7
