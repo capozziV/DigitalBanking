@@ -24,4 +24,5 @@ include(
     ":services:transfers:application",
     ":services:transfers:adapters",
     ":services:transfers:bootstrap",
+    ":tests:e2e",
 )

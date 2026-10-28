@@ -24,6 +24,7 @@ jobs:
       accounts: ${{ steps.filter.outputs.accounts }}
       transfers: ${{ steps.filter.outputs.transfers }}
       shared: ${{ steps.filter.outputs.shared }}
+      e2e: ${{ steps.filter.outputs.e2e }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4.0.3
@@ -34,6 +35,8 @@ jobs:
               - 'services/accounts/**'
             transfers:
               - 'services/transfers/**'
+            e2e:
+              - 'tests/e2e/**'
             shared:
               - 'libs/**'
               - 'build-logic/**'
@@ -198,10 +201,42 @@ jobs:
         if: always()
         run: docker compose --env-file infra/local/.env.example -f infra/local/docker-compose.yml down -v
 
+  # Testes ponta a ponta da saga: accounts e transfers como processos (java -jar), PostgreSQL e LocalStack por
+  # Testcontainers. Roda quando muda qualquer servico, o proprio e2e ou o que afeta todos (`shared`).
+  e2e:
+    needs: changes
+    if: >-
+      ${{ needs.changes.outputs.accounts == 'true' ||
+      needs.changes.outputs.transfers == 'true' ||
+      needs.changes.outputs.shared == 'true' ||
+      needs.changes.outputs.e2e == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Testes ponta a ponta (gera os dois jars e sobe os processos)
+        env:
+          # Sem o segredo, o teste falha no CI em vez de ser pulado.
+          LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
+        run: ./gradlew :tests:e2e:integrationTest
+      - name: Publicar relatorios e logs dos processos
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports-e2e
+          path: |
+            tests/e2e/build/reports/tests/
+            tests/e2e/build/e2e-logs/
+
   # Check unico exigido pela protecao da main: falha se algum job falhou ou foi cancelado;
   # job pulado pelo filtro de caminhos conta como sucesso.
   ci-ok:
-    needs: [changes, accounts, transfers, libs, smoke]
+    needs: [changes, accounts, transfers, libs, smoke, e2e]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
