@@ -149,14 +149,14 @@ class AccountTest {
 
     @Test
     fun `changing a free account to gold emits the type change`() {
-        val (changed, event) = account.changeType(AccountType.GOLD)!!
+        val (changed, event) = account.changeType(AccountType.GOLD, OverdraftLimit(100_000))!!
 
         assertThat(changed).isEqualTo(Account(accountId, customerId, AccountType.GOLD))
-        assertThat(event).isEqualTo(AccountTypeChanged(accountId, AccountType.FREE, AccountType.GOLD))
+        assertThat(event).isEqualTo(AccountTypeChanged(accountId, AccountType.FREE, AccountType.GOLD, OverdraftLimit(100_000)))
     }
 
     @Test
     fun `changing to the same type emits nothing`() {
-        assertThat(account.changeType(AccountType.FREE)).isNull()
+        assertThat(account.changeType(AccountType.FREE, OverdraftLimit(0))).isNull()
     }
 }
