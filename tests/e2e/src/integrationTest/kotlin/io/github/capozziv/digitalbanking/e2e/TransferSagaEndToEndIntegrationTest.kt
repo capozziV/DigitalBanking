@@ -157,6 +157,7 @@ class TransferSagaEndToEndIntegrationTest {
         val id = hold.awaitHeld(CALL_HELD_TIMEOUT).transferId()
         expectedCorrelationIds[id] = TransfersApiClient.correlationIdFor(key)
         val lease = environment.transfersDatabase.lease(id)
+        val deadline = environment.transfersDatabase.deadline(id)
         assertThat(lease.status).isEqualTo("PENDING")
         assertThat(lease.step).isEqualTo("CREDIT")
         assertThat(lease.lockedUntil).isAfter(Instant.now())
@@ -174,8 +175,13 @@ class TransferSagaEndToEndIntegrationTest {
             .isBefore(lease.lockedUntil)
 
         assertThat(transfers.awaitTerminal(id, SAGA_FINISH_TIMEOUT)).isEqualTo("COMPLETED")
-        val stepsAfterKill = environment.transfersDatabase.stepTimes(id).filter { it.isAfter(killedAt) }
-        assertThat(stepsAfterKill).isNotEmpty.allSatisfy { assertThat(it).isAfterOrEqualTo(lease.lockedUntil) }
+        val stepsAfterKill = environment.transfersDatabase.recordedSteps(id).filter { it.second.isAfter(killedAt) }
+        assertThat(stepsAfterKill.map { it.second }).isNotEmpty.allSatisfy { assertThat(it).isAfterOrEqualTo(lease.lockedUntil) }
+        // The resume happened before the deadline, so the credit was repeated, not resolved by a lookup.
+        assertThat(stepsAfterKill.first().second).describedAs("first step after the restart").isBefore(deadline)
+        assertThat(
+            stepsAfterKill.map { it.first },
+        ).describedAs("steps after the restart").doesNotContain("RESOLVE_CREDIT").contains("CREDIT")
         assertThat(accounts.entryStatus(destination, "transfer-$id-credit")).isEqualTo(200)
         assertThat(accounts.entryStatus(source, "transfer-$id-compensation")).isEqualTo(404)
         assertThat(accounts.balance(source)).isEqualTo(700)
@@ -193,14 +199,21 @@ class TransferSagaEndToEndIntegrationTest {
         val id = hold.awaitHeld(CALL_HELD_TIMEOUT).transferId()
         expectedCorrelationIds[id] = TransfersApiClient.correlationIdFor(key)
         assertThat(environment.transfersDatabase.lease(id).step).isEqualTo("DEBIT")
+        val deadline = environment.transfersDatabase.deadline(id)
 
         environment.transfers.kill()
+        val killedAt = Instant.now()
         assertThat(request.get().isFailure).describedAs("the request dies with the process").isTrue()
         hold.drop()
         assertThat(accounts.entryStatus(source, "transfer-$id-debit")).isEqualTo(404)
         environment.transfers.start()
 
         assertThat(transfers.awaitTerminal(id, SAGA_FINISH_TIMEOUT)).isEqualTo("COMPLETED")
+        val stepsAfterKill = environment.transfersDatabase.recordedSteps(id).filter { it.second.isAfter(killedAt) }
+        assertThat(stepsAfterKill.first().second).describedAs("first step after the restart").isBefore(deadline)
+        assertThat(
+            stepsAfterKill.map { it.first },
+        ).describedAs("steps after the restart").contains("DEBIT").noneMatch { it.startsWith("RESOLVE") }
         assertThat(accounts.balance(source)).isEqualTo(700)
         assertThat(accounts.balance(destination)).isEqualTo(300)
         expectedEvents[id] = "TransferCompleted"
