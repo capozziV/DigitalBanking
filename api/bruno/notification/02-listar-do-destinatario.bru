@@ -1,0 +1,30 @@
+meta {
+  name: Listar notificacoes do destinatario
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/notifications?customerId={{destinationCustomerId}}
+  body: none
+  auth: none
+}
+
+script:pre-request {
+  // Espera ate 45 s pela notificacao do destinatario.
+  const axios = require("axios");
+  const base = bru.getEnvVar("baseUrl");
+  for (let i = 0; i < 45; i++) {
+    const r = await axios.get(`${base}/notifications`, { params: { customerId: bru.getVar("destinationCustomerId") } });
+    if (r.data.items.some((n) => n.kind === "TRANSFER_RECEIVED")) break;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    if (i === 44) throw new Error("FALHA: TRANSFER_RECEIVED nao chegou em 45 s");
+  }
+}
+
+tests {
+  test("200 com TRANSFER_RECEIVED para o destinatario", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.items.map((n) => n.kind)).to.include("TRANSFER_RECEIVED");
+  });
+}

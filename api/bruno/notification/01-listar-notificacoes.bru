@@ -1,0 +1,56 @@
+meta {
+  name: Listar notificacoes
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/notifications?customerId={{sourceCustomerId}}
+  body: none
+  auth: none
+}
+
+script:pre-request {
+  // Gera os eventos: abre duas contas, credita a origem e transfere; depois espera a notificacao chegar (ate 45 s).
+  const axios = require("axios");
+  const base = bru.getEnvVar("baseUrl");
+  const guid = () => bru.interpolate("{{$guid}}");
+  const sourceCustomer = guid();
+  const destinationCustomer = guid();
+  async function openAccount(customerId) {
+    const r = await axios.post(`${base}/accounts`, { customerId },
+      { headers: { "Idempotency-Key": guid() } });
+    return r.data.id;
+  }
+  const source = await openAccount(sourceCustomer);
+  const destination = await openAccount(destinationCustomer);
+  await axios.post(`${base}/accounts/${source}/credits`, { amount: 1000, description: "bruno credito" },
+    { headers: { "Idempotency-Key": guid() } });
+  await axios.post(`${base}/transfers`,
+    { sourceAccountId: source, destinationAccountId: destination, amount: 300, description: "bruno transferencia" },
+    { headers: { "Idempotency-Key": guid() } });
+  bru.setVar("sourceCustomerId", sourceCustomer);
+  bru.setVar("destinationCustomerId", destinationCustomer);
+
+  for (let i = 0; i < 45; i++) {
+    const r = await axios.get(`${base}/notifications`, { params: { customerId: sourceCustomer } });
+    if (r.data.items.some((n) => n.kind === "TRANSFER_SENT")) break;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    if (i === 44) throw new Error("FALHA: TRANSFER_SENT nao chegou em 45 s");
+  }
+}
+
+script:post-response {
+  if (res.body.items && res.body.items.length > 0) {
+    bru.setVar("latestNotificationId", res.body.items[0].id);
+  }
+}
+
+tests {
+  test("200 com TRANSFER_SENT nao lida para o remetente", function () {
+    expect(res.status).to.equal(200);
+    const kinds = res.body.items.map((n) => n.kind);
+    expect(kinds).to.include("TRANSFER_SENT");
+    expect(res.body.unreadCount).to.be.above(0);
+  });
+}

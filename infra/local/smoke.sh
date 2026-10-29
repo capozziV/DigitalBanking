@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Smoke da API pelo nginx, com os servicos accounts e transfers de pe:
+# Smoke da API pelo nginx, com os servicos accounts, transfers e notification de pe:
 # 1. accounts: abre conta, credita 1000, debita 300 e confere saldo 700; le a fila de inspecao do
 #    LocalStack e confere os eventos da conta, em ordem: AccountOpened, LedgerEntryRecorded (sequence 1)
 #    e LedgerEntryRecorded (sequence 2).
 # 2. transfers: abre duas contas, credita 1000 na origem, transfere 400, espera COMPLETED, confere
 #    saldos 600 (origem) e 400 (destino) e o evento TransferCompleted na fila transfers-events-inspection.fifo.
+# 3. notification: espera ate 10 s e confere TRANSFER_SENT para o remetente e TRANSFER_RECEIVED para o
+#    destinatario em GET /notifications?customerId=.
 # Uso: infra/local/smoke.sh [url-base]   (padrao http://127.0.0.1; exige o compose de pe)
 set -euo pipefail
 
@@ -103,8 +105,10 @@ check_events "$queue_name" .aggregateId "$id" \
   "AccountOpened LedgerEntryRecorded:1 LedgerEntryRecorded:2" 3
 
 # --- transfers ---
-source_id=$(call 201 POST /accounts "{\"customerId\":\"$(uuid)\"}" | jq -r .id)
-destination_id=$(call 201 POST /accounts "{\"customerId\":\"$(uuid)\"}" | jq -r .id)
+source_customer=$(uuid)
+destination_customer=$(uuid)
+source_id=$(call 201 POST /accounts "{\"customerId\":\"$source_customer\"}" | jq -r .id)
+destination_id=$(call 201 POST /accounts "{\"customerId\":\"$destination_customer\"}" | jq -r .id)
 call 201 POST "/accounts/$source_id/credits" '{"amount":1000,"description":"smoke credito"}' > /dev/null
 
 # 201 concluida na hora, 202 ainda em andamento (a saga termina em segundo plano).
@@ -132,3 +136,22 @@ fi
 echo "OK: transferencia $transfer_id concluida (origem $source_balance, destino $destination_balance)"
 
 check_events "$transfers_queue_name" .payload.transferId "$transfer_id" "TransferCompleted" 1
+
+# --- notification ---
+# O notification consome as filas notification-accounts.fifo e notification-transfers.fifo; espera ate 45 s (se o evento chegar antes da conta conhecida, a mensagem so volta apos 30 s de visibilidade).
+# Uso: check_notification <customerId> <kind-esperado>
+check_notification() {
+  local customer="$1" expected="$2" kinds=""
+  for _ in $(seq 1 45); do
+    kinds=$(call 200 GET "/notifications?customerId=$customer" | jq -r '[.items[].kind] | join(" ")')
+    case " $kinds " in
+      *" $expected "*) echo "OK: cliente $customer recebeu $expected"; return 0 ;;
+    esac
+    sleep 1
+  done
+  echo "FALHA: notificacoes do cliente $customer: '$kinds' (esperado $expected)" >&2
+  exit 1
+}
+
+check_notification "$source_customer" TRANSFER_SENT
+check_notification "$destination_customer" TRANSFER_RECEIVED
