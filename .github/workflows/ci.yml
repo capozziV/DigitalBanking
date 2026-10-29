@@ -23,6 +23,7 @@ jobs:
     outputs:
       accounts: ${{ steps.filter.outputs.accounts }}
       transfers: ${{ steps.filter.outputs.transfers }}
+      notification: ${{ steps.filter.outputs.notification }}
       shared: ${{ steps.filter.outputs.shared }}
       e2e: ${{ steps.filter.outputs.e2e }}
     steps:
@@ -35,6 +36,8 @@ jobs:
               - 'services/accounts/**'
             transfers:
               - 'services/transfers/**'
+            notification:
+              - 'services/notification/**'
             e2e:
               - 'tests/e2e/**'
             shared:
@@ -107,6 +110,38 @@ jobs:
           name: test-reports-transfers
           path: 'services/transfers/**/build/reports/tests/'
 
+  notification:
+    needs: changes
+    if: ${{ needs.changes.outputs.notification == 'true' || needs.changes.outputs.shared == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Build do notification (compile, ktlint, testes, ArchUnit, integracao)
+        env:
+          # Testes com LocalStack; sem o segredo, falham no CI em vez de serem pulados.
+          LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
+        run: |
+          # Uma tarefa por modulo de services/notification/, para um modulo novo entrar sem editar o workflow.
+          tasks=()
+          for dir in services/notification/*/; do
+            if [ -f "${dir}build.gradle.kts" ]; then
+              tasks+=(":services:notification:$(basename "$dir"):build")
+            fi
+          done
+          ./gradlew "${tasks[@]}"
+      - name: Publicar relatorios de teste
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports-notification
+          path: 'services/notification/**/build/reports/tests/'
+
   libs:
     needs: changes
     if: ${{ needs.changes.outputs.shared == 'true' }}
@@ -138,12 +173,13 @@ jobs:
 
   smoke:
     # Pulado (nao falho) conta como sucesso nos `needs`; `!failure()` deixa o smoke rodar quando
-    # o accounts, o transfers ou o libs foram pulados.
-    needs: [changes, accounts, transfers, libs]
+    # o accounts, o transfers, o notification ou o libs foram pulados.
+    needs: [changes, accounts, transfers, notification, libs]
     if: >-
       ${{ !failure() && !cancelled() &&
       (needs.changes.outputs.accounts == 'true' ||
       needs.changes.outputs.transfers == 'true' ||
+      needs.changes.outputs.notification == 'true' ||
       needs.changes.outputs.shared == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -155,7 +191,7 @@ jobs:
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v6
       - name: Gerar os jars executaveis
-        run: ./gradlew :services:accounts:bootstrap:bootJar :services:transfers:bootstrap:bootJar
+        run: ./gradlew :services:accounts:bootstrap:bootJar :services:transfers:bootstrap:bootJar :services:notification:bootstrap:bootJar
       - name: Subir a infra local (PostgreSQL, Redis, nginx, LocalStack)
         env:
           LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
@@ -165,16 +201,17 @@ jobs:
             exit 1
           fi
           docker compose --env-file infra/local/.env.example -f infra/local/docker-compose.yml up --wait
-      - name: Subir os servicos accounts e transfers
+      - name: Subir os servicos accounts, transfers e notification
         run: |
           set -a
           . infra/local/.env.example
           set +a
           java -jar services/accounts/bootstrap/build/libs/bootstrap.jar > accounts.log 2>&1 &
           java -jar services/transfers/bootstrap/build/libs/bootstrap.jar > transfers.log 2>&1 &
-      - name: Health dos dois servicos via nginx
+          java -jar services/notification/bootstrap/build/libs/bootstrap.jar > notification.log 2>&1 &
+      - name: Health dos tres servicos via nginx
         run: |
-          for service in accounts transfers; do
+          for service in accounts transfers notifications; do
             ok=false
             for _ in $(seq 1 60); do
               if body=$(curl -fsS "http://127.0.0.1/$service/actuator/health") && echo "$body" | grep -q '"status":"UP"'; then
@@ -196,6 +233,7 @@ jobs:
         run: |
           cat accounts.log || true
           cat transfers.log || true
+          cat notification.log || true
           docker compose --env-file infra/local/.env.example -f infra/local/docker-compose.yml logs localstack || true
       - name: Derrubar a infra local
         if: always()
@@ -236,7 +274,7 @@ jobs:
   # Check unico exigido pela protecao da main: falha se algum job falhou ou foi cancelado;
   # job pulado pelo filtro de caminhos conta como sucesso.
   ci-ok:
-    needs: [changes, accounts, transfers, libs, smoke, e2e]
+    needs: [changes, accounts, transfers, notification, libs, smoke, e2e]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

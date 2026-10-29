@@ -1,0 +1,24 @@
+meta {
+  name: Marcar como lidas
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/notifications/read
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "customerId": "{{sourceCustomerId}}",
+    "upTo": "{{latestNotificationId}}"
+  }
+}
+
+tests {
+  test("sucesso ao marcar ate a mais recente", function () {
+    expect(res.status).to.be.oneOf([200, 204]);
+  });
+}
