@@ -51,7 +51,7 @@ class NotificationController(
             cursor?.let {
                 NotificationCursorCodec.decode(it) ?: throw InvalidRequestException(listOf(InvalidField("cursor", "is invalid")))
             }
-        return NotificationPageDTO.from(listNotifications.list(customerId, decoded))
+        return NotificationPageDTO.from(listNotifications.execute(customerId, decoded))
     }
 
     @Operation(summary = "Mark as read the notifications of a customer up to one of them, inclusive; idempotent")
@@ -76,5 +76,5 @@ class NotificationController(
     fun markRead(
         @Valid @RequestBody request: MarkNotificationsReadDTO,
     ): MarkedNotificationsDTO =
-        MarkedNotificationsDTO(markNotificationsRead.markRead(checkNotNull(request.customerId), checkNotNull(request.upTo)))
+        MarkedNotificationsDTO(markNotificationsRead.execute(checkNotNull(request.customerId), checkNotNull(request.upTo)))
 }

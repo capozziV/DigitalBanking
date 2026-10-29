@@ -29,7 +29,7 @@ class ConsumeEventUseCase(
     private val ids: IdGenerator,
     private val clock: Clock,
 ) {
-    fun consume(event: ReceivedEvent): ConsumeOutcome =
+    fun execute(event: ReceivedEvent): ConsumeOutcome =
         transactions.inTransaction {
             val now = clock.instant()
             // Owners are resolved before anything is written, so an unknown account leaves no trace.

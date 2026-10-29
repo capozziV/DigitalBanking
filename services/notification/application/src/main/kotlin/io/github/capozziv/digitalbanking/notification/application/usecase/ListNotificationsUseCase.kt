@@ -14,7 +14,7 @@ data class NotificationPage(
 class ListNotificationsUseCase(
     private val notifications: NotificationRepository,
 ) {
-    fun list(
+    fun execute(
         customerId: UUID,
         cursor: NotificationCursor?,
     ): NotificationPage {

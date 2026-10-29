@@ -137,9 +137,13 @@ class NotificationApiIntegrationTest : NotificationWebIntegrationTest() {
     @Test
     fun `a tampered cursor is 400 validation-error`() {
         val notDecodable = "%25%25%25"
-        val wrongContent = Base64.getUrlEncoder().withoutPadding().encodeToString("hello|world".toByteArray())
 
-        for (cursor in listOf(notDecodable, wrongContent)) {
+        fun encoded(raw: String) = Base64.getUrlEncoder().withoutPadding().encodeToString(raw.toByteArray())
+        val notAnInstant = encoded("hello|${UUID.randomUUID()}")
+        val notAUuid = encoded("2026-10-28T12:00:00Z|world")
+        val threeParts = encoded("2026-10-28T12:00:00Z|${UUID.randomUUID()}|extra")
+
+        for (cursor in listOf(notDecodable, notAnInstant, notAUuid, threeParts)) {
             val response = api.get("/notifications?customerId=$customer&cursor=$cursor")
 
             assertProblem(response, 400, "validation-error")

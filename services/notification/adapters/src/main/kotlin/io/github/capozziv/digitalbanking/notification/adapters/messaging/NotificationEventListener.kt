@@ -40,7 +40,7 @@ class NotificationEventListener(
         if (correlationId != null) MDC.put(CORRELATION_ID_MDC_KEY, correlationId)
         try {
             val event = reader.read(body)
-            when (consumeEvent.consume(event)) {
+            when (consumeEvent.execute(event)) {
                 ConsumeOutcome.PROCESSED -> log.debug("event {} {} processed", event.eventType, event.eventId)
                 ConsumeOutcome.DUPLICATE -> log.debug("event {} {} already processed", event.eventType, event.eventId)
                 ConsumeOutcome.IGNORED -> log.info("event {} {} ignored: type not notified", event.eventType, event.eventId)

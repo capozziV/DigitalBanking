@@ -10,6 +10,8 @@ import org.springframework.boot.test.context.SpringBootTest
         "spring.cloud.aws.region.static=us-east-1",
         "spring.cloud.aws.credentials.access-key=test",
         "spring.cloud.aws.credentials.secret-key=test",
+        // These properties replace the base class's, so the queue listeners are stopped here too.
+        "spring.cloud.aws.sqs.listener.auto-startup=false",
     ],
 )
 abstract class NotificationWebIntegrationTest : NotificationIntegrationTest()

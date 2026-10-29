@@ -12,7 +12,7 @@ class MarkNotificationsReadUseCase(
     private val clock: Clock,
 ) {
     /** Marks every unread notification of [customerId] up to [upTo] inclusive; returns how many changed. */
-    fun markRead(
+    fun execute(
         customerId: UUID,
         upTo: UUID,
     ): Int =
