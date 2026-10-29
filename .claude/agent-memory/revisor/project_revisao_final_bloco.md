@@ -18,4 +18,8 @@ Na revisão final do bloco 1 da etapa 2 (2026-10-27), as tasks estavam limpas um
 - Bloco 2: invariante de segurança que cruza duas famílias de propriedades (`transfers.saga.call-budget` ≥ conexão + leitura de `transfers.accounts.*`) só existia em KDoc; o e2e ajustou as duas à mão. Procure invariantes entre propriedades de módulos diferentes e peça validação na partida no `bootstrap`.
 - Drift de docs se repetiu no bloco 2: rulings de execução (reentrância do arrendamento, owner por execução, 408/429 passageiros, `perform`, pacote do `RetryBackoff`, prazo do e2e) chegaram ao código, mas não à spec §4 nem às Tasks do plano. Faça sempre a tabela ruling → spec/plano.
 
+- Etapa 3 (revisão final, 2026-10-29): de novo o drift veio de correções feitas *depois* da task de docs. A A10 (Clara) escreveu o guia com "espera 10 s"; a correção da A8 mudou smoke/Bruno para 45 s e ninguém voltou ao `rodando-localmente.md` nem ao plano. Renome por ruling (`consume/list/markRead` → `execute`) também ficou só no código. Para cada ruling ou rodada de correção do ledger, faça grep do valor antigo em `docs/` e no plano.
+- Menor adiado de docs ("uma fila + DLQ por consumidor") estava errado em dois lugares (arquitetura.md e ADR 0003); ADR novo que refina um antigo precisa citá-lo. Confira os ADRs base, não só o novo.
+- Metade dos menores adiados já estava resolvida no HEAD: confira cada um no código antes de mandar para o board.
+
 Relacionado: [[gate-revisao-task]]
