@@ -138,12 +138,12 @@ echo "OK: transferencia $transfer_id concluida (origem $source_balance, destino 
 check_events "$transfers_queue_name" .payload.transferId "$transfer_id" "TransferCompleted" 1
 
 # --- notification ---
-# O notification consome as filas notification-accounts.fifo e notification-transfers.fifo; espera ate 10 s.
+# O notification consome as filas notification-accounts.fifo e notification-transfers.fifo; espera ate 45 s (se o evento chegar antes da conta conhecida, a mensagem so volta apos 30 s de visibilidade).
 # Uso: check_notification <customerId> <kind-esperado>
 check_notification() {
   local customer="$1" expected="$2" kinds=""
-  for _ in $(seq 1 10); do
-    kinds=$(call 200 GET "/notifications?customerId=$customer" 2> /dev/null | jq -r '[.items[].kind] | join(" ")')
+  for _ in $(seq 1 45); do
+    kinds=$(call 200 GET "/notifications?customerId=$customer" | jq -r '[.items[].kind] | join(" ")')
     case " $kinds " in
       *" $expected "*) echo "OK: cliente $customer recebeu $expected"; return 0 ;;
     esac
