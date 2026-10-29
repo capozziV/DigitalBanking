@@ -239,13 +239,14 @@ jobs:
         if: always()
         run: docker compose --env-file infra/local/.env.example -f infra/local/docker-compose.yml down -v
 
-  # Testes ponta a ponta da saga: accounts e transfers como processos (java -jar), PostgreSQL e LocalStack por
+  # Testes ponta a ponta da saga: accounts, transfers e notification como processos (java -jar), PostgreSQL e LocalStack por
   # Testcontainers. Roda quando muda qualquer servico, o proprio e2e ou o que afeta todos (`shared`).
   e2e:
     needs: changes
     if: >-
       ${{ needs.changes.outputs.accounts == 'true' ||
       needs.changes.outputs.transfers == 'true' ||
+      needs.changes.outputs.notification == 'true' ||
       needs.changes.outputs.shared == 'true' ||
       needs.changes.outputs.e2e == 'true' }}
     runs-on: ubuntu-latest
@@ -257,7 +258,7 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v6
-      - name: Testes ponta a ponta (gera os dois jars e sobe os processos)
+      - name: Testes ponta a ponta (gera os tres jars e sobe os processos)
         env:
           # Sem o segredo, o teste falha no CI em vez de ser pulado.
           LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}

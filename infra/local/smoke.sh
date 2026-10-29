@@ -5,7 +5,7 @@
 #    e LedgerEntryRecorded (sequence 2).
 # 2. transfers: abre duas contas, credita 1000 na origem, transfere 400, espera COMPLETED, confere
 #    saldos 600 (origem) e 400 (destino) e o evento TransferCompleted na fila transfers-events-inspection.fifo.
-# 3. notification: espera ate 10 s e confere TRANSFER_SENT para o remetente e TRANSFER_RECEIVED para o
+# 3. notification: espera ate 45 s (45 tentativas de 1 s) e confere TRANSFER_SENT para o remetente e TRANSFER_RECEIVED para o
 #    destinatario em GET /notifications?customerId=.
 # Uso: infra/local/smoke.sh [url-base]   (padrao http://127.0.0.1; exige o compose de pe)
 set -euo pipefail
@@ -118,7 +118,7 @@ transfer_id=$(echo "$transfer" | jq -r .id)
 
 transfer_status=""
 for _ in $(seq 1 30); do
-  transfer_status=$(call 200 GET "/transfers/$transfer_id" 2> /dev/null | jq -r .status)
+  transfer_status=$(call 200 GET "/transfers/$transfer_id" | jq -r .status)
   [ "$transfer_status" != "COMPLETED" ] || break
   sleep 1
 done
