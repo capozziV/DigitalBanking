@@ -70,12 +70,14 @@ class TransferSagaEndToEndIntegrationTest {
         val everyAccount = listOf(source) + destinations
         val totalBefore = everyAccount.sumOf { accounts.balance(it) }
 
+        val keys = List(PARALLEL_TRANSFERS) { UUID.randomUUID().toString() }
         val transferIds =
             inParallel(PARALLEL_TRANSFERS) { index ->
-                val response = transfers.requestTransfer(source, destinations[index], 200)
+                val response = transfers.requestTransfer(source, destinations[index], 200, keys[index])
                 assertThat(response.status).describedAs(response.body).isIn(201, 202, 422)
                 response.transferId()
             }
+        transferIds.forEachIndexed { index, id -> expectedCorrelationIds[id] = TransfersApiClient.correlationIdFor(keys[index]) }
         val statuses = transferIds.associateWith { transfers.awaitTerminal(it, SAGA_FINISH_TIMEOUT) }
 
         assertThat(statuses.values.count { it == "COMPLETED" }).isEqualTo(25)
@@ -103,7 +105,7 @@ class TransferSagaEndToEndIntegrationTest {
         assertThat(accounts.balance(source)).isEqualTo(800)
         assertThat(accounts.balance(destination)).isEqualTo(200)
         expectedEvents[id] = "TransferCompleted"
-        expectedCorrelationIds[id] = "e2e-$key"
+        expectedCorrelationIds[id] = TransfersApiClient.correlationIdFor(key)
     }
 
     @Test
@@ -150,8 +152,10 @@ class TransferSagaEndToEndIntegrationTest {
     fun `transfers killed in the credit step with a valid lease - the restarted process resumes only after the lease and credits once`() {
         val (source, destination) = fundedPair(1_000)
         val hold = environment.proxy.holdNext("POST", "/accounts/$destination/credits")
-        val request = CompletableFuture.supplyAsync { runCatching { transfers.requestTransfer(source, destination, 300) } }
+        val key = UUID.randomUUID().toString()
+        val request = CompletableFuture.supplyAsync { runCatching { transfers.requestTransfer(source, destination, 300, key) } }
         val id = hold.awaitHeld(CALL_HELD_TIMEOUT).transferId()
+        expectedCorrelationIds[id] = TransfersApiClient.correlationIdFor(key)
         val lease = environment.transfersDatabase.lease(id)
         assertThat(lease.status).isEqualTo("PENDING")
         assertThat(lease.step).isEqualTo("CREDIT")
@@ -165,12 +169,6 @@ class TransferSagaEndToEndIntegrationTest {
         assertThat(hold.awaitForwarded(CALL_HELD_TIMEOUT)).isEqualTo(201)
         environment.transfers.start()
         val restartedAt = Instant.now()
-        println(
-            "E2E lease margin: the restarted transfers was healthy ${Duration.between(
-                restartedAt,
-                lease.lockedUntil!!,
-            )} before the lease ended",
-        )
         assertThat(restartedAt)
             .describedAs("transfers restarted after the lease ended; the lease check would prove nothing (slow environment)")
             .isBefore(lease.lockedUntil)
@@ -190,8 +188,10 @@ class TransferSagaEndToEndIntegrationTest {
     fun `transfers killed in the debit step before the call reaches accounts - the restarted process finishes the transfer`() {
         val (source, destination) = fundedPair(1_000)
         val hold = environment.proxy.holdNext("POST", "/accounts/$source/debits")
-        val request = CompletableFuture.supplyAsync { runCatching { transfers.requestTransfer(source, destination, 300) } }
+        val key = UUID.randomUUID().toString()
+        val request = CompletableFuture.supplyAsync { runCatching { transfers.requestTransfer(source, destination, 300, key) } }
         val id = hold.awaitHeld(CALL_HELD_TIMEOUT).transferId()
+        expectedCorrelationIds[id] = TransfersApiClient.correlationIdFor(key)
         assertThat(environment.transfersDatabase.lease(id).step).isEqualTo("DEBIT")
 
         environment.transfers.kill()
@@ -237,8 +237,10 @@ class TransferSagaEndToEndIntegrationTest {
         destination: UUID,
     ): String {
         val hold = environment.proxy.holdNext("POST", "/accounts/$destination/credits")
-        val request = CompletableFuture.supplyAsync { transfers.requestTransfer(source, destination, 300) }
+        val key = UUID.randomUUID().toString()
+        val request = CompletableFuture.supplyAsync { transfers.requestTransfer(source, destination, 300, key) }
         val id = hold.awaitHeld(CALL_HELD_TIMEOUT).transferId()
+        expectedCorrelationIds[id] = TransfersApiClient.correlationIdFor(key)
         assertThat(accounts.entryStatus(source, "transfer-$id-debit")).isEqualTo(200)
 
         environment.accounts.stop()

@@ -147,13 +147,17 @@ class EndToEndEnvironment : AutoCloseable {
          * - deadline 30 s: `accounts` stops and starts again inside it (a restart takes 6 to 10 s on a laptop, so a slower CI
          *   runner still has room), and the test that waits it out stays well under a minute;
          * - read timeout 10 s, so a call held at the proxy is still in flight when the test acts on it;
-         * - call budget 11 s (connect 1 s + read 10 s) below the lease of 16 s, as the saga requires;
+         * - call budget 11 s (connect 1 s + read 10 s), which must stay below the lease (validated at startup);
+         * - lease 40 s: the lease test restarts `transfers` after a kill and needs it healthy before the lease ends. A
+         *   restart takes 6 to 10 s unloaded; the margin (lease minus restart) was ~9.8 s with a 16 s lease and failed once on a
+         *   loaded machine. At 40 s the margin is ~30 s, and the test only waits the remaining lease (well under
+         *   SAGA_FINISH_TIMEOUT of 90 s);
          * - retries every 200 ms to 1 s and the scheduler every 200 ms, so a recovery is seen quickly.
          */
         val SAGA_ARGUMENTS =
             listOf(
                 "--transfers.saga.deadline=30s",
-                "--transfers.saga.lease=16s",
+                "--transfers.saga.lease=40s",
                 "--transfers.saga.call-budget=11s",
                 "--transfers.accounts.read-timeout=10s",
                 "--transfers.saga.retry-initial=200ms",
