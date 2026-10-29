@@ -4,6 +4,9 @@ dependencies {
     implementation(project(":services:notification:domain"))
     implementation(project(":services:notification:application"))
 
+    implementation("org.springframework.boot:spring-boot-starter-webmvc")
+    implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation(libs.springdoc.openapi.starter.webmvc.ui)
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
     implementation(libs.java.uuid.generator)
 
