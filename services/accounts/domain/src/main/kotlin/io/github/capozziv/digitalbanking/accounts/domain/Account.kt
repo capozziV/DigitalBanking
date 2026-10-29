@@ -37,9 +37,12 @@ data class Account(
         )
     }
 
-    fun changeType(newType: AccountType): Pair<Account, AccountTypeChanged>? {
+    fun changeType(
+        newType: AccountType,
+        newTypeLimit: OverdraftLimit,
+    ): Pair<Account, AccountTypeChanged>? {
         if (newType == type) return null
-        return copy(type = newType) to AccountTypeChanged(id, type, newType)
+        return copy(type = newType) to AccountTypeChanged(id, type, newType, newTypeLimit)
     }
 
     private fun requireOwnEntry(last: LedgerEntry?) {

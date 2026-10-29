@@ -9,6 +9,9 @@ spring:
     username: ${TRANSFERS_DB_USER:transfers_app}
     password: ${TRANSFERS_DB_PASSWORD:transfers_app}
   jackson:
+    mapper:
+      # Amounts are numbers: "1500" must be rejected, never coerced from a string.
+      allow-coercion-of-scalars: false
     deserialization:
       # Amounts are whole cents: 1.5 must be rejected, never truncated to 1.
       accept-float-as-int: false
@@ -36,6 +39,8 @@ transfers:
     alert-after-attempts: 10
     publish-timeout: 2s
     max-cycle-duration: 10s
+    retry-backoff: 1s
+    max-retry-backoff: 30s
   aws:
     # LocalStack by default; an empty TRANSFERS_AWS_ENDPOINT uses the real AWS endpoint and credential chain.
     endpoint: ${TRANSFERS_AWS_ENDPOINT:http://localhost:4566}

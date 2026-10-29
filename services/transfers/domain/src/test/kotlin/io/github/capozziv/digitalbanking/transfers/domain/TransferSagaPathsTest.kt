@@ -42,20 +42,39 @@ class TransferSagaPathsTest {
 
     @Test
     fun `debit times out until the deadline and no entry so failed`() {
-        val t = run(timeout to afterDeadline, timeout to afterDeadline, notFound to afterDeadline)
+        val t = run(timeout to beforeDeadline, timeout to afterDeadline, timeout to afterDeadline, notFound to afterDeadline)
         assertThat(t.status).isEqualTo(TransferStatus.FAILED)
         assertThat(t.failureReason).isEqualTo(StepOutcome.DEBIT_NOT_CONFIRMED)
     }
 
     @Test
     fun `credit times out until the deadline and the entry exists so completed`() {
-        val t = run(ok to beforeDeadline, timeout to afterDeadline, ok to afterDeadline)
+        val t = run(ok to beforeDeadline, timeout to beforeDeadline, timeout to afterDeadline, ok to afterDeadline)
         assertThat(t.status).isEqualTo(TransferStatus.COMPLETED)
     }
 
     @Test
     fun `credit times out until the deadline and no entry so compensated`() {
-        val t = run(ok to beforeDeadline, timeout to afterDeadline, notFound to afterDeadline, ok to afterDeadline)
+        val t =
+            run(
+                ok to beforeDeadline,
+                timeout to beforeDeadline,
+                timeout to afterDeadline,
+                notFound to afterDeadline,
+                ok to afterDeadline,
+            )
         assertThat(t.status).isEqualTo(TransferStatus.COMPENSATED)
+    }
+
+    @Test
+    fun `transient failure before the deadline stays in the same step`() {
+        assertThat(run(timeout to beforeDeadline).step).isEqualTo(TransferStep.Debit)
+        assertThat(run(ok to beforeDeadline, timeout to beforeDeadline).step).isEqualTo(TransferStep.Credit)
+    }
+
+    @Test
+    fun `transient failure after the deadline moves to the resolve step`() {
+        assertThat(run(timeout to afterDeadline).step).isEqualTo(TransferStep.ResolveDebit)
+        assertThat(run(ok to beforeDeadline, timeout to afterDeadline).step).isEqualTo(TransferStep.ResolveCredit)
     }
 }

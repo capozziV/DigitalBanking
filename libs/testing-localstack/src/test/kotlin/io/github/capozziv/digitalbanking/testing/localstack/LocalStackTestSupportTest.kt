@@ -4,6 +4,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.opentest4j.TestAbortedException
+import org.testcontainers.containers.GenericContainer
 
 class LocalStackTestSupportTest {
     @Test
@@ -39,6 +40,20 @@ class LocalStackTestSupportTest {
         assertThat(container.envMap)
             .containsEntry("LOCALSTACK_AUTH_TOKEN", "token-1")
             .doesNotContainKeys("HTTPS_PROXY", "REQUESTS_CA_BUNDLE")
+    }
+
+    @Test
+    fun `container waits for the explicit startup timeout and logs its output`() {
+        val container = LocalStackTestSupport.container(listOf("sns"), mapOf("LOCALSTACK_AUTH_TOKEN" to "token-1"))
+
+        assertThat(LocalStackTestSupport.STARTUP_TIMEOUT).isEqualTo(java.time.Duration.ofMinutes(3))
+        val waitStrategy =
+            GenericContainer::class.java
+                .getDeclaredField("waitStrategy")
+                .apply { isAccessible = true }
+                .get(container)
+        assertThat(waitStrategy).extracting("startupTimeout").isEqualTo(LocalStackTestSupport.STARTUP_TIMEOUT)
+        assertThat(container.logConsumers).hasSize(1)
     }
 
     @Test

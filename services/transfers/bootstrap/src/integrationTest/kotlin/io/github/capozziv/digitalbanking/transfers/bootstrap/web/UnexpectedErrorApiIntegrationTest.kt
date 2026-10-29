@@ -12,7 +12,12 @@ import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import java.util.UUID
 
-/** An exception nobody expects becomes a generic 500 Problem Details, logged as ERROR with the correlation id. */
+/**
+ * An exception nobody expects becomes a generic 500 Problem Details, logged as ERROR with the correlation id.
+ *
+ * The `@MockitoBean` gives this class its own Spring context (and so its own startup), which keeps the mock away from
+ * every other test; that cost is deliberate, and this is the only class that replaces a use case.
+ */
 @ExtendWith(OutputCaptureExtension::class)
 class UnexpectedErrorApiIntegrationTest : TransfersIntegrationTest() {
     @LocalServerPort

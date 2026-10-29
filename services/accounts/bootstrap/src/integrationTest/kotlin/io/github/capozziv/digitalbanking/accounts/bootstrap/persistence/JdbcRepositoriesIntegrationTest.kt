@@ -368,12 +368,13 @@ class JdbcRepositoriesIntegrationTest : AccountsIntegrationTest() {
         )
 
         ownerJdbc.sql("delete from outbox where aggregate_id = :id").param("id", accountId.toString()).update()
-        tx.inTransaction { outbox.append(AccountTypeChanged(accountId, AccountType.FREE, AccountType.GOLD)) }
+        tx.inTransaction { outbox.append(AccountTypeChanged(accountId, AccountType.FREE, AccountType.GOLD, OverdraftLimit(100_000))) }
         assertOutboxRow(
             accountId,
             "AccountTypeChanged",
             "corr-account",
-            """{"accountId": "$accountId", "previousType": "FREE", "newType": "GOLD"}""",
+            """{"accountId": "$accountId", "previousType": "FREE", "newType": "GOLD", "overdraftLimit": 100000}""",
+            eventVersion = 2,
         )
     }
 
@@ -463,6 +464,7 @@ class JdbcRepositoriesIntegrationTest : AccountsIntegrationTest() {
         eventType: String,
         correlationId: String?,
         payload: String,
+        eventVersion: Int = 1,
     ) {
         val row =
             ownerJdbc
@@ -471,7 +473,7 @@ class JdbcRepositoriesIntegrationTest : AccountsIntegrationTest() {
                 .query()
                 .singleRow()
         assertThat(row["event_type"]).isEqualTo(eventType)
-        assertThat(row["event_version"]).isEqualTo(1)
+        assertThat(row["event_version"]).isEqualTo(eventVersion)
         assertThat(row["correlation_id"]).isEqualTo(correlationId)
         assertThat(row["published_at"]).isNull()
         assertThat(row["occurred_at"]).isNotNull()

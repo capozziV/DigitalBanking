@@ -1,6 +1,6 @@
 # Rodando o projeto localmente (macOS)
 
-Guia para subir a infraestrutura local, os serviços `accounts` e `transfers` e conferir as APIs pelo nginx.
+Guia para subir a infraestrutura local, os serviços `accounts`, `transfers` e `notification` e conferir as APIs pelo nginx.
 Todos os comandos rodam na raiz do repositório e valem tanto para o zsh (o shell padrão do macOS) quanto para o bash. Os blocos de comando não têm comentários: as explicações ficam no texto antes e depois de cada bloco, porque o zsh do macOS, por padrão, não aceita `# comentário` na linha de comando.
 
 ## Pré-requisitos
@@ -52,13 +52,13 @@ Os comandos `brew` abaixo valem só para Mac com chip Apple (M1 em diante): o Ho
 ```bash
 cp infra/local/.env.example infra/local/.env
 ```
-Preencha `LOCALSTACK_AUTH_TOKEN` no `infra/local/.env`. Os outros valores do `.env.example` servem para desenvolvimento. Se a porta 80 ou 5432 já estiver em uso, troque `NGINX_PORT` ou `POSTGRES_PORT` no `infra/local/.env`. Ao trocar `POSTGRES_PORT`, ajuste a porta em `ACCOUNTS_DB_URL` e `TRANSFERS_DB_URL` no mesmo arquivo. Ao trocar `NGINX_PORT`, use a porta nova nas URLs abaixo (`http://localhost:<porta>`) e no `baseUrl` de `api/bruno/accounts/environments/local.bru` e `api/bruno/transfers/environments/local.bru`.
+Preencha `LOCALSTACK_AUTH_TOKEN` no `infra/local/.env`. Os outros valores do `.env.example` servem para desenvolvimento. Se a porta 80 ou 5432 já estiver em uso, troque `NGINX_PORT` ou `POSTGRES_PORT` no `infra/local/.env`. Ao trocar `POSTGRES_PORT`, ajuste a porta em `ACCOUNTS_DB_URL`, `TRANSFERS_DB_URL` e `NOTIFICATION_DB_URL` no mesmo arquivo. Ao trocar `NGINX_PORT`, use a porta nova nas URLs abaixo (`http://localhost:<porta>`) e no `baseUrl` de `local.bru` de cada coleção em `api/bruno/*/environments/`.
 
 ## 2. Subir a infraestrutura (PostgreSQL, Redis, nginx, LocalStack)
 ```bash
 docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml up --wait
 ```
-O comando volta quando os quatro contêineres estão saudáveis. Sem o token, o `up --wait` volta com erro porque o LocalStack encerra, mas PostgreSQL, Redis e nginx ficam de pé. O LocalStack só fica saudável depois que os scripts de `infra/local/localstack/init/ready.d/` criam os tópicos `accounts-events.fifo` e `transfers-events.fifo`, cada um com sua fila de inspeção assinada (`accounts-events-inspection.fifo` e `transfers-events-inspection.fifo`). O script de init do PostgreSQL (`infra/local/postgres/init/01-create-service-databases.sh`) cria um banco por serviço, cada um com dois roles: `<serviço>_owner` (dono, usado pelo Flyway) e `<serviço>_app` (só `LOGIN`; as permissões vêm das migrations). Hoje são `accounts` e `transfers`. Os dados ficam no volume nomeado `postgres-data`, que sobrevive a `down` e `up`; o script só roda com volume novo, então, se mudar senhas ou o script, recrie com `down -v` (passo 8). O script é idempotente: para rodá-lo de novo sem apagar nada, execute `docker compose exec postgres /docker-entrypoint-initdb.d/01-create-service-databases.sh`. Ele cria só o que falta e não troca a senha de um role que já existe.
+O comando volta quando os quatro contêineres estão saudáveis. Sem o token, o `up --wait` volta com erro porque o LocalStack encerra, mas PostgreSQL, Redis e nginx ficam de pé. O LocalStack só fica saudável depois que os scripts de `infra/local/localstack/init/ready.d/` criam os tópicos `accounts-events.fifo` e `transfers-events.fifo`, cada um com sua fila de inspeção assinada (`accounts-events-inspection.fifo` e `transfers-events-inspection.fifo`), e as filas do `notification`: `notification-accounts.fifo` (assinada em `accounts-events.fifo`) e `notification-transfers.fifo` (assinada em `transfers-events.fifo`), cada uma com sua DLQ FIFO (`notification-accounts-dlq.fifo` e `notification-transfers-dlq.fifo`). A fila de origem move a mensagem para a DLQ na 5ª recepção (`NOTIFICATION_MAX_RECEIVE_COUNT`) e esconde a mensagem em leitura por 30 s (`NOTIFICATION_VISIBILITY_TIMEOUT_SECONDS`); os dois valores podem ser trocados no `infra/local/.env`. O script de init do PostgreSQL (`infra/local/postgres/init/01-create-service-databases.sh`) cria um banco por serviço, cada um com dois roles: `<serviço>_owner` (dono, usado pelo Flyway) e `<serviço>_app` (só `LOGIN`; as permissões vêm das migrations). Hoje são `accounts`, `transfers` e `notification`. Os dados ficam no volume nomeado `postgres-data`, que sobrevive a `down` e `up`; o script só roda com volume novo, então, se mudar senhas ou o script, recrie com `down -v` (passo 8). O script é idempotente: para rodá-lo de novo sem apagar nada, execute `docker compose exec postgres /docker-entrypoint-initdb.d/01-create-service-databases.sh`. Ele cria só o que falta e não troca a senha de um role que já existe.
 
 Para adicionar o banco de um serviço novo: acrescente ao fim do script a linha `create_service_db <serviço> <SERVICO>_DB_OWNER_PASSWORD <SERVICO>_DB_PASSWORD` (os dois últimos argumentos são os nomes das variáveis com as senhas), declare essas duas variáveis no `environment` do `postgres` em `docker-compose.yml` e em `infra/local/.env.example`, e recrie o volume com `down -v`.
 
@@ -73,7 +73,7 @@ Para rodar só os testes unitários, sem Docker:
 ./gradlew test
 ```
 
-## 4. Subir os serviços `accounts` e `transfers`
+## 4. Subir os serviços `accounts`, `transfers` e `notification`
 O serviço lê as variáveis `ACCOUNTS_DB_*` e `ACCOUNTS_AWS_ENDPOINT` do ambiente. Num terminal novo, carregue o `.env` no shell (e o `JAVA_HOME`, se não estiver no `~/.zshrc`) e rode:
 ```bash
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
@@ -88,15 +88,23 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 set -a; . infra/local/.env; set +a
 ./gradlew :services:transfers:bootstrap:bootRun
 ```
-O `transfers` sobe na porta 8082 e aplica as próprias migrations. Use um terceiro terminal para os passos seguintes.
+O `transfers` sobe na porta 8082 e aplica as próprias migrations.
+
+O `notification` consome os eventos dos dois serviços e roda num terceiro terminal, com o mesmo `.env` carregado. Ele lê as variáveis `NOTIFICATION_*` (banco e LocalStack) e consome as filas `notification-accounts.fifo` e `notification-transfers.fifo`:
+```bash
+export JAVA_HOME=$(/usr/libexec/java_home -v 21)
+set -a; . infra/local/.env; set +a
+./gradlew :services:notification:bootstrap:bootRun
+```
+O `notification` sobe na porta 8083 e aplica as próprias migrations; o nginx o expõe em `/notifications`. Use um quarto terminal para os passos seguintes.
 
 ## 5. Conferir a API pelo nginx
-Primeiro o health, que deve responder `"status":"UP"`; depois o smoke, que abre uma conta, credita 1000, debita 300, confere o saldo 700 e lê os eventos da conta na fila de inspeção:
+Primeiro o health, que deve responder `"status":"UP"`; depois o smoke, que abre uma conta, credita 1000, debita 300, confere o saldo 700, lê os eventos da conta na fila de inspeção e, com os três serviços no ar, confere as notificações de uma transferência:
 ```bash
 curl http://localhost/accounts/actuator/health
 infra/local/smoke.sh http://localhost
 ```
-O smoke é o mesmo que roda no CI. Na parte do `accounts`, ele imprime `OK: eventos de <id> na fila accounts-events-inspection.fifo: AccountOpened LedgerEntryRecorded:1 LedgerEntryRecorded:2`; a última linha é a do `transfers`: `OK: eventos de <transferId> na fila transfers-events-inspection.fifo: TransferCompleted`. Ele apaga da fila só as mensagens da conta que criou; as de outras contas ficam escondidas por 2 minutos depois do smoke. Como a fila não tem consumidor, ela acumula: se o smoke não achar os próprios eventos, recrie o ambiente com `down -v`. A mesma sequência à mão:
+O smoke é o mesmo que roda no CI. Na parte do `accounts`, ele imprime `OK: eventos de <id> na fila accounts-events-inspection.fifo: AccountOpened LedgerEntryRecorded:1 LedgerEntryRecorded:2`; a parte do `transfers` termina em `OK: eventos de <transferId> na fila transfers-events-inspection.fifo: TransferCompleted`. As duas últimas linhas são as do `notification`: o smoke espera até 45 s (45 tentativas de 1 s, acima da visibilidade de 30 s da fila: o evento da transferência pode chegar antes do da conta e voltar à fila só depois de 30 s) e confere `TRANSFER_SENT` para o cliente da origem e `TRANSFER_RECEIVED` para o da conta de destino, lendo `GET /notifications?customerId=` pelo nginx (`OK: cliente <id> recebeu TRANSFER_SENT` e `OK: cliente <id> recebeu TRANSFER_RECEIVED`). Ele apaga da fila só as mensagens da conta que criou; as de outras contas ficam escondidas por 2 minutos depois do smoke. Como a fila não tem consumidor, ela acumula: se o smoke não achar os próprios eventos, recrie o ambiente com `down -v`. A mesma sequência à mão:
 ```bash
 ACCOUNT_ID=$(curl -sS -X POST http://localhost/accounts \
   -H 'Content-Type: application/json' -H "Idempotency-Key: $(uuidgen)" \
@@ -145,6 +153,26 @@ docker compose -f infra/local/docker-compose.yml exec -T \
 ```
 A leitura não apaga as mensagens: elas voltam para a fila depois de 30 s. Numa fila FIFO, enquanto uma mensagem de uma conta está em leitura, as seguintes da mesma conta esperam. Com a CLI da AWS instalada no Mac (`brew install awscli`), o mesmo comando funciona direto com `aws --endpoint-url http://localhost:4566` e as mesmas variáveis `AWS_*`. O relay também expõe métricas em `http://localhost/accounts/actuator/metrics/outbox.pending` e `.../outbox.relay.cycles`.
 
+### DLQ do notification
+Cada fila do `notification` tem uma DLQ FIFO: `notification-accounts-dlq.fifo` e `notification-transfers-dlq.fifo`. A mensagem vai para lá na 5ª tentativa que falha (`NOTIFICATION_MAX_RECEIVE_COUNT`, visibilidade de 30 s em `NOTIFICATION_VISIBILITY_TIMEOUT_SECONDS`). A métrica `notification.dlq.messages` também mostra a quantidade. Os comandos usam a CLI da AWS da imagem do LocalStack.
+
+Para ver quantas mensagens estão paradas (troque o nome para a DLQ de `transfers`):
+```bash
+docker compose -f infra/local/docker-compose.yml exec -T \
+  -e AWS_ACCESS_KEY_ID=test -e AWS_SECRET_ACCESS_KEY=test -e AWS_DEFAULT_REGION=us-east-1 \
+  localstack aws --endpoint-url http://127.0.0.1:4566 sqs get-queue-attributes \
+  --queue-url http://127.0.0.1:4566/000000000000/notification-accounts-dlq.fifo \
+  --attribute-names ApproximateNumberOfMessages QueueArn
+```
+Depois de corrigir a causa, devolva as mensagens à fila de origem com o ARN da DLQ (campo `QueueArn` acima) e o da fila (`arn:aws:sqs:us-east-1:000000000000:notification-accounts.fifo`):
+```bash
+docker compose -f infra/local/docker-compose.yml exec -T \
+  -e AWS_ACCESS_KEY_ID=test -e AWS_SECRET_ACCESS_KEY=test -e AWS_DEFAULT_REGION=us-east-1 \
+  localstack aws --endpoint-url http://127.0.0.1:4566 sqs start-message-move-task \
+  --source-arn <arn da DLQ> --destination-arn <arn da fila>
+```
+O consumo é idempotente (`processed_events`), então devolver uma mensagem já processada não duplica a notificação.
+
 ## 7. Coleção Bruno
 A coleção fica em `api/bruno/accounts/`, com uma requisição por endpoint e `Idempotency-Key` nova a cada envio (`{{$guid}}`, ou uma chave gerada no script da requisição). A consulta de lançamento por chave (`08`) usa a chave do crédito (`03`): rode o `03` antes do `08`.
 - **App do Bruno:** "Open Collection" → `api/bruno/accounts`, escolha o ambiente `local` e rode "Abrir conta" primeiro (ela guarda o `accountId` para as outras).
@@ -153,6 +181,14 @@ A coleção fica em `api/bruno/accounts/`, com uma requisição por endpoint e `
   (cd api/bruno/accounts && bru run --env local)
   ```
   Esperado: `Requests 8 (8 Passed)`. A requisição de limite grava o valor da migration (`GOLD` = 200000), sem alterar o ambiente.
+
+### Coleção do `notification`
+A coleção `api/bruno/notification/` também roda sozinha: o script da requisição `01` abre duas contas, credita a origem, faz uma transferência pelo `transfers` e espera até 45 s pela notificação (acima da visibilidade de 30 s da fila: o evento da transferência pode chegar antes do da conta e voltar à fila só depois de 30 s). As requisições seguem a ordem: `01` lista as notificações do remetente (`TRANSFER_SENT`), `02` as do destinatário (`TRANSFER_RECEIVED`), `03` marca como lidas até a mais recente, `04` confere `unreadCount` zero e `05` mostra o `400` de um `customerId` que não é UUID. Os três serviços precisam estar no ar.
+- **Terminal:**
+  ```bash
+  (cd api/bruno/notification && bru run --env local)
+  ```
+  Esperado: `Requests 5 (5 Passed)`.
 
 ### Coleção do `transfers`
 A coleção `api/bruno/transfers/` roda sozinha, sem depender da coleção do `accounts`: o script da requisição `01` abre duas contas pelo `accounts`, credita 1000 na origem e guarda a `Idempotency-Key` e os ids em variáveis. Rode as requisições na ordem: `01` cria a transferência (`201`), `02` repete a mesma chave (`200`, mesma transferência) e `03` consulta pelo id. Os dois serviços precisam estar no ar.
@@ -164,7 +200,7 @@ A coleção `api/bruno/transfers/` roda sozinha, sem depender da coleção do `a
   Esperado: `Requests 3 (3 Passed)`.
 
 ## 8. Derrubar tudo
-Pare os dois `bootRun` com Ctrl+C nos terminais deles. Depois derrube os contêineres; o `-v` apaga os dados:
+Pare os três `bootRun` com Ctrl+C nos terminais deles. Depois derrube os contêineres; o `-v` apaga os dados:
 ```bash
 docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml down -v
 ```

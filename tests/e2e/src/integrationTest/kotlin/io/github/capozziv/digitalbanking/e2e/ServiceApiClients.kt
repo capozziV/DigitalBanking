@@ -55,11 +55,19 @@ private fun send(
 class AccountsApiClient(
     private val baseUrl: String,
 ) {
-    fun openAccount(): UUID {
+    fun openAccount(customerId: UUID = UUID.randomUUID()): UUID {
         val result =
-            send("POST", "$baseUrl/accounts", """{"customerId":"${UUID.randomUUID()}"}""", mapOf("Idempotency-Key" to newKey()))
+            send("POST", "$baseUrl/accounts", """{"customerId":"$customerId"}""", mapOf("Idempotency-Key" to newKey()))
         check(result.status == 201) { "open account: ${result.status} ${result.body}" }
         return UUID.fromString(result.json().get("id").asString())
+    }
+
+    fun changeType(
+        account: UUID,
+        type: String,
+    ) {
+        val result = send("PUT", "$baseUrl/accounts/$account/type", """{"type":"$type"}""")
+        check(result.status == 200) { "change type: ${result.status} ${result.body}" }
     }
 
     fun credit(
@@ -106,7 +114,7 @@ class TransfersApiClient(
             "POST",
             "$baseUrl/transfers",
             """{"sourceAccountId":"$source","destinationAccountId":"$destination","amount":$amount,"description":"e2e"}""",
-            mapOf("Idempotency-Key" to idempotencyKey, "X-Correlation-Id" to "e2e-$idempotencyKey"),
+            mapOf("Idempotency-Key" to idempotencyKey, "X-Correlation-Id" to correlationIdFor(idempotencyKey)),
         )
 
     fun status(id: String): String {
@@ -125,6 +133,52 @@ class TransfersApiClient(
             val status = status(id)
             if (status != "PENDING") return status
             check(Instant.now().isBefore(deadline)) { "transfer $id still PENDING after $timeout" }
+            Thread.sleep(POLL.toMillis())
+        }
+    }
+
+    companion object {
+        private val POLL: Duration = Duration.ofMillis(200)
+
+        /** The `X-Correlation-Id` [requestTransfer] sends for [idempotencyKey]. */
+        fun correlationIdFor(idempotencyKey: String) = "e2e-$idempotencyKey"
+    }
+}
+
+class NotificationApiClient(
+    private val baseUrl: String,
+) {
+    /** Every notification of [customerId], following the cursor through all pages, most recent first. */
+    fun all(customerId: UUID): List<JsonNode> {
+        val items = mutableListOf<JsonNode>()
+        var cursor: String? = null
+        do {
+            val query = "customerId=$customerId" + (cursor?.let { "&cursor=${URLEncoder.encode(it, Charsets.UTF_8)}" } ?: "")
+            val result = send("GET", "$baseUrl/notifications?$query")
+            check(result.status == 200) { "list notifications: ${result.status} ${result.body}" }
+            val page = result.json()
+            val pageItems = page.get("items")
+            (0 until pageItems.size()).forEach { items.add(pageItems.get(it)) }
+            cursor = page.get("nextCursor")?.takeUnless { it.isNull }?.asString()
+        } while (cursor != null)
+        return items
+    }
+
+    /**
+     * Polls until the notifications of [customerId] are exactly [kinds] (in any order, duplicates counted) and returns
+     * them; fails with what was seen when the time runs out.
+     */
+    fun awaitKinds(
+        customerId: UUID,
+        kinds: List<String>,
+        timeout: Duration,
+    ): List<JsonNode> {
+        val deadline = Instant.now().plus(timeout)
+        while (true) {
+            val items = all(customerId)
+            val seen = items.map { it.get("kind").asString() }
+            if (seen.sorted() == kinds.sorted()) return items
+            check(Instant.now().isBefore(deadline)) { "notifications of customer $customerId: expected $kinds, got $seen after $timeout" }
             Thread.sleep(POLL.toMillis())
         }
     }

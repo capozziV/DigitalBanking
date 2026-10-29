@@ -1,6 +1,8 @@
 package io.github.capozziv.digitalbanking.testing.localstack
 
 import org.junit.jupiter.api.Assumptions.abort
+import org.slf4j.LoggerFactory
+import org.testcontainers.containers.output.Slf4jLogConsumer
 import org.testcontainers.localstack.LocalStackContainer
 import org.testcontainers.utility.DockerImageName
 import org.testcontainers.utility.MountableFile
@@ -9,6 +11,7 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.sns.SnsClient
 import software.amazon.awssdk.services.sqs.SqsClient
+import java.time.Duration
 
 /**
  * Single place for how integration tests run LocalStack: pinned image, auth token from the
@@ -25,6 +28,15 @@ object LocalStackTestSupport {
     /** Host path of the CA that the proxy uses to re-terminate TLS. */
     const val CA_BUNDLE_VARIABLE = "LOCALSTACK_CA_BUNDLE"
     const val CONTAINER_CA_BUNDLE = "/etc/ssl/certs/egress-proxy-ca.crt"
+
+    /**
+     * How long to wait for the `Ready.` log line. The Testcontainers default is 60 s, which LocalStack
+     * sometimes exceeds when it starts right after other LocalStack containers (seen in the full build,
+     * where the first end-to-end class timed out). The wait strategy itself is unchanged.
+     */
+    val STARTUP_TIMEOUT: Duration = Duration.ofMinutes(3)
+
+    private val containerLog = LoggerFactory.getLogger("localstack")
 
     /**
      * Returns the token. Without it the test is aborted (reported as skipped) on a developer machine
@@ -49,6 +61,9 @@ object LocalStackTestSupport {
             LocalStackContainer(DockerImageName.parse(IMAGE))
                 .withServices(*services.toTypedArray())
                 .withEnv(AUTH_TOKEN_VARIABLE, authToken(environment))
+                .withStartupTimeout(STARTUP_TIMEOUT)
+                // Container output goes to the test log, so a startup timeout leaves evidence in the report.
+                .withLogConsumer(Slf4jLogConsumer(containerLog).withPrefix("localstack"))
         val proxy = environment[HTTPS_PROXY_VARIABLE]?.takeIf { it.isNotBlank() } ?: return container
         container.withEnv("HTTPS_PROXY", proxy).withEnv("NO_PROXY", "localhost,127.0.0.1")
         environment[CA_BUNDLE_VARIABLE]?.takeIf { it.isNotBlank() }?.let { caBundle ->

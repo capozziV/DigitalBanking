@@ -1,6 +1,7 @@
+import org.springframework.boot.gradle.tasks.bundling.BootJar
 import java.time.Duration
 
-// End-to-end tests of the transfer saga: accounts and transfers run as real processes (java -jar of the boot jars),
+// End-to-end tests of the transfer saga and the notifications: accounts, transfers and notification run as real processes (java -jar of the boot jars),
 // with PostgreSQL and LocalStack in Testcontainers. Everything lives in the integrationTest source set.
 plugins {
     id("digitalbanking.integration-test")
@@ -15,8 +16,9 @@ dependencies {
     integrationTestImplementation("tools.jackson.core:jackson-databind")
 }
 
-// The jars and the init scripts reach the tests as system properties. They are task inputs (the jar content, the
-// scripts by relative path), so a change in either service reruns the tests and the clone path stays out of the cache key.
+// The jars and the init scripts reach the tests as system properties. The jars come from the output of each service's
+// `bootJar` task (never a fixed file name), and are task inputs along with the scripts (by relative path), so a change
+// in either service reruns the tests and the clone path stays out of the cache key.
 abstract class EndToEndInputs : CommandLineArgumentProvider {
     @get:InputFile
     @get:PathSensitive(PathSensitivity.NONE)
@@ -25,6 +27,10 @@ abstract class EndToEndInputs : CommandLineArgumentProvider {
     @get:InputFile
     @get:PathSensitive(PathSensitivity.NONE)
     abstract val transfersJar: RegularFileProperty
+
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val notificationJar: RegularFileProperty
 
     @get:InputDirectory
     @get:PathSensitive(PathSensitivity.RELATIVE)
@@ -41,21 +47,31 @@ abstract class EndToEndInputs : CommandLineArgumentProvider {
         listOf(
             "-De2e.accounts-jar=${accountsJar.get().asFile.absolutePath}",
             "-De2e.transfers-jar=${transfersJar.get().asFile.absolutePath}",
+            "-De2e.notification-jar=${notificationJar.get().asFile.absolutePath}",
             "-De2e.postgres-init-dir=${postgresInitDir.get().asFile.absolutePath}",
             "-De2e.localstack-init-dir=${localStackInitDir.get().asFile.absolutePath}",
             "-De2e.log-dir=${logDir.get().asFile.absolutePath}",
         )
 }
 
+// The service projects must be configured before their bootJar tasks can be looked up.
+evaluationDependsOn(":services:accounts:bootstrap")
+evaluationDependsOn(":services:transfers:bootstrap")
+evaluationDependsOn(":services:notification:bootstrap")
+
+val accountsBootJar = project(":services:accounts:bootstrap").tasks.named<BootJar>("bootJar")
+val transfersBootJar = project(":services:transfers:bootstrap").tasks.named<BootJar>("bootJar")
+val notificationBootJar = project(":services:notification:bootstrap").tasks.named<BootJar>("bootJar")
+
 tasks.named<Test>("integrationTest") {
-    dependsOn(":services:accounts:bootstrap:bootJar", ":services:transfers:bootstrap:bootJar")
-    // Two service processes and their restarts: room for the suite, but a stuck process never hangs the build.
+    // Three service processes and their restarts: room for the suite, but a stuck process never hangs the build.
     timeout = Duration.ofMinutes(15)
     jvmArgumentProviders.add(
         objects.newInstance<EndToEndInputs>().apply {
             val root = rootProject.layout.projectDirectory
-            accountsJar.set(root.file("services/accounts/bootstrap/build/libs/bootstrap.jar"))
-            transfersJar.set(root.file("services/transfers/bootstrap/build/libs/bootstrap.jar"))
+            accountsJar.set(accountsBootJar.flatMap { it.archiveFile })
+            transfersJar.set(transfersBootJar.flatMap { it.archiveFile })
+            notificationJar.set(notificationBootJar.flatMap { it.archiveFile })
             postgresInitDir.set(root.dir("infra/local/postgres/init"))
             localStackInitDir.set(root.dir("infra/local/localstack/init/ready.d"))
             logDir.set(layout.buildDirectory.dir("e2e-logs"))

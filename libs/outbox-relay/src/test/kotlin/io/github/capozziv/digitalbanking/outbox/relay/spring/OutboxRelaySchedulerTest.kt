@@ -1,4 +1,4 @@
-package io.github.capozziv.digitalbanking.transfers.bootstrap
+package io.github.capozziv.digitalbanking.outbox.relay.spring
 
 import io.github.capozziv.digitalbanking.outbox.PendingEvent
 import io.github.capozziv.digitalbanking.outbox.relay.EventPublisher
@@ -10,6 +10,7 @@ import io.github.capozziv.digitalbanking.outbox.relay.OutboxStore
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.springframework.scheduling.config.ScheduledTaskRegistrar
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -32,7 +33,7 @@ class OutboxRelaySchedulerTest {
 
     @Test
     fun `shutdown waits for the cycle in progress to finish`() {
-        val scheduler = OutboxRelayScheduler(relay, shutdownTimeout = Duration.ofSeconds(5))
+        val scheduler = OutboxRelayScheduler(relay, shutdownTimeout = Duration.ofSeconds(5), pollInterval = POLL_INTERVAL)
         store.blockNextCycle()
         val cycle = Thread.ofPlatform().start { scheduler.runCycle() }
         assertThat(store.cycleEntered.await(5, TimeUnit.SECONDS)).isTrue()
@@ -49,7 +50,7 @@ class OutboxRelaySchedulerTest {
 
     @Test
     fun `no cycle starts after shutdown`() {
-        val scheduler = OutboxRelayScheduler(relay, shutdownTimeout = Duration.ofSeconds(5))
+        val scheduler = OutboxRelayScheduler(relay, shutdownTimeout = Duration.ofSeconds(5), pollInterval = POLL_INTERVAL)
 
         scheduler.destroy()
         scheduler.runCycle()
@@ -59,7 +60,7 @@ class OutboxRelaySchedulerTest {
 
     @Test
     fun `shutdown gives up after the timeout when a cycle does not finish`() {
-        val scheduler = OutboxRelayScheduler(relay, shutdownTimeout = Duration.ofMillis(200))
+        val scheduler = OutboxRelayScheduler(relay, shutdownTimeout = Duration.ofMillis(200), pollInterval = POLL_INTERVAL)
         store.blockNextCycle()
         val cycle = Thread.ofPlatform().start { scheduler.runCycle() }
         assertThat(store.cycleEntered.await(5, TimeUnit.SECONDS)).isTrue()
@@ -71,6 +72,21 @@ class OutboxRelaySchedulerTest {
         assertThat(waited).isBetween(Duration.ofMillis(150), Duration.ofSeconds(3))
         store.release.countDown()
         cycle.join(5_000)
+    }
+
+    @Test
+    fun `registers the cycle as a fixed delay task with the configured poll interval`() {
+        val scheduler = OutboxRelayScheduler(relay, shutdownTimeout = Duration.ofSeconds(5), pollInterval = Duration.ofMillis(250))
+        val registrar = ScheduledTaskRegistrar()
+
+        scheduler.configureTasks(registrar)
+
+        assertThat(registrar.fixedDelayTaskList).hasSize(1)
+        assertThat(registrar.fixedDelayTaskList.single().intervalDuration).isEqualTo(Duration.ofMillis(250))
+    }
+
+    private companion object {
+        val POLL_INTERVAL: Duration = Duration.ofMillis(500)
     }
 
     private class BlockingStore : OutboxStore {
