@@ -2,12 +2,18 @@ package io.github.capozziv.digitalbanking.notification.bootstrap.messaging
 
 import io.github.capozziv.digitalbanking.notification.bootstrap.NotificationApplication
 import io.github.capozziv.digitalbanking.notification.bootstrap.NotificationIntegrationTest
+import io.github.capozziv.digitalbanking.notification.bootstrap.web.ApiClient
 import io.github.capozziv.digitalbanking.testing.localstack.LocalStackTestSupport
 import io.micrometer.core.instrument.MeterRegistry
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.ExtendWith
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.system.CapturedOutput
+import org.springframework.boot.test.system.OutputCaptureExtension
+import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.jdbc.datasource.DriverManagerDataSource
 import org.springframework.test.annotation.DirtiesContext
@@ -16,6 +22,7 @@ import org.springframework.test.context.DynamicPropertySource
 import org.testcontainers.localstack.LocalStackContainer
 import software.amazon.awssdk.services.sqs.SqsClient
 import software.amazon.awssdk.services.sqs.model.MessageAttributeValue
+import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName
 import software.amazon.awssdk.services.sqs.model.QueueAttributeName
 import java.time.Duration
 import java.time.Instant
@@ -25,12 +32,27 @@ import java.util.UUID
  * Consumption of both FIFO queues against LocalStack, with the redrive policy of production (5 receives) and a
  * visibility timeout of 1 s so retries are quick: redeliveries are no-ops, a malformed message ends in the DLQ
  * without holding other groups, and an event about an account not known yet is retried until it is.
+ *
+ * The queues are shared by the tests of the class, so each test compares the DLQs with their depth when it started.
  */
-@SpringBootTest(classes = [NotificationApplication::class], webEnvironment = SpringBootTest.WebEnvironment.NONE)
+@SpringBootTest(classes = [NotificationApplication::class], webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+@ExtendWith(OutputCaptureExtension::class)
 class NotificationConsumptionIntegrationTest {
     @Autowired
     private lateinit var meterRegistry: MeterRegistry
+
+    @LocalServerPort
+    private var port: Int = 0
+
+    private var accountsDlqAtStart = 0
+    private var transfersDlqAtStart = 0
+
+    @BeforeEach
+    fun recordDlqDepths() {
+        accountsDlqAtStart = visibleMessages(ACCOUNTS_DLQ)
+        transfersDlqAtStart = visibleMessages(TRANSFERS_DLQ)
+    }
 
     private val jdbc: JdbcClient by lazy {
         val postgres = NotificationIntegrationTest.postgres
@@ -67,6 +89,8 @@ class NotificationConsumptionIntegrationTest {
         repeat(20) { sendTransferEvent(transferEventId, body) }
 
         awaitEmpty(TRANSFERS_QUEUE)
+        // The redeliveries were acknowledged as no-ops: none of them failed into the DLQ.
+        assertThat(visibleMessages(TRANSFERS_DLQ)).isEqualTo(transfersDlqAtStart)
         assertThat(kindsOf(alice)).containsExactlyInAnyOrder("WELCOME", "TRANSFER_SENT")
         assertThat(kindsOf(bob)).containsExactlyInAnyOrder("WELCOME", "TRANSFER_RECEIVED")
         assertThat(notificationsOfEvent(transferEventId)).isEqualTo(2)
@@ -74,11 +98,57 @@ class NotificationConsumptionIntegrationTest {
     }
 
     @Test
+    fun `an unknown event type and a ledger entry recorded are acknowledged without notifications`() {
+        val unknownEventId = UUID.randomUUID()
+        val ledgerEventId = UUID.randomUUID()
+        val accountId = UUID.randomUUID()
+        sendAccountEvent(accountId, envelope(unknownEventId, "SomethingNew", """{"accountId":"$accountId"}"""))
+        sendAccountEvent(
+            accountId,
+            envelope(
+                ledgerEventId,
+                "LedgerEntryRecorded",
+                """{"entryId":"${UUID.randomUUID()}","accountId":"$accountId","kind":"CREDIT","amount":1000,""" +
+                    """"balanceAfter":1000,"sequence":1}""",
+            ),
+        )
+
+        await { processedRows(unknownEventId) == 1 && processedRows(ledgerEventId) == 1 }
+        awaitEmpty(ACCOUNTS_QUEUE)
+        assertThat(visibleMessages(ACCOUNTS_DLQ)).isEqualTo(accountsDlqAtStart)
+        assertThat(notificationsOfEvent(unknownEventId)).isZero()
+        assertThat(notificationsOfEvent(ledgerEventId)).isZero()
+    }
+
+    @Test
+    fun `the correlation id of the SQS message attribute reaches the log of the consumption`(output: CapturedOutput) {
+        val eventId = UUID.randomUUID()
+        sendAccountEvent(UUID.randomUUID(), envelope(eventId, "SomethingNew", "{}"))
+
+        await { output.out.lines().any { it.contains(eventId.toString()) && it.contains("ignored") } }
+        val line = output.out.lines().first { it.contains(eventId.toString()) && it.contains("ignored") }
+        // The envelope carries another id, so only the message attribute can put this one in the log.
+        assertThat(line).contains("[$CORRELATION_ID]").doesNotContain(ENVELOPE_CORRELATION_ID)
+    }
+
+    @Test
+    fun `the DLQ gauge is exposed by the metrics endpoint with the queue tag`() {
+        val response = ApiClient(port).get("/actuator/metrics/notification.dlq.messages")
+
+        assertThat(response.status).describedAs(response.rawBody).isEqualTo(200)
+        val tags = response.body!!.get("availableTags")
+        val queueTag = (0 until tags.size()).map { tags.get(it) }.single { it.get("tag").asString() == "queue" }
+        val values = (0 until queueTag.get("values").size()).map { queueTag.get("values").get(it).asString() }
+        assertThat(values).containsExactlyInAnyOrder(ACCOUNTS_DLQ, TRANSFERS_DLQ)
+    }
+
+    @Test
     fun `a malformed message goes to the DLQ after 5 receives without holding other groups`() {
+        val brokenGroup = "broken-${UUID.randomUUID()}"
         sqs.sendMessage {
             it
                 .queueUrl(queueUrl(ACCOUNTS_QUEUE))
-                .messageGroupId("broken-${UUID.randomUUID()}")
+                .messageGroupId(brokenGroup)
                 .messageDeduplicationId(UUID.randomUUID().toString())
                 .messageBody("""{"eventId":"not-a-uuid","eventType":"AccountOpened"}""")
         }
@@ -87,23 +157,26 @@ class NotificationConsumptionIntegrationTest {
 
         // The other group is processed while the broken message is still being retried.
         await { kindsOf(carol) == listOf("WELCOME") }
-        assertThat(visibleMessages(ACCOUNTS_DLQ)).isZero()
+        assertThat(visibleMessages(ACCOUNTS_DLQ)).isEqualTo(accountsDlqAtStart)
 
-        await(Duration.ofSeconds(60)) { visibleMessages(ACCOUNTS_DLQ) == 1 }
+        await(Duration.ofSeconds(60)) { visibleMessages(ACCOUNTS_DLQ) == accountsDlqAtStart + 1 }
         awaitEmpty(ACCOUNTS_QUEUE)
-        await { dlqGauge(ACCOUNTS_DLQ) == 1.0 }
-        assertThat(dlqGauge(TRANSFERS_DLQ)).isZero()
+        await { dlqGauge(ACCOUNTS_DLQ) == (accountsDlqAtStart + 1).toDouble() }
+        assertThat(dlqGauge(TRANSFERS_DLQ)).isEqualTo(transfersDlqAtStart.toDouble())
+        // SQS keeps the receive count when it moves the message, and the inspection is one more receive.
+        assertThat(receiveCountInDlq(ACCOUNTS_DLQ, brokenGroup)).isEqualTo(MAX_RECEIVE_COUNT + 1)
     }
 
     @Test
-    fun `a transfer of an account not known yet comes back until the account opened arrives`() {
+    fun `a transfer of an account not known yet comes back until the account opened arrives`(output: CapturedOutput) {
         val (dave, daveAccount) = UUID.randomUUID() to UUID.randomUUID()
         val (erin, erinAccount) = UUID.randomUUID() to UUID.randomUUID()
         val transferEventId = UUID.randomUUID()
 
         sendTransferEvent(transferEventId, transferCompleted(transferEventId, daveAccount, erinAccount))
-        // Let the transfer be received (and fail) at least once before its accounts are known.
-        await { processedRows(transferEventId) == 0 && notVisibleMessages(TRANSFERS_QUEUE) > 0 }
+        // The transfer must fail at least once before its accounts are known: the listener error names the account.
+        await { output.out.contains("unknown account $daveAccount") }
+        assertThat(processedRows(transferEventId)).isZero()
         assertThat(notificationsOfEvent(transferEventId)).isZero()
         sendAccountEvent(daveAccount, accountOpened(daveAccount, dave))
         sendAccountEvent(erinAccount, accountOpened(erinAccount, erin))
@@ -112,8 +185,29 @@ class NotificationConsumptionIntegrationTest {
         assertThat(kindsOf(dave)).containsExactlyInAnyOrder("WELCOME", "TRANSFER_SENT")
         assertThat(kindsOf(erin)).containsExactlyInAnyOrder("WELCOME", "TRANSFER_RECEIVED")
         awaitEmpty(TRANSFERS_QUEUE)
-        assertThat(visibleMessages(TRANSFERS_DLQ)).isZero()
+        assertThat(visibleMessages(TRANSFERS_DLQ)).isEqualTo(transfersDlqAtStart)
     }
+
+    /** Receives (and leaves visible) the DLQ message of [group], returning how many times it had been received. */
+    private fun receiveCountInDlq(
+        dlq: String,
+        group: String,
+    ): Int =
+        sqs
+            .receiveMessage {
+                it
+                    .queueUrl(queueUrl(dlq))
+                    .maxNumberOfMessages(10)
+                    .visibilityTimeout(0)
+                    .messageSystemAttributeNames(
+                        MessageSystemAttributeName.APPROXIMATE_RECEIVE_COUNT,
+                        MessageSystemAttributeName.MESSAGE_GROUP_ID,
+                    )
+            }.messages()
+            .single { it.attributes()[MessageSystemAttributeName.MESSAGE_GROUP_ID] == group }
+            .attributes()
+            .getValue(MessageSystemAttributeName.APPROXIMATE_RECEIVE_COUNT)
+            .toInt()
 
     private fun dlqGauge(queue: String): Double =
         meterRegistry
@@ -203,7 +297,7 @@ class NotificationConsumptionIntegrationTest {
         eventType: String,
         payload: String,
     ) = """{"eventId":"$eventId","eventType":"$eventType","eventVersion":1,"occurredAt":"${Instant.now()}",""" +
-        """"aggregateId":"agg","correlationId":"$CORRELATION_ID","payload":$payload}"""
+        """"aggregateId":"agg","correlationId":"$ENVELOPE_CORRELATION_ID","payload":$payload}"""
 
     private fun visibleMessages(queue: String): Int = attribute(queue, QueueAttributeName.APPROXIMATE_NUMBER_OF_MESSAGES)
 
@@ -240,6 +334,7 @@ class NotificationConsumptionIntegrationTest {
         private const val MAX_RECEIVE_COUNT = 5
         private const val VISIBILITY_SECONDS = 1
         private const val CORRELATION_ID = "a5-correlation"
+        private const val ENVELOPE_CORRELATION_ID = "envelope-correlation"
 
         private val localStack: LocalStackContainer by lazy {
             LocalStackTestSupport.container(listOf("sqs")).also { it.start() }

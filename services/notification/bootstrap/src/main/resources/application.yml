@@ -34,6 +34,13 @@ notification:
     accounts-dlq: ${NOTIFICATION_ACCOUNTS_DLQ:notification-accounts-dlq.fifo}
     transfers-dlq: ${NOTIFICATION_TRANSFERS_DLQ:notification-transfers-dlq.fifo}
 
+management:
+  endpoints:
+    web:
+      exposure:
+        # notification.dlq.messages is read from /actuator/metrics.
+        include: health,metrics
+
 logging:
   pattern:
     # Correlation id (MDC key of OutboxEventEnvelope.CORRELATION_ID_MDC_KEY), from the SQS message attribute
