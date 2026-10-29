@@ -35,7 +35,7 @@ class ConsumeEventUseCaseTest {
     fun `account opened stores the owner and welcomes the customer`() {
         val event = ReceivedEvent.AccountOpened(UUID.randomUUID(), aliceAccount, alice, "GOLD")
 
-        val outcome = useCase.consume(event)
+        val outcome = useCase.execute(event)
 
         assertThat(outcome).isEqualTo(ConsumeOutcome.PROCESSED)
         assertThat(accounts.customerOf(aliceAccount)).isEqualTo(alice)
@@ -56,9 +56,9 @@ class ConsumeEventUseCaseTest {
     @Test
     fun `the same event delivered again is a duplicate and creates nothing`() {
         val event = ReceivedEvent.AccountOpened(UUID.randomUUID(), aliceAccount, alice, "GOLD")
-        useCase.consume(event)
+        useCase.execute(event)
 
-        val outcome = useCase.consume(event)
+        val outcome = useCase.execute(event)
 
         assertThat(outcome).isEqualTo(ConsumeOutcome.DUPLICATE)
         assertThat(notifications.all).hasSize(1)
@@ -69,7 +69,7 @@ class ConsumeEventUseCaseTest {
         openAccounts()
         val event = transferCompleted(aliceAccount, bobAccount, 12_345)
 
-        val outcome = useCase.consume(event)
+        val outcome = useCase.execute(event)
 
         assertThat(outcome).isEqualTo(ConsumeOutcome.PROCESSED)
         val sent = notifications.all.single { it.kind == NotificationKind.TRANSFER_SENT }
@@ -90,7 +90,7 @@ class ConsumeEventUseCaseTest {
         openAccounts()
         val event = transferCompleted(aliceAccount, aliceSecondAccount, 500)
 
-        useCase.consume(event)
+        useCase.execute(event)
 
         val forEvent = notifications.all.filter { it.sourceEventId == event.eventId }
         assertThat(forEvent.map { it.customerId }).containsOnly(alice)
@@ -111,7 +111,7 @@ class ConsumeEventUseCaseTest {
                 "insufficient-available-balance",
             )
 
-        useCase.consume(event)
+        useCase.execute(event)
 
         val failed = notifications.all.single { it.sourceEventId == event.eventId }
         assertThat(failed.customerId).isEqualTo(alice)
@@ -126,7 +126,7 @@ class ConsumeEventUseCaseTest {
         openAccounts()
         val event = ReceivedEvent.TransferCompensated(UUID.randomUUID(), UUID.randomUUID(), aliceAccount, bobAccount, 900)
 
-        useCase.consume(event)
+        useCase.execute(event)
 
         val compensated = notifications.all.single { it.sourceEventId == event.eventId }
         assertThat(compensated.customerId).isEqualTo(alice)
@@ -139,7 +139,7 @@ class ConsumeEventUseCaseTest {
         openAccounts()
         val event = ReceivedEvent.AccountTypeChanged(UUID.randomUUID(), aliceAccount, "BLACK", 500_000)
 
-        useCase.consume(event)
+        useCase.execute(event)
 
         val changed = notifications.all.single { it.sourceEventId == event.eventId }
         assertThat(changed.customerId).isEqualTo(alice)
@@ -153,7 +153,7 @@ class ConsumeEventUseCaseTest {
         openAccounts()
         val event = ReceivedEvent.AccountTypeChanged(UUID.randomUUID(), aliceAccount, "GOLD", null)
 
-        val outcome = useCase.consume(event)
+        val outcome = useCase.execute(event)
 
         assertThat(outcome).isEqualTo(ConsumeOutcome.PROCESSED)
         val changed = notifications.all.single { it.sourceEventId == event.eventId }
@@ -165,7 +165,7 @@ class ConsumeEventUseCaseTest {
     fun `an unsupported event is ignored but marked as processed`() {
         val event = ReceivedEvent.Unsupported(UUID.randomUUID(), "AccountClosed")
 
-        val outcome = useCase.consume(event)
+        val outcome = useCase.execute(event)
 
         assertThat(outcome).isEqualTo(ConsumeOutcome.IGNORED)
         assertThat(processed.processed).containsEntry(event.eventId, "AccountClosed")
@@ -175,9 +175,9 @@ class ConsumeEventUseCaseTest {
     @Test
     fun `an unsupported event delivered again is a duplicate`() {
         val event = ReceivedEvent.Unsupported(UUID.randomUUID(), "AccountClosed")
-        useCase.consume(event)
+        useCase.execute(event)
 
-        val outcome = useCase.consume(event)
+        val outcome = useCase.execute(event)
 
         assertThat(outcome).isEqualTo(ConsumeOutcome.DUPLICATE)
         assertThat(notifications.all).isEmpty()
@@ -187,10 +187,10 @@ class ConsumeEventUseCaseTest {
     fun `a transfer completed delivered again is a duplicate and creates no notification`() {
         openAccounts()
         val event = transferCompleted(aliceAccount, bobAccount, 500)
-        useCase.consume(event)
+        useCase.execute(event)
         val before = notifications.all.size
 
-        val outcome = useCase.consume(event)
+        val outcome = useCase.execute(event)
 
         assertThat(outcome).isEqualTo(ConsumeOutcome.DUPLICATE)
         assertThat(notifications.all).hasSize(before)
@@ -203,7 +203,7 @@ class ConsumeEventUseCaseTest {
         val event = transferCompleted(aliceAccount, unknown, 100)
         val before = notifications.all.size
 
-        assertThatThrownBy { useCase.consume(event) }
+        assertThatThrownBy { useCase.execute(event) }
             .isInstanceOf(UnknownAccountException::class.java)
             .satisfies({ assertThat((it as UnknownAccountException).accountId).isEqualTo(unknown) })
 
@@ -215,16 +215,16 @@ class ConsumeEventUseCaseTest {
     fun `an unknown account on a type change fails and records nothing`() {
         val event = ReceivedEvent.AccountTypeChanged(UUID.randomUUID(), UUID.randomUUID(), "GOLD", null)
 
-        assertThatThrownBy { useCase.consume(event) }.isInstanceOf(UnknownAccountException::class.java)
+        assertThatThrownBy { useCase.execute(event) }.isInstanceOf(UnknownAccountException::class.java)
 
         assertThat(processed.processed).isEmpty()
         assertThat(notifications.all).isEmpty()
     }
 
     private fun openAccounts() {
-        useCase.consume(ReceivedEvent.AccountOpened(UUID.randomUUID(), aliceAccount, alice, "STANDARD"))
-        useCase.consume(ReceivedEvent.AccountOpened(UUID.randomUUID(), aliceSecondAccount, alice, "GOLD"))
-        useCase.consume(ReceivedEvent.AccountOpened(UUID.randomUUID(), bobAccount, bob, "FREE"))
+        useCase.execute(ReceivedEvent.AccountOpened(UUID.randomUUID(), aliceAccount, alice, "STANDARD"))
+        useCase.execute(ReceivedEvent.AccountOpened(UUID.randomUUID(), aliceSecondAccount, alice, "GOLD"))
+        useCase.execute(ReceivedEvent.AccountOpened(UUID.randomUUID(), bobAccount, bob, "FREE"))
     }
 
     private fun transferCompleted(

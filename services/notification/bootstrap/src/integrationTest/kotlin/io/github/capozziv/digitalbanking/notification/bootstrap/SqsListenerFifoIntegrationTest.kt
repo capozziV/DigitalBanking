@@ -165,7 +165,14 @@ class SqsListenerFifoIntegrationTest {
         @JvmStatic
         @DynamicPropertySource
         fun properties(registry: DynamicPropertyRegistry) {
-            listOf(ORDERED_QUEUE, RETRY_QUEUE, BLOCKING_QUEUE).forEach { queue ->
+            // The application's own listeners start too, so their queues (default names) must exist.
+            listOf(
+                ORDERED_QUEUE,
+                RETRY_QUEUE,
+                BLOCKING_QUEUE,
+                "notification-accounts.fifo",
+                "notification-transfers.fifo",
+            ).forEach { queue ->
                 sqs.createQueue {
                     it.queueName(queue).attributes(
                         mapOf(

@@ -3,6 +3,8 @@ plugins { id("digitalbanking.spring-module") }
 dependencies {
     implementation(project(":services:notification:domain"))
     implementation(project(":services:notification:application"))
+    // Only for OutboxEventEnvelope.CORRELATION_ID_MDC_KEY, the MDC key shared by every service.
+    implementation(project(":libs:outbox"))
 
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-validation")

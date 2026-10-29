@@ -26,7 +26,7 @@ class MarkNotificationsReadUseCaseTest {
         val stored = store(customer, 5, firstIndex = 0)
         val transactionsBefore = transactions.transactions
 
-        val marked = useCase.markRead(customer, stored[2].id)
+        val marked = useCase.execute(customer, stored[2].id)
 
         assertThat(marked).isEqualTo(3)
         val byId = repository.all.associateBy { it.id }
@@ -40,7 +40,7 @@ class MarkNotificationsReadUseCaseTest {
         val mine = store(customer, 2, firstIndex = 0)
         val theirs = store(other, 2, firstIndex = 10)
 
-        useCase.markRead(customer, mine.last().id)
+        useCase.execute(customer, mine.last().id)
 
         val byId = repository.all.associateBy { it.id }
         assertThat(theirs.map { byId.getValue(it.id).readAt }).containsOnlyNulls()
@@ -49,9 +49,9 @@ class MarkNotificationsReadUseCaseTest {
     @Test
     fun `already read notifications are not counted again`() {
         val stored = store(customer, 3, firstIndex = 0)
-        useCase.markRead(customer, stored[1].id)
+        useCase.execute(customer, stored[1].id)
 
-        assertThat(useCase.markRead(customer, stored[2].id)).isEqualTo(1)
+        assertThat(useCase.execute(customer, stored[2].id)).isEqualTo(1)
     }
 
     @Test
@@ -59,7 +59,7 @@ class MarkNotificationsReadUseCaseTest {
         store(customer, 2, firstIndex = 0)
         val theirs = store(other, 1, firstIndex = 10).single()
 
-        assertThatThrownBy { useCase.markRead(customer, theirs.id) }
+        assertThatThrownBy { useCase.execute(customer, theirs.id) }
             .isInstanceOf(NotificationNotFoundException::class.java)
             .satisfies({ assertThat((it as NotificationNotFoundException).notificationId).isEqualTo(theirs.id) })
 
@@ -68,7 +68,7 @@ class MarkNotificationsReadUseCaseTest {
 
     @Test
     fun `up to an unknown notification is not found`() {
-        assertThatThrownBy { useCase.markRead(customer, UUID.randomUUID()) }
+        assertThatThrownBy { useCase.execute(customer, UUID.randomUUID()) }
             .isInstanceOf(NotificationNotFoundException::class.java)
     }
 
@@ -80,7 +80,7 @@ class MarkNotificationsReadUseCaseTest {
         val tieUseCase = MarkNotificationsReadUseCase(tiedStore, transactions, MutableClock(readAt))
         val (smaller, larger) = tied.sortedBy { it.id.toString() }
 
-        val marked = tieUseCase.markRead(customer, smaller.id)
+        val marked = tieUseCase.execute(customer, smaller.id)
 
         assertThat(marked).isEqualTo(1)
         assertThat(tiedStore.find(smaller.id)!!.readAt).isEqualTo(readAt)
