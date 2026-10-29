@@ -17,6 +17,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer
         "spring.cloud.aws.region.static=us-east-1",
         "spring.cloud.aws.credentials.access-key=test",
         "spring.cloud.aws.credentials.secret-key=test",
+        // No SQS here: the queue listeners stay stopped (NotificationConsumptionIntegrationTest covers them).
+        "spring.cloud.aws.sqs.listener.auto-startup=false",
     ],
 )
 abstract class NotificationIntegrationTest {
