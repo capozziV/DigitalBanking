@@ -1,7 +1,7 @@
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 import java.time.Duration
 
-// End-to-end tests of the transfer saga: accounts and transfers run as real processes (java -jar of the boot jars),
+// End-to-end tests of the transfer saga and the notifications: accounts, transfers and notification run as real processes (java -jar of the boot jars),
 // with PostgreSQL and LocalStack in Testcontainers. Everything lives in the integrationTest source set.
 plugins {
     id("digitalbanking.integration-test")
@@ -28,6 +28,10 @@ abstract class EndToEndInputs : CommandLineArgumentProvider {
     @get:PathSensitive(PathSensitivity.NONE)
     abstract val transfersJar: RegularFileProperty
 
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val notificationJar: RegularFileProperty
+
     @get:InputDirectory
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val postgresInitDir: DirectoryProperty
@@ -43,6 +47,7 @@ abstract class EndToEndInputs : CommandLineArgumentProvider {
         listOf(
             "-De2e.accounts-jar=${accountsJar.get().asFile.absolutePath}",
             "-De2e.transfers-jar=${transfersJar.get().asFile.absolutePath}",
+            "-De2e.notification-jar=${notificationJar.get().asFile.absolutePath}",
             "-De2e.postgres-init-dir=${postgresInitDir.get().asFile.absolutePath}",
             "-De2e.localstack-init-dir=${localStackInitDir.get().asFile.absolutePath}",
             "-De2e.log-dir=${logDir.get().asFile.absolutePath}",
@@ -52,18 +57,21 @@ abstract class EndToEndInputs : CommandLineArgumentProvider {
 // The service projects must be configured before their bootJar tasks can be looked up.
 evaluationDependsOn(":services:accounts:bootstrap")
 evaluationDependsOn(":services:transfers:bootstrap")
+evaluationDependsOn(":services:notification:bootstrap")
 
 val accountsBootJar = project(":services:accounts:bootstrap").tasks.named<BootJar>("bootJar")
 val transfersBootJar = project(":services:transfers:bootstrap").tasks.named<BootJar>("bootJar")
+val notificationBootJar = project(":services:notification:bootstrap").tasks.named<BootJar>("bootJar")
 
 tasks.named<Test>("integrationTest") {
-    // Two service processes and their restarts: room for the suite, but a stuck process never hangs the build.
+    // Three service processes and their restarts: room for the suite, but a stuck process never hangs the build.
     timeout = Duration.ofMinutes(15)
     jvmArgumentProviders.add(
         objects.newInstance<EndToEndInputs>().apply {
             val root = rootProject.layout.projectDirectory
             accountsJar.set(accountsBootJar.flatMap { it.archiveFile })
             transfersJar.set(transfersBootJar.flatMap { it.archiveFile })
+            notificationJar.set(notificationBootJar.flatMap { it.archiveFile })
             postgresInitDir.set(root.dir("infra/local/postgres/init"))
             localStackInitDir.set(root.dir("infra/local/localstack/init/ready.d"))
             logDir.set(layout.buildDirectory.dir("e2e-logs"))

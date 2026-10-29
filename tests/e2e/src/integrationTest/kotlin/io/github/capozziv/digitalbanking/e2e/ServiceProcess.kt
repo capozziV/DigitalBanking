@@ -83,6 +83,19 @@ class ServiceProcess(
         return all.takeLast(lines).joinToString("\n", prefix = "----- last ${minOf(lines, all.size)} lines of $logFile -----\n")
     }
 
+    /** Polls the log of every start of this service until at least [count] lines match [line]. */
+    fun awaitLogLine(
+        timeout: Duration,
+        count: Int = 1,
+        line: (String) -> Boolean,
+    ) {
+        val deadline = Instant.now().plus(timeout)
+        while (!Files.exists(logFile) || Files.readAllLines(logFile).count(line) < count) {
+            check(Instant.now().isBefore(deadline)) { "no matching line in the log of $name after $timeout\n${logTail()}" }
+            Thread.sleep(HEALTH_POLL.toMillis())
+        }
+    }
+
     override fun close() = stop()
 
     private fun awaitHealthy(started: Process) {
