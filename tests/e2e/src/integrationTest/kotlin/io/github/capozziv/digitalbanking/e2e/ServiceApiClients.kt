@@ -106,7 +106,7 @@ class TransfersApiClient(
             "POST",
             "$baseUrl/transfers",
             """{"sourceAccountId":"$source","destinationAccountId":"$destination","amount":$amount,"description":"e2e"}""",
-            mapOf("Idempotency-Key" to idempotencyKey, "X-Correlation-Id" to "e2e-$idempotencyKey"),
+            mapOf("Idempotency-Key" to idempotencyKey, "X-Correlation-Id" to correlationIdFor(idempotencyKey)),
         )
 
     fun status(id: String): String {
@@ -129,7 +129,10 @@ class TransfersApiClient(
         }
     }
 
-    private companion object {
-        val POLL: Duration = Duration.ofMillis(200)
+    companion object {
+        private val POLL: Duration = Duration.ofMillis(200)
+
+        /** The `X-Correlation-Id` [requestTransfer] sends for [idempotencyKey]. */
+        fun correlationIdFor(idempotencyKey: String) = "e2e-$idempotencyKey"
     }
 }

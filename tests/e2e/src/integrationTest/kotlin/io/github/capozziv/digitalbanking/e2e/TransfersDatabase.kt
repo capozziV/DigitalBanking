@@ -65,6 +65,9 @@ class TransfersDatabase(
     /** When each step of the transfer was recorded, in order. */
     fun stepTimes(transferId: String): List<Instant> = steps(transferId).map { it.third }
 
+    /** The recorded steps (name and time), in order. */
+    fun recordedSteps(transferId: String): List<Pair<String, Instant>> = steps(transferId).map { it.first to it.third }
+
     /** Polls until the transfer has a step record with [step] and [outcome]. */
     fun awaitStepOutcome(
         transferId: String,
