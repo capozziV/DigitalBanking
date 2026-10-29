@@ -290,9 +290,13 @@ class HttpAccountsGatewayIntegrationTest {
                 }
 
             val started = System.nanoTime()
-            val result = gatewayFor("http://localhost:${stalling.localPort}").perform(debit())
+            val result =
+                try {
+                    gatewayFor("http://localhost:${stalling.localPort}").perform(debit())
+                } finally {
+                    peer.interrupt()
+                }
             val elapsed = Duration.ofNanos(System.nanoTime() - started)
-            peer.interrupt()
 
             assertThat(result.outcome).isEqualTo(StepOutcome.TransientFailure)
             assertThat(result.httpStatus).isNull()

@@ -6,6 +6,9 @@ dependencies {
     // Only for OutboxEventEnvelope.CORRELATION_ID_MDC_KEY, the MDC key shared by every service.
     implementation(project(":libs:outbox"))
 
+    implementation("org.springframework.boot:spring-boot-starter-webmvc")
+    implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation(libs.springdoc.openapi.starter.webmvc.ui)
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
     implementation(libs.java.uuid.generator)
 

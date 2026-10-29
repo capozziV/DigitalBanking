@@ -73,12 +73,6 @@ class ApiClient(
         body: String,
         headers: Map<String, String> = emptyMap(),
     ) = send(HttpMethod.POST, path, body, headers)
-
-    fun put(
-        path: String,
-        body: String,
-        headers: Map<String, String> = emptyMap(),
-    ) = send(HttpMethod.PUT, path, body, headers)
 }
 
 /** Asserts a Problem Details response (RFC 9457) with the given status and type `/problems/<slug>`. */

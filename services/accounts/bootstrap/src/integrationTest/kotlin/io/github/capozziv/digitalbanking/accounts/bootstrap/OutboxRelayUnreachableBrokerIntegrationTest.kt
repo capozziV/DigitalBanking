@@ -12,7 +12,12 @@ import java.time.Duration
 import java.time.Instant
 import java.util.UUID
 
-/** With the SNS endpoint unreachable, the relay records failed attempts and the service stays healthy. */
+/**
+ * With the SNS endpoint unreachable, the relay records failed attempts (retried with backoff) and the service
+ * stays healthy. It also covers the scheduler wiring of the application: the relay cycles run from the real
+ * `OutboxRelayScheduler` bean, configured through the `accounts.outbox.*` properties, and the scheduler is
+ * destroyed before the task scheduler.
+ */
 @TestPropertySource(
     properties = [
         "accounts.outbox.relay-enabled=true",

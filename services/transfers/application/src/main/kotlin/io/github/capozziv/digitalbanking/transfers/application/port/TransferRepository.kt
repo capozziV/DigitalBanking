@@ -26,7 +26,8 @@ interface TransferRepository {
 
     /**
      * Saves [transfer] only if [owner] still holds the lease; returns false otherwise (nothing is written).
-     * The same write renews the lease to [leaseUntil] (`locked_until`).
+     * The lease must be valid at [now] (`locked_until >= now`, symmetric to [tryAcquireLease]); the same write renews it
+     * to [leaseUntil] (`locked_until`).
      *
      * [nextAttemptAt] is when the scheduler may pick the transfer up again; the domain `Transfer` does not carry it.
      * It is null only for a terminal transfer. A non-terminal transfer always gets a value, even when the saga goes on
@@ -38,6 +39,7 @@ interface TransferRepository {
         owner: String,
         nextAttemptAt: Instant?,
         leaseUntil: Instant,
+        now: Instant,
     ): Boolean
 
     fun releaseLease(

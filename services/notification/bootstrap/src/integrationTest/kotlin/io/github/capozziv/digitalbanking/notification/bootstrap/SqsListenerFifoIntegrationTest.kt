@@ -56,9 +56,25 @@ class SqsListenerFifoIntegrationTest {
         await { body in listeners.retried }
         assertThat(listeners.deliveries.getValue(body).get()).isEqualTo(2)
         awaitEmpty(RETRY_QUEUE)
-        // No third delivery: the successful attempt acknowledged (deleted) the message.
-        Thread.sleep(Duration.ofSeconds(VISIBILITY_SECONDS * 2).toMillis())
+        // Nothing left in flight or visible, so no third delivery can happen: the success acknowledged the message.
         assertThat(listeners.deliveries.getValue(body).get()).isEqualTo(2)
+    }
+
+    @Test
+    fun `when a message fails the next message of the same group is not delivered before it succeeds`() {
+        val group = UUID.randomUUID().toString()
+        val first = "first-$group"
+        val second = "second-$group"
+
+        send(BLOCKING_QUEUE, group, first)
+        send(BLOCKING_QUEUE, group, second)
+
+        await { second in listeners.blockingSucceeded }
+        // Every delivery attempt in order: M1 failed, M1 succeeded, only then M2 was ever delivered.
+        assertThat(listeners.blockingAttempts.filter { it.endsWith(group) })
+            .containsExactly(first, first, second)
+        assertThat(listeners.blockingSucceeded.filter { it.endsWith(group) }).containsExactly(first, second)
+        awaitEmpty(BLOCKING_QUEUE)
     }
 
     private fun send(
@@ -101,11 +117,21 @@ class SqsListenerFifoIntegrationTest {
     class TestListeners {
         val ordered: MutableList<String> = Collections.synchronizedList(mutableListOf())
         val retried: MutableSet<String> = ConcurrentHashMap.newKeySet()
+        val blockingAttempts: MutableList<String> = Collections.synchronizedList(mutableListOf())
+        val blockingSucceeded: MutableList<String> = Collections.synchronizedList(mutableListOf())
         val deliveries = ConcurrentHashMap<String, AtomicInteger>()
 
         @SqsListener(queueNames = [ORDERED_QUEUE], acknowledgementMode = "ON_SUCCESS")
         fun onOrdered(body: String) {
             ordered.add(body)
+        }
+
+        @SqsListener(queueNames = [BLOCKING_QUEUE], acknowledgementMode = "ON_SUCCESS")
+        fun onBlocking(body: String) {
+            val firstAttempt = blockingAttempts.none { it == body }
+            blockingAttempts.add(body)
+            check(!(firstAttempt && body.startsWith("first-"))) { "simulated failure on the first delivery of $body" }
+            blockingSucceeded.add(body)
         }
 
         @SqsListener(queueNames = [RETRY_QUEUE], acknowledgementMode = "ON_SUCCESS")
@@ -125,6 +151,7 @@ class SqsListenerFifoIntegrationTest {
     companion object {
         private const val ORDERED_QUEUE = "a1-ordered.fifo"
         private const val RETRY_QUEUE = "a1-retry.fifo"
+        private const val BLOCKING_QUEUE = "a1-blocking.fifo"
         private const val VISIBILITY_SECONDS = 1L
 
         private val localStack: LocalStackContainer by lazy {
@@ -139,7 +166,7 @@ class SqsListenerFifoIntegrationTest {
         @DynamicPropertySource
         fun properties(registry: DynamicPropertyRegistry) {
             // The application's own listeners start too, so their queues (default names) must exist.
-            listOf(ORDERED_QUEUE, RETRY_QUEUE, "notification-accounts.fifo", "notification-transfers.fifo").forEach { queue ->
+            listOf(ORDERED_QUEUE, RETRY_QUEUE, BLOCKING_QUEUE, "notification-accounts.fifo", "notification-transfers.fifo").forEach { queue ->
                 sqs.createQueue {
                     it.queueName(queue).attributes(
                         mapOf(

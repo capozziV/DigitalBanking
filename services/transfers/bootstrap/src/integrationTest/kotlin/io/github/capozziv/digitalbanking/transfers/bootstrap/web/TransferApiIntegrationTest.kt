@@ -248,7 +248,7 @@ class TransferApiIntegrationTest : TransfersIntegrationTest() {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["0", "-1", "10.5", "9223372036854775808", "null"])
+    @ValueSource(strings = ["0", "-1", "10.5", "9223372036854775808", "null", "\"1500\"", "\"\""])
     fun `an invalid amount is 400 validation-error and accounts is never called`(amount: String) {
         val response = api.post("/transfers", transferJson(amount = amount), key())
 
