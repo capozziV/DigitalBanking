@@ -79,13 +79,13 @@ class NotificationQueues(
         }
     }
 
-    /** Polls until at least [count] messages wait in the queue (nobody consuming it). */
+    /** Polls until exactly [count] messages wait in the queue (nobody consuming it). */
     fun awaitTransfersQueueDepth(
         count: Int,
         timeout: Duration,
     ) {
         val deadline = Instant.now().plus(timeout)
-        while (visible(transfersQueueUrl) < count) {
+        while (visible(transfersQueueUrl) != count) {
             check(Instant.now().isBefore(deadline)) {
                 "$TRANSFERS_QUEUE has ${visible(transfersQueueUrl)} messages after $timeout, expected $count"
             }

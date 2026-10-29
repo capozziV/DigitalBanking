@@ -91,7 +91,7 @@ class EndToEndEnvironment : AutoCloseable {
                 "notification",
                 systemPath("e2e.notification-jar"),
                 notificationEnvironment(),
-                NOTIFICATION_ARGUMENTS,
+                emptyList(),
                 logDir,
             )
         accounts.start()
@@ -197,19 +197,13 @@ class EndToEndEnvironment : AutoCloseable {
                 "--transfers.outbox.poll-interval=200ms",
             )
 
-        /** The listener logs each processed event at DEBUG, with the correlation ID of the message in the pattern. */
-        val NOTIFICATION_ARGUMENTS =
-            listOf("--logging.level.io.github.capozziv.digitalbanking.notification.adapters.messaging=DEBUG")
-
         /**
          * Read by the notification queues init script: a short visibility, so a message that always fails reaches the
-         * DLQ after its 5 receives in about 10 s instead of 2.5 min; the receive count stays the one of the local
-         * environment.
+         * DLQ after its receives (the script's default count) in about 10 s instead of 2.5 min.
          */
         private val NOTIFICATION_QUEUE_SETTINGS =
             mapOf(
                 "NOTIFICATION_VISIBILITY_TIMEOUT_SECONDS" to "2",
-                "NOTIFICATION_MAX_RECEIVE_COUNT" to "5",
             )
 
         private const val POSTGRES_IMAGE = "postgres:17-alpine"

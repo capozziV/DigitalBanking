@@ -1,5 +1,9 @@
 package io.github.capozziv.digitalbanking.notification.adapters.messaging
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import io.github.capozziv.digitalbanking.notification.application.UnknownAccountException
 import io.github.capozziv.digitalbanking.notification.application.port.IdGenerator
 import io.github.capozziv.digitalbanking.notification.application.port.KnownAccountRepository
@@ -13,7 +17,9 @@ import io.github.capozziv.digitalbanking.outbox.OutboxEventEnvelope.CORRELATION_
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import java.time.Clock
 import java.time.Instant
@@ -82,8 +88,48 @@ class NotificationEventListenerTest {
 
     private val listener = NotificationEventListener(EventEnvelopeReader(), useCase)
 
+    private val logger = LoggerFactory.getLogger(NotificationEventListener::class.java) as Logger
+    private val logged = ListAppender<ILoggingEvent>()
+
+    @BeforeEach
+    fun captureLogs() {
+        logger.level = Level.INFO
+        logged.start()
+        logger.addAppender(logged)
+    }
+
     @AfterEach
-    fun clearMdc() = MDC.clear()
+    fun clearMdc() {
+        logger.detachAppender(logged)
+        MDC.clear()
+    }
+
+    private fun infoLines() = logged.list.filter { it.level == Level.INFO }.map { it.formattedMessage }
+
+    @Test
+    fun `a processed event, a duplicate and an ignored one are logged at INFO with type and event ID`() {
+        val processedId = UUID.randomUUID()
+        val ignoredId = UUID.randomUUID()
+        val body = accountOpened(processedId)
+
+        listener.onAccountEvent(body, "corr-1")
+        listener.onAccountEvent(body, "corr-1")
+        listener.onAccountEvent(envelope("LedgerEntryRecorded", "{}", ignoredId), "corr-1")
+
+        assertThat(infoLines())
+            .anyMatch { "AccountOpened" in it && "$processedId" in it && it.endsWith("processed") }
+            .anyMatch { "AccountOpened" in it && "$processedId" in it && "already processed" in it }
+            .anyMatch { "LedgerEntryRecorded" in it && "$ignoredId" in it && "ignored" in it }
+    }
+
+    @Test
+    fun `a failure is logged at WARN with the correlation ID still in the MDC, and rethrown`() {
+        assertThatThrownBy { listener.onAccountEvent("{", "corr-fail") }.isInstanceOf(MalformedEventException::class.java)
+
+        val warning = logged.list.single { it.level == Level.WARN }
+        assertThat(warning.mdcPropertyMap[CORRELATION_ID_MDC_KEY]).isEqualTo("corr-fail")
+        assertThat(MDC.get(CORRELATION_ID_MDC_KEY)).isNull()
+    }
 
     @Test
     fun `the correlation ID attribute is in the MDC while the event is consumed and removed afterwards`() {
