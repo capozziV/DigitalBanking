@@ -16,10 +16,10 @@ import java.time.Duration
 import java.time.Instant
 
 /**
- * Everything the end-to-end tests run against, as in the local environment: one PostgreSQL with the `accounts` and
- * `transfers` databases and their owner/app users (created by the compose init script itself), LocalStack with the
- * topics and inspection queues of the compose init scripts, both services as `java -jar` processes, and
- * [AccountsProxy] between `transfers` and `accounts`.
+ * Everything the end-to-end tests run against, as in the local environment: one PostgreSQL with the `accounts`,
+ * `transfers` and `notification` databases and their owner/app users (created by the compose init script itself),
+ * LocalStack with the topics, inspection queues and notification queues of the compose init scripts, the three services
+ * as `java -jar` processes, and [AccountsProxy] between `transfers` and `accounts`.
  *
  * The saga runs with short times (see [SAGA_ARGUMENTS]) so the deadline and lease scenarios take seconds, not minutes.
  */
@@ -39,11 +39,17 @@ class EndToEndEnvironment : AutoCloseable {
         private set
     lateinit var transfers: ServiceProcess
         private set
+    lateinit var notification: ServiceProcess
+        private set
     lateinit var proxy: AccountsProxy
         private set
     lateinit var accountsApi: AccountsApiClient
         private set
     lateinit var transfersApi: TransfersApiClient
+        private set
+    lateinit var notificationApi: NotificationApiClient
+        private set
+    lateinit var notificationQueues: NotificationQueues
         private set
     lateinit var transfersDatabase: TransfersDatabase
         private set
@@ -52,11 +58,12 @@ class EndToEndEnvironment : AutoCloseable {
 
     fun processes(): List<ServiceProcess> =
         listOfNotNull(if (::accounts.isInitialized) accounts else null) +
-            listOfNotNull(if (::transfers.isInitialized) transfers else null)
+            listOfNotNull(if (::transfers.isInitialized) transfers else null) +
+            listOfNotNull(if (::notification.isInitialized) notification else null)
 
     /** Starts LocalStack first: without the token the whole class is skipped locally (and fails on CI) right away. */
     fun start() {
-        localStack = LocalStackTestSupport.container(listOf("sns", "sqs"))
+        localStack = LocalStackTestSupport.container(listOf("sns", "sqs")).withEnv(NOTIFICATION_QUEUE_SETTINGS)
         scripts(systemPath("e2e.localstack-init-dir")).forEach { script ->
             localStack.withCopyFileToContainer(
                 MountableFile.forHostPath(script, EXECUTABLE),
@@ -69,6 +76,7 @@ class EndToEndEnvironment : AutoCloseable {
 
         sqs = LocalStackTestSupport.sqsClient(localStack)
         transferEvents = TransferEventsQueue(sqs, sqs.getQueueUrl { it.queueName(TRANSFERS_INSPECTION_QUEUE) }.queueUrl())
+        notificationQueues = NotificationQueues(sqs)
         transfersDatabase =
             TransfersDatabase(jdbcUrl("transfers"), "transfers_owner", DATABASE_PASSWORDS.getValue("TRANSFERS_DB_OWNER_PASSWORD"))
 
@@ -78,10 +86,20 @@ class EndToEndEnvironment : AutoCloseable {
         proxy = AccountsProxy(accounts.baseUrl)
         transfers =
             ServiceProcess("transfers", systemPath("e2e.transfers-jar"), transfersEnvironment(), SAGA_ARGUMENTS, logDir)
+        notification =
+            ServiceProcess(
+                "notification",
+                systemPath("e2e.notification-jar"),
+                notificationEnvironment(),
+                emptyList(),
+                logDir,
+            )
         accounts.start()
         transfers.start()
+        notification.start()
         accountsApi = AccountsApiClient(accounts.baseUrl)
         transfersApi = TransfersApiClient(transfers.baseUrl)
+        notificationApi = NotificationApiClient(notification.baseUrl)
     }
 
     override fun close() {
@@ -115,6 +133,17 @@ class EndToEndEnvironment : AutoCloseable {
             "TRANSFERS_AWS_ENDPOINT" to localStack.endpoint.toString(),
             "TRANSFERS_AWS_REGION" to localStack.region,
             "TRANSFERS_TOPIC_ARN" to topicArn("transfers-events.fifo"),
+        )
+
+    private fun notificationEnvironment() =
+        mapOf(
+            "NOTIFICATION_DB_URL" to jdbcUrl("notification"),
+            "NOTIFICATION_DB_USER" to "notification_app",
+            "NOTIFICATION_DB_PASSWORD" to DATABASE_PASSWORDS.getValue("NOTIFICATION_DB_PASSWORD"),
+            "NOTIFICATION_DB_OWNER_USER" to "notification_owner",
+            "NOTIFICATION_DB_OWNER_PASSWORD" to DATABASE_PASSWORDS.getValue("NOTIFICATION_DB_OWNER_PASSWORD"),
+            "NOTIFICATION_AWS_ENDPOINT" to localStack.endpoint.toString(),
+            "NOTIFICATION_AWS_REGION" to localStack.region,
         )
 
     private fun jdbcUrl(database: String) = "jdbc:postgresql://${postgres.host}:${postgres.getMappedPort(POSTGRES_PORT)}/$database"
@@ -168,6 +197,15 @@ class EndToEndEnvironment : AutoCloseable {
                 "--transfers.outbox.poll-interval=200ms",
             )
 
+        /**
+         * Read by the notification queues init script: a short visibility, so a message that always fails reaches the
+         * DLQ after its receives (the script's default count) in about 10 s instead of 2.5 min.
+         */
+        private val NOTIFICATION_QUEUE_SETTINGS =
+            mapOf(
+                "NOTIFICATION_VISIBILITY_TIMEOUT_SECONDS" to "2",
+            )
+
         private const val POSTGRES_IMAGE = "postgres:17-alpine"
         private const val POSTGRES_PORT = 5432
         private const val TRANSFERS_INSPECTION_QUEUE = "transfers-events-inspection.fifo"
@@ -183,6 +221,8 @@ class EndToEndEnvironment : AutoCloseable {
                 "ACCOUNTS_DB_PASSWORD" to "accounts_app",
                 "TRANSFERS_DB_OWNER_PASSWORD" to "transfers_owner",
                 "TRANSFERS_DB_PASSWORD" to "transfers_app",
+                "NOTIFICATION_DB_OWNER_PASSWORD" to "notification_owner",
+                "NOTIFICATION_DB_PASSWORD" to "notification_app",
             )
 
         private fun systemPath(property: String): Path =

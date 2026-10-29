@@ -41,10 +41,14 @@ class NotificationEventListener(
         try {
             val event = reader.read(body)
             when (consumeEvent.execute(event)) {
-                ConsumeOutcome.PROCESSED -> log.debug("event {} {} processed", event.eventType, event.eventId)
-                ConsumeOutcome.DUPLICATE -> log.debug("event {} {} already processed", event.eventType, event.eventId)
+                ConsumeOutcome.PROCESSED -> log.info("event {} {} processed", event.eventType, event.eventId)
+                ConsumeOutcome.DUPLICATE -> log.info("event {} {} already processed", event.eventType, event.eventId)
                 ConsumeOutcome.IGNORED -> log.info("event {} {} ignored: type not notified", event.eventType, event.eventId)
             }
+        } catch (e: Exception) {
+            // Logged here, with the correlation ID still in the MDC: the container logs the error after the finally.
+            log.warn("failed to consume message; it returns to the queue", e)
+            throw e
         } finally {
             MDC.remove(CORRELATION_ID_MDC_KEY)
         }
