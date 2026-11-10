@@ -26,3 +26,4 @@ create_service_db() {
 
 create_service_db accounts ACCOUNTS_DB_OWNER_PASSWORD ACCOUNTS_DB_PASSWORD
 create_service_db transfers TRANSFERS_DB_OWNER_PASSWORD TRANSFERS_DB_PASSWORD
+create_service_db notification NOTIFICATION_DB_OWNER_PASSWORD NOTIFICATION_DB_PASSWORD

@@ -86,17 +86,20 @@ class ResumeDueTransfersUseCaseTest {
     fun `takes at most the batch size`() {
         pending(1)
         pending(2)
-        pending(3)
+        val third = pending(3)
         accounts.reply(created, created, created, created)
 
         assertThat(useCase.execute()).isEqualTo(2)
+
+        assertThat(repository.findById(third.id)!!.status).isEqualTo(TransferStatus.PENDING)
+        assertThat(accounts.calls).hasSize(4)
     }
 
     @Test
     fun `ignores transfers not yet due`() {
         val transfer = pending(1)
         repository.tryAcquireLease(transfer.id, "x", start.plusSeconds(1), start)
-        repository.saveIfOwner(transfer, "x", start.plusSeconds(60), start.plusSeconds(1))
+        repository.saveIfOwner(transfer, "x", start.plusSeconds(60), start.plusSeconds(1), start)
         repository.releaseLease(transfer.id, "x")
 
         assertThat(useCase.execute()).isEqualTo(0)
@@ -183,6 +186,7 @@ class ResumeDueTransfersUseCaseTest {
         assertThat(repository.findById(first.id)!!.status).isEqualTo(TransferStatus.PENDING)
         assertThat(repository.findById(second.id)!!.status).isEqualTo(TransferStatus.PENDING)
         assertThat(accounts.calls).hasSize(1)
+        assertThat(repository.leaseOwner(first.id)).isNull()
     }
 
     @Test

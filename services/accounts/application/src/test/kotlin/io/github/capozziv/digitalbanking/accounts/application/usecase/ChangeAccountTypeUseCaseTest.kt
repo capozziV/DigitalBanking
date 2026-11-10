@@ -5,13 +5,17 @@ import io.github.capozziv.digitalbanking.accounts.application.AccountNotFoundExc
 import io.github.capozziv.digitalbanking.accounts.application.fake.CallLog
 import io.github.capozziv.digitalbanking.accounts.application.fake.DirectTransactionRunner
 import io.github.capozziv.digitalbanking.accounts.application.fake.InMemoryAccountRepository
+import io.github.capozziv.digitalbanking.accounts.application.fake.InMemoryAccountTypeRepository
 import io.github.capozziv.digitalbanking.accounts.application.fake.RecordingEventOutbox
 import io.github.capozziv.digitalbanking.accounts.domain.Account
 import io.github.capozziv.digitalbanking.accounts.domain.AccountType
 import io.github.capozziv.digitalbanking.accounts.domain.AccountTypeChanged
+import io.github.capozziv.digitalbanking.accounts.domain.AccountTypeLimit
+import io.github.capozziv.digitalbanking.accounts.domain.OverdraftLimit
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import java.time.Instant
 import java.util.UUID
 
 class ChangeAccountTypeUseCaseTest {
@@ -24,7 +28,15 @@ class ChangeAccountTypeUseCaseTest {
     private val accounts = InMemoryAccountRepository().apply { insert(account, "open-key-1") }
     private val outbox = RecordingEventOutbox()
     private val tx = DirectTransactionRunner()
-    private val useCase = ChangeAccountTypeUseCase(accounts, outbox, tx)
+    private val types =
+        InMemoryAccountTypeRepository(
+            AccountType.entries.mapIndexed { index, type ->
+                AccountTypeLimit(type, OverdraftLimit((index + 1) * 10_000L), Instant.parse("2026-10-22T00:00:00Z"))
+            },
+        )
+    private val useCase = ChangeAccountTypeUseCase(accounts, types, outbox, tx)
+
+    private fun limitOf(type: AccountType) = types.findLimit(type)
 
     @Test
     fun `upgrade updates the type and appends account type changed to the outbox`() {
@@ -34,7 +46,12 @@ class ChangeAccountTypeUseCaseTest {
         assertThat(result).isEqualTo(upgraded)
         assertThat(accounts.findById(account.id)).isEqualTo(upgraded)
         assertThat(outbox.events).containsExactly(
-            AccountTypeChanged(accountId = account.id, previousType = AccountType.FREE, newType = AccountType.GOLD),
+            AccountTypeChanged(
+                accountId = account.id,
+                previousType = AccountType.FREE,
+                newType = AccountType.GOLD,
+                overdraftLimit = limitOf(AccountType.GOLD),
+            ),
         )
         assertThat(tx.transactions).isEqualTo(1)
     }
@@ -49,15 +66,25 @@ class ChangeAccountTypeUseCaseTest {
         assertThat(result).isEqualTo(downgraded)
         assertThat(accounts.findById(account.id)).isEqualTo(downgraded)
         assertThat(outbox.events).containsExactly(
-            AccountTypeChanged(accountId = account.id, previousType = AccountType.FREE, newType = AccountType.DIAMOND),
-            AccountTypeChanged(accountId = account.id, previousType = AccountType.DIAMOND, newType = AccountType.STANDARD),
+            AccountTypeChanged(
+                accountId = account.id,
+                previousType = AccountType.FREE,
+                newType = AccountType.DIAMOND,
+                overdraftLimit = limitOf(AccountType.DIAMOND),
+            ),
+            AccountTypeChanged(
+                accountId = account.id,
+                previousType = AccountType.DIAMOND,
+                newType = AccountType.STANDARD,
+                overdraftLimit = limitOf(AccountType.STANDARD),
+            ),
         )
     }
 
     @Test
     fun `changing to the same type returns the account without update or event`() {
         val log = CallLog()
-        val tracked = ChangeAccountTypeUseCase(log.accounts(accounts), log.outbox(outbox), log.transactions(tx))
+        val tracked = ChangeAccountTypeUseCase(log.accounts(accounts), log.types(types), log.outbox(outbox), log.transactions(tx))
 
         val result = tracked.execute(account.id, AccountType.FREE)
 
@@ -96,13 +123,14 @@ class ChangeAccountTypeUseCaseTest {
     @Test
     fun `type change follows lock, type update and event append in one transaction`() {
         val log = CallLog()
-        val tracked = ChangeAccountTypeUseCase(log.accounts(accounts), log.outbox(outbox), log.transactions(tx))
+        val tracked = ChangeAccountTypeUseCase(log.accounts(accounts), log.types(types), log.outbox(outbox), log.transactions(tx))
 
         tracked.execute(account.id, AccountType.BLACK)
 
         assertThat(log.calls).containsExactly(
             "begin",
             "accounts.lockById",
+            "types.findLimit",
             "accounts.updateType",
             "outbox.append",
             "end",

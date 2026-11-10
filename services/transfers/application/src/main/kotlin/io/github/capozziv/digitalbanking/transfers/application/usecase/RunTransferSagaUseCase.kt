@@ -53,11 +53,18 @@ class RunTransferSagaUseCase(
         val leaseUntil = now.plus(settings.lease)
         val acquired = tx.inTransaction { transfers.tryAcquireLease(transferId, owner, leaseUntil, now) }
         if (!acquired) return null
+        val run = Run(transferId, owner, busyAttempts, leaseUntil)
         try {
-            return Run(transferId, owner, busyAttempts, leaseUntil).steps()
+            return run.steps()
         } finally {
             runCatching { tx.inTransaction { transfers.releaseLease(transferId, owner) } }
-                .onFailure { LOG.log(System.Logger.Level.WARNING, "could not release the lease of transfer $transferId", it) }
+                .onFailure {
+                    LOG.log(
+                        System.Logger.Level.WARNING,
+                        "could not release the lease of transfer $transferId (correlation ${run.correlationId})",
+                        it,
+                    )
+                }
         }
     }
 
@@ -67,8 +74,13 @@ class RunTransferSagaUseCase(
         private val busyAttempts: Int,
         private var leaseUntil: Instant,
     ) {
+        /** Set once the transfer is loaded, so the lease release can log it even when the run fails. */
+        var correlationId: String? = null
+            private set
+
         fun steps(): Transfer? {
             var transfer = tx.inTransaction { transfers.findById(transferId) } ?: return null
+            correlationId = transfer.correlationId
             while (true) {
                 val call = transfer.step.call(transfer) ?: return transfer
                 val pending = mutableListOf<StepRecord>()
@@ -97,7 +109,7 @@ class RunTransferSagaUseCase(
 
                 val saved =
                     tx.inTransaction {
-                        val owned = transfers.saveIfOwner(next, owner, nextAttemptAt, renewedUntil)
+                        val owned = transfers.saveIfOwner(next, owner, nextAttemptAt, renewedUntil, at)
                         if (owned) {
                             pending.forEach(stepLog::append)
                             if (event != null) outbox.append(event)

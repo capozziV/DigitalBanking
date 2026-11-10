@@ -87,6 +87,7 @@ class OutboxRelayTest {
         relay.runCycle()
         assertThat(publisher.attempted.map { it.position }).containsExactly(1)
 
+        clock.advance(Duration.ofSeconds(1))
         relay.runCycle()
 
         assertThat(publisher.attempted.map { it.position }).containsExactly(1, 1, 4)
@@ -128,6 +129,86 @@ class OutboxRelayTest {
         assertThat(error.throwableProxy.message).isEqualTo("sns down for 1")
         assertThat(error.mdcPropertyMap).containsEntry(OutboxEventEnvelope.CORRELATION_ID_MDC_KEY, "corr-1")
         assertThat(MDC.get(OutboxEventEnvelope.CORRELATION_ID_MDC_KEY)).isNull()
+    }
+
+    @Test
+    fun `a failed event is retried only after its backoff, which doubles from one second up to the cap`() {
+        store.add(event(1, "A"))
+        publisher.failOn(1)
+
+        relay.runCycle()
+        relay.runCycle()
+        assertThat(publisher.attempted).hasSize(1)
+
+        clock.advance(Duration.ofSeconds(1))
+        relay.runCycle()
+        assertThat(publisher.attempted).hasSize(2)
+
+        clock.advance(Duration.ofSeconds(1))
+        relay.runCycle()
+        assertThat(publisher.attempted).hasSize(2)
+
+        clock.advance(Duration.ofSeconds(1))
+        relay.runCycle()
+        assertThat(publisher.attempted).hasSize(3)
+    }
+
+    @Test
+    fun `the backoff never exceeds the configured maximum`() {
+        store.add(event(1, "A", attempts = 40))
+        publisher.failOn(1)
+
+        relay.runCycle()
+        clock.advance(Duration.ofSeconds(29))
+        relay.runCycle()
+        assertThat(publisher.attempted).hasSize(1)
+
+        clock.advance(Duration.ofSeconds(1))
+        relay.runCycle()
+        assertThat(publisher.attempted).hasSize(2)
+    }
+
+    @Test
+    fun `an account in backoff does not hold back other accounts`() {
+        store.add(event(1, "A"), event(2, "B"))
+        publisher.failOn(1)
+        relay.runCycle()
+
+        store.add(event(3, "B"), event(4, "A"))
+        relay.runCycle()
+
+        assertThat(publisher.published.map { it.position }).containsExactly(2, 3)
+        assertThat(publisher.attempted.map { it.position }).containsExactly(1, 2, 3)
+    }
+
+    @Test
+    fun `losing the leadership clears the backoff, so the next leadership retries at once`() {
+        store.add(event(1, "A"))
+        publisher.failOn(1)
+        relay.runCycle()
+        store.leader = false
+        relay.runCycle()
+        store.leader = true
+
+        relay.runCycle()
+
+        assertThat(publisher.attempted).hasSize(2)
+    }
+
+    @Test
+    fun `the error is logged once when the account becomes stuck, not on every later attempt`() {
+        store.add(event(1, "A", attempts = 9))
+        publisher.failOn(1)
+
+        relay.runCycle()
+        clock.advance(Duration.ofSeconds(30))
+        relay.runCycle()
+        clock.advance(Duration.ofSeconds(30))
+        relay.runCycle()
+
+        assertThat(publisher.attempted).hasSize(3)
+        assertThat(logs.list.filter { it.level == Level.ERROR }).hasSize(1)
+        assertThat(logs.list.filter { it.level == Level.WARN }).hasSize(2)
     }
 
     @Test

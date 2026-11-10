@@ -166,6 +166,51 @@ class RequestTransferUseCaseTest {
     }
 
     @Test
+    fun `insert race with a different request throws IdempotencyKeyReusedException`() {
+        val winner =
+            Transfer.request(
+                UUID.fromString("00000000-0000-7000-8000-0000000000ff"),
+                source,
+                destination,
+                Money(999),
+                "rent",
+                "key-1",
+                "corr-0",
+                start,
+                settings.deadline,
+            )
+        val racingRepository =
+            object : TransferRepository by repository {
+                private var inserted = false
+
+                override fun findByIdempotencyKey(key: String): Transfer? = if (inserted) repository.findByIdempotencyKey(key) else null
+
+                override fun insert(transfer: Transfer): Boolean {
+                    repository.insert(winner)
+                    inserted = true
+                    return repository.insert(transfer)
+                }
+            }
+        val racing = RequestTransferUseCase(racingRepository, accounts, runSaga, ids, settings, clock)
+
+        assertThatThrownBy { racing.execute(command(amount = 500)) }
+            .isInstanceOf(IdempotencyKeyReusedException::class.java)
+        assertThat(accounts.calls).isEmpty()
+    }
+
+    @Test
+    fun `busyAttempts from the settings reaches the saga`() {
+        val twoAttempts = SagaSettings(busyAttempts = 2)
+        val configured = RequestTransferUseCase(repository, accounts, runSaga, ids, twoAttempts, clock)
+        accounts.reply(FakeAccountsGateway.busy, FakeAccountsGateway.busy)
+
+        val outcome = configured.execute(command())
+
+        assertThat(accounts.calls).hasSize(2)
+        assertThat((outcome as RequestTransferOutcome.Created).transfer.status).isEqualTo(TransferStatus.PENDING)
+    }
+
+    @Test
     fun `when the lease is held by another run the persisted state is returned`() {
         repository.holdLease(newId, "other", Instant.MAX)
 

@@ -47,4 +47,15 @@ class InMemoryTransferRepositoryTest {
         assertThat(repository.findDue(createdAt.plusSeconds(1), 10)).isEmpty()
         assertThat(repository.findDue(createdAt.plusSeconds(31), 10)).containsExactly(id)
     }
+
+    @Test
+    fun `saveIfOwner refuses when the lease of the owner has expired`() {
+        insertNew()
+        assertThat(repository.tryAcquireLease(id, "a", createdAt.plusSeconds(30), createdAt)).isTrue()
+        val transfer = repository.findById(id)!!
+        val late = createdAt.plusSeconds(31)
+
+        assertThat(repository.saveIfOwner(transfer, "a", null, late.plusSeconds(30), late)).isFalse()
+        assertThat(repository.saveIfOwner(transfer, "a", null, createdAt.plusSeconds(60), createdAt.plusSeconds(30))).isTrue()
+    }
 }

@@ -156,6 +156,7 @@ class TransferSagaSchedulerTest {
             owner: String,
             nextAttemptAt: Instant?,
             leaseUntil: Instant,
+            now: Instant,
         ): Boolean = unused()
 
         override fun releaseLease(

@@ -77,12 +77,49 @@ class TransferTest {
         assertThat(t.failureReason).isNull()
     }
 
+    private val nonTerminalSteps =
+        listOf(
+            TransferStep.Debit,
+            TransferStep.ResolveDebit,
+            TransferStep.Credit,
+            TransferStep.ResolveCredit,
+            TransferStep.Compensate,
+        )
+
     @Test
-    fun `terminal event only exists for terminal steps`() {
-        assertThat(transfer(TransferStep.Debit).terminalEvent()).isNull()
-        assertThat(transfer(TransferStep.Compensate).terminalEvent()).isNull()
+    fun `non terminal steps are pending and have no terminal event`() {
+        nonTerminalSteps.forEach { step ->
+            assertThat(transfer(step).status).describedAs(step.name).isEqualTo(TransferStatus.PENDING)
+            assertThat(transfer(step).terminalEvent()).describedAs(step.name).isNull()
+        }
+    }
+
+    @Test
+    fun `terminal steps have the matching status and event`() {
         assertThat(transfer(TransferStep.Completed).terminalEvent()).isInstanceOf(TransferEvent.TransferCompleted::class.java)
         assertThat(transfer(TransferStep.Compensated).terminalEvent()).isInstanceOf(TransferEvent.TransferCompensated::class.java)
+        assertThat(transfer(TransferStep.Completed).status).isEqualTo(TransferStatus.COMPLETED)
+        assertThat(transfer(TransferStep.Failed).status).isEqualTo(TransferStatus.FAILED)
+        assertThat(transfer(TransferStep.Compensated).status).isEqualTo(TransferStatus.COMPENSATED)
+    }
+
+    @Test
+    fun `request rejects a deadline that is not in the future`() {
+        listOf(Duration.ZERO, Duration.ofSeconds(-1)).forEach { deadlineAfter ->
+            assertThatThrownBy {
+                Transfer.request(
+                    id = TransferFixtures.id,
+                    sourceAccountId = TransferFixtures.source,
+                    destinationAccountId = TransferFixtures.destination,
+                    amount = Money(1),
+                    description = null,
+                    idempotencyKey = "k",
+                    correlationId = null,
+                    now = created,
+                    deadlineAfter = deadlineAfter,
+                )
+            }.isInstanceOf(IllegalArgumentException::class.java)
+        }
     }
 
     @Test

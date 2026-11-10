@@ -1,0 +1,2 @@
+- [Worktree Bash guard](project_worktree_bash_guard.md) — compound Bash refused in worktree agents and runs nothing; use Edit/Write, verify with git status
+- [SQS listener tests](project_sqs_listener_tests.md) — notification @SqsListener starts in every SpringBootTest; auto-startup=false in base, queues pre-created otherwise

@@ -1,28 +1,34 @@
-package io.github.capozziv.digitalbanking.transfers.bootstrap
+package io.github.capozziv.digitalbanking.outbox.relay.spring
 
 import io.github.capozziv.digitalbanking.outbox.relay.OutboxRelay
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.DisposableBean
-import org.springframework.scheduling.annotation.Scheduled
+import org.springframework.scheduling.annotation.SchedulingConfigurer
+import org.springframework.scheduling.config.ScheduledTaskRegistrar
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 
 /**
- * Runs an [OutboxRelay] cycle on a fixed delay. On shutdown no new cycle starts and the one in progress
- * is awaited (up to [shutdownTimeout]), so it commits before the data source closes: this bean depends on
- * the relay, hence on the data source, and is destroyed first. Same as the scheduler of the accounts relay.
+ * Runs an [OutboxRelay] cycle on a fixed delay of [pollInterval]. On shutdown no new cycle starts and the one in
+ * progress is awaited (up to [shutdownTimeout]), so it commits before the data source closes: this bean depends on
+ * the relay, hence on the data source, and is destroyed first.
  */
 class OutboxRelayScheduler(
     private val relay: OutboxRelay,
     private val shutdownTimeout: Duration,
-) : DisposableBean {
+    private val pollInterval: Duration,
+) : SchedulingConfigurer,
+    DisposableBean {
     private val cycleLock = ReentrantLock()
 
     @Volatile
     private var stopping = false
 
-    @Scheduled(fixedDelayString = "\${transfers.outbox.poll-interval:500ms}")
+    override fun configureTasks(taskRegistrar: ScheduledTaskRegistrar) {
+        taskRegistrar.addFixedDelayTask(::runCycle, pollInterval)
+    }
+
     fun runCycle() {
         if (stopping) return
         cycleLock.lock()

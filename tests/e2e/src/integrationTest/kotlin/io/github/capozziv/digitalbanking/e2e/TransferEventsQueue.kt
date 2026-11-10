@@ -1,6 +1,7 @@
 package io.github.capozziv.digitalbanking.e2e
 
 import software.amazon.awssdk.services.sqs.SqsClient
+import software.amazon.awssdk.services.sqs.model.Message
 import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName
 import tools.jackson.databind.json.JsonMapper
 import java.time.Duration
@@ -38,17 +39,47 @@ class TransferEventsQueue(
         return received
     }
 
+    /**
+     * Reads and deletes messages until the one of type [eventType] of transfer [transferId] arrives, and returns it as
+     * published (body and message attributes). Messages of other transfers are discarded.
+     */
+    fun awaitMessage(
+        transferId: String,
+        eventType: String,
+        timeout: Duration,
+    ): PublishedMessage {
+        val deadline = Instant.now().plus(timeout)
+        while (Instant.now().isBefore(deadline)) {
+            val messages = receiveRaw(1)
+            messages.forEach { message -> sqs.deleteMessage { it.queueUrl(queueUrl).receiptHandle(message.receiptHandle()) } }
+            messages
+                .firstOrNull { message ->
+                    message.attributes()[MessageSystemAttributeName.MESSAGE_GROUP_ID] == transferId &&
+                        message.messageAttributes()[EVENT_TYPE_ATTRIBUTE]?.stringValue() == eventType
+                }?.let { message ->
+                    return PublishedMessage(
+                        body = message.body(),
+                        groupId = transferId,
+                        attributes = message.messageAttributes().mapValues { it.value.stringValue() },
+                    )
+                }
+        }
+        error("no $eventType of transfer $transferId in the inspection queue after $timeout")
+    }
+
+    private fun receiveRaw(waitSeconds: Int): List<Message> =
+        sqs
+            .receiveMessage {
+                it
+                    .queueUrl(queueUrl)
+                    .maxNumberOfMessages(10)
+                    .waitTimeSeconds(waitSeconds)
+                    .messageSystemAttributeNames(MessageSystemAttributeName.MESSAGE_GROUP_ID)
+                    .messageAttributeNames("All")
+            }.messages()
+
     private fun receive(waitSeconds: Int): List<Pair<String, ReceivedEvent>> {
-        val messages =
-            sqs
-                .receiveMessage {
-                    it
-                        .queueUrl(queueUrl)
-                        .maxNumberOfMessages(10)
-                        .waitTimeSeconds(waitSeconds)
-                        .messageSystemAttributeNames(MessageSystemAttributeName.MESSAGE_GROUP_ID)
-                        .messageAttributeNames("All")
-                }.messages()
+        val messages = receiveRaw(waitSeconds)
         messages.forEach { message -> sqs.deleteMessage { it.queueUrl(queueUrl).receiptHandle(message.receiptHandle()) } }
         return messages.map { message ->
             message.attributes().getValue(MessageSystemAttributeName.MESSAGE_GROUP_ID) to

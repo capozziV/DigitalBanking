@@ -3,6 +3,7 @@ package io.github.capozziv.digitalbanking.transfers.bootstrap
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 import org.springframework.boot.autoconfigure.AutoConfigurations
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -56,16 +57,21 @@ class SagaPropertiesTest {
     }
 
     @ParameterizedTest
-    @ValueSource(
-        strings = [
-            "transfers.saga.call-budget=30s",
-            "transfers.saga.call-budget=10s,transfers.saga.lease=10s",
-            "transfers.saga.retry-initial=20s",
+    @CsvSource(
+        delimiter = '|',
+        value = [
+            "transfers.saga.call-budget=30s|transfers.saga.call-budget must be shorter than transfers.saga.lease",
+            "transfers.saga.call-budget=10s,transfers.saga.lease=10s|transfers.saga.call-budget must be shorter than transfers.saga.lease",
+            "transfers.saga.retry-initial=20s|transfers.saga.retry-initial must not exceed transfers.saga.retry-max",
         ],
     )
-    fun `inconsistent settings stop the startup`(properties: String) {
+    fun `inconsistent settings stop the startup`(
+        properties: String,
+        message: String,
+    ) {
         runner.withPropertyValues(*properties.split(',').toTypedArray()).run { context ->
             assertThat(context).hasFailed()
+            assertThat(context.startupFailure).rootCause().hasMessageContaining(message)
         }
     }
 

@@ -1,0 +1,18 @@
+meta {
+  name: customerId invalido
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/notifications?customerId=nao-e-uuid
+  body: none
+  auth: none
+}
+
+tests {
+  test("400 validation-error", function () {
+    expect(res.status).to.equal(400);
+    expect(res.body.type).to.contain("validation-error");
+  });
+}

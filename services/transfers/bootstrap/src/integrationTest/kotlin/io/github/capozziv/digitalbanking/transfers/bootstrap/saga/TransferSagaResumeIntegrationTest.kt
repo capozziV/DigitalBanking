@@ -139,7 +139,12 @@ class TransferSagaResumeIntegrationTest : TransfersIntegrationTest() {
         insertPendingInCredit(id, lockedUntil = now.plusSeconds(60), now = now)
         accountsServer.stubFor(post(urlEqualTo("/accounts/$destination/credits")).willReturn(entryCreated()))
 
-        Thread.sleep(1_000)
+        // A due transfer in the same batch proves the scheduler ticked; no fixed wait.
+        val control = UUID.randomUUID()
+        val controlDestination = UUID.randomUUID()
+        insertPendingInCredit(control, lockedUntil = now.minusSeconds(1), now = now, destinationId = controlDestination)
+        accountsServer.stubFor(post(urlEqualTo("/accounts/$controlDestination/credits")).willReturn(entryCreated()))
+        ownerJdbc.awaitStatus(control, "COMPLETED")
 
         assertThat(ownerJdbc.statusOf(id)).isEqualTo("PENDING")
         assertThat(stubs.requestsFor(destination)).isEmpty()
@@ -156,6 +161,7 @@ class TransferSagaResumeIntegrationTest : TransfersIntegrationTest() {
         id: UUID,
         lockedUntil: Instant,
         now: Instant,
+        destinationId: UUID = destination,
     ) {
         ownerJdbc
             .sql(
@@ -168,7 +174,7 @@ class TransferSagaResumeIntegrationTest : TransfersIntegrationTest() {
                 """.trimIndent(),
             ).param("id", id)
             .param("source", source)
-            .param("destination", destination)
+            .param("destination", destinationId)
             .param("key", "key-$id")
             .param("deadline", now.plusSeconds(120).utc())
             .param("past", now.minusSeconds(5).utc())

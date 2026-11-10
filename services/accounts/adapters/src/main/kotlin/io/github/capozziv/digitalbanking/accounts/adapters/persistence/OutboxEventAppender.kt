@@ -12,7 +12,7 @@ import tools.jackson.databind.ObjectMapper
 import java.time.format.DateTimeFormatter
 
 /**
- * Maps each AccountEvent to its eventVersion 1 payload (spec, section 5) and writes it to the outbox in the
+ * Maps each AccountEvent to its payload (spec, section 5) and eventVersion (1; AccountTypeChanged is 2, with overdraftLimit) and writes it to the outbox in the
  * caller's transaction. Amounts are numbers of cents; instants are ISO-8601 UTC strings.
  */
 @Component
@@ -24,7 +24,7 @@ class OutboxEventAppender(
         writer.write(
             OutboxMessage(
                 eventType = event.eventType(),
-                eventVersion = EVENT_VERSION,
+                eventVersion = event.eventVersion(),
                 aggregateId = event.accountId.toString(),
                 payloadJson = objectMapper.writeValueAsString(event.payload()),
             ),
@@ -36,6 +36,13 @@ class OutboxEventAppender(
             is AccountOpened -> "AccountOpened"
             is LedgerEntryRecorded -> "LedgerEntryRecorded"
             is AccountTypeChanged -> "AccountTypeChanged"
+        }
+
+    private fun AccountEvent.eventVersion(): Int =
+        when (this) {
+            is AccountOpened -> 1
+            is LedgerEntryRecorded -> 1
+            is AccountTypeChanged -> 2
         }
 
     private fun AccountEvent.payload(): Map<String, Any?> =
@@ -67,11 +74,8 @@ class OutboxEventAppender(
                     "accountId" to accountId.toString(),
                     "previousType" to previousType.name,
                     "newType" to newType.name,
+                    "overdraftLimit" to overdraftLimit.cents,
                 )
             }
         }
-
-    private companion object {
-        const val EVENT_VERSION = 1
-    }
 }

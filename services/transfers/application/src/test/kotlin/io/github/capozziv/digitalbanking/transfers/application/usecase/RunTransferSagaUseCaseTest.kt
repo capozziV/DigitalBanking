@@ -387,6 +387,37 @@ class RunTransferSagaUseCaseTest {
     }
 
     @Test
+    fun `a failing lease release is logged as a warning with the correlation id`() {
+        givenTransfer()
+        accounts.reply(created, created)
+        repository.failOnRelease = true
+        val records = mutableListOf<java.util.logging.LogRecord>()
+        val handler =
+            object : java.util.logging.Handler() {
+                override fun publish(record: java.util.logging.LogRecord) {
+                    records += record
+                }
+
+                override fun flush() = Unit
+
+                override fun close() = Unit
+            }
+        val logger =
+            java.util.logging.Logger
+                .getLogger(RunTransferSagaUseCase::class.java.name)
+        logger.addHandler(handler)
+        try {
+            useCase.execute(id, "owner-a")
+        } finally {
+            logger.removeHandler(handler)
+        }
+
+        val warning = records.single { it.message.contains("could not release the lease") }
+        assertThat(warning.level).isEqualTo(java.util.logging.Level.WARNING)
+        assertThat(warning.message).contains(id.toString()).contains("corr-1")
+    }
+
+    @Test
     fun `unknown transfer returns null`() {
         assertThat(useCase.execute(UUID.randomUUID(), "owner-a")).isNull()
     }

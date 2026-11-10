@@ -87,6 +87,7 @@ data class Transfer(
             deadlineAfter: Duration,
         ): Transfer {
             require(sourceAccountId != destinationAccountId) { "source and destination accounts must differ" }
+            require(deadlineAfter.isPositive) { "deadlineAfter must be positive, was $deadlineAfter" }
             return Transfer(
                 id = id,
                 sourceAccountId = sourceAccountId,

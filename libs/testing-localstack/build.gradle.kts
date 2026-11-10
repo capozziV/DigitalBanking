@@ -10,6 +10,7 @@ dependencies {
     api(libs.testcontainers.localstack)
     api(libs.aws.sdk.sns)
     api(libs.aws.sdk.sqs)
+    api("org.slf4j:slf4j-api")
     implementation(platform(libs.junit.bom))
     implementation("org.junit.jupiter:junit-jupiter-api")
 }

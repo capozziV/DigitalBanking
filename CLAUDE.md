@@ -33,6 +33,7 @@ Agentes recebem do coordenador o trecho de cada documento que precisam.
 
 ## Fluxo de trabalho (skills)
 Todo trabalho, da sessão principal e dos agentes, passa pelos skills dos plugins **Superpowers** e **Matt Pocock**. Antes de agir, identifique a situação abaixo e carregue o skill dela com `Skill`; um skill por situação, sem alternar entre equivalentes dos dois plugins.
+Perguntas ao usuário vão todas numa mensagem só, numeradas, cada uma com as opções e a recomendação; vale também quando um skill (ex.: `superpowers:brainstorming`) mandar perguntar uma por vez.
 
 | Situação | Skill |
 |---|---|

@@ -22,4 +22,5 @@ data class AccountTypeChanged(
     override val accountId: UUID,
     val previousType: AccountType,
     val newType: AccountType,
+    val overdraftLimit: OverdraftLimit,
 ) : AccountEvent

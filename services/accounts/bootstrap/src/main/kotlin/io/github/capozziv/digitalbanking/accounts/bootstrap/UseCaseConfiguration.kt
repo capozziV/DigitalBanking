@@ -74,9 +74,10 @@ class UseCaseConfiguration {
     @Bean
     fun changeAccountTypeUseCase(
         accounts: AccountRepository,
+        types: AccountTypeRepository,
         outbox: EventOutbox,
         tx: TransactionRunner,
-    ) = ChangeAccountTypeUseCase(accounts, outbox, tx)
+    ) = ChangeAccountTypeUseCase(accounts, types, outbox, tx)
 
     @Bean
     fun listAccountTypesUseCase(types: AccountTypeRepository) = ListAccountTypesUseCase(types)
