@@ -16,7 +16,7 @@ internal fun aNotification(
     kind: NotificationKind = NotificationKind.WELCOME,
     sourceEventId: UUID = UUID.randomUUID(),
     readAt: Instant? = null,
-    data: Map<String, String> = mapOf("accountId" to UUID.randomUUID().toString()),
+    data: Map<String, Any> = mapOf("accountId" to UUID.randomUUID().toString()),
 ): Notification =
     Notification(
         id = id,

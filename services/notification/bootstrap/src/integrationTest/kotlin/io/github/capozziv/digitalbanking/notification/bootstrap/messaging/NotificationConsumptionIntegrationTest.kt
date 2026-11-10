@@ -2,6 +2,7 @@ package io.github.capozziv.digitalbanking.notification.bootstrap.messaging
 
 import io.github.capozziv.digitalbanking.notification.bootstrap.NotificationApplication
 import io.github.capozziv.digitalbanking.notification.bootstrap.NotificationIntegrationTest
+import io.github.capozziv.digitalbanking.notification.bootstrap.NotificationTestPropertiesSupport
 import io.github.capozziv.digitalbanking.notification.bootstrap.web.ApiClient
 import io.github.capozziv.digitalbanking.testing.localstack.LocalStackTestSupport
 import io.micrometer.core.instrument.MeterRegistry
@@ -385,10 +386,9 @@ class NotificationConsumptionIntegrationTest {
             registry.add("notification.queues.transfers") { TRANSFERS_QUEUE }
             registry.add("notification.queues.accounts-dlq") { ACCOUNTS_DLQ }
             registry.add("notification.queues.transfers-dlq") { TRANSFERS_DLQ }
-            registry.add("spring.cloud.aws.sqs.endpoint") { localStack.endpoint.toString() }
-            registry.add("spring.cloud.aws.region.static") { localStack.region }
-            registry.add("spring.cloud.aws.credentials.access-key") { localStack.accessKey }
-            registry.add("spring.cloud.aws.credentials.secret-key") { localStack.secretKey }
+            NotificationTestPropertiesSupport.localStack(registry, localStack)
+            // The DLQ gauge shows what the last refresh read, so the DLQ test needs frequent refreshes.
+            registry.add("notification.dlq-metrics.refresh-interval") { "200ms" }
         }
     }
 }

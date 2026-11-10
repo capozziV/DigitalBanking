@@ -2,39 +2,61 @@ package io.github.capozziv.digitalbanking.notification.bootstrap
 
 import io.github.capozziv.digitalbanking.notification.adapters.messaging.QueueProperties
 import io.micrometer.core.instrument.Gauge
+import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.binder.MeterBinder
 import org.slf4j.LoggerFactory
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.scheduling.annotation.EnableScheduling
+import org.springframework.scheduling.annotation.Scheduled
 import software.amazon.awssdk.services.sqs.SqsAsyncClient
 import software.amazon.awssdk.services.sqs.model.QueueAttributeName
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
-/** Gauge `notification.dlq.messages{queue}`: the approximate number of messages waiting in each DLQ. */
+/**
+ * Gauge `notification.dlq.messages{queue}`: the approximate number of messages waiting in each DLQ, read from SQS
+ * every `notification.dlq-metrics.refresh-interval` (30 s by default), never during a scrape.
+ */
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(QueueProperties::class)
+@EnableScheduling
 class DlqMetricsConfiguration {
     @Bean
-    fun dlqMetrics(
+    fun dlqDepthMonitor(
         queues: QueueProperties,
         sqs: SqsAsyncClient,
-    ): MeterBinder {
-        val probe = DlqDepthProbe(sqs)
-        return MeterBinder { registry ->
-            queues.deadLetterQueues.forEach { queue ->
-                Gauge
-                    .builder("notification.dlq.messages") { probe.depth(queue) }
-                    .tag("queue", queue)
-                    .description("Approximate number of messages in the dead-letter queue")
-                    .register(registry)
-            }
+    ): DlqDepthMonitor = DlqDepthMonitor(queues.deadLetterQueues, DlqDepthProbe(sqs)::depth)
+}
+
+/**
+ * Keeps the last depth read of each DLQ; the gauge only returns the stored value, so a scrape never waits on SQS.
+ * The depth is NaN (unknown) until the first refresh and after a failed read, never a stale number.
+ */
+class DlqDepthMonitor(
+    private val queues: List<String>,
+    private val probe: (String) -> Double,
+) : MeterBinder {
+    private val depths = ConcurrentHashMap<String, Double>()
+
+    override fun bindTo(registry: MeterRegistry) {
+        queues.forEach { queue ->
+            Gauge
+                .builder("notification.dlq.messages") { depths[queue] ?: Double.NaN }
+                .tag("queue", queue)
+                .description("Approximate number of messages in the dead-letter queue")
+                .register(registry)
         }
+    }
+
+    @Scheduled(fixedDelayString = "\${notification.dlq-metrics.refresh-interval:30s}")
+    fun refresh() {
+        queues.forEach { queue -> depths[queue] = probe(queue) }
     }
 }
 
-/** Reads the depth on each scrape; a failure (queue missing, SQS down) is reported as NaN, never thrown. */
+/** Reads the depth from SQS; a failure (queue missing, SQS down) is reported as NaN, never thrown. */
 internal class DlqDepthProbe(
     private val sqs: SqsAsyncClient,
 ) {

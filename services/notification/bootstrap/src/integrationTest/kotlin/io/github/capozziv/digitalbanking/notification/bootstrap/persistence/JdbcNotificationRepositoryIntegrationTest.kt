@@ -32,12 +32,28 @@ class JdbcNotificationRepositoryIntegrationTest : NotificationIntegrationTest() 
 
     @Test
     fun `saves and finds a notification with its data`() {
-        val notification = aNotification(data = mapOf("amount" to "12345", "name" to "João \"Zé\""))
+        val notification = aNotification(data = mapOf("amountCents" to 12_345L, "name" to "João \"Zé\""))
 
         repository.saveAll(listOf(notification))
 
         assertThat(repository.find(notification.id)).isEqualTo(notification)
         assertThat(repository.find(UUID.randomUUID())).isNull()
+    }
+
+    @Test
+    fun `an amount in cents is stored as a JSON number and comes back as a Long`() {
+        val notification = aNotification(data = mapOf("amountCents" to 7L, "accountId" to "x"))
+
+        repository.saveAll(listOf(notification))
+
+        val types =
+            ownerJdbc
+                .sql("select jsonb_typeof(data->'amountCents') || ',' || jsonb_typeof(data->'accountId') from notifications where id = ?")
+                .param(notification.id)
+                .query(String::class.java)
+                .single()
+        assertThat(types).isEqualTo("number,string")
+        assertThat(repository.find(notification.id)!!.data["amountCents"]).isEqualTo(7L)
     }
 
     @Test

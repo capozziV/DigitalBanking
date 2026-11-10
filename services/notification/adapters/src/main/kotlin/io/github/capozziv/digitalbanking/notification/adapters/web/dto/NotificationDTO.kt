@@ -5,13 +5,16 @@ import io.github.capozziv.digitalbanking.notification.domain.NotificationKind
 import java.time.Instant
 import java.util.UUID
 
-/** One notification of the bell. `readAt` is null while unread; `data` holds the identifiers and amounts (cents) of the event. */
+/**
+ * One notification of the bell. `readAt` is null while unread; `data` holds the identifiers (strings) and the
+ * amounts in cents (integers) of the event.
+ */
 data class NotificationDTO(
     val id: UUID,
     val kind: NotificationKind,
     val title: String,
     val body: String,
-    val data: Map<String, String>,
+    val data: Map<String, Any>,
     val createdAt: Instant,
     val readAt: Instant?,
 ) {

@@ -78,7 +78,7 @@ class ConsumeEventUseCaseTest {
         assertThat(sent.body).isEqualTo(NotificationText.transferSent(12_345, bobAccount).body)
         assertThat(sent.data)
             .containsEntry("transferId", event.transferId.toString())
-            .containsEntry("amountCents", "12345")
+            .containsEntry("amountCents", 12_345L)
         assertThat(received.customerId).isEqualTo(bob)
         assertThat(received.body).isEqualTo(NotificationText.transferReceived(12_345, aliceAccount).body)
         assertThat(sent.sourceEventId).isEqualTo(event.eventId)
@@ -145,7 +145,7 @@ class ConsumeEventUseCaseTest {
         assertThat(changed.customerId).isEqualTo(alice)
         assertThat(changed.kind).isEqualTo(NotificationKind.ACCOUNT_TYPE_CHANGED)
         assertThat(changed.body).isEqualTo(NotificationText.accountTypeChanged("BLACK", 500_000).body)
-        assertThat(changed.data).containsEntry("overdraftLimitCents", "500000")
+        assertThat(changed.data).containsEntry("overdraftLimitCents", 500_000L)
     }
 
     @Test

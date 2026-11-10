@@ -62,10 +62,10 @@ class ConsumeEventUseCase(
                         ownerOf(event.accountId),
                         NotificationKind.ACCOUNT_TYPE_CHANGED,
                         NotificationText.accountTypeChanged(event.newType, event.overdraftLimitCents),
-                        buildMap {
+                        buildMap<String, Any> {
                             put("accountId", event.accountId.toString())
                             put("accountType", event.newType)
-                            event.overdraftLimitCents?.let { put("overdraftLimitCents", it.toString()) }
+                            event.overdraftLimitCents?.let { put("overdraftLimitCents", it) }
                         },
                     ),
                 )
@@ -131,18 +131,19 @@ class ConsumeEventUseCase(
         sourceAccountId: UUID,
         destinationAccountId: UUID,
         amountCents: Long,
-    ) = mapOf(
-        "transferId" to transferId.toString(),
-        "sourceAccountId" to sourceAccountId.toString(),
-        "destinationAccountId" to destinationAccountId.toString(),
-        "amountCents" to amountCents.toString(),
-    )
+    ): Map<String, Any> =
+        mapOf(
+            "transferId" to transferId.toString(),
+            "sourceAccountId" to sourceAccountId.toString(),
+            "destinationAccountId" to destinationAccountId.toString(),
+            "amountCents" to amountCents,
+        )
 
     private inner class Draft(
         val customerId: UUID,
         val kind: NotificationKind,
         val content: NotificationContent,
-        val data: Map<String, String>,
+        val data: Map<String, Any>,
     ) {
         fun toNotification(
             sourceEventId: UUID,
