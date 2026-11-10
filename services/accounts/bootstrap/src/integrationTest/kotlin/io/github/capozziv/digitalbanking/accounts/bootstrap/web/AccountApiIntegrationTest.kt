@@ -233,6 +233,29 @@ class AccountApiIntegrationTest : AccountsIntegrationTest() {
     }
 
     @Test
+    fun `an amount sent as JSON text or boolean, even a numeric one, is 400 validation-error and records nothing`() {
+        val accountId = openAccount()
+
+        for (body in listOf("""{"amount":"1050"}""", """{"amount":10.5}""", """{"amount":true}""")) {
+            for (path in listOf("credits", "debits")) {
+                val response = api.post("/accounts/$accountId/$path", body, key(UUID.randomUUID().toString()))
+
+                assertProblem(response, 400, "validation-error")
+                assertThat(response.errorFields()).describedAs("$path $body").containsExactly("amount")
+            }
+        }
+        assertThat(entryCount(accountId)).isZero()
+    }
+
+    @Test
+    fun `an integer amount is still accepted`() {
+        val response = api.post("/accounts/${openAccount()}/credits", """{"amount":1050}""", key(UUID.randomUUID().toString()))
+
+        assertThat(response.status).isEqualTo(201)
+        assertThat(response.body?.get("amount")?.asLong()).isEqualTo(1050)
+    }
+
+    @Test
     fun `a description of 140 characters is accepted and one of 141 is 400 validation-error`() {
         val accountId = openAccount()
 
