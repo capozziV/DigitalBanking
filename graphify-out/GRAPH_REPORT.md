@@ -1,17 +1,17 @@
-# Graph Report - DigitalBanking  (2026-10-29)
+# Graph Report - DigitalBanking  (2026-11-10)
 
 ## Corpus Check
-- 415 files · ~115,350 words
+- 415 files · ~115,521 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 29 file(s) not represented in the graph (top: .bru 19, (none) 3, .properties 2)
 
 ## Summary
-- 3668 nodes · 8879 edges · 223 communities (103 shown, 120 thin omitted)
+- 3668 nodes · 8882 edges · 225 communities (107 shown, 118 thin omitted)
 - Extraction: 92% EXTRACTED · 8% INFERRED · 0% AMBIGUOUS · INFERRED: 676 edges (avg confidence: 0.89)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `ad94a6cd`
+- Built from commit: `3789870d`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -156,7 +156,7 @@
 - transfers/adapters/persistence/OutboxEventAppender.kt
 - ProcessLogsOnFailureExtension
 - ServiceProcess
-- InMemoryTransferRepositoryTest
+- transfers/bootstrap/web/UnexpectedErrorApiIntegrationTest.kt
 - IdGenerator
 - SchedulerLeaseOwners
 - uuid
@@ -168,6 +168,7 @@
 - Etapa 2 — `transfers` + saga: design
 - NotificationTest
 - clock
+- AccountsApplication.kt
 - JdbcOutboxWriter
 - TransferStep
 - TransfersIntegrationTest
@@ -179,6 +180,7 @@
 - OpenApiIntegrationTest
 - notification/adapters/web/OpenApiConfiguration.kt
 - transfer
+- 0001 — Stack: Kotlin + Spring Boot 4 na AWS
 - OutboxMessage
 - 03-notification-queues.sh
 - V3__outbox.sql
@@ -192,7 +194,7 @@
 - 0007 — Conta e ledger no mesmo serviço (`accounts`)
 - TestListeners
 - transfers/adapters/web/CorrelationIdFilter.kt
-- BlockingRepository
+- Transfer
 - TransactionRunner
 - accounts/adapters/web/CorrelationIdFilter.kt
 - CreditStepTest
@@ -205,7 +207,7 @@
 - Bloco 2 — o `transfers` (branch `etapa-2-bloco-2` a partir da `main` com o bloco 1, PR 2)
 - ResolveCreditStepTest
 - ResolveDebitStepTest
-- Status do projeto
+- status.md
 - .record
 - 0002 — Clean Architecture por serviço
 
@@ -236,7 +238,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (223 total, 120 thin omitted)
+## Communities (225 total, 118 thin omitted)
 
 ### Community 0 - "ChangeAccountTypeUseCaseTest"
 Cohesion: 0.11
@@ -315,7 +317,7 @@ Cohesion: 0.40
 Nodes (5): 0006 — Observabilidade só com correlation ID, Alternativas consideradas, Consequências, Contexto, Decisão
 
 ### Community 29 - "Rodando o projeto localmente (macOS)"
-Cohesion: 0.13
+Cohesion: 0.12
 Nodes (15): 1. Configurar o ambiente, 2. Subir a infraestrutura (PostgreSQL, Redis, nginx, LocalStack), 3. Build e testes, 4. Subir os serviços `accounts`, `transfers` e `notification`, 5. Conferir a API pelo nginx, 6. Ver os eventos na fila de inspeção, 7. Coleção Bruno, 8. Derrubar tudo (+7 more)
 
 ### Community 30 - "AccountController.kt"
@@ -415,8 +417,8 @@ Cohesion: 0.40
 Nodes (5): 0016 — Saga de transferência orquestrada por HTTP síncrono, Alternativas consideradas, Consequências, Contexto, Decisão
 
 ### Community 77 - "Etapa 0 — Fundação: design"
-Cohesion: 0.10
-Nodes (14): Task 3: Aplicação `accounts` com health do banco (Testcontainers), 2. Build e convenções, 3. Esqueleto do `accounts`, 4. Ambiente local, 5. CI (GitHub Actions), Critério de pronto, Etapa 0 — Fundação: design, Fora de escopo (e onde foi registrado) (+6 more)
+Cohesion: 0.18
+Nodes (11): 2. Build e convenções, 3. Esqueleto do `accounts`, 4. Ambiente local, 5. CI (GitHub Actions), Critério de pronto, Etapa 0 — Fundação: design, Fora de escopo (e onde foi registrado), Objetivo (+3 more)
 
 ### Community 78 - "HttpAccountsGateway.kt"
 Cohesion: 0.09
@@ -443,7 +445,7 @@ Cohesion: 0.11
 Nodes (4): OutboxMetrics, OutboxBacklog, OutboxMetricsTest, FakeOutboxStore
 
 ### Community 85 - "Foco de revisão"
-Cohesion: 0.12
+Cohesion: 0.13
 Nodes (13): Ambiente de execução, Etapa 0 — Fundação: plano de implementação, Foco de revisão, Restrições globais, Task 1: Esqueleto do build (wrapper, catálogo, `build-logic`, módulos vazios, ktlint), Task 2: Regras de arquitetura (ArchUnit), Task 4: Ambiente local (docker-compose), Task 5: CI no GitHub Actions (+5 more)
 
 ### Community 88 - "RunTransferSagaUseCase"
@@ -461,6 +463,10 @@ Nodes (8): RunTransferSagaUseCaseTest, Handler, OutboxEventAppenderIntegrationTe
 ### Community 93 - "NotificationEventListenerTest.kt"
 Cohesion: 0.08
 Nodes (8): OutboxEventEnvelope, TransactionRunner, ConsumeOutcome, DUPLICATE, IGNORED, PROCESSED, MdcCorrelationContext, MdcCorrelationContextTest
+
+### Community 96 - "InMemoryTransferRepository"
+Cohesion: 0.15
+Nodes (3): InMemoryTransferRepository, Lease, InMemoryTransferRepositoryTest
 
 ### Community 97 - "retryWhileAccountBusy"
 Cohesion: 0.23
@@ -542,6 +548,10 @@ Nodes (3): JdbcKnownAccountRepository, KnownAccountRepository, InMemoryKnownAcco
 Cohesion: 0.23
 Nodes (4): JdbcPendingTransferStats, PendingTransfers, TransferMetrics, TransferMetricsConfiguration
 
+### Community 160 - "transfers/bootstrap/web/UnexpectedErrorApiIntegrationTest.kt"
+Cohesion: 0.18
+Nodes (4): 2. Módulos e camadas, GetTransferUseCase, GetTransferUseCaseTest, UnexpectedErrorApiIntegrationTest
+
 ### Community 161 - "IdGenerator"
 Cohesion: 0.10
 Nodes (5): UuidV7IdGenerator, UuidV7IdGenerator, IdGenerator, SequentialIdGenerator, UuidV7IdGenerator
@@ -551,24 +561,24 @@ Cohesion: 0.07
 Nodes (4): Task 9: Portas e execução da saga (Marina, `dev-kotlin`), RetryBackoff, FakeEventOutbox, InMemoryTransferStepLog
 
 ### Community 173 - "Etapa 2 — `transfers` + saga: design"
-Cohesion: 0.11
-Nodes (14): 2. Módulos e camadas, 5. Esquema do banco (`transfers`), 6. Eventos, 7. API, nginx e Bruno, 8. Testes, 9. Ambiente local e CI, Critério de pronto, Decisões desta etapa (usuário, 2026-10-27) (+6 more)
+Cohesion: 0.18
+Nodes (11): 5. Esquema do banco (`transfers`), 6. Eventos, 7. API, nginx e Bruno, 8. Testes, 9. Ambiente local e CI, Critério de pronto, Decisões desta etapa (usuário, 2026-10-27), Etapa 2 — `transfers` + saga: design (+3 more)
 
 ### Community 175 - "clock"
 Cohesion: 0.06
 Nodes (8): ClockWiringIntegrationTest, IdempotencyKeyReusedException, CorrelationContext, IdGenerator, TransactionRunner, TransferRepository, TransferStepLog, RecordingCorrelationContext
+
+### Community 176 - "AccountsApplication.kt"
+Cohesion: 0.24
+Nodes (3): Task 3: Aplicação `accounts` com health do banco (Testcontainers), AccountsApplication, TransfersApplication
 
 ### Community 177 - "JdbcOutboxWriter"
 Cohesion: 0.13
 Nodes (13): 10. Documentação que acompanha, 3. Esquema do banco, 5. Outbox e relay (`libs/outbox`), 6. API, 7. Testes, 8. Ambiente local e CI, 9. Entrega em dois blocos, Critério de pronto (+5 more)
 
 ### Community 178 - "TransferStep"
-Cohesion: 0.07
-Nodes (24): Transferências, Etapa 2 — `transfers` + saga Implementation Plan, Global Constraints, Review Focus, Task 8: Domínio da transferência e passos da saga (Marina, `dev-kotlin`), 10. Documentação que acompanha, 3. Modelo de domínio, Riscos (+16 more)
-
-### Community 179 - "TransfersIntegrationTest"
-Cohesion: 0.14
-Nodes (3): ClockWiringIntegrationTest, TransfersIntegrationTest, UnexpectedErrorApiIntegrationTest
+Cohesion: 0.10
+Nodes (21): Transferências, Etapa 2 — `transfers` + saga Implementation Plan, Global Constraints, Review Focus, Task 8: Domínio da transferência e passos da saga (Marina, `dev-kotlin`), 10. Documentação que acompanha, 3. Modelo de domínio, Riscos (+13 more)
 
 ### Community 181 - ".resumeDueOver"
 Cohesion: 0.11
@@ -589,6 +599,10 @@ Nodes (6): ApiDocs, OpenApiConfiguration, ApiDocs, OpenApiConfiguration, ApiDocs
 ### Community 187 - "transfer"
 Cohesion: 0.47
 Nodes (4): transfer, transfer_due_idx, transfer_step, transfer_step_transfer_idx
+
+### Community 188 - "0001 — Stack: Kotlin + Spring Boot 4 na AWS"
+Cohesion: 0.33
+Nodes (5): 0001 — Stack: Kotlin + Spring Boot 4 na AWS, Alternativas consideradas, Consequências, Contexto, Decisão
 
 ### Community 191 - "03-notification-queues.sh"
 Cohesion: 0.39
@@ -615,12 +629,16 @@ Cohesion: 0.40
 Nodes (5): 0014 — Tipo de conta e cheque especial, Alternativas consideradas, Consequências, Contexto, Decisão
 
 ### Community 203 - "ConsumeEventUseCase"
-Cohesion: 0.05
-Nodes (25): Etapa 3 — Mensageria e `notification` Implementation Plan, Frente A — `notification`, Frente B — débitos técnicos, Frentes e ordem, Review Focus, Task A10: Documentação (Clara, `documentador`) — paralela desde o início, Task A1: Esqueleto do `notification` e prova do `@SqsListener` (Marina, `dev-kotlin`), Task A2: Domínio das notificações (Marina, `dev-kotlin`) (+17 more)
+Cohesion: 0.06
+Nodes (19): Etapa 3 — Mensageria e `notification` Implementation Plan, Frente A — `notification`, Frentes e ordem, Review Focus, Task A10: Documentação (Clara, `documentador`) — paralela desde o início, Task A1: Esqueleto do `notification` e prova do `@SqsListener` (Marina, `dev-kotlin`), Task A2: Domínio das notificações (Marina, `dev-kotlin`), Task A4: Persistência (Marina, `dev-kotlin`) (+11 more)
 
 ### Community 205 - "0007 — Conta e ledger no mesmo serviço (`accounts`)"
 Cohesion: 0.50
 Nodes (4): 0007 — Conta e ledger no mesmo serviço (`accounts`), Consequências, Contexto, Decisão
+
+### Community 208 - "Transfer"
+Cohesion: 0.08
+Nodes (4): BlockingRepository, Transfer, Credit, Debit
 
 ### Community 215 - "V1__notification_schema.sql"
 Cohesion: 0.50
@@ -631,16 +649,16 @@ Cohesion: 0.40
 Nodes (5): 0017 — `notification` com banco próprio e consumo SQS com Spring Cloud AWS, Alternativas consideradas, Consequências, Contexto, Decisão
 
 ### Community 225 - "Banco digital em microsserviços"
-Cohesion: 0.12
-Nodes (13): Agentes do projeto, Ao terminar uma tarefa, Banco digital em microsserviços, Contexto, Fluxo de trabalho (skills), Git, Grafo do código (graphify), 0001 — Stack: Kotlin + Spring Boot 4 na AWS (+5 more)
+Cohesion: 0.29
+Nodes (7): Agentes do projeto, Ao terminar uma tarefa, Banco digital em microsserviços, Contexto, Fluxo de trabalho (skills), Git, Grafo do código (graphify)
 
 ### Community 226 - "Bloco 2 — o `transfers` (branch `etapa-2-bloco-2` a partir da `main` com o bloco 1, PR 2)"
 Cohesion: 0.29
 Nodes (7): Bloco 2 — o `transfers` (branch `etapa-2-bloco-2` a partir da `main` com o bloco 1, PR 2), Task 10: Pedir, consultar e retomar transferências (Marina, `dev-kotlin`), Task 11: Persistência do `transfers` (Marina, `dev-kotlin`), Task 13: API HTTP do `transfers` (Marina, `dev-kotlin`), Task 14: Agendador, relay e eventos no `transfers` (Marina, `dev-kotlin`), Task 15: Infra local, Bruno, smoke e CI do `transfers` (Rafael, `infra`), Task 7: Esqueleto do `transfers` (Marina, `dev-kotlin`)
 
-### Community 235 - "Status do projeto"
-Cohesion: 0.33
-Nodes (6): Ambiente do Claude, Como rodar localmente, Como usar o board, Concluído, Convenções que já custaram caro, Status do projeto
+### Community 235 - "status.md"
+Cohesion: 0.12
+Nodes (12): Ambiente do Claude, Como rodar localmente, Como usar o board, Concluído, Convenções que já custaram caro, Status do projeto, Frente B — débitos técnicos, Task B1: Configuração do relay em `libs/outbox-relay` (Marina, `dev-kotlin`) — cartão #92 (+4 more)
 
 ### Community 243 - ".record"
 Cohesion: 0.19
@@ -653,13 +671,13 @@ Nodes (5): 0002 — Clean Architecture por serviço, Alternativas consideradas, 
 ## Knowledge Gaps
 - **45 isolated node(s):** `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (+40 more)
   These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 616 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **120 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **118 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Transfer` connect `TransferStep` to `RequestTransferUseCaseTest`, `.repeat`, `ResumeDueTransfersUseCaseTest`, `.transfer`, `duration`, `TransferMetricsIntegrationTest.kt`, `JdbcTransferRepository`, `uuid`, `.run`, `TransferController.kt`, `Etapa 2 — `transfers` + saga: design`, `clock`, `JdbcTransferRepositoryIntegrationTest`, `BlockingRepository`, `Money`, `InMemoryTransferRepository`, `Bloco 2 — o `transfers` (branch `etapa-2-bloco-2` a partir da `main` com o bloco 1, PR 2)`, `RunTransferSagaUseCase`, `transfers/adapters/web/ProblemDetailsExceptionHandler.kt`?**
-  _High betweenness centrality (0.050) - this node is a cross-community bridge._
+- **Why does `Transfer` connect `Transfer` to `RequestTransferUseCaseTest`, `.repeat`, `ResumeDueTransfersUseCaseTest`, `.transfer`, `duration`, `TransferMetricsIntegrationTest.kt`, `JdbcTransferRepository`, `transfers/bootstrap/web/UnexpectedErrorApiIntegrationTest.kt`, `uuid`, `.run`, `TransferController.kt`, `Etapa 2 — `transfers` + saga: design`, `clock`, `TransferStep`, `JdbcTransferRepositoryIntegrationTest`, `Money`, `InMemoryTransferRepository`, `Bloco 2 — o `transfers` (branch `etapa-2-bloco-2` a partir da `main` com o bloco 1, PR 2)`, `RunTransferSagaUseCase`, `transfers/adapters/web/ProblemDetailsExceptionHandler.kt`?**
+  _High betweenness centrality (0.049) - this node is a cross-community bridge._
 - **Are the 6 inferred relationships involving `Transfer` (e.g. with `Transferências` and `Global Constraints`) actually correct?**
   _`Transfer` has 6 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` to the rest of the system?**
