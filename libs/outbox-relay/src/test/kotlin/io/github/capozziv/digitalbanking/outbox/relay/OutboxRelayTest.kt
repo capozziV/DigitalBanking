@@ -261,13 +261,14 @@ class OutboxRelayTest {
 
     @Test
     fun `backlog gauges and the cycle counter are refreshed after every cycle, with or without leadership`() {
-        store.backlog = OutboxBacklog(pending = 4, oldestAge = Duration.ofSeconds(3))
+        store.backlog = OutboxBacklog(pending = 4, oldestAge = Duration.ofSeconds(3), stuckAggregates = 0)
         store.leader = false
 
         relay.runCycle()
         relay.runCycle()
 
         assertThat(store.backlogQueriedAt).containsExactly(now, now)
+        assertThat(store.backlogThresholds).containsOnly(10)
         assertThat(registry.get("outbox.pending").gauge().value()).isEqualTo(4.0)
         assertThat(registry.get("outbox.oldest.pending.age").gauge().value()).isEqualTo(3.0)
         assertThat(registry.get("outbox.relay.cycles").counter().count()).isEqualTo(2.0)
@@ -312,7 +313,7 @@ class OutboxRelayTest {
     private class FakeOutboxStore : OutboxStore {
         var leader = true
         var failMarkPublished = false
-        var backlog = OutboxBacklog(pending = 0, oldestAge = null)
+        var backlog = OutboxBacklog(pending = 0, oldestAge = null, stuckAggregates = 0)
         private val rows = linkedMapOf<Long, PendingEvent>()
         private var insideLeadership = false
         val leaderLockKeys = mutableListOf<Long>()
@@ -320,6 +321,7 @@ class OutboxRelayTest {
         val publishedAt = linkedMapOf<Long, Instant>()
         val failures = linkedMapOf<Long, String>()
         val backlogQueriedAt = mutableListOf<Instant>()
+        val backlogThresholds = mutableListOf<Int>()
         val callsOutsideLeadership = mutableListOf<String>()
 
         fun add(vararg events: PendingEvent) {
@@ -368,8 +370,12 @@ class OutboxRelayTest {
             rows.computeIfPresent(position) { _, row -> row.copy(attempts = row.attempts + 1) }
         }
 
-        override fun backlog(now: Instant): OutboxBacklog {
+        override fun backlog(
+            now: Instant,
+            stuckAfterAttempts: Int,
+        ): OutboxBacklog {
             backlogQueriedAt += now
+            backlogThresholds += stuckAfterAttempts
             return backlog
         }
 

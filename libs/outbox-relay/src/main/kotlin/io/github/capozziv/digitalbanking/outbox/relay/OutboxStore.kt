@@ -33,17 +33,23 @@ interface OutboxStore {
         error: String,
     )
 
-    /** How many events wait for publication and how old the oldest one is at [now]. */
-    fun backlog(now: Instant): OutboxBacklog
+    /**
+     * How many events wait for publication, how old the oldest one is at [now] and how many aggregates are
+     * stuck: have an unpublished event with at least [stuckAfterAttempts] failed attempts.
+     */
+    fun backlog(
+        now: Instant,
+        stuckAfterAttempts: Int,
+    ): OutboxBacklog
 }
 
 /**
  * Unpublished events: their count, the age of the oldest (`null` when there is none) and how many aggregates
- * are stuck, that is, have an unpublished event with a failed attempt. Derived from the persisted rows, so it
- * stays right after a restart or a leader change.
+ * are stuck, that is, have an unpublished event that reached the stuck threshold of failed attempts. Derived
+ * from the persisted rows, so it stays right after a restart or a leader change.
  */
 data class OutboxBacklog(
     val pending: Long,
     val oldestAge: Duration?,
-    val stuckAggregates: Long = 0,
+    val stuckAggregates: Long,
 )

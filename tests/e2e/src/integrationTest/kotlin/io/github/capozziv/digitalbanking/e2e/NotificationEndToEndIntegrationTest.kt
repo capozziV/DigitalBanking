@@ -174,7 +174,7 @@ class NotificationEndToEndIntegrationTest {
 
     @Test
     @Order(7)
-    fun `a malformed message reaches the DLQ after 5 receives while a transfer of another account is notified`() {
+    fun `a malformed message reaches the DLQ after 5 receives and a transfer of another account is still notified`() {
         val (sender, source) = welcomedAccount()
         val (_, destination) = welcomedAccount()
         accounts.credit(source, 1_000)
@@ -186,8 +186,8 @@ class NotificationEndToEndIntegrationTest {
 
         assertThat(transfers.awaitTerminal(id, SAGA_FINISH_TIMEOUT)).isEqualTo("COMPLETED")
         notifications.awaitKinds(sender, listOf("WELCOME", "TRANSFER_SENT"), NOTIFICATION_TIMEOUT)
-        // The other group was notified while the malformed one was still being received, so it was not blocked.
-        // Whether the DLQ is still empty at this point depends on the speed of the runner, so it is not asserted.
+        // Group isolation (a malformed message does not block another group) is proved in NotificationConsumptionIntegrationTest.
+        // Here the transfer is only checked to be notified; whether the DLQ is still empty depends on the runner speed.
         val dead = queues.awaitDeadLetter(malformedGroup, DLQ_TIMEOUT)
         assertThat(dead.body).isEqualTo(MALFORMED_BODY)
         // SQS carries the receive count into the DLQ; the receive that reads it here adds one.

@@ -246,34 +246,39 @@ class JdbcOutboxStoreIntegrationTest {
             .param("at", OffsetDateTime.ofInstant(now.minusSeconds(30), ZoneOffset.UTC))
             .update()
 
-        val backlog = store.backlog(now)
+        val backlog = store.backlog(now, STUCK_AFTER)
 
-        assertThat(backlog).isEqualTo(OutboxBacklog(pending = 1, oldestAge = Duration.ofSeconds(30)))
+        assertThat(backlog).isEqualTo(OutboxBacklog(pending = 1, oldestAge = Duration.ofSeconds(30), stuckAggregates = 0))
     }
 
     @Test
     fun `backlog of an empty outbox has no age`() {
-        assertThat(store.backlog(now)).isEqualTo(OutboxBacklog(pending = 0, oldestAge = null, stuckAggregates = 0))
+        assertThat(store.backlog(now, STUCK_AFTER)).isEqualTo(OutboxBacklog(pending = 0, oldestAge = null, stuckAggregates = 0))
     }
 
     @Test
-    fun `backlog counts each aggregate with an unpublished failed event once, from the persisted state`() {
+    fun `backlog counts only aggregates whose unpublished event reached the stuck threshold, once each`() {
         repeat(2) { write("acc-stuck") }
         write("acc-healthy")
         write("acc-recovered")
+        write("acc-transient")
         write("acc-stuck-2")
-        val (stuck1, _, _, recovered, stuck2) = positions()
+        val positions = positions()
+        val stuck1 = positions[0]
+        val recovered = positions[3]
+        val transient = positions[4]
+        val stuck2 = positions[5]
         store.asLeader(LOCK_KEY) {
-            store.markFailed(stuck1, "sns down")
-            store.markFailed(stuck1, "sns down")
-            store.markFailed(stuck2, "sns down")
-            store.markFailed(recovered, "sns down")
+            repeat(STUCK_AFTER) { store.markFailed(stuck1, "sns down") }
+            repeat(STUCK_AFTER) { store.markFailed(stuck2, "sns down") }
+            repeat(STUCK_AFTER) { store.markFailed(recovered, "sns down") }
             store.markPublished(recovered, now)
+            store.markFailed(transient, "sns blip")
         }
 
-        val backlog = store.backlog(now)
+        val backlog = store.backlog(now, STUCK_AFTER)
 
-        assertThat(backlog.pending).isEqualTo(4)
+        assertThat(backlog.pending).isEqualTo(5)
         assertThat(backlog.stuckAggregates).isEqualTo(2)
     }
 
@@ -302,6 +307,7 @@ class JdbcOutboxStoreIntegrationTest {
 
     companion object {
         private const val LOCK_KEY = 4_242L
+        private const val STUCK_AFTER = 3
 
         @Container
         @JvmStatic

@@ -104,11 +104,13 @@ class NotificationQueues(
         timeout: Duration,
     ) {
         val deadline = Instant.now().plus(timeout)
-        var stableReadings = 0
+        var depth = transfersDlqDepth()
+        var stableReadings = if (depth == expected) 1 else 0
         while (stableReadings < STABLE_READINGS) {
-            stableReadings = if (transfersDlqDepth() == expected) stableReadings + 1 else 0
-            check(Instant.now().isBefore(deadline)) { "$TRANSFERS_DLQ depth is ${transfersDlqDepth()} after $timeout, expected $expected" }
+            check(Instant.now().isBefore(deadline)) { "$TRANSFERS_DLQ depth is $depth after $timeout, expected $expected" }
             Thread.sleep(POLL.toMillis())
+            depth = transfersDlqDepth()
+            stableReadings = if (depth == expected) stableReadings + 1 else 0
         }
     }
 

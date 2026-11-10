@@ -62,9 +62,13 @@ class JdbcOutboxStore(
             .update()
     }
 
-    override fun backlog(now: Instant): OutboxBacklog =
+    override fun backlog(
+        now: Instant,
+        stuckAfterAttempts: Int,
+    ): OutboxBacklog =
         jdbcClient
             .sql(BACKLOG_SQL)
+            .param("stuckAfterAttempts", stuckAfterAttempts)
             .query { rs, _ ->
                 val oldest = rs.getObject("oldest", OffsetDateTime::class.java)?.toInstant()
                 OutboxBacklog(
@@ -88,10 +92,10 @@ class JdbcOutboxStore(
         )
 
     companion object {
-        /** Pending count, oldest pending event and distinct aggregates with a failed unpublished event. */
+        /** Pending count, oldest pending event and distinct aggregates with an unpublished event at the stuck threshold. */
         const val BACKLOG_SQL =
             "select count(*) as pending, min(occurred_at) as oldest, " +
-                "count(distinct aggregate_id) filter (where attempts > 0) as stuck " +
+                "count(distinct aggregate_id) filter (where attempts >= :stuckAfterAttempts) as stuck " +
                 "from outbox where published_at is null"
 
         /**
