@@ -126,6 +126,11 @@ Lista dos lançamentos de uma conta em ordem cronológica, para consulta do clie
 _Código_: `Statement`
 _Evite_: histórico
 
+**Lançamento do extrato**:
+Lançamento como aparece no extrato, cópia de leitura do lançamento do ledger.
+_Código_: `StatementEntry`
+_Evite_: item, linha
+
 **Notificação**:
 Aviso enviado ao cliente sobre algo que aconteceu na conta.
 _Código_: `Notification`

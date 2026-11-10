@@ -16,7 +16,7 @@
 | customer | Cadastro e status do cliente | PostgreSQL |
 | accounts | Contas, ledger imutável e saldo (fonte da verdade) | PostgreSQL |
 | transfers | Saga orquestrada de transferência, idempotência, limite diário | PostgreSQL + Redis |
-| statement | Extrato para leitura (CQRS) | DynamoDB + Redis |
+| statement | Extrato para leitura (CQRS) | DynamoDB (Redis para a primeira página chega na etapa 5) |
 | notification | Consome eventos e grava notificações dentro do aplicativo (sininho) | PostgreSQL |
 
 ## Fluxo de entrada
@@ -71,7 +71,8 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 - A leitura do lote pula os eventos seguintes de uma conta presa, que não ocupa o lote das outras. Limites de tempo: 2 s por publicação e 10 s por ciclo (configuráveis).
 - O `notification` consome com `@SqsListener` (Spring Cloud AWS) as filas FIFO `notification-accounts.fifo` e `notification-transfers.fifo`, cada uma com DLQ FIFO (`notification-accounts-dlq.fifo`, `notification-transfers-dlq.fifo`); a mensagem vai para a DLQ na 5ª tentativa.
 - Idempotência do consumidor pela tabela `processed_events`, gravada na mesma transação das notificações; a mensagem é confirmada só depois do commit.
-- (ver [ADR 0003](adr/0003-transactional-outbox-e-mensageria.md), [ADR 0015](adr/0015-outbox-relay-lider-e-sns-fifo.md) e [ADR 0017](adr/0017-notification-com-banco-e-consumo-sqs.md))
+- O `statement` (porta 8084, sem PostgreSQL) consome `AccountOpened` e `LedgerEntryRecorded` do `accounts-events.fifo` na fila FIFO `statement-accounts.fifo`, com DLQ `statement-accounts-dlq.fifo` (5 tentativas, visibilidade 30 s). Não usa `processed_events`: o `PutItem` condicional é a idempotência.
+- (ver [ADR 0003](adr/0003-transactional-outbox-e-mensageria.md), [ADR 0015](adr/0015-outbox-relay-lider-e-sns-fifo.md), [ADR 0017](adr/0017-notification-com-banco-e-consumo-sqs.md) e [ADR 0018](adr/0018-chave-do-extrato-pela-sequencia.md))
 
 ### Borda e segurança
 - **API Gateway HTTP API** substitui um gateway em Spring: roteamento por caminho, autorizador JWT nativo do Cognito, VPC Link para ALB interno.
