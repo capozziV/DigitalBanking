@@ -95,6 +95,23 @@ class NotificationQueues(
 
     fun transfersDlqDepth(): Int = pending(transfersDlqUrl)
 
+    /**
+     * Polls until the DLQ depth reads [expected] on [STABLE_READINGS] readings in a row. The queue counters are
+     * approximate and lag behind moves and deletes, so a single reading can still show the previous depth.
+     */
+    fun awaitTransfersDlqDepth(
+        expected: Int,
+        timeout: Duration,
+    ) {
+        val deadline = Instant.now().plus(timeout)
+        var stableReadings = 0
+        while (stableReadings < STABLE_READINGS) {
+            stableReadings = if (transfersDlqDepth() == expected) stableReadings + 1 else 0
+            check(Instant.now().isBefore(deadline)) { "$TRANSFERS_DLQ depth is ${transfersDlqDepth()} after $timeout, expected $expected" }
+            Thread.sleep(POLL.toMillis())
+        }
+    }
+
     /** Polls the DLQ until the message of [groupId] is there; deletes it and returns its body and receive count. */
     fun awaitDeadLetter(
         groupId: String,
@@ -148,6 +165,7 @@ class NotificationQueues(
         const val TRANSFERS_QUEUE = "notification-transfers.fifo"
         const val TRANSFERS_DLQ = "notification-transfers-dlq.fifo"
         val POLL: Duration = Duration.ofMillis(250)
+        const val STABLE_READINGS = 3
 
         /** Long enough to delete the message just read (visibility 0 expires its receipt handle at once). */
         const val DLQ_INSPECTION_VISIBILITY_SECONDS = 5

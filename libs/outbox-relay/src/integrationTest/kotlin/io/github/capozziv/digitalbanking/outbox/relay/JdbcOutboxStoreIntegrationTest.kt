@@ -253,7 +253,28 @@ class JdbcOutboxStoreIntegrationTest {
 
     @Test
     fun `backlog of an empty outbox has no age`() {
-        assertThat(store.backlog(now)).isEqualTo(OutboxBacklog(pending = 0, oldestAge = null))
+        assertThat(store.backlog(now)).isEqualTo(OutboxBacklog(pending = 0, oldestAge = null, stuckAggregates = 0))
+    }
+
+    @Test
+    fun `backlog counts each aggregate with an unpublished failed event once, from the persisted state`() {
+        repeat(2) { write("acc-stuck") }
+        write("acc-healthy")
+        write("acc-recovered")
+        write("acc-stuck-2")
+        val (stuck1, _, _, recovered, stuck2) = positions()
+        store.asLeader(LOCK_KEY) {
+            store.markFailed(stuck1, "sns down")
+            store.markFailed(stuck1, "sns down")
+            store.markFailed(stuck2, "sns down")
+            store.markFailed(recovered, "sns down")
+            store.markPublished(recovered, now)
+        }
+
+        val backlog = store.backlog(now)
+
+        assertThat(backlog.pending).isEqualTo(4)
+        assertThat(backlog.stuckAggregates).isEqualTo(2)
     }
 
     private fun JdbcOutboxStore.asLeaderOnOtherConnection(lockKey: Long): String? {

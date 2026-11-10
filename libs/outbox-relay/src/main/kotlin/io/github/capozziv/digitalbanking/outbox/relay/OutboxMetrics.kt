@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
 /**
- * Micrometer meters of the outbox relay: backlog gauges, the publish failure counter and the cycle counter.
+ * Micrometer meters of the outbox relay: backlog gauges (pending, oldest age, stuck aggregates), the publish failure counter and the cycle counter.
  *
  * The gauges hold the value of the last cycle, so they freeze if the relay stops running; a stopped relay
  * shows as `outbox.relay.cycles` no longer increasing. Only completed cycles count: a cycle that throws
@@ -18,6 +18,7 @@ class OutboxMetrics(
 ) {
     private val pending = AtomicLong()
     private val oldestAgeSeconds = AtomicReference(0.0)
+    private val stuckAggregates = AtomicLong()
     private val publishFailures: Counter =
         Counter
             .builder("outbox.publish.failures")
@@ -39,10 +40,15 @@ class OutboxMetrics(
             .description("Age of the oldest outbox event waiting for publication, as of the last relay cycle")
             .baseUnit("seconds")
             .register(registry)
+        Gauge
+            .builder("outbox.stuck.aggregates", stuckAggregates) { it.get().toDouble() }
+            .description("Aggregates with an unpublished event that already failed to publish, as of the last relay cycle")
+            .register(registry)
     }
 
     fun recordBacklog(backlog: OutboxBacklog) {
         pending.set(backlog.pending)
+        stuckAggregates.set(backlog.stuckAggregates)
         oldestAgeSeconds.set(backlog.oldestAge?.let { it.toNanos() / NANOS_PER_SECOND } ?: 0.0)
     }
 

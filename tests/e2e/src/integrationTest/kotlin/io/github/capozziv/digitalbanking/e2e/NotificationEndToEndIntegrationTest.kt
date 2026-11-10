@@ -107,7 +107,7 @@ class NotificationEndToEndIntegrationTest {
         assertThat(notifications.all(sender).map { it.get("kind").asString() }).containsExactlyInAnyOrder("WELCOME", "TRANSFER_SENT")
         assertThat(notifications.all(receiver).map { it.get("kind").asString() })
             .containsExactlyInAnyOrder("WELCOME", "TRANSFER_RECEIVED")
-        assertThat(queues.transfersDlqDepth()).isEqualTo(dlqBefore)
+        queues.awaitTransfersDlqDepth(dlqBefore, DLQ_DEPTH_TIMEOUT)
     }
 
     @Test
@@ -186,13 +186,14 @@ class NotificationEndToEndIntegrationTest {
 
         assertThat(transfers.awaitTerminal(id, SAGA_FINISH_TIMEOUT)).isEqualTo("COMPLETED")
         notifications.awaitKinds(sender, listOf("WELCOME", "TRANSFER_SENT"), NOTIFICATION_TIMEOUT)
-        // The other group went on while the malformed message was still failing: it is not in the DLQ yet.
-        assertThat(queues.transfersDlqDepth()).isEqualTo(dlqBefore)
+        // The other group was notified while the malformed one was still being received, so it was not blocked.
+        // Whether the DLQ is still empty at this point depends on the speed of the runner, so it is not asserted.
         val dead = queues.awaitDeadLetter(malformedGroup, DLQ_TIMEOUT)
         assertThat(dead.body).isEqualTo(MALFORMED_BODY)
         // SQS carries the receive count into the DLQ; the receive that reads it here adds one.
         assertThat(dead.receiveCount).isEqualTo(MAX_RECEIVE_COUNT + 1)
-        assertThat(queues.transfersDlqDepth()).isEqualTo(dlqBefore)
+        // Only the malformed message was dead-lettered; the counters lag behind the delete, so poll.
+        queues.awaitTransfersDlqDepth(dlqBefore, DLQ_DEPTH_TIMEOUT)
     }
 
     @Test
@@ -238,6 +239,7 @@ class NotificationEndToEndIntegrationTest {
         val CALL_HELD_TIMEOUT: Duration = Duration.ofSeconds(30)
         val EVENTS_TIMEOUT: Duration = Duration.ofSeconds(30)
         val DRAIN_TIMEOUT: Duration = Duration.ofSeconds(30)
+        val DLQ_DEPTH_TIMEOUT: Duration = Duration.ofSeconds(30)
 
         /** 5 receives 2 s apart plus the time to move the message. */
         val DLQ_TIMEOUT: Duration = Duration.ofSeconds(60)

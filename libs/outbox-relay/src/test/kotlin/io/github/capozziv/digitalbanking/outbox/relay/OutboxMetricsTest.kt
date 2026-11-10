@@ -48,6 +48,17 @@ class OutboxMetricsTest {
     }
 
     @Test
+    fun `stuck aggregates gauge follows the backlog and starts at zero`() {
+        assertThat(registry.get("outbox.stuck.aggregates").gauge().value()).isZero()
+
+        metrics.recordBacklog(OutboxBacklog(pending = 5, oldestAge = Duration.ofSeconds(1), stuckAggregates = 2))
+        assertThat(registry.get("outbox.stuck.aggregates").gauge().value()).isEqualTo(2.0)
+
+        metrics.recordBacklog(OutboxBacklog(pending = 0, oldestAge = null, stuckAggregates = 0))
+        assertThat(registry.get("outbox.stuck.aggregates").gauge().value()).isZero()
+    }
+
+    @Test
     fun `each publish failure increments the counter`() {
         metrics.recordPublishFailure()
         metrics.recordPublishFailure()

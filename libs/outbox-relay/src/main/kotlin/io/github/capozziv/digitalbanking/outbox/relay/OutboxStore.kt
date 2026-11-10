@@ -37,8 +37,13 @@ interface OutboxStore {
     fun backlog(now: Instant): OutboxBacklog
 }
 
-/** Unpublished events: their count and the age of the oldest (`null` when there is none). */
+/**
+ * Unpublished events: their count, the age of the oldest (`null` when there is none) and how many aggregates
+ * are stuck, that is, have an unpublished event with a failed attempt. Derived from the persisted rows, so it
+ * stays right after a restart or a leader change.
+ */
 data class OutboxBacklog(
     val pending: Long,
     val oldestAge: Duration?,
+    val stuckAggregates: Long = 0,
 )
