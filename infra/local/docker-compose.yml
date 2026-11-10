@@ -44,15 +44,17 @@ services:
       timeout: 3s
       retries: 10
 
-  # Emulador AWS (SNS e SQS). Exige LOCALSTACK_AUTH_TOKEN (conta Hobby gratuita) no .env.
+  # Emulador AWS (SNS, SQS e DynamoDB). Exige LOCALSTACK_AUTH_TOKEN (conta Hobby gratuita) no .env.
   # Mesma imagem de LocalStackTestSupport.IMAGE (libs/testing-localstack); mude as duas juntas.
   localstack:
     image: localstack/localstack:2026.10.2
     environment:
       LOCALSTACK_AUTH_TOKEN: ${LOCALSTACK_AUTH_TOKEN:-}
-      SERVICES: sns,sqs
+      SERVICES: sns,sqs,dynamodb
       NOTIFICATION_MAX_RECEIVE_COUNT: ${NOTIFICATION_MAX_RECEIVE_COUNT:-5}
       NOTIFICATION_VISIBILITY_TIMEOUT_SECONDS: ${NOTIFICATION_VISIBILITY_TIMEOUT_SECONDS:-30}
+      STATEMENT_MAX_RECEIVE_COUNT: ${STATEMENT_MAX_RECEIVE_COUNT:-5}
+      STATEMENT_VISIBILITY_TIMEOUT_SECONDS: ${STATEMENT_VISIBILITY_TIMEOUT_SECONDS:-30}
     ports:
       - "${LOCALSTACK_PORT:-4566}:4566"
     volumes:
