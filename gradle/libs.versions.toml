@@ -25,6 +25,7 @@ springdoc-openapi-starter-webmvc-ui = { module = "org.springdoc:springdoc-openap
 java-uuid-generator = { module = "com.fasterxml.uuid:java-uuid-generator", version.ref = "java-uuid-generator" }
 testcontainers-localstack = { module = "org.testcontainers:testcontainers-localstack" }
 aws-sdk-bom = { module = "software.amazon.awssdk:bom", version.ref = "aws-sdk" }
+aws-sdk-dynamodb = { module = "software.amazon.awssdk:dynamodb" }
 aws-sdk-sns = { module = "software.amazon.awssdk:sns" }
 wiremock-standalone = { module = "org.wiremock:wiremock-standalone", version.ref = "wiremock" }
 aws-sdk-sqs = { module = "software.amazon.awssdk:sqs" }
