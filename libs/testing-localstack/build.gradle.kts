@@ -2,6 +2,7 @@
 // Consume it only from integrationTestImplementation.
 plugins {
     id("digitalbanking.kotlin-library")
+    id("digitalbanking.integration-test")
 }
 
 dependencies {
@@ -10,7 +11,10 @@ dependencies {
     api(libs.testcontainers.localstack)
     api(libs.aws.sdk.sns)
     api(libs.aws.sdk.sqs)
+    api(libs.aws.sdk.dynamodb)
     api("org.slf4j:slf4j-api")
     implementation(platform(libs.junit.bom))
     implementation("org.junit.jupiter:junit-jupiter-api")
+
+    integrationTestImplementation(libs.testcontainers.junit.jupiter)
 }
