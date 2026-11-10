@@ -4,14 +4,28 @@ import io.github.capozziv.digitalbanking.accounts.application.port.TransactionRu
 import org.springframework.stereotype.Component
 import org.springframework.transaction.support.TransactionTemplate
 
-/** Runs the block in a transaction of the default TransactionTemplate; any exception rolls it back. */
+/**
+ * Runs the block in a transaction of the default TransactionTemplate; any exception rolls it back. Read-only
+ * blocks run in a read-only copy of it, which the JDBC driver opens as a read-only transaction.
+ */
 @Component
 class SpringTransactionRunner(
     private val transactionTemplate: TransactionTemplate,
 ) : TransactionRunner {
-    override fun <T> inTransaction(block: () -> T): T {
+    private val readOnlyTemplate =
+        TransactionTemplate(checkNotNull(transactionTemplate.transactionManager), transactionTemplate)
+            .apply { isReadOnly = true }
+
+    override fun <T> inTransaction(block: () -> T): T = run(transactionTemplate, block)
+
+    override fun <T> inReadOnlyTransaction(block: () -> T): T = run(readOnlyTemplate, block)
+
+    private fun <T> run(
+        template: TransactionTemplate,
+        block: () -> T,
+    ): T {
         var result: Result<T>? = null
-        transactionTemplate.executeWithoutResult { result = Result.success(block()) }
+        template.executeWithoutResult { result = Result.success(block()) }
         return checkNotNull(result) { "transaction finished without running the block" }.getOrThrow()
     }
 }

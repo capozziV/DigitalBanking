@@ -41,7 +41,7 @@ class RecordDebitUseCaseTest {
     private val entries = InMemoryLedgerEntryRepository()
     private val types =
         InMemoryAccountTypeRepository(
-            listOf(AccountTypeLimit(AccountType.STANDARD, OverdraftLimit(50000), Instant.parse("2026-10-01T00:00:00Z"))),
+            listOf(AccountTypeLimit(AccountType.STANDARD, OverdraftLimit(LIMIT), Instant.parse("2026-10-01T00:00:00Z"))),
         )
     private val outbox = RecordingEventOutbox()
     private val tx = DirectTransactionRunner()
@@ -49,23 +49,34 @@ class RecordDebitUseCaseTest {
     private val credits = RecordCreditUseCase(accounts, entries, outbox, tx, ids, clock)
     private val useCase = RecordDebitUseCase(accounts, entries, types, outbox, tx, ids, clock)
 
-    // Every scenario starts with a credit of 1000 (entry id 1, sequence 1).
+    // Every scenario starts with a credit of INITIAL_BALANCE (entry id 1, sequence 1).
     private val initialCredit =
         LedgerEntry(
             id = SequentialIdGenerator.idAt(1),
             accountId = account.id,
             sequence = 1,
             kind = EntryKind.CREDIT,
-            amount = Money(1000),
-            balanceAfter = Balance(1000),
+            amount = Money(INITIAL_BALANCE),
+            balanceAfter = Balance(INITIAL_BALANCE),
             description = null,
-            idempotencyKey = "credit-key-1",
+            idempotencyKey = CREDIT_KEY,
             createdAt = now,
         )
 
     init {
-        credits.execute(RecordEntryCommand(account.id, Money(1000), null, "credit-key-1"))
+        credits.execute(RecordEntryCommand(account.id, Money(INITIAL_BALANCE), null, CREDIT_KEY))
     }
+
+    private fun tracked(log: CallLog) =
+        RecordDebitUseCase(
+            log.accounts(accounts),
+            log.entries(entries),
+            log.types(types),
+            log.outbox(outbox),
+            log.transactions(tx),
+            ids,
+            clock,
+        )
 
     private fun debit(
         amount: Long,
@@ -93,9 +104,19 @@ class RecordDebitUseCaseTest {
 
     @Test
     fun `debit within the overdraft limit records an entry and appends ledger entry recorded`() {
-        val outcome = useCase.execute(debit(1300, "debit-key-1"))
+        val outcome = useCase.execute(debit(1300, DEBIT_KEY))
 
-        val expected = debitEntry(id = 2, sequence = 2, amount = 1300, balanceAfter = -300, key = "debit-key-1")
+        val expected = debitEntry(id = 2, sequence = 2, amount = 1300, balanceAfter = -300, key = DEBIT_KEY)
+        assertThat(outcome).isEqualTo(DebitOutcome.Recorded(RecordEntryResult(expected, created = true)))
+        assertThat(entries.all()).containsExactly(initialCredit, expected)
+        assertThat(outbox.events).containsExactly(LedgerEntryRecorded(initialCredit), LedgerEntryRecorded(expected))
+    }
+
+    @Test
+    fun `debit of exactly the available balance is recorded and leaves the balance at the overdraft limit`() {
+        val outcome = useCase.execute(debit(AVAILABLE, DEBIT_KEY))
+
+        val expected = debitEntry(id = 2, sequence = 2, amount = AVAILABLE, balanceAfter = -LIMIT, key = DEBIT_KEY)
         assertThat(outcome).isEqualTo(DebitOutcome.Recorded(RecordEntryResult(expected, created = true)))
         assertThat(entries.all()).containsExactly(initialCredit, expected)
         assertThat(outbox.events).containsExactly(LedgerEntryRecorded(initialCredit), LedgerEntryRecorded(expected))
@@ -103,20 +124,20 @@ class RecordDebitUseCaseTest {
 
     @Test
     fun `debit above the available balance is refused without recording or publishing anything`() {
-        val outcome = useCase.execute(debit(51001, "debit-key-1"))
+        val outcome = useCase.execute(debit(AVAILABLE + 1, DEBIT_KEY))
 
-        assertThat(outcome).isEqualTo(DebitOutcome.Refused(AvailableBalance(51000)))
+        assertThat(outcome).isEqualTo(DebitOutcome.Refused(AvailableBalance(AVAILABLE)))
         assertThat(entries.all()).containsExactly(initialCredit)
         assertThat(outbox.events).containsExactly(LedgerEntryRecorded(initialCredit))
     }
 
     @Test
     fun `retrying a debit with the same key returns the original entry without a new entry or event`() {
-        useCase.execute(debit(300, "debit-key-1"))
+        useCase.execute(debit(300, DEBIT_KEY))
 
-        val retry = useCase.execute(debit(300, "debit-key-1"))
+        val retry = useCase.execute(debit(300, DEBIT_KEY))
 
-        val original = debitEntry(id = 2, sequence = 2, amount = 300, balanceAfter = 700, key = "debit-key-1")
+        val original = debitEntry(id = 2, sequence = 2, amount = 300, balanceAfter = 700, key = DEBIT_KEY)
         assertThat(retry).isEqualTo(DebitOutcome.Recorded(RecordEntryResult(original, created = false)))
         assertThat(entries.all()).containsExactly(initialCredit, original)
         assertThat(outbox.events).containsExactly(LedgerEntryRecorded(initialCredit), LedgerEntryRecorded(original))
@@ -124,22 +145,22 @@ class RecordDebitUseCaseTest {
 
     @Test
     fun `reusing a debit key with another amount fails without recording anything`() {
-        useCase.execute(debit(300, "debit-key-1"))
+        useCase.execute(debit(300, DEBIT_KEY))
 
-        assertThatThrownBy { useCase.execute(debit(400, "debit-key-1")) }
+        assertThatThrownBy { useCase.execute(debit(400, DEBIT_KEY)) }
             .isInstanceOfSatisfying(IdempotencyKeyReusedException::class.java) {
-                assertThat(it.key).isEqualTo("debit-key-1")
+                assertThat(it.key).isEqualTo(DEBIT_KEY)
             }
-        val original = debitEntry(id = 2, sequence = 2, amount = 300, balanceAfter = 700, key = "debit-key-1")
+        val original = debitEntry(id = 2, sequence = 2, amount = 300, balanceAfter = 700, key = DEBIT_KEY)
         assertThat(entries.all()).containsExactly(initialCredit, original)
         assertThat(outbox.events).containsExactly(LedgerEntryRecorded(initialCredit), LedgerEntryRecorded(original))
     }
 
     @Test
     fun `reusing a credit key for a debit of the same amount fails without recording anything`() {
-        assertThatThrownBy { useCase.execute(debit(1000, "credit-key-1")) }
+        assertThatThrownBy { useCase.execute(debit(1000, CREDIT_KEY)) }
             .isInstanceOfSatisfying(IdempotencyKeyReusedException::class.java) {
-                assertThat(it.key).isEqualTo("credit-key-1")
+                assertThat(it.key).isEqualTo(CREDIT_KEY)
             }
         assertThat(entries.all()).containsExactly(initialCredit)
         assertThat(outbox.events).containsExactly(LedgerEntryRecorded(initialCredit))
@@ -147,11 +168,11 @@ class RecordDebitUseCaseTest {
 
     @Test
     fun `reusing a debit key for a credit of the same amount fails without recording anything`() {
-        useCase.execute(debit(300, "debit-key-1"))
+        useCase.execute(debit(300, DEBIT_KEY))
 
-        assertThatThrownBy { credits.execute(RecordEntryCommand(account.id, Money(300), "rent", "debit-key-1")) }
+        assertThatThrownBy { credits.execute(RecordEntryCommand(account.id, Money(300), "rent", DEBIT_KEY)) }
             .isInstanceOf(IdempotencyKeyReusedException::class.java)
-        val original = debitEntry(id = 2, sequence = 2, amount = 300, balanceAfter = 700, key = "debit-key-1")
+        val original = debitEntry(id = 2, sequence = 2, amount = 300, balanceAfter = 700, key = DEBIT_KEY)
         assertThat(entries.all()).containsExactly(initialCredit, original)
         assertThat(outbox.events).containsExactly(LedgerEntryRecorded(initialCredit), LedgerEntryRecorded(original))
     }
@@ -160,7 +181,7 @@ class RecordDebitUseCaseTest {
     fun `debiting an unknown account fails with account not found`() {
         val unknown = UUID.fromString("0199a0b0-0000-7000-8000-0000000000a9")
 
-        assertThatThrownBy { useCase.execute(debit(100, "debit-key-1", accountId = unknown)) }
+        assertThatThrownBy { useCase.execute(debit(100, DEBIT_KEY, accountId = unknown)) }
             .isInstanceOfSatisfying(AccountNotFoundException::class.java) {
                 assertThat(it.accountId).isEqualTo(unknown)
             }
@@ -172,7 +193,7 @@ class RecordDebitUseCaseTest {
     fun `debiting a busy account propagates account busy without recording anything`() {
         accounts.busyAccounts += account.id
 
-        assertThatThrownBy { useCase.execute(debit(100, "debit-key-1")) }
+        assertThatThrownBy { useCase.execute(debit(100, DEBIT_KEY)) }
             .isInstanceOfSatisfying(AccountBusyException::class.java) {
                 assertThat(it.accountId).isEqualTo(account.id)
             }
@@ -183,18 +204,8 @@ class RecordDebitUseCaseTest {
     @Test
     fun `debit follows lock, key check, last entry, limit, entry insert and event append in one transaction`() {
         val log = CallLog()
-        val tracked =
-            RecordDebitUseCase(
-                log.accounts(accounts),
-                log.entries(entries),
-                log.types(types),
-                log.outbox(outbox),
-                log.transactions(tx),
-                ids,
-                clock,
-            )
 
-        tracked.execute(debit(300, "debit-key-1"))
+        tracked(log).execute(debit(300, DEBIT_KEY))
 
         assertThat(log.calls).containsExactly(
             "begin",
@@ -211,18 +222,8 @@ class RecordDebitUseCaseTest {
     @Test
     fun `refused debit stops after reading the limit and writes nothing`() {
         val log = CallLog()
-        val tracked =
-            RecordDebitUseCase(
-                log.accounts(accounts),
-                log.entries(entries),
-                log.types(types),
-                log.outbox(outbox),
-                log.transactions(tx),
-                ids,
-                clock,
-            )
 
-        tracked.execute(debit(51001, "debit-key-1"))
+        tracked(log).execute(debit(AVAILABLE + 1, DEBIT_KEY))
 
         assertThat(log.calls).containsExactly(
             "begin",
@@ -232,5 +233,15 @@ class RecordDebitUseCaseTest {
             "types.findLimit",
             "end",
         )
+    }
+
+    private companion object {
+        const val CREDIT_KEY = "credit-key-1"
+        const val DEBIT_KEY = "debit-key-1"
+        const val INITIAL_BALANCE = 1_000L
+        const val LIMIT = 50_000L
+
+        /** Initial balance plus the overdraft limit of the standard account. */
+        const val AVAILABLE = INITIAL_BALANCE + LIMIT
     }
 }

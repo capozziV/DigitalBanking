@@ -32,17 +32,20 @@ class UseCaseConfiguration {
     @Bean
     fun openAccountUseCase(
         accounts: AccountRepository,
+        entries: LedgerEntryRepository,
+        types: AccountTypeRepository,
         outbox: EventOutbox,
         tx: TransactionRunner,
         ids: IdGenerator,
-    ) = OpenAccountUseCase(accounts, outbox, tx, ids)
+    ) = OpenAccountUseCase(accounts, entries, types, outbox, tx, ids)
 
     @Bean
     fun getAccountUseCase(
         accounts: AccountRepository,
         entries: LedgerEntryRepository,
         types: AccountTypeRepository,
-    ) = GetAccountUseCase(accounts, entries, types)
+        tx: TransactionRunner,
+    ) = GetAccountUseCase(accounts, entries, types, tx)
 
     @Bean
     fun findEntryByIdempotencyKeyUseCase(
@@ -74,10 +77,11 @@ class UseCaseConfiguration {
     @Bean
     fun changeAccountTypeUseCase(
         accounts: AccountRepository,
+        entries: LedgerEntryRepository,
         types: AccountTypeRepository,
         outbox: EventOutbox,
         tx: TransactionRunner,
-    ) = ChangeAccountTypeUseCase(accounts, types, outbox, tx)
+    ) = ChangeAccountTypeUseCase(accounts, entries, types, outbox, tx)
 
     @Bean
     fun listAccountTypesUseCase(types: AccountTypeRepository) = ListAccountTypesUseCase(types)

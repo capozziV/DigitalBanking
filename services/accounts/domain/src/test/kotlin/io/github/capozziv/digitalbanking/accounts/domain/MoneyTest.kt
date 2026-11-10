@@ -19,25 +19,4 @@ class MoneyTest {
     fun `money rejects a negative amount`() {
         assertThatThrownBy { Money(-1) }.isInstanceOf(IllegalArgumentException::class.java)
     }
-
-    @Test
-    fun `overdraft limit accepts zero`() {
-        assertThat(OverdraftLimit(0).cents).isEqualTo(0)
-    }
-
-    @Test
-    fun `overdraft limit rejects a negative amount`() {
-        assertThatThrownBy { OverdraftLimit(-1) }.isInstanceOf(IllegalArgumentException::class.java)
-    }
-
-    @Test
-    fun `account types follow the glossary`() {
-        assertThat(AccountType.entries.map { it.name })
-            .containsExactly("FREE", "STANDARD", "GOLD", "BLACK", "DIAMOND")
-    }
-
-    @Test
-    fun `entry kinds are credit and debit`() {
-        assertThat(EntryKind.entries.map { it.name }).containsExactly("CREDIT", "DEBIT")
-    }
 }

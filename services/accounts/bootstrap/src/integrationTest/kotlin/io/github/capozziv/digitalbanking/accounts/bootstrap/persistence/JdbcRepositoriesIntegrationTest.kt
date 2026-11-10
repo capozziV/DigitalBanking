@@ -22,6 +22,7 @@ import io.github.capozziv.digitalbanking.accounts.domain.OverdraftLimit
 import io.github.capozziv.digitalbanking.outbox.OutboxEventEnvelope
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.awaitility.Awaitility.await
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.slf4j.MDC
@@ -189,7 +190,7 @@ class JdbcRepositoriesIntegrationTest : AccountsIntegrationTest() {
                 CompletableFuture.supplyAsync {
                     tx.inTransaction { accounts.insert(loser, key) to accounts.findByOpeningIdempotencyKey(key) }
                 }
-            Thread.sleep(300)
+            await().atMost(Duration.ofSeconds(5)).until { appSessionsWaitingOnALock() == 1 }
             assertThat(racing).isNotDone()
 
             connection.commit()
@@ -238,6 +239,44 @@ class JdbcRepositoriesIntegrationTest : AccountsIntegrationTest() {
         assertThatThrownBy {
             tx.inTransaction { accounts.updateType(Account(UUID.randomUUID(), UUID.randomUUID(), AccountType.GOLD)) }
         }.isInstanceOf(IllegalStateException::class.java)
+    }
+
+    @Test
+    fun `the application user can update only the type and updated_at of an account`() {
+        val account = openAccount()
+
+        val updated =
+            appJdbc
+                .sql("update account set type = 'GOLD', updated_at = now() where id = :id")
+                .param("id", account.id)
+                .update()
+
+        assertThat(updated).isEqualTo(1)
+        for (column in listOf("customer_id = gen_random_uuid()", "opening_idempotency_key = 'other'", "created_at = now()")) {
+            assertThat(sqlStateOf { appJdbc.sql("update account set $column where id = :id").param("id", account.id).update() })
+                .describedAs("update account set %s", column)
+                .isEqualTo(INSUFFICIENT_PRIVILEGE)
+        }
+        assertThat(accounts.findById(account.id)).isEqualTo(account.copy(type = AccountType.GOLD))
+    }
+
+    // --- grants ---
+
+    @Test
+    fun `every table of the service is granted to the application user`() {
+        val ungranted =
+            ownerJdbc
+                .sql(
+                    """
+                    select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+                    where n.nspname = 'public' and c.relkind in ('r', 'p') and c.relname <> 'flyway_schema_history'
+                      and not has_table_privilege(cast(:appUser as name), c.oid, 'SELECT')
+                    """.trimIndent(),
+                ).param("appUser", APP_USER)
+                .query(String::class.java)
+                .list()
+
+        assertThat(ungranted).isEmpty()
     }
 
     // --- ledger_entry ---
@@ -401,6 +440,14 @@ class JdbcRepositoriesIntegrationTest : AccountsIntegrationTest() {
     }
 
     @Test
+    fun `inReadOnlyTransaction runs the block in a read-only transaction and inTransaction does not`() {
+        val readOnlyFlag = { appJdbc.sql("show transaction_read_only").query(String::class.java).single() }
+
+        assertThat(tx.inReadOnlyTransaction(readOnlyFlag)).isEqualTo("on")
+        assertThat(tx.inTransaction(readOnlyFlag)).isEqualTo("off")
+    }
+
+    @Test
     fun `ids are version 7 uuids`() {
         val generated = List(3) { ids.newId() }
 
@@ -437,6 +484,14 @@ class JdbcRepositoriesIntegrationTest : AccountsIntegrationTest() {
     )
 
     private fun appConnection() = DriverManager.getConnection(postgres.jdbcUrl, APP_USER, APP_PASSWORD)
+
+    /** Sessions of the application user blocked waiting for a lock held by another transaction. */
+    private fun appSessionsWaitingOnALock(): Int =
+        ownerJdbc
+            .sql("select count(*) from pg_stat_activity where usename = :appUser and wait_event_type = 'Lock'")
+            .param("appUser", APP_USER)
+            .query(Int::class.java)
+            .single()
 
     private fun rawAccountType(id: UUID): String =
         ownerJdbc

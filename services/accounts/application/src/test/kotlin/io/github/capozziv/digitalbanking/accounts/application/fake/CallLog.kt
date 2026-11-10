@@ -37,6 +37,15 @@ class CallLog {
                     record("end")
                 }
             }
+
+            override fun <T> inReadOnlyTransaction(block: () -> T): T {
+                record("begin read-only")
+                try {
+                    return delegate.inReadOnlyTransaction(block)
+                } finally {
+                    record("end")
+                }
+            }
         }
 
     fun accounts(delegate: AccountRepository): AccountRepository =
