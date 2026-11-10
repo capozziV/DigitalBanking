@@ -1,7 +1,7 @@
 # Etapa 4 — `statement` (extrato com CQRS no DynamoDB): design
 
 - **Data:** 2026-11-10
-- **Status:** rascunho, aguardando revisão do usuário
+- **Status:** aprovada (2026-11-10)
 - **Roadmap:** etapa 4 de [`docs/roadmap.md`](../../roadmap.md)
 - **Board:** cartão [#11](https://github.com/capozziV/DigitalBanking/issues/11) (Stage 4 · Statement)
 
