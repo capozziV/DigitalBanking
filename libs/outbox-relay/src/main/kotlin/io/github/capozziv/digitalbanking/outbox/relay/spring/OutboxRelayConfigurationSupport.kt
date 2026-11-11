@@ -144,15 +144,18 @@ abstract class OutboxRelayConfigurationSupport(
     }
 }
 
-/** `<prefix>.outbox.*`: relay tuning (see [OutboxRelaySettings]) and the poll interval read by [OutboxRelayScheduler]. */
+/**
+ * `<prefix>.outbox.*`: relay tuning (see [OutboxRelaySettings], whose `DEFAULT_*` constants it inherits) and the
+ * poll interval read by [OutboxRelayScheduler].
+ */
 data class OutboxRelayProperties(
-    val batchSize: Int = 100,
-    val alertAfterAttempts: Int = 10,
-    val publishTimeout: Duration = Duration.ofSeconds(2),
-    val maxCycleDuration: Duration = Duration.ofSeconds(10),
+    val batchSize: Int = OutboxRelaySettings.DEFAULT_BATCH_SIZE,
+    val alertAfterAttempts: Int = OutboxRelaySettings.DEFAULT_ALERT_AFTER_ATTEMPTS,
+    val publishTimeout: Duration = OutboxRelaySettings.DEFAULT_PUBLISH_TIMEOUT,
+    val maxCycleDuration: Duration = OutboxRelaySettings.DEFAULT_MAX_CYCLE_DURATION,
     val pollInterval: Duration = Duration.ofMillis(500),
-    val retryBackoff: Duration = Duration.ofSeconds(1),
-    val maxRetryBackoff: Duration = Duration.ofSeconds(30),
+    val retryBackoff: Duration = OutboxRelaySettings.DEFAULT_RETRY_BACKOFF,
+    val maxRetryBackoff: Duration = OutboxRelaySettings.DEFAULT_MAX_RETRY_BACKOFF,
 )
 
 /** `<prefix>.aws.*`: where the events go. A blank [endpoint] means the real AWS endpoint of [region]. */

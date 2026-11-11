@@ -125,7 +125,10 @@ class OutboxRelaySchedulerTest {
             error: String,
         ) = Unit
 
-        override fun backlog(now: Instant) = OutboxBacklog(pending = 0, oldestAge = null)
+        override fun backlog(
+            now: Instant,
+            stuckAfterAttempts: Int,
+        ) = OutboxBacklog(pending = 0, oldestAge = null, stuckAggregates = 0)
     }
 
     private class NoOpPublisher : EventPublisher {

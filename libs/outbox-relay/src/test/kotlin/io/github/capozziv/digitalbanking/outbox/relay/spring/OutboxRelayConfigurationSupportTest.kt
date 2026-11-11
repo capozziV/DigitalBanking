@@ -36,6 +36,7 @@ class OutboxRelayConfigurationSupportTest {
             assertThat(settings.lockKey).isEqualTo(DEMO_LOCK_KEY)
             assertThat(settings.batchSize).isEqualTo(100)
             assertThat(settings.publishTimeout).isEqualTo(Duration.ofSeconds(2))
+            assertThat(settings).isEqualTo(OutboxRelaySettings(lockKey = DEMO_LOCK_KEY))
             assertThat(context).hasSingleBean(OutboxRelay::class.java)
             assertThat(context).hasSingleBean(OutboxRelayScheduler::class.java)
         }
