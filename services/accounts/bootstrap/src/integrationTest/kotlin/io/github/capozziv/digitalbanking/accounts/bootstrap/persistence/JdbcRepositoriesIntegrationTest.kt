@@ -270,7 +270,8 @@ class JdbcRepositoriesIntegrationTest : AccountsIntegrationTest() {
                     """
                     select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
                     where n.nspname = 'public' and c.relkind in ('r', 'p') and c.relname <> 'flyway_schema_history'
-                      and not has_table_privilege(cast(:appUser as name), c.oid, 'SELECT')
+                      and not (has_table_privilege(cast(:appUser as name), c.oid, 'SELECT')
+                               and has_table_privilege(cast(:appUser as name), c.oid, 'INSERT'))
                     """.trimIndent(),
                 ).param("appUser", APP_USER)
                 .query(String::class.java)
@@ -445,6 +446,13 @@ class JdbcRepositoriesIntegrationTest : AccountsIntegrationTest() {
 
         assertThat(tx.inReadOnlyTransaction(readOnlyFlag)).isEqualTo("on")
         assertThat(tx.inTransaction(readOnlyFlag)).isEqualTo("off")
+    }
+
+    @Test
+    fun `inReadOnlyTransaction reads from a single snapshot`() {
+        val isolation = { appJdbc.sql("show transaction_isolation").query(String::class.java).single() }
+
+        assertThat(tx.inReadOnlyTransaction(isolation)).isEqualTo("repeatable read")
     }
 
     @Test
