@@ -5,20 +5,27 @@ import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.jdbc.datasource.DriverManagerDataSource
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.context.TestPropertySource
 import org.testcontainers.postgresql.PostgreSQLContainer
 
 /**
  * Base of the integration tests of the notification service. One PostgreSQL container is shared by all subclasses.
  * The application connects as [APP_USER]; Flyway runs as the container's owner user, mirroring
  * notification_owner / notification_app of the local environment.
+ *
+ * The properties are in [TestPropertySource], which subclasses inherit and merge, so a subclass's own
+ * `@SpringBootTest` (e.g. a web environment) does not drop them.
  */
-@SpringBootTest(
+@SpringBootTest
+@TestPropertySource(
     properties = [
         "spring.cloud.aws.region.static=us-east-1",
-        "spring.cloud.aws.credentials.access-key=test",
-        "spring.cloud.aws.credentials.secret-key=test",
-        // No SQS here: the queue listeners stay stopped (NotificationConsumptionIntegrationTest covers them).
+        // No SQS here, and never the real AWS: an explicit endpoint where nothing listens.
+        "spring.cloud.aws.sqs.endpoint=http://127.0.0.1:1",
+        // The queue listeners stay stopped (NotificationConsumptionIntegrationTest covers them).
         "spring.cloud.aws.sqs.listener.auto-startup=false",
+        // The DLQ gauge reads SQS once at startup (and fails, reporting NaN); no further reads during the tests.
+        "notification.dlq-metrics.refresh-interval=1h",
     ],
 )
 abstract class NotificationIntegrationTest {

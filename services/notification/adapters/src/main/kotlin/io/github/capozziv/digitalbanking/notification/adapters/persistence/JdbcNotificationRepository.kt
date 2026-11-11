@@ -8,6 +8,7 @@ import org.springframework.jdbc.core.RowMapper
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Repository
 import tools.jackson.core.type.TypeReference
+import tools.jackson.databind.DeserializationFeature
 import tools.jackson.databind.json.JsonMapper
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -104,8 +105,9 @@ class JdbcNotificationRepository(
     private companion object {
         const val COLUMNS = "id, customer_id, kind, title, body, data::text as data, source_event_id, created_at, read_at"
 
-        val JSON: JsonMapper = JsonMapper.builder().build()
-        val DATA_TYPE = object : TypeReference<Map<String, String>>() {}
+        // Amounts in cents are JSON integers; they come back as Long, never Integer, whatever their size.
+        val JSON: JsonMapper = JsonMapper.builder().enable(DeserializationFeature.USE_LONG_FOR_INTS).build()
+        val DATA_TYPE = object : TypeReference<Map<String, Any>>() {}
 
         val ROW_MAPPER =
             RowMapper { rs, _ ->

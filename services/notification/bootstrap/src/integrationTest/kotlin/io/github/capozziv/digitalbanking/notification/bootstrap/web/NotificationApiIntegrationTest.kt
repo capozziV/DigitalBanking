@@ -80,6 +80,22 @@ class NotificationApiIntegrationTest : NotificationWebIntegrationTest() {
     }
 
     @Test
+    fun `an amount in cents of the data map is a JSON number`() {
+        repository.saveAll(listOf(aNotification(customerId = customer, data = mapOf("amountCents" to 250_000L))))
+
+        val data =
+            api
+                .get("/notifications?customerId=$customer")
+                .body!!
+                .get("items")
+                .get(0)
+                .get("data")
+
+        assertThat(data.get("amountCents").isIntegralNumber).isTrue()
+        assertThat(data.get("amountCents").asLong()).isEqualTo(250_000L)
+    }
+
+    @Test
     fun `marking up to a notification reads it and the older ones, and repeating changes nothing`() {
         val saved = seed(customer, 5) // newest first
         val anchor = saved[2]

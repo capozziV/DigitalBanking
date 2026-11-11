@@ -47,7 +47,8 @@ class NotificationEventListener(
             }
         } catch (e: Exception) {
             // Logged here, with the correlation ID still in the MDC: the container logs the error after the finally.
-            log.warn("failed to consume message; it returns to the queue", e)
+            // Only the message: the container's ERROR already carries the stack trace.
+            log.warn("failed to consume message; it returns to the queue: {}", e.toString())
             throw e
         } finally {
             MDC.remove(CORRELATION_ID_MDC_KEY)

@@ -10,6 +10,10 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation(libs.springdoc.openapi.starter.webmvc.ui)
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
+    // The migrations live here, next to the SQL that depends on them (same layout as accounts and transfers).
+    implementation("org.springframework.boot:spring-boot-starter-flyway")
+    implementation(libs.flyway.postgresql)
+    runtimeOnly(libs.postgresql)
     implementation(libs.java.uuid.generator)
 
     // The project's AWS SDK BOM sits next to the Spring Cloud AWS one so its (newer) SDK version wins.

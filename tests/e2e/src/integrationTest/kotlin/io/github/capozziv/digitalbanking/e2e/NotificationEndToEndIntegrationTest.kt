@@ -91,8 +91,11 @@ class NotificationEndToEndIntegrationTest {
         assertThat(transfers.awaitTerminal(id, SAGA_FINISH_TIMEOUT)).isEqualTo("COMPLETED")
         val sent = notifications.awaitKinds(sender, listOf("WELCOME", "TRANSFER_SENT"), NOTIFICATION_TIMEOUT)
         val received = notifications.awaitKinds(receiver, listOf("WELCOME", "TRANSFER_RECEIVED"), NOTIFICATION_TIMEOUT)
-        assertThat(sent.single { it.get("kind").asString() == "TRANSFER_SENT" }.get("body").asString())
-            .isEqualTo("Você enviou R$ 3,00 para a conta $destination.")
+        val sentNotification = sent.single { it.get("kind").asString() == "TRANSFER_SENT" }
+        assertThat(sentNotification.get("body").asString()).isEqualTo("Você enviou R$ 3,00 para a conta $destination.")
+        // Amounts in cents are JSON numbers in data, not strings.
+        assertThat(sentNotification.get("data").get("amountCents").isIntegralNumber).isTrue()
+        assertThat(sentNotification.get("data").get("amountCents").asLong()).isEqualTo(300L)
         assertThat(received.single { it.get("kind").asString() == "TRANSFER_RECEIVED" }.get("body").asString())
             .isEqualTo("Você recebeu R$ 3,00 da conta $source.")
 

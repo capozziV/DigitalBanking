@@ -154,7 +154,7 @@ docker compose -f infra/local/docker-compose.yml exec -T \
 A leitura não apaga as mensagens: elas voltam para a fila depois de 30 s. Numa fila FIFO, enquanto uma mensagem de uma conta está em leitura, as seguintes da mesma conta esperam. Com a CLI da AWS instalada no Mac (`brew install awscli`), o mesmo comando funciona direto com `aws --endpoint-url http://localhost:4566` e as mesmas variáveis `AWS_*`. O relay também expõe métricas em `http://localhost/accounts/actuator/metrics/outbox.pending` e `.../outbox.relay.cycles`.
 
 ### DLQ do notification
-Cada fila do `notification` tem uma DLQ FIFO: `notification-accounts-dlq.fifo` e `notification-transfers-dlq.fifo`. A mensagem vai para lá na 5ª tentativa que falha (`NOTIFICATION_MAX_RECEIVE_COUNT`, visibilidade de 30 s em `NOTIFICATION_VISIBILITY_TIMEOUT_SECONDS`). A métrica `notification.dlq.messages` também mostra a quantidade. Os comandos usam a CLI da AWS da imagem do LocalStack.
+Cada fila do `notification` tem uma DLQ FIFO: `notification-accounts-dlq.fifo` e `notification-transfers-dlq.fifo`. A mensagem vai para lá na 5ª tentativa que falha (`NOTIFICATION_MAX_RECEIVE_COUNT`, visibilidade de 30 s em `NOTIFICATION_VISIBILITY_TIMEOUT_SECONDS`). A métrica `notification.dlq.messages` também mostra a quantidade, lida do SQS a cada 30 s (`NOTIFICATION_DLQ_METRICS_REFRESH_INTERVAL`). Os comandos usam a CLI da AWS da imagem do LocalStack.
 
 Para ver quantas mensagens estão paradas (troque o nome para a DLQ de `transfers`):
 ```bash
