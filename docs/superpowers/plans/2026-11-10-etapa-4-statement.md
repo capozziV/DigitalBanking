@@ -26,7 +26,7 @@
 1. Lançamento que chega antes do `AccountOpened` (ou sem ele): o extrato lista os lançamentos e não devolve `404`. Teste na Task 3 e na Task 4.
 2. `balanceAfter` negativo (conta no cheque especial) volta negativo, sem perder o sinal. Teste na Task 4.
 3. `description` nula: o atributo não é gravado e volta `null`, sem string vazia. Teste na Task 4.
-4. Cursor da última página (`sequence` 1) e cursor maior que a última `sequence`: página vazia com `nextCursor` nulo, sem `404`. Teste na Task 3.
+4. Cursor da última página (`sequence` 1): página vazia com `nextCursor` nulo, sem `404` e sem consulta. Cursor maior que a última `sequence` devolve os lançamentos com `sequence` menor que ele (página vazia só em conta sem lançamentos). Teste na Task 3.
 5. `limit=0`, `limit=101`, `limit=abc` e cursor adulterado → `400 validation-error`, nunca `500`. Teste na Task 6.
 
 ---
@@ -120,7 +120,7 @@ class ConflictingStatementEntryException(val accountId: UUID, val sequence: Long
   - `unknown account without entries is not found` → `AccountNotFoundException`;
   - `known account without entries is an empty page`;
   - `entries without AccountOpened are listed` (Review Focus 1);
-  - `cursor past the last page is an empty page` (Review Focus 4): cursor 1 e cursor 999 dão `entries` vazio, `nextCursor` nulo, sem exceção;
+  - `cursor past the last page is an empty page` (Review Focus 4): cursor 1 dá `entries` vazio e `nextCursor` nulo, sem exceção; cursor 999 numa conta com lançamentos devolve os de `sequence < 999`;
   - `limit outside 1..100 is rejected` (`IllegalArgumentException`).
 
   O `404` só sai sem cursor e com página vazia.
