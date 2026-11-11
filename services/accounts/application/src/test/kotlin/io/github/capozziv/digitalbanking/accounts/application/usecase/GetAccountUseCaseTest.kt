@@ -1,6 +1,8 @@
 package io.github.capozziv.digitalbanking.accounts.application.usecase
 
 import io.github.capozziv.digitalbanking.accounts.application.AccountNotFoundException
+import io.github.capozziv.digitalbanking.accounts.application.fake.CallLog
+import io.github.capozziv.digitalbanking.accounts.application.fake.DirectTransactionRunner
 import io.github.capozziv.digitalbanking.accounts.application.fake.InMemoryAccountRepository
 import io.github.capozziv.digitalbanking.accounts.application.fake.InMemoryAccountTypeRepository
 import io.github.capozziv.digitalbanking.accounts.application.fake.InMemoryLedgerEntryRepository
@@ -32,7 +34,8 @@ class GetAccountUseCaseTest {
                 AccountTypeLimit(AccountType.STANDARD, OverdraftLimit(50000), Instant.parse("2026-10-01T00:00:00Z")),
             ),
         )
-    private val useCase = GetAccountUseCase(accounts, entries, types)
+    private val tx = DirectTransactionRunner()
+    private val useCase = GetAccountUseCase(accounts, entries, types, tx)
 
     private fun entry(
         sequence: Long,
@@ -73,6 +76,24 @@ class GetAccountUseCaseTest {
         assertThat(view).isEqualTo(
             AccountView(account, Balance(-20000), OverdraftLimit(50000), AvailableBalance(30000)),
         )
+    }
+
+    @Test
+    fun `account, balance and overdraft limit are read in one read-only transaction`() {
+        accounts.insert(account, "open-key-1")
+        val log = CallLog()
+        val tracked = GetAccountUseCase(log.accounts(accounts), log.entries(entries), log.types(types), log.transactions(tx))
+
+        tracked.execute(accountId)
+
+        assertThat(log.calls).containsExactly(
+            "begin read-only",
+            "accounts.findById",
+            "entries.findLast",
+            "types.findLimit",
+            "end",
+        )
+        assertThat(tx.transactions).isZero()
     }
 
     @Test

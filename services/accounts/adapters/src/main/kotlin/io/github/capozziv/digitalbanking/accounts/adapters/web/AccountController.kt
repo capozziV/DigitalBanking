@@ -100,7 +100,7 @@ class AccountController(
     ): ResponseEntity<AccountDTO> {
         val key = IdempotencyKeyHeader.require(idempotencyKey)
         val result = openAccount.execute(OpenAccountCommand(checkNotNull(request.customerId), key))
-        val body = AccountDTO.from(getAccount.execute(result.account.id))
+        val body = AccountDTO.from(result.view)
         return if (result.created) {
             ResponseEntity.created(URI.create("/accounts/${body.id}")).body(body)
         } else {
@@ -288,10 +288,7 @@ class AccountController(
     fun changeType(
         @PathVariable id: UUID,
         @Valid @RequestBody request: ChangeAccountTypeDTO,
-    ): AccountDTO {
-        changeAccountType.execute(id, checkNotNull(request.type))
-        return AccountDTO.from(getAccount.execute(id))
-    }
+    ): AccountDTO = AccountDTO.from(changeAccountType.execute(id, checkNotNull(request.type)))
 
     private fun command(
         accountId: UUID,

@@ -5,8 +5,6 @@ import io.github.capozziv.digitalbanking.accounts.domain.Balance
 import io.github.capozziv.digitalbanking.accounts.domain.EntryKind
 import io.github.capozziv.digitalbanking.accounts.domain.LedgerEntry
 import io.github.capozziv.digitalbanking.accounts.domain.Money
-import org.slf4j.LoggerFactory
-import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Repository
@@ -41,33 +39,27 @@ class JdbcLedgerEntryRepository(
     override fun insert(entry: LedgerEntry) {
         // timestamptz keeps microseconds: a finer createdAt would come back different from the entry and its event.
         require(entry.createdAt.nano % 1_000 == 0) { "createdAt must have microsecond precision" }
-        try {
-            jdbcClient
-                .sql(
-                    """
-                    insert into ledger_entry ($COLUMNS)
-                    values (:id, :accountId, :sequence, :kind, :amount, :balanceAfter, :description, :idempotencyKey, :createdAt)
-                    """.trimIndent(),
-                ).param("id", entry.id)
-                .param("accountId", entry.accountId)
-                .param("sequence", entry.sequence)
-                .param("kind", entry.kind.name)
-                .param("amount", entry.amount.cents)
-                .param("balanceAfter", entry.balanceAfter.cents)
-                .param("description", entry.description)
-                .param("idempotencyKey", entry.idempotencyKey)
-                .param("createdAt", OffsetDateTime.ofInstant(entry.createdAt, ZoneOffset.UTC))
-                .update()
-        } catch (e: DuplicateKeyException) {
-            // The account lock should make this impossible: it signals a bug, so it is not handled as a result.
-            log.error("unexpected duplicate ledger entry for account {} (sequence {})", entry.accountId, entry.sequence, e)
-            throw e
-        }
+        // A duplicate sequence or idempotency key propagates as DuplicateKeyException. The account lock should make it
+        // impossible, so it signals a bug: it is not handled as a result, and the API exception handler logs it once.
+        jdbcClient
+            .sql(
+                """
+                insert into ledger_entry ($COLUMNS)
+                values (:id, :accountId, :sequence, :kind, :amount, :balanceAfter, :description, :idempotencyKey, :createdAt)
+                """.trimIndent(),
+            ).param("id", entry.id)
+            .param("accountId", entry.accountId)
+            .param("sequence", entry.sequence)
+            .param("kind", entry.kind.name)
+            .param("amount", entry.amount.cents)
+            .param("balanceAfter", entry.balanceAfter.cents)
+            .param("description", entry.description)
+            .param("idempotencyKey", entry.idempotencyKey)
+            .param("createdAt", OffsetDateTime.ofInstant(entry.createdAt, ZoneOffset.UTC))
+            .update()
     }
 
     private companion object {
-        val log = LoggerFactory.getLogger(JdbcLedgerEntryRepository::class.java)
-
         const val COLUMNS = "id, account_id, sequence, kind, amount, balance_after, description, idempotency_key, created_at"
 
         val ENTRY_ROW_MAPPER =

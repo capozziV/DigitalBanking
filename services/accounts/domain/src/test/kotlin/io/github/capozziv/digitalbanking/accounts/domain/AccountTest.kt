@@ -10,6 +10,7 @@ class AccountTest {
     private val accountId = UUID.fromString("0199a0b0-0000-7000-8000-000000000001")
     private val customerId = UUID.fromString("0199a0b0-0000-7000-8000-000000000002")
     private val entryId = UUID.fromString("0199a0b0-0000-7000-8000-000000000003")
+    private val otherAccountId = UUID.fromString("0199a0b0-0000-7000-8000-0000000000ff")
     private val now = Instant.parse("2026-10-22T12:00:00Z")
     private val account = Account(accountId, customerId, AccountType.FREE)
 
@@ -71,13 +72,19 @@ class AccountTest {
         val result =
             account.debit(lastEntry(sequence = 1, balanceAfter = 1000), OverdraftLimit(500), entryId, Money(1500), "rent", "key-3", now)
 
-        assertThat(result).isInstanceOf(DebitResult.Recorded::class.java)
-        val entry = (result as DebitResult.Recorded).recorded.entry
-        assertThat(entry.kind).isEqualTo(EntryKind.DEBIT)
-        assertThat(entry.amount).isEqualTo(Money(1500))
-        assertThat(entry.sequence).isEqualTo(2)
-        assertThat(entry.balanceAfter).isEqualTo(Balance(-500))
-        assertThat(result.recorded.event).isEqualTo(LedgerEntryRecorded(entry))
+        val entry =
+            LedgerEntry(
+                id = entryId,
+                accountId = accountId,
+                sequence = 2,
+                kind = EntryKind.DEBIT,
+                amount = Money(1500),
+                balanceAfter = Balance(-500),
+                description = "rent",
+                idempotencyKey = "key-3",
+                createdAt = now,
+            )
+        assertThat(result).isEqualTo(DebitResult.Recorded(EntryRecorded(entry, LedgerEntryRecorded(entry))))
     }
 
     @Test
@@ -121,21 +128,17 @@ class AccountTest {
 
     @Test
     fun `credit rejects a last entry from another account`() {
-        val otherAccount = UUID.fromString("0199a0b0-0000-7000-8000-0000000000ff")
-
         assertThatThrownBy {
-            account.credit(lastEntry(sequence = 1, balanceAfter = 0, accountId = otherAccount), entryId, Money(1), null, "key-9", now)
+            account.credit(lastEntry(sequence = 1, balanceAfter = 0, accountId = otherAccountId), entryId, Money(1), null, "key-9", now)
         }.isInstanceOf(IllegalArgumentException::class.java)
             .hasMessage("last entry belongs to another account")
     }
 
     @Test
     fun `debit rejects a last entry from another account`() {
-        val otherAccount = UUID.fromString("0199a0b0-0000-7000-8000-0000000000ff")
-
         assertThatThrownBy {
             account.debit(
-                lastEntry(sequence = 1, balanceAfter = 1000, accountId = otherAccount),
+                lastEntry(sequence = 1, balanceAfter = 1000, accountId = otherAccountId),
                 OverdraftLimit(0),
                 entryId,
                 Money(1),

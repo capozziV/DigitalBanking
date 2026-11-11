@@ -48,7 +48,7 @@ class RecordCreditUseCaseTest {
             amount = Money(1500),
             balanceAfter = Balance(1500),
             description = "salary",
-            idempotencyKey = "credit-key-1",
+            idempotencyKey = CREDIT_KEY,
             createdAt = now,
         )
 
@@ -61,7 +61,7 @@ class RecordCreditUseCaseTest {
 
     @Test
     fun `credit records an entry and appends ledger entry recorded to the outbox`() {
-        val result = useCase.execute(credit(1500, "credit-key-1"))
+        val result = useCase.execute(credit(1500, CREDIT_KEY))
 
         assertThat(result).isEqualTo(RecordEntryResult(firstCredit, created = true))
         assertThat(entries.all()).containsExactly(firstCredit)
@@ -71,7 +71,7 @@ class RecordCreditUseCaseTest {
 
     @Test
     fun `credit continues the sequence and balance of the last entry`() {
-        useCase.execute(credit(1500, "credit-key-1"))
+        useCase.execute(credit(1500, CREDIT_KEY))
 
         val result = useCase.execute(credit(700, "credit-key-2", description = null))
 
@@ -94,9 +94,9 @@ class RecordCreditUseCaseTest {
 
     @Test
     fun `retrying a credit with the same key returns the original entry without a new entry or event`() {
-        useCase.execute(credit(1500, "credit-key-1"))
+        useCase.execute(credit(1500, CREDIT_KEY))
 
-        val retry = useCase.execute(credit(1500, "credit-key-1"))
+        val retry = useCase.execute(credit(1500, CREDIT_KEY))
 
         assertThat(retry).isEqualTo(RecordEntryResult(firstCredit, created = false))
         assertThat(entries.all()).containsExactly(firstCredit)
@@ -105,11 +105,11 @@ class RecordCreditUseCaseTest {
 
     @Test
     fun `reusing a credit key with another amount fails without recording anything`() {
-        useCase.execute(credit(1500, "credit-key-1"))
+        useCase.execute(credit(1500, CREDIT_KEY))
 
-        assertThatThrownBy { useCase.execute(credit(1600, "credit-key-1")) }
+        assertThatThrownBy { useCase.execute(credit(1600, CREDIT_KEY)) }
             .isInstanceOfSatisfying(IdempotencyKeyReusedException::class.java) {
-                assertThat(it.key).isEqualTo("credit-key-1")
+                assertThat(it.key).isEqualTo(CREDIT_KEY)
             }
         assertThat(entries.all()).containsExactly(firstCredit)
         assertThat(outbox.events).containsExactly(LedgerEntryRecorded(firstCredit))
@@ -119,7 +119,7 @@ class RecordCreditUseCaseTest {
     fun `crediting an unknown account fails with account not found`() {
         val unknown = UUID.fromString("0199a0b0-0000-7000-8000-0000000000a9")
 
-        assertThatThrownBy { useCase.execute(credit(1500, "credit-key-1", accountId = unknown)) }
+        assertThatThrownBy { useCase.execute(credit(1500, CREDIT_KEY, accountId = unknown)) }
             .isInstanceOfSatisfying(AccountNotFoundException::class.java) {
                 assertThat(it.accountId).isEqualTo(unknown)
             }
@@ -131,7 +131,7 @@ class RecordCreditUseCaseTest {
     fun `crediting a busy account propagates account busy without recording anything`() {
         accounts.busyAccounts += account.id
 
-        assertThatThrownBy { useCase.execute(credit(1500, "credit-key-1")) }
+        assertThatThrownBy { useCase.execute(credit(1500, CREDIT_KEY)) }
             .isInstanceOfSatisfying(AccountBusyException::class.java) {
                 assertThat(it.accountId).isEqualTo(account.id)
             }
@@ -152,7 +152,7 @@ class RecordCreditUseCaseTest {
                 Clock.fixed(now, ZoneOffset.UTC),
             )
 
-        tracked.execute(credit(1500, "credit-key-1"))
+        tracked.execute(credit(1500, CREDIT_KEY))
 
         assertThat(log.calls).containsExactly(
             "begin",
@@ -163,5 +163,9 @@ class RecordCreditUseCaseTest {
             "outbox.append",
             "end",
         )
+    }
+
+    private companion object {
+        const val CREDIT_KEY = "credit-key-1"
     }
 }
