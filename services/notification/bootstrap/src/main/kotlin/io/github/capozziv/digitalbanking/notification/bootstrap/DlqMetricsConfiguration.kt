@@ -8,7 +8,6 @@ import org.slf4j.LoggerFactory
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.scheduling.annotation.EnableScheduling
 import org.springframework.scheduling.annotation.Scheduled
 import software.amazon.awssdk.services.sqs.SqsAsyncClient
 import software.amazon.awssdk.services.sqs.model.QueueAttributeName
@@ -21,7 +20,6 @@ import java.util.concurrent.TimeUnit
  */
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(QueueProperties::class)
-@EnableScheduling
 class DlqMetricsConfiguration {
     @Bean
     fun dlqDepthMonitor(

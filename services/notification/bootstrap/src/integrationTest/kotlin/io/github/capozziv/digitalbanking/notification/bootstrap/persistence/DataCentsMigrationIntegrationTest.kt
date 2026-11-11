@@ -34,11 +34,14 @@ class DataCentsMigrationIntegrationTest {
         val typeChanged = insert("""{"accountType":"GOLD","overdraftLimitCents":"200000"}""")
         val welcome = insert("""{"accountId":"a-1","accountType":"FREE"}""")
 
+        val alreadyNumber = insert("""{"transferId":"t-2","amountCents":500}""")
+
         flyway("latest").migrate()
 
         // jsonb prints shorter keys first.
         assertThat(data(transfer)).isEqualTo("""{"transferId": "t-1", "amountCents": 12345}""")
         assertThat(data(typeChanged)).isEqualTo("""{"accountType": "GOLD", "overdraftLimitCents": 200000}""")
+        assertThat(data(alreadyNumber)).isEqualTo("""{"transferId": "t-2", "amountCents": 500}""")
         assertThat(data(welcome)).isEqualTo("""{"accountId": "a-1", "accountType": "FREE"}""")
     }
 

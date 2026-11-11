@@ -5,11 +5,11 @@ import io.awspring.cloud.autoconfigure.core.CredentialsProviderAutoConfiguration
 import io.awspring.cloud.autoconfigure.core.RegionProviderAutoConfiguration
 import io.awspring.cloud.autoconfigure.sqs.SqsAutoConfiguration
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
 import org.springframework.boot.autoconfigure.AutoConfigurations
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
+import org.springframework.core.env.StandardEnvironment
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
@@ -23,6 +23,8 @@ import java.net.URI
 class AwsClientConfigurationTest {
     private val runner =
         ApplicationContextRunner()
+            // Without the system environment, a shell with infra/local/.env loaded cannot change the application.yml defaults.
+            .withInitializer { it.environment.propertySources.remove(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME) }
             .withInitializer(ConfigDataApplicationContextInitializer())
             .withUserConfiguration(AwsCredentialsConfiguration::class.java)
             .withConfiguration(
@@ -36,9 +38,6 @@ class AwsClientConfigurationTest {
 
     @Test
     fun `without NOTIFICATION_AWS_ENDPOINT the client targets the real AWS with the default credential chain`() {
-        // A shell with infra/local/.env loaded defines it; the default of application.yml is what is under test.
-        assumeTrue(System.getenv("NOTIFICATION_AWS_ENDPOINT") == null, "NOTIFICATION_AWS_ENDPOINT defined in the environment")
-
         runner.run { context ->
             assertThat(context.getBean(SqsAsyncClient::class.java).serviceClientConfiguration().endpointOverride()).isEmpty
             assertThat(context.getBean(AwsCredentialsProvider::class.java)).isInstanceOf(DefaultCredentialsProvider::class.java)
