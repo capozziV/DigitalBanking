@@ -19,20 +19,9 @@ class ArchitectureTest {
             .withImportOption(ImportOption.DoNotIncludeTests())
             .importPackages(STATEMENT_PACKAGE)
 
-    /**
-     * The web adapter (controller and DTOs) arrives in Task 6 of stage 4. Until then these rules match no classes,
-     * and a rule over no classes fails by design. Task 6 empties this set.
-     */
-    private val rulesWaitingForTheWebAdapter =
-        setOf(
-            ServiceArchitectureRules.webDoesNotUsePersistence(STATEMENT_PACKAGE).description,
-            ServiceArchitectureRules.controllersEndWithController(STATEMENT_PACKAGE).description,
-            ServiceArchitectureRules.webBodiesEndWithDto(STATEMENT_PACKAGE).description,
-        )
-
     @TestFactory
     fun `statement respects the shared service rules`(): List<DynamicTest> =
-        ServiceArchitectureRules.all(STATEMENT_PACKAGE).filterNot { it.description in rulesWaitingForTheWebAdapter }.map { rule ->
+        ServiceArchitectureRules.all(STATEMENT_PACKAGE).map { rule ->
             DynamicTest.dynamicTest(rule.description) { rule.check(classes) }
         }
 
