@@ -7,7 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties = [
-        // These properties replace the base class's, so the queue listeners are stopped here too.
+        // Only the web tests stop the queue listeners; the base class's @TestPropertySource still applies.
         "spring.cloud.aws.sqs.listener.auto-startup=false",
     ],
 )
