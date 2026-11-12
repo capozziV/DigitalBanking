@@ -107,12 +107,12 @@ set -a; . infra/local/.env; set +a
 O `statement` sobe na porta 8084. A tabela DynamoDB `statement` (chave `accountId` texto + `sequence` numérica, cobrança `PAY_PER_REQUEST`) e as filas são criadas pelo `infra/local/localstack/init/ready.d/04-statement.sh`, não pelo serviço. O nginx expõe `GET /accounts/{id}/statement` e `/statement/actuator/`. Use um quinto terminal para os passos seguintes.
 
 ## 5. Conferir a API pelo nginx
-Primeiro o health, que deve responder `"status":"UP"`; depois o smoke, que abre uma conta, credita 1000, debita 300, confere o saldo 700, lê os eventos da conta na fila de inspeção e, com os três serviços no ar, confere as notificações de uma transferência:
+Primeiro o health, que deve responder `"status":"UP"`; depois o smoke, que abre uma conta, credita 1000, debita 300, confere o saldo 700, lê os eventos da conta na fila de inspeção e, com os quatro serviços no ar, confere as notificações de uma transferência e o extrato da primeira conta:
 ```bash
 curl http://localhost/accounts/actuator/health
 infra/local/smoke.sh http://localhost
 ```
-O smoke é o mesmo que roda no CI. Na parte do `accounts`, ele imprime `OK: eventos de <id> na fila accounts-events-inspection.fifo: AccountOpened LedgerEntryRecorded:1 LedgerEntryRecorded:2`; a parte do `transfers` termina em `OK: eventos de <transferId> na fila transfers-events-inspection.fifo: TransferCompleted`. As duas últimas linhas são as do `notification`: o smoke espera até 45 s (45 tentativas de 1 s, acima da visibilidade de 30 s da fila: o evento da transferência pode chegar antes do da conta e voltar à fila só depois de 30 s) e confere `TRANSFER_SENT` para o cliente da origem e `TRANSFER_RECEIVED` para o da conta de destino, lendo `GET /notifications?customerId=` pelo nginx (`OK: cliente <id> recebeu TRANSFER_SENT` e `OK: cliente <id> recebeu TRANSFER_RECEIVED`). Ele apaga da fila só as mensagens da conta que criou; as de outras contas ficam escondidas por 2 minutos depois do smoke. Como a fila não tem consumidor, ela acumula: se o smoke não achar os próprios eventos, recrie o ambiente com `down -v`. A mesma sequência à mão:
+O smoke é o mesmo que roda no CI. Na parte do `accounts`, ele imprime `OK: eventos de <id> na fila accounts-events-inspection.fifo: AccountOpened LedgerEntryRecorded:1 LedgerEntryRecorded:2`; a parte do `transfers` termina em `OK: eventos de <transferId> na fila transfers-events-inspection.fifo: TransferCompleted`. As duas últimas linhas são as do `notification`: o smoke espera até 45 s (45 tentativas de 1 s, acima da visibilidade de 30 s da fila: o evento da transferência pode chegar antes do da conta e voltar à fila só depois de 30 s) e confere `TRANSFER_SENT` para o cliente da origem e `TRANSFER_RECEIVED` para o da conta de destino, lendo `GET /notifications?customerId=` pelo nginx (`OK: cliente <id> recebeu TRANSFER_SENT` e `OK: cliente <id> recebeu TRANSFER_RECEIVED`). A última linha é a do `statement`: o smoke espera até 30 s e confere, em `GET /accounts/<id>/statement` pelo nginx, os dois lançamentos da primeira conta, do mais novo para o mais antigo (`OK: extrato da conta <id>: 2:DEBIT:300:700 1:CREDIT:1000:1000`, no formato `sequence:kind:amount:balanceAfter`). Ele apaga da fila só as mensagens da conta que criou; as de outras contas ficam escondidas por 2 minutos depois do smoke. Como a fila não tem consumidor, ela acumula: se o smoke não achar os próprios eventos, recrie o ambiente com `down -v`. A mesma sequência à mão:
 ```bash
 ACCOUNT_ID=$(curl -sS -X POST http://localhost/accounts \
   -H 'Content-Type: application/json' -H "Idempotency-Key: $(uuidgen)" \
@@ -182,7 +182,12 @@ docker compose -f infra/local/docker-compose.yml exec -T \
 O consumo é idempotente (`processed_events`), então devolver uma mensagem já processada não duplica a notificação.
 
 ### DLQ do statement
-A fila `statement-accounts.fifo` tem a DLQ FIFO `statement-accounts-dlq.fifo`. A mensagem vai para lá na 5ª tentativa que falha (`STATEMENT_MAX_RECEIVE_COUNT`, visibilidade de 30 s em `STATEMENT_VISIBILITY_TIMEOUT_SECONDS`, ambos lidos pelo compose; veja o `.env.example`). Para ver quantas estão paradas:
+A fila `statement-accounts.fifo` tem a DLQ FIFO `statement-accounts-dlq.fifo`. A mensagem vai para lá na 5ª tentativa que falha (`STATEMENT_MAX_RECEIVE_COUNT`, visibilidade de 30 s em `STATEMENT_VISIBILITY_TIMEOUT_SECONDS`, ambos lidos pelo compose; veja o `.env.example`). A métrica `statement.dlq.messages` também mostra a quantidade (o valor é relido do SQS a cada 30 s, `STATEMENT_DLQ_METRICS_REFRESH`); consulte pelo actuator, direto no serviço ou pelo nginx:
+```bash
+curl http://localhost:8084/actuator/metrics/statement.dlq.messages
+curl http://localhost/statement/actuator/metrics/statement.dlq.messages
+```
+A resposta traz `"measurements":[{"statistic":"VALUE","value":0.0}]` com a DLQ vazia. Para ver as mensagens paradas pela CLI da AWS:
 ```bash
 docker compose -f infra/local/docker-compose.yml exec -T \
   -e AWS_ACCESS_KEY_ID=test -e AWS_SECRET_ACCESS_KEY=test -e AWS_DEFAULT_REGION=us-east-1 \
@@ -218,6 +223,14 @@ A coleção `api/bruno/notification/` também roda sozinha: o script da requisi�
 - **Terminal:**
   ```bash
   (cd api/bruno/notification && bru run --env local)
+  ```
+  Esperado: `Requests 5 (5 Passed)`.
+
+### Coleção do `statement`
+A coleção `api/bruno/statement/` também roda sozinha: o script da requisição `01` abre uma conta, faz três créditos (1000, 2000 e 3000) e espera até 30 s pelo extrato ter os três lançamentos. As requisições seguem a ordem: `01` lê o extrato (sequences 3, 2 e 1, saldos 6000, 3000 e 1000), `02` pede a primeira página com `limit=2` e guarda o `nextCursor`, `03` segue o cursor até o último lançamento, `04` mostra o `404` de uma conta desconhecida e `05` o `400` de um `limit` fora de 1 a 100. Precisa do `accounts` e do `statement` no ar.
+- **Terminal:**
+  ```bash
+  (cd api/bruno/statement && bru run --env local)
   ```
   Esperado: `Requests 5 (5 Passed)`.
 
