@@ -4,8 +4,8 @@
 
 **Última atualização:** 2026-11-12
 **Board:** [Digital Banking no GitHub Projects](https://github.com/users/capozziV/projects/2)
-**Fase atual:** etapa 4 (`statement`) implementada e revisada na branch `etapa-4-statement` (Tasks 1–8 e revisão final da branch); últimos ajustes da revisão final em andamento antes do PR.
-**Próximo passo:** PR da etapa 4, CI e merge; depois, etapa 5 (cache do extrato), começando pelo brainstorming.
+**Fase atual:** etapa 4 (`statement`) implementada e revisada; PR #139 aberto, aguardando CI e merge.
+**Próximo passo:** merge do PR #139; depois, etapa 5 (cache do extrato), começando pelo brainstorming.
 
 ## Como usar o board
 - Colunas: **Backlog** (pendência sem resposta, ou etapa anterior fora de Done), **Ready** (sem pendência e etapa anterior em Done), **In progress**, **In review** (revisão da Beatriz) e **Done** (revisado, build, testes e lint verdes, merge feito).
