@@ -20,5 +20,6 @@ class DailyLimitConfiguration {
         transactions: TransactionTemplate,
         properties: DailyLimitProperties,
         meterRegistry: MeterRegistry,
-    ): DailyLimitGateway = RedisDailyLimitGateway(redis, DailyLimitScripts(), JdbcDailyLimitStore(jdbc), transactions, properties, meterRegistry)
+    ): DailyLimitGateway =
+        RedisDailyLimitGateway(redis, DailyLimitScripts(), JdbcDailyLimitStore(jdbc), transactions, properties, meterRegistry)
 }

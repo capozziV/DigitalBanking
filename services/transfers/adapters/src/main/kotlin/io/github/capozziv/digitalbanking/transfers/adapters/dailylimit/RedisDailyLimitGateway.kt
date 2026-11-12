@@ -102,7 +102,13 @@ class RedisDailyLimitGateway(
             try {
                 reserveInRedis(transferId, accountId, day, amount, epoch)
             } catch (e: RedisUnavailableException) {
-                log.warn("daily limit of transfer {} falls back to postgres (account {}, day {}): {}", transferId, accountId, day, e.message)
+                log.warn(
+                    "daily limit of transfer {} falls back to postgres (account {}, day {}): {}",
+                    transferId,
+                    accountId,
+                    day,
+                    e.message,
+                )
                 return reserveInPostgres(transferId, accountId, day, amount)
             }
         if (!reserved) return Outcome.EXCEEDED
@@ -123,7 +129,14 @@ class RedisDailyLimitGateway(
             rebuildIfStale(key, accountId, day, epoch)
             val answer =
                 redisCall {
-                    redis.execute(scripts.reserve, listOf(key), transferId.toString(), amount.cents.toString(), limit.cents.toString(), ttlSeconds)
+                    redis.execute(
+                        scripts.reserve,
+                        listOf(key),
+                        transferId.toString(),
+                        amount.cents.toString(),
+                        limit.cents.toString(),
+                        ttlSeconds,
+                    )
                 }
             when (answer) {
                 LUA_RESERVED -> return true
