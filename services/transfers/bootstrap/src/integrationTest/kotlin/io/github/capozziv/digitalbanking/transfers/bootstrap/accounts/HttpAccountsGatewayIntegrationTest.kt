@@ -281,6 +281,7 @@ class HttpAccountsGatewayIntegrationTest {
                             )
                             out.flush()
                             repeat(10) {
+                                // Simulates a peer that trickles the body slowly, so the gateway's read timeout fires.
                                 Thread.sleep(1_000)
                                 out.write(' '.code)
                                 out.flush()
