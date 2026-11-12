@@ -27,7 +27,7 @@ class RedisStatementFirstPageCache(
             try {
                 redis.opsForValue().get(key(accountId))
             } catch (e: RuntimeException) {
-                failed("get", accountId, e)
+                failed("get", accountId, e) { countRequest("error") }
                 return null
             }
         if (json == null) {
@@ -49,8 +49,9 @@ class RedisStatementFirstPageCache(
     ) {
         try {
             redis.opsForValue().set(key(accountId), mapper.writeValueAsString(CachedStatementPage.from(page)), nextTtl())
+            countWrite("ok")
         } catch (e: RuntimeException) {
-            failed("put", accountId, e)
+            failed("put", accountId, e) { countWrite("error") }
         }
     }
 
@@ -59,8 +60,7 @@ class RedisStatementFirstPageCache(
             redis.delete(key(accountId))
             meterRegistry.counter(EVICTIONS, RESULT, "ok").increment()
         } catch (e: RuntimeException) {
-            log.warn("statement cache {} failed for account {}: {}", "evict", accountId, e.message)
-            meterRegistry.counter(EVICTIONS, RESULT, "error").increment()
+            failed("evict", accountId, e) { meterRegistry.counter(EVICTIONS, RESULT, "error").increment() }
         }
     }
 
@@ -75,10 +75,13 @@ class RedisStatementFirstPageCache(
         operation: String,
         accountId: UUID,
         e: RuntimeException,
+        count: () -> Unit,
     ) {
         log.warn("statement cache {} failed for account {}: {}", operation, accountId, e.message)
-        countRequest("error")
+        count()
     }
+
+    private fun countWrite(result: String) = meterRegistry.counter(WRITES, RESULT, result).increment()
 
     private fun countRequest(result: String) = meterRegistry.counter(REQUESTS, RESULT, result).increment()
 
@@ -87,6 +90,7 @@ class RedisStatementFirstPageCache(
     private companion object {
         const val KEY_PREFIX = "statement:first-page:v1:"
         const val REQUESTS = "statement.cache.requests"
+        const val WRITES = "statement.cache.writes"
         const val EVICTIONS = "statement.cache.evictions"
         const val RESULT = "result"
         val log = LoggerFactory.getLogger(RedisStatementFirstPageCache::class.java)

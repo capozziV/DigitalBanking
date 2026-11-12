@@ -103,6 +103,7 @@ class RedisStatementFirstPageCacheIntegrationTest : StatementIntegrationTest() {
         val accountId = UUID.randomUUID()
         val misses = counter("statement.cache.requests", "miss")
         val hits = counter("statement.cache.requests", "hit")
+        val writes = counter("statement.cache.writes", "ok")
 
         assertThat(cache.get(accountId)).isNull()
         cache.put(accountId, StatementPage(emptyList(), null))
@@ -110,6 +111,7 @@ class RedisStatementFirstPageCacheIntegrationTest : StatementIntegrationTest() {
 
         assertThat(counter("statement.cache.requests", "miss")).isEqualTo(misses + 1)
         assertThat(counter("statement.cache.requests", "hit")).isEqualTo(hits + 1)
+        assertThat(counter("statement.cache.writes", "ok")).isEqualTo(writes + 1)
     }
 
     @Test
@@ -132,6 +134,7 @@ class RedisStatementFirstPageCacheIntegrationTest : StatementIntegrationTest() {
         // Warm the connection, so the paused read exercises the command timeout and not the first connect.
         cache.put(accountId, page)
         val requestErrors = counter("statement.cache.requests", "error")
+        val writeErrors = counter("statement.cache.writes", "error")
         val evictionErrors = counter("statement.cache.evictions", "error")
 
         redis.dockerClient.pauseContainerCmd(redis.containerId).exec()
@@ -147,8 +150,9 @@ class RedisStatementFirstPageCacheIntegrationTest : StatementIntegrationTest() {
             redis.dockerClient.unpauseContainerCmd(redis.containerId).exec()
         }
 
-        // One for the get and one for the put.
-        assertThat(counter("statement.cache.requests", "error")).isEqualTo(requestErrors + 2)
+        // Reads and writes are counted apart: the get is a request error, the put a write error.
+        assertThat(counter("statement.cache.requests", "error")).isEqualTo(requestErrors + 1)
+        assertThat(counter("statement.cache.writes", "error")).isEqualTo(writeErrors + 1)
         assertThat(counter("statement.cache.evictions", "error")).isEqualTo(evictionErrors + 1)
     }
 }
