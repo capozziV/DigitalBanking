@@ -98,16 +98,15 @@ class JdbcRepositoriesIntegrationTest : AccountsIntegrationTest() {
 
     @Test
     fun `findLimit and updateLimit throw when the type row is missing`() {
-        assertThatThrownBy {
-            tx.inTransaction {
-                appJdbc.sql("update account_type set type = 'GONE' where type = 'DIAMOND'").update()
-
-                assertThatThrownBy { types.findLimit(AccountType.DIAMOND) }.isInstanceOf(IllegalStateException::class.java)
-                assertThatThrownBy { types.updateLimit(AccountType.DIAMOND, OverdraftLimit(1), now) }
-                    .isInstanceOf(IllegalStateException::class.java)
-                throw RollbackSignal()
-            }
-        }.isInstanceOf(RollbackSignal::class.java)
+        // The application user cannot rename a type (column grant), so the owner removes the row for the test.
+        ownerJdbc.sql("update account_type set type = 'GONE' where type = 'DIAMOND'").update()
+        try {
+            assertThatThrownBy { types.findLimit(AccountType.DIAMOND) }.isInstanceOf(IllegalStateException::class.java)
+            assertThatThrownBy { tx.inTransaction { types.updateLimit(AccountType.DIAMOND, OverdraftLimit(1), now) } }
+                .isInstanceOf(IllegalStateException::class.java)
+        } finally {
+            ownerJdbc.sql("update account_type set type = 'DIAMOND' where type = 'GONE'").update()
+        }
 
         assertThat(types.findLimit(AccountType.DIAMOND)).isEqualTo(OverdraftLimit(5_000_000))
     }

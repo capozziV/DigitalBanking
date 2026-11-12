@@ -48,10 +48,11 @@ class StatementConsumptionIntegrationTest : StatementIntegrationTest() {
         // Each send has its own deduplication ID, so SQS delivers all 20: the redelivery after a lost ack.
         repeat(20) { send(accountId, body) }
 
-        await { output.out.lines().count { it.contains("entry $accountId/1 ") } == 20 }
+        // SQS is at-least-once, so one of the 20 messages may arrive twice: only a lower bound is stable.
+        await { output.out.lines().count { it.contains("entry $accountId/1 ") } >= 20 }
         awaitEmpty()
         assertThat(output.out.lines().count { it.contains("entry $accountId/1 recorded") }).isEqualTo(1)
-        assertThat(output.out.lines().count { it.contains("entry $accountId/1 already recorded") }).isEqualTo(19)
+        assertThat(output.out.lines().count { it.contains("entry $accountId/1 already recorded") }).isGreaterThanOrEqualTo(19)
         assertThat(repository.findPage(accountId, null, 10).entries).hasSize(1)
         assertThat(visibleMessages(ACCOUNTS_DLQ)).isEqualTo(dlqAtStart)
     }

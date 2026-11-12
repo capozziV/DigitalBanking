@@ -1,8 +1,9 @@
 package io.github.capozziv.digitalbanking.transfers.bootstrap.saga
 
+import org.awaitility.Awaitility
+import org.awaitility.core.ConditionTimeoutException
 import org.springframework.jdbc.core.simple.JdbcClient
 import java.time.Duration
-import java.time.Instant
 import java.util.UUID
 
 /** Polls the transfer row until it reaches [status]; fails with the last status seen after [timeout]. */
@@ -11,14 +12,19 @@ internal fun JdbcClient.awaitStatus(
     status: String,
     timeout: Duration = Duration.ofSeconds(20),
 ) {
-    val deadline = Instant.now().plus(timeout)
     var current: String? = null
-    while (Instant.now().isBefore(deadline)) {
-        current = statusOf(transferId)
-        if (current == status) return
-        Thread.sleep(50)
+    try {
+        Awaitility
+            .await()
+            .atMost(timeout)
+            .pollInterval(Duration.ofMillis(50))
+            .until {
+                current = statusOf(transferId)
+                current == status
+            }
+    } catch (e: ConditionTimeoutException) {
+        error("transfer $transferId still $current after $timeout, expected $status")
     }
-    error("transfer $transferId still $current after $timeout, expected $status")
 }
 
 internal fun JdbcClient.statusOf(transferId: UUID): String? =
