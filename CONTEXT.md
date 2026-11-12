@@ -106,7 +106,7 @@ O valor chegou a sair da origem, não pôde chegar ao destino e voltou para a or
 _Código_: `TransferStatus.COMPENSATED`
 
 **Passo da saga**:
-Etapa da saga de transferência em andamento (débito, crédito, consulta, compensação) ou terminal; define o status da transferência.
+Etapa da saga de transferência em andamento (reserva de limite, débito, crédito, consulta, compensação) ou terminal; define o status da transferência.
 _Código_: `TransferStep`
 _Evite_: estágio, fase
 
@@ -115,7 +115,7 @@ Valor máximo que uma conta pode transferir num mesmo dia.
 _Código_: `DailyLimit`
 
 **Reserva de limite**:
-Parte do limite diário separada para uma transferência em andamento; consumida quando ela conclui e liberada na compensação.
+Parte do limite diário separada para uma transferência em andamento; consumida quando ela conclui e liberada quando ela falha ou é compensada.
 _Código_: `LimitReservation`
 _Evite_: bloqueio, hold
 
