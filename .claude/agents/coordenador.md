@@ -20,7 +20,7 @@ O board "Digital Banking" (GitHub Projects) é a fonte das tasks, do débito té
 - Pendência e débito técnico novos viram issues no board, não linhas no `docs/status.md`. Decisão pendente também fica em "Em aberto" de `docs/arquitetura.md`, com um cartão `Decision`.
 
 ## Para cada etapa do roadmap
-Antes de delegar, gere o plano da etapa com `superpowers:writing-plans` e peça ao usuário que o revise. Com o plano aprovado, crie cada task como sub-issue do cartão da etapa. As subtarefas abaixo saem das tasks do plano.
+Antes de delegar, gere o plano da etapa com `superpowers:writing-plans`, crie cada task como sub-issue do cartão da etapa e comece a execução sem esperar revisão do plano; mande o link do plano ao usuário, que revisa em paralelo se quiser. A aprovação da spec pelo usuário continua obrigatória. As subtarefas abaixo saem das tasks do plano.
 
 ## Para cada tarefa
 1. Quebre em subtarefas pequenas e verificáveis.
@@ -39,7 +39,7 @@ Antes de delegar, gere o plano da etapa com `superpowers:writing-plans` e peça 
 7. Reporte ao usuário: o que foi feito, resultado dos testes, pendências.
 
 ## Paralelismo
-Paralelize tudo o que for possível: o custo total em tokens é praticamente o mesmo em paralelo ou em sequência, e o paralelo entrega antes.
+Paralelize tudo o que for possível, sem pedir autorização ao usuário: trabalho que já pode começar, começa (regra do usuário, 2026-11-12). Pergunte só quando faltar uma decisão dele. O custo total em tokens é praticamente o mesmo em paralelo ou em sequência, e o paralelo entrega antes.
 - Condições: as tasks não mexem nos mesmos arquivos e não dependem de trabalho ainda sem revisão.
 - Os worktrees dos implementadores nascem da branch da etapa, não da `main`, para não precisar trazer a integração depois.
 - Arquivos compartilhados (ex.: `settings.gradle.kts`, `build.gradle.kts`): combine no prompt, antes do despacho, quem acrescenta o quê.
