@@ -1,6 +1,7 @@
 package io.github.capozziv.digitalbanking.e2e
 
 import io.github.capozziv.digitalbanking.testing.localstack.LocalStackTestSupport
+import org.testcontainers.containers.GenericContainer
 import org.testcontainers.localstack.LocalStackContainer
 import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.MountableFile
@@ -16,7 +17,7 @@ import java.time.Duration
 import java.time.Instant
 
 /**
- * Everything the end-to-end tests run against, as in the local environment: one PostgreSQL with the `accounts`,
+ * Everything the end-to-end tests run against, as in the local environment: one Redis (the `statement` first-page cache), one PostgreSQL with the `accounts`,
  * `transfers` and `notification` databases and their owner/app users (created by the compose init script itself),
  * LocalStack with the topics, inspection queues, notification queues and statement queue and table of the compose init scripts, the four services
  * as `java -jar` processes, and [AccountsProxy] between `transfers` and `accounts`.
@@ -32,6 +33,7 @@ class EndToEndEnvironment : AutoCloseable {
                     withCopyFileToContainer(MountableFile.forHostPath(script, EXECUTABLE), "/docker-entrypoint-initdb.d/${script.fileName}")
                 }
             }
+    private val redis: GenericContainer<*> = GenericContainer<Nothing>(REDIS_IMAGE).withExposedPorts(REDIS_PORT)
     private lateinit var localStack: LocalStackContainer
     private lateinit var sqs: SqsClient
 
@@ -78,6 +80,7 @@ class EndToEndEnvironment : AutoCloseable {
         localStack.start()
         awaitLocalStackInit()
         postgres.start()
+        redis.start()
 
         sqs = LocalStackTestSupport.sqsClient(localStack)
         transferEvents = TransferEventsQueue(sqs, sqs.getQueueUrl { it.queueName(TRANSFERS_INSPECTION_QUEUE) }.queueUrl())
@@ -117,6 +120,7 @@ class EndToEndEnvironment : AutoCloseable {
         if (::sqs.isInitialized) sqs.close()
         if (::localStack.isInitialized) localStack.stop()
         postgres.stop()
+        redis.stop()
     }
 
     private fun accountsEnvironment() =
@@ -159,6 +163,8 @@ class EndToEndEnvironment : AutoCloseable {
         mapOf(
             "STATEMENT_AWS_ENDPOINT" to localStack.endpoint.toString(),
             "STATEMENT_AWS_REGION" to localStack.region,
+            "STATEMENT_REDIS_HOST" to redis.host,
+            "STATEMENT_REDIS_PORT" to redis.getMappedPort(REDIS_PORT).toString(),
         )
 
     private fun jdbcUrl(database: String) = "jdbc:postgresql://${postgres.host}:${postgres.getMappedPort(POSTGRES_PORT)}/$database"
@@ -223,6 +229,8 @@ class EndToEndEnvironment : AutoCloseable {
 
         private const val POSTGRES_IMAGE = "postgres:17-alpine"
         private const val POSTGRES_PORT = 5432
+        private const val REDIS_IMAGE = "redis:7-alpine"
+        private const val REDIS_PORT = 6379
         private const val TRANSFERS_INSPECTION_QUEUE = "transfers-events-inspection.fifo"
         private const val EXECUTABLE = 0b111_101_101
         private val LOCALSTACK_INIT_TIMEOUT: Duration = Duration.ofSeconds(60)

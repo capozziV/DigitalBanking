@@ -277,7 +277,7 @@ jobs:
         if: always()
         run: docker compose --env-file infra/local/.env.example -f infra/local/docker-compose.yml down -v
 
-  # Testes ponta a ponta da saga: accounts, transfers, notification e statement como processos (java -jar), PostgreSQL e LocalStack por
+  # Testes ponta a ponta da saga: accounts, transfers, notification e statement como processos (java -jar), PostgreSQL, Redis e LocalStack por
   # Testcontainers. Roda quando muda qualquer servico, o proprio e2e ou o que afeta todos (`shared`).
   e2e:
     needs: changes
