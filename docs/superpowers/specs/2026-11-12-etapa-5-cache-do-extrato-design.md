@@ -65,6 +65,7 @@ A primeira página do extrato é a consulta mais comum, e o cache tira essa leit
 ## 4. Observabilidade
 - Contador `statement.cache.requests`, com a tag `result` = `hit`, `miss` ou `error`.
 - Contador `statement.cache.evictions`, com a tag `result` = `ok` ou `error`.
+- Contador `statement.cache.writes`, com a tag `result` = `ok` ou `error`, para o `put`. O `statement.cache.requests` conta só leituras, para a taxa de acerto não se misturar com falhas de escrita (decisão da coordenadora na revisão da Task 2).
 - Os logs de WARN levam o correlation ID do MDC, como o resto do serviço.
 
 ## 5. Configuração
