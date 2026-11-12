@@ -98,13 +98,13 @@ set -a; . infra/local/.env; set +a
 ```
 O `notification` sobe na porta 8083 e aplica as próprias migrations; o nginx o expõe em `/notifications`.
 
-O `statement` consome os eventos do `accounts` e roda num quarto terminal, com o mesmo `.env` carregado. Não usa PostgreSQL: grava no DynamoDB do LocalStack. Ele lê `STATEMENT_AWS_ENDPOINT` (no `.env.example`: `http://localhost:4566`; vazio usa o endpoint real da AWS) e, se definidas, `STATEMENT_AWS_REGION` (padrão `us-east-1`), `STATEMENT_TABLE` (padrão `statement`), `STATEMENT_ACCOUNTS_QUEUE` (padrão `statement-accounts.fifo`), `STATEMENT_ACCOUNTS_DLQ` (padrão `statement-accounts-dlq.fifo`) e `STATEMENT_DLQ_METRICS_REFRESH` (padrão `30s`):
+O `statement` consome os eventos do `accounts` e roda num quarto terminal, com o mesmo `.env` carregado. Não usa PostgreSQL: grava no DynamoDB do LocalStack. Ele lê `STATEMENT_AWS_ENDPOINT` (no `.env.example`: `http://localhost:4566`; vazio usa o endpoint real da AWS) e, se definidas, `STATEMENT_AWS_REGION` (padrão `us-east-1`), `STATEMENT_TABLE` (padrão `statement`), `STATEMENT_ACCOUNTS_QUEUE` (padrão `statement-accounts.fifo`), `STATEMENT_ACCOUNTS_DLQ` (padrão `statement-accounts-dlq.fifo`), `STATEMENT_DLQ_METRICS_REFRESH` (padrão `30s`), `STATEMENT_REDIS_HOST` (padrão `localhost`), `STATEMENT_REDIS_PORT` (padrão `6379`) e `STATEMENT_CACHE_TIMEOUT` (padrão `100ms`, tempo de conexão e de comando ao Redis):
 ```bash
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 set -a; . infra/local/.env; set +a
 ./gradlew :services:statement:bootstrap:bootRun
 ```
-O `statement` sobe na porta 8084. A tabela DynamoDB `statement` (chave `accountId` texto + `sequence` numérica, cobrança `PAY_PER_REQUEST`) e as filas são criadas pelo `infra/local/localstack/init/ready.d/04-statement.sh`, não pelo serviço. O nginx expõe `GET /accounts/{id}/statement` e `/statement/actuator/`. Use um quinto terminal para os passos seguintes.
+O `statement` guarda no Redis do compose a primeira página do extrato (20 lançamentos, sem cursor) por cerca de 60 s; com o Redis fora, ele lê do DynamoDB. O `statement` sobe na porta 8084. A tabela DynamoDB `statement` (chave `accountId` texto + `sequence` numérica, cobrança `PAY_PER_REQUEST`) e as filas são criadas pelo `infra/local/localstack/init/ready.d/04-statement.sh`, não pelo serviço. O nginx expõe `GET /accounts/{id}/statement` e `/statement/actuator/`. Use um quinto terminal para os passos seguintes.
 
 ## 5. Conferir a API pelo nginx
 Primeiro o health, que deve responder `"status":"UP"`; depois o smoke, que abre uma conta, credita 1000, debita 300, confere o saldo 700, lê os eventos da conta na fila de inspeção e, com os quatro serviços no ar, confere as notificações de uma transferência e o extrato da primeira conta:
@@ -180,6 +180,17 @@ docker compose -f infra/local/docker-compose.yml exec -T \
   --source-arn <arn da DLQ> --destination-arn <arn da fila>
 ```
 O consumo é idempotente (`processed_events`), então devolver uma mensagem já processada não duplica a notificação.
+
+### Cache do extrato
+A primeira página do extrato fica no Redis na chave `statement:first-page:v1:{accountId}`, com TTL de 50 a 70 s, e o consumo de um lançamento da conta apaga a chave. Para ver o que está guardado:
+```bash
+docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml exec redis redis-cli --scan --pattern 'statement:first-page:v1:*'
+```
+As métricas do cache saem pelo actuator, direto no serviço ou pelo nginx (`statement.cache.requests` com a tag `result` = `hit`, `miss` ou `error`; `statement.cache.evictions` com `result` = `ok` ou `error`):
+```bash
+curl http://localhost:8084/actuator/metrics/statement.cache.requests
+curl http://localhost/statement/actuator/metrics/statement.cache.evictions
+```
 
 ### DLQ do statement
 A fila `statement-accounts.fifo` tem a DLQ FIFO `statement-accounts-dlq.fifo`. A mensagem vai para lá na 5ª tentativa que falha (`STATEMENT_MAX_RECEIVE_COUNT`, visibilidade de 30 s em `STATEMENT_VISIBILITY_TIMEOUT_SECONDS`, ambos lidos pelo compose; veja o `.env.example`). A métrica `statement.dlq.messages` também mostra a quantidade (o valor é relido do SQS a cada 30 s, `STATEMENT_DLQ_METRICS_REFRESH`); consulte pelo actuator, direto no serviço ou pelo nginx:

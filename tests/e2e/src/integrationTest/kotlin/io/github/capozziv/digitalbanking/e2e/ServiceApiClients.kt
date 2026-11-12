@@ -208,6 +208,38 @@ class StatementApiClient(
     /** HTTP status of the first page of the statement of [account]. */
     fun status(account: UUID): Int = send("GET", "$baseUrl/accounts/$account/statement").status
 
+    /**
+     * Entries of the first page with the default limit and no cursor, the only read the cache serves. Fails unless the
+     * status is 200.
+     */
+    fun firstPage(account: UUID): List<JsonNode> {
+        val result = send("GET", "$baseUrl/accounts/$account/statement")
+        check(result.status == 200) { "get first page: ${result.status} ${result.body}" }
+        val entries = result.json().get("entries")
+        return (0 until entries.size()).map { entries.get(it) }
+    }
+
+    /**
+     * Polls the cached read path (first page, default limit) until it has [count] entries; fails with what was seen when
+     * the time runs out. A 404 counts as no entries.
+     */
+    fun awaitFirstPage(
+        account: UUID,
+        count: Int,
+        timeout: Duration,
+    ): List<JsonNode> {
+        val deadline = Instant.now().plus(timeout)
+        while (true) {
+            val status = status(account)
+            val entries = if (status == 200) firstPage(account) else emptyList()
+            if (entries.size == count) return entries
+            check(Instant.now().isBefore(deadline)) {
+                "first page of $account: expected $count entries, got ${entries.size} (last status $status) after $timeout"
+            }
+            Thread.sleep(POLL.toMillis())
+        }
+    }
+
     /** Every entry of the statement of [account], following the cursor through all pages, newest first. */
     fun all(
         account: UUID,
