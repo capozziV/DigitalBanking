@@ -1,0 +1,19 @@
+meta {
+  name: Segunda pagina (cursor)
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/accounts/{{accountId}}/statement?limit=2&cursor={{statementCursor}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("200 com o lancamento mais antigo e sem proxima pagina", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.entries.map((e) => e.sequence)).to.eql([1]);
+    expect(res.body.nextCursor).to.equal(null);
+  });
+}

@@ -84,6 +84,20 @@ class AccountsApiClient(
         check(result.status == 201) { "credit: ${result.status} ${result.body}" }
     }
 
+    fun debit(
+        account: UUID,
+        amount: Long,
+    ) {
+        val result =
+            send(
+                "POST",
+                "$baseUrl/accounts/$account/debits",
+                """{"amount":$amount,"description":"e2e setup"}""",
+                mapOf("Idempotency-Key" to newKey()),
+            )
+        check(result.status == 201) { "debit: ${result.status} ${result.body}" }
+    }
+
     fun account(account: UUID): JsonNode {
         val result = send("GET", "$baseUrl/accounts/$account")
         check(result.status == 200) { "get account: ${result.status} ${result.body}" }
@@ -179,6 +193,57 @@ class NotificationApiClient(
             val seen = items.map { it.get("kind").asString() }
             if (seen.sorted() == kinds.sorted()) return items
             check(Instant.now().isBefore(deadline)) { "notifications of customer $customerId: expected $kinds, got $seen after $timeout" }
+            Thread.sleep(POLL.toMillis())
+        }
+    }
+
+    private companion object {
+        val POLL: Duration = Duration.ofMillis(200)
+    }
+}
+
+class StatementApiClient(
+    private val baseUrl: String,
+) {
+    /** HTTP status of the first page of the statement of [account]. */
+    fun status(account: UUID): Int = send("GET", "$baseUrl/accounts/$account/statement").status
+
+    /** Every entry of the statement of [account], following the cursor through all pages, newest first. */
+    fun all(
+        account: UUID,
+        limit: Int = 100,
+    ): List<JsonNode> {
+        val entries = mutableListOf<JsonNode>()
+        var cursor: String? = null
+        do {
+            val query = "limit=$limit" + (cursor?.let { "&cursor=${URLEncoder.encode(it, Charsets.UTF_8)}" } ?: "")
+            val result = send("GET", "$baseUrl/accounts/$account/statement?$query")
+            check(result.status == 200) { "get statement: ${result.status} ${result.body}" }
+            val page = result.json()
+            val pageEntries = page.get("entries")
+            (0 until pageEntries.size()).forEach { entries.add(pageEntries.get(it)) }
+            cursor = page.get("nextCursor")?.takeUnless { it.isNull }?.asString()
+        } while (cursor != null)
+        return entries
+    }
+
+    /**
+     * Polls until the statement of [account] has [count] entries and returns them; fails with what was seen when the
+     * time runs out. An account the statement does not know yet (404) counts as no entries.
+     */
+    fun awaitEntries(
+        account: UUID,
+        count: Int,
+        timeout: Duration,
+    ): List<JsonNode> {
+        val deadline = Instant.now().plus(timeout)
+        while (true) {
+            val status = status(account)
+            val entries = if (status == 200) all(account) else emptyList()
+            if (entries.size == count) return entries
+            check(Instant.now().isBefore(deadline)) {
+                "statement of $account: expected $count entries, got ${entries.size} (last status $status) after $timeout"
+            }
             Thread.sleep(POLL.toMillis())
         }
     }
