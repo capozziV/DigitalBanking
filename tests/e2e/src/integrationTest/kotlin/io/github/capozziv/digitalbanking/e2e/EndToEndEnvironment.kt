@@ -165,6 +165,9 @@ class EndToEndEnvironment : AutoCloseable {
             "STATEMENT_AWS_REGION" to localStack.region,
             "STATEMENT_REDIS_HOST" to redis.host,
             "STATEMENT_REDIS_PORT" to redis.getMappedPort(REDIS_PORT).toString(),
+            // A long TTL (default 60s) makes the cache tests fail by invalidation, never by expiry. Spring relaxed binding
+            // maps the variable to statement.cache.ttl.
+            "STATEMENT_CACHE_TTL" to "600s",
         )
 
     private fun jdbcUrl(database: String) = "jdbc:postgresql://${postgres.host}:${postgres.getMappedPort(POSTGRES_PORT)}/$database"
