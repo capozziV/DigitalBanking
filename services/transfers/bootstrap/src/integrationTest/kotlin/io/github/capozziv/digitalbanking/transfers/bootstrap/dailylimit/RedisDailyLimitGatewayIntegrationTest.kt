@@ -175,6 +175,23 @@ class RedisDailyLimitGatewayIntegrationTest : TransfersIntegrationTest() {
     }
 
     @Test
+    fun `a release that fails in redis makes the next reservation rebuild the counter`() {
+        val first = transferOf(400_000)
+        val second = transferOf(200_000)
+        reserve(first, 400_000)
+        fail(first)
+
+        whilePaused { gateway.release(first, account, day) }
+        val rebuilds = rebuilds()
+
+        // The command may still reach Redis after it comes back, so the proof is the epoch and the rebuild.
+        assertThat(epochInPostgres()).isEqualTo(1)
+        assertThat(reserve(second, 200_000)).isEqualTo(RESERVED)
+        assertThat(rebuilds()).isEqualTo(rebuilds + 1)
+        assertThat(redisTemplate.opsForHash<String, String>().get(key(), "total")).isEqualTo("200000")
+    }
+
+    @Test
     fun `release returns the amount and is idempotent`() {
         val first = transferOf(300_000)
         val second = transferOf(200_000)
