@@ -122,6 +122,48 @@ class RedisDailyLimitGatewayIntegrationTest : TransfersIntegrationTest() {
     }
 
     @Test
+    fun `the lock is taken before the epoch is read, so a reservation that waited sees the fallback's epoch`() {
+        reserve(transferOf(50_000), 50_000)
+        val behindFallback = transferOf(400_000)
+        val waiting = transferOf(200_000)
+        val pool = Executors.newSingleThreadExecutor()
+        DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password).use { connection ->
+            connection.autoCommit = false
+            connection
+                .prepareStatement("select pg_advisory_xact_lock(hashtextextended(? || ':' || ?, 0))")
+                .use { lock ->
+                    lock.setString(1, account.toString())
+                    lock.setString(2, day.toString())
+                    lock.executeQuery().close()
+                }
+            try {
+                val blocked = pool.submit<ReservationResult> { reserve(waiting, 200_000) }
+                awaitBlockedOnAdvisoryLock()
+
+                // What the fallback does while it holds the lock: mark the transfer and bump the epoch.
+                connection.prepareStatement("update transfer set limit_reserved = true where id = ?").use {
+                    it.setObject(1, behindFallback)
+                    it.executeUpdate()
+                }
+                connection
+                    .prepareStatement("insert into daily_limit_epoch (account_id, limit_day, epoch) values (?, ?, 1)")
+                    .use {
+                        it.setObject(1, account)
+                        it.setObject(2, day)
+                        it.executeUpdate()
+                    }
+                connection.commit()
+
+                assertThat(blocked.get(10, TimeUnit.SECONDS)).isEqualTo(EXCEEDED)
+                assertThat(redisTemplate.opsForHash<String, String>().get(key(), "total")).isEqualTo("450000")
+            } finally {
+                connection.rollback()
+                pool.shutdownNow()
+            }
+        }
+    }
+
+    @Test
     fun `release returns the amount and is idempotent`() {
         val first = transferOf(300_000)
         val second = transferOf(200_000)
@@ -262,6 +304,21 @@ class RedisDailyLimitGatewayIntegrationTest : TransfersIntegrationTest() {
                 .copy(sourceAccountId = accountId, amount = Money(amount))
         transfers.insert(transfer)
         return transfer.id
+    }
+
+    /** Waits until a backend is blocked on an advisory lock, i.e. the reservation reached the lock. */
+    private fun awaitBlockedOnAdvisoryLock() {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+        while (System.nanoTime() < deadline) {
+            val waiting =
+                ownerJdbc
+                    .sql("select count(*) from pg_stat_activity where wait_event_type = 'Lock' and wait_event = 'advisory'")
+                    .query(Long::class.java)
+                    .single()
+            if (waiting > 0) return
+            Thread.sleep(20)
+        }
+        error("no reservation got blocked on the advisory lock")
     }
 
     private fun fail(transferId: UUID) {
