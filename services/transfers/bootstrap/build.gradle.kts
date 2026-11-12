@@ -8,6 +8,7 @@ dependencies {
     implementation(project(":libs:outbox-relay"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
 
     testImplementation(project(":libs:testing-architecture"))
     testImplementation("org.springframework.boot:spring-boot-starter-test")
@@ -18,7 +19,6 @@ dependencies {
     integrationTestImplementation("org.awaitility:awaitility") // version managed by the Spring Boot BOM
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-webmvc")
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-jdbc")
-    integrationTestImplementation("org.springframework.boot:spring-boot-starter-data-redis")
     // V6BackfillIntegrationTest migrates a database of its own step by step.
     integrationTestImplementation("org.flywaydb:flyway-core")
     integrationTestImplementation(libs.testcontainers.postgresql)

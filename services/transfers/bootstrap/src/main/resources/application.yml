@@ -15,6 +15,13 @@ spring:
     deserialization:
       # Amounts are whole cents: 1.5 must be rejected, never truncated to 1.
       accept-float-as-int: false
+  data:
+    redis:
+      host: ${TRANSFERS_REDIS_HOST:localhost}
+      port: ${TRANSFERS_REDIS_PORT:6379}
+      # With Redis down a command fails fast and the daily limit is decided in PostgreSQL (RedisDailyLimitGateway).
+      timeout: ${TRANSFERS_REDIS_TIMEOUT:100ms}
+      connect-timeout: ${TRANSFERS_REDIS_TIMEOUT:100ms}
   flyway:
     user: ${TRANSFERS_DB_OWNER_USER:transfers_owner}
     password: ${TRANSFERS_DB_OWNER_PASSWORD:transfers_owner}
@@ -22,6 +29,11 @@ spring:
       appUser: ${TRANSFERS_DB_USER:transfers_app}
 
 transfers:
+  daily-limit:
+    # Cents a source account may transfer per São Paulo day.
+    amount: ${TRANSFERS_DAILY_LIMIT:500000}
+    # Life of the Redis counter without a reservation; then it is rebuilt from PostgreSQL.
+    counter-ttl: 10m
   saga:
     scheduler-enabled: true
     poll-interval: 1s
@@ -65,3 +77,7 @@ management:
     health:
       show-details: always
       show-components: always
+  health:
+    redis:
+      # Redis is not required: with it down the daily limit falls back to PostgreSQL, so the service stays UP.
+      enabled: false
