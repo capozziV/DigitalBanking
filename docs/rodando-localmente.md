@@ -104,7 +104,7 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 set -a; . infra/local/.env; set +a
 ./gradlew :services:statement:bootstrap:bootRun
 ```
-O `statement` guarda no Redis do compose a primeira página do extrato (20 lançamentos, sem cursor) por cerca de 60 s; com o Redis fora, ele lê do DynamoDB. O `statement` sobe na porta 8084. A tabela DynamoDB `statement` (chave `accountId` texto + `sequence` numérica, cobrança `PAY_PER_REQUEST`) e as filas são criadas pelo `infra/local/localstack/init/ready.d/04-statement.sh`, não pelo serviço. O nginx expõe `GET /accounts/{id}/statement` e `/statement/actuator/`. Use um quinto terminal para os passos seguintes.
+O `statement` sobe na porta 8084. O `statement` guarda no Redis do compose a primeira página do extrato (20 lançamentos, sem cursor) por cerca de 60 s; com o Redis fora, ele lê do DynamoDB. A tabela DynamoDB `statement` (chave `accountId` texto + `sequence` numérica, cobrança `PAY_PER_REQUEST`) e as filas são criadas pelo `infra/local/localstack/init/ready.d/04-statement.sh`, não pelo serviço. O nginx expõe `GET /accounts/{id}/statement` e `/statement/actuator/`. Use um quinto terminal para os passos seguintes.
 
 ## 5. Conferir a API pelo nginx
 Primeiro o health, que deve responder `"status":"UP"`; depois o smoke, que abre uma conta, credita 1000, debita 300, confere o saldo 700, lê os eventos da conta na fila de inspeção e, com os quatro serviços no ar, confere as notificações de uma transferência e o extrato da primeira conta:
