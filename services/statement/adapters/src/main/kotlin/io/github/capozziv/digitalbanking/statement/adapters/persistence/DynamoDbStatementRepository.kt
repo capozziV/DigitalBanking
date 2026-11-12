@@ -58,6 +58,11 @@ class DynamoDbStatementRepository(
 
     override fun accountExists(accountId: UUID): Boolean = getItem(accountId, ACCOUNT_SEQUENCE) != null
 
+    /**
+     * The first page (no cursor) is read with strong consistency: it is the page the cache keeps, and the record use
+     * case evicts it right after an insert. An eventually consistent read after that evict could miss the new entry and
+     * put the stale page back in the cache for a whole TTL. Pages after a cursor stay eventually consistent.
+     */
     override fun findPage(
         accountId: UUID,
         cursor: StatementCursor?,
@@ -89,6 +94,7 @@ class DynamoDbStatementRepository(
                         .expressionAttributeValues(values)
                         .scanIndexForward(false)
                         .limit(limit)
+                        .consistentRead(cursor == null)
                 }.items()
                 .map(::toEntry)
         val last = entries.lastOrNull()

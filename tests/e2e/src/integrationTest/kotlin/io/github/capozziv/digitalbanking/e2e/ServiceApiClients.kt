@@ -221,7 +221,7 @@ class StatementApiClient(
 
     /**
      * Polls the cached read path (first page, default limit) until it has [count] entries; fails with what was seen when
-     * the time runs out. A 404 counts as no entries.
+     * the time runs out. A 404 counts as no entries. One GET per lap.
      */
     fun awaitFirstPage(
         account: UUID,
@@ -230,11 +230,13 @@ class StatementApiClient(
     ): List<JsonNode> {
         val deadline = Instant.now().plus(timeout)
         while (true) {
-            val status = status(account)
-            val entries = if (status == 200) firstPage(account) else emptyList()
+            val result = send("GET", "$baseUrl/accounts/$account/statement")
+            check(result.status == 200 || result.status == 404) { "get first page: ${result.status} ${result.body}" }
+            val entries =
+                if (result.status == 200) result.json().get("entries").let { e -> (0 until e.size()).map { e.get(it) } } else emptyList()
             if (entries.size == count) return entries
             check(Instant.now().isBefore(deadline)) {
-                "first page of $account: expected $count entries, got ${entries.size} (last status $status) after $timeout"
+                "first page of $account: expected $count entries, got ${entries.size} (last status ${result.status}) after $timeout"
             }
             Thread.sleep(POLL.toMillis())
         }
@@ -244,12 +246,19 @@ class StatementApiClient(
     fun all(
         account: UUID,
         limit: Int = 100,
-    ): List<JsonNode> {
+    ): List<JsonNode> = checkNotNull(allOrNull(account, limit)) { "get statement of $account: 404" }
+
+    /** Like [all], but null when the statement does not know the account yet (404). Never touches the cache. */
+    private fun allOrNull(
+        account: UUID,
+        limit: Int,
+    ): List<JsonNode>? {
         val entries = mutableListOf<JsonNode>()
         var cursor: String? = null
         do {
             val query = "limit=$limit" + (cursor?.let { "&cursor=${URLEncoder.encode(it, Charsets.UTF_8)}" } ?: "")
             val result = send("GET", "$baseUrl/accounts/$account/statement?$query")
+            if (result.status == 404) return null
             check(result.status == 200) { "get statement: ${result.status} ${result.body}" }
             val page = result.json()
             val pageEntries = page.get("entries")
@@ -261,7 +270,8 @@ class StatementApiClient(
 
     /**
      * Polls until the statement of [account] has [count] entries and returns them; fails with what was seen when the
-     * time runs out. An account the statement does not know yet (404) counts as no entries.
+     * time runs out. An account the statement does not know yet (404) counts as no entries. One GET per lap, with
+     * `limit=100`: it bypasses the first-page cache, so polling cannot pin a stale page in it.
      */
     fun awaitEntries(
         account: UUID,
@@ -270,11 +280,10 @@ class StatementApiClient(
     ): List<JsonNode> {
         val deadline = Instant.now().plus(timeout)
         while (true) {
-            val status = status(account)
-            val entries = if (status == 200) all(account) else emptyList()
+            val entries = allOrNull(account, 100) ?: emptyList()
             if (entries.size == count) return entries
             check(Instant.now().isBefore(deadline)) {
-                "statement of $account: expected $count entries, got ${entries.size} (last status $status) after $timeout"
+                "statement of $account: expected $count entries, got ${entries.size} after $timeout"
             }
             Thread.sleep(POLL.toMillis())
         }
