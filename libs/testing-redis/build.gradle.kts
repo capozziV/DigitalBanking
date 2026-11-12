@@ -7,7 +7,8 @@ plugins {
 
 dependencies {
     api(platform(libs.spring.boot.bom))
-    api(libs.testcontainers.localstack)
+    // Core Testcontainers only: GenericContainer and the Docker client.
+    api(libs.testcontainers.core)
 
     integrationTestImplementation(platform(libs.junit.bom))
     integrationTestImplementation(libs.testcontainers.junit.jupiter)
