@@ -14,6 +14,7 @@ dependencies {
 
     integrationTestImplementation(testFixtures(project(":libs:outbox")))
     integrationTestImplementation(project(":libs:testing-localstack"))
+    integrationTestImplementation("org.awaitility:awaitility") // version managed by the Spring Boot BOM
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-webmvc")
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-jdbc")
     integrationTestImplementation(libs.testcontainers.postgresql)

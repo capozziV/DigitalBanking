@@ -9,6 +9,8 @@ import io.github.capozziv.digitalbanking.transfers.bootstrap.saga.AccountsStubs.
 import io.github.capozziv.digitalbanking.transfers.bootstrap.saga.AccountsStubs.Companion.problem
 import io.github.capozziv.digitalbanking.transfers.bootstrap.web.ApiClient
 import org.assertj.core.api.Assertions.assertThat
+import org.awaitility.Awaitility.await
+import org.awaitility.core.ConditionTimeoutException
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
@@ -29,7 +31,6 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
-import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
@@ -192,15 +193,14 @@ class TransferEventsIntegrationTest : TransfersIntegrationTest() {
         @BeforeAll
         fun startLocalStack() {
             val initDir = Path.of(System.getProperty("transfers.localstack.init-dir"))
-            localStack = LocalStackTestSupport.container(listOf("sns", "sqs", "dynamodb"))
-            Files.list(initDir).use { scripts ->
-                scripts.forEach { script ->
-                    localStack.withCopyFileToContainer(
-                        MountableFile.forHostPath(script, 0b111_101_101),
-                        "/etc/localstack/init/ready.d/${script.fileName}",
-                    )
-                }
-            }
+            localStack = LocalStackTestSupport.container(listOf("sns", "sqs"))
+            // Only this service's script: mounting the whole folder breaks whenever another service adds one
+            // that needs a LocalStack service this test does not start (04-statement.sh needs DynamoDB).
+            val script = initDir.resolve("02-transfers-topic.sh")
+            localStack.withCopyFileToContainer(
+                MountableFile.forHostPath(script, 0b111_101_101),
+                "/etc/localstack/init/ready.d/${script.fileName}",
+            )
             localStack.start()
             awaitInitScripts()
             sqs = LocalStackTestSupport.sqsClient(localStack)
@@ -226,20 +226,21 @@ class TransferEventsIntegrationTest : TransfersIntegrationTest() {
         private fun awaitInitScripts() {
             val http = HttpClient.newHttpClient()
             val request = HttpRequest.newBuilder(URI.create("${localStack.endpoint}/_localstack/init/ready")).build()
-            val deadline = Instant.now().plusSeconds(60)
-            while (Instant.now().isBefore(deadline)) {
-                val status = mapper.readTree(http.send(request, HttpResponse.BodyHandlers.ofString()).body())
-                if (status.get("completed").asBoolean()) {
-                    val scripts = status.get("scripts")
-                    val states = (0 until scripts.size()).map { scripts.get(it).get("state").asString() }
-                    check(states.isNotEmpty() && states.all { it == "SUCCESSFUL" }) {
-                        "LocalStack init scripts did not succeed: $status\n${localStack.logs}"
-                    }
-                    return
+
+            fun status() = mapper.readTree(http.send(request, HttpResponse.BodyHandlers.ofString()).body())
+            try {
+                await().atMost(Duration.ofSeconds(60)).pollInterval(Duration.ofMillis(250)).until {
+                    status().get("completed").asBoolean()
                 }
-                Thread.sleep(250)
+            } catch (e: ConditionTimeoutException) {
+                error("LocalStack init scripts did not complete:\n${localStack.logs}")
             }
-            error("LocalStack init scripts did not complete:\n${localStack.logs}")
+            val status = status()
+            val scripts = status.get("scripts")
+            val states = (0 until scripts.size()).map { scripts.get(it).get("state").asString() }
+            check(states.isNotEmpty() && states.all { it == "SUCCESSFUL" }) {
+                "LocalStack init scripts did not succeed: $status\n${localStack.logs}"
+            }
         }
     }
 }

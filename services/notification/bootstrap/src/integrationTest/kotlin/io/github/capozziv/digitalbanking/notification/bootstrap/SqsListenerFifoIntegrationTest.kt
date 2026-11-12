@@ -3,6 +3,7 @@ package io.github.capozziv.digitalbanking.notification.bootstrap
 import io.awspring.cloud.sqs.annotation.SqsListener
 import io.github.capozziv.digitalbanking.testing.localstack.LocalStackTestSupport
 import org.assertj.core.api.Assertions.assertThat
+import org.awaitility.Awaitility
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -16,7 +17,6 @@ import org.testcontainers.localstack.LocalStackContainer
 import software.amazon.awssdk.services.sqs.SqsClient
 import software.amazon.awssdk.services.sqs.model.QueueAttributeName
 import java.time.Duration
-import java.time.Instant
 import java.util.Collections
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -106,11 +106,11 @@ class SqsListenerFifoIntegrationTest {
         }
 
     private fun await(condition: () -> Boolean) {
-        val deadline = Instant.now().plus(Duration.ofSeconds(20))
-        while (!condition()) {
-            check(Instant.now().isBefore(deadline)) { "condition not met within 20s" }
-            Thread.sleep(100)
-        }
+        Awaitility
+            .await()
+            .atMost(Duration.ofSeconds(20))
+            .pollInterval(Duration.ofMillis(100))
+            .until(condition)
     }
 
     /** Records what the listeners received; the retry listener throws on the first delivery of each message. */

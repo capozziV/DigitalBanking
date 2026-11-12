@@ -7,6 +7,7 @@ import io.github.capozziv.digitalbanking.notification.bootstrap.web.ApiClient
 import io.github.capozziv.digitalbanking.testing.localstack.LocalStackTestSupport
 import io.micrometer.core.instrument.MeterRegistry
 import org.assertj.core.api.Assertions.assertThat
+import org.awaitility.Awaitility
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
@@ -320,11 +321,11 @@ class NotificationConsumptionIntegrationTest {
         timeout: Duration = Duration.ofSeconds(30),
         condition: () -> Boolean,
     ) {
-        val deadline = Instant.now().plus(timeout)
-        while (!condition()) {
-            check(Instant.now().isBefore(deadline)) { "condition not met within $timeout" }
-            Thread.sleep(100)
-        }
+        Awaitility
+            .await()
+            .atMost(timeout)
+            .pollInterval(Duration.ofMillis(100))
+            .until(condition)
     }
 
     companion object {
