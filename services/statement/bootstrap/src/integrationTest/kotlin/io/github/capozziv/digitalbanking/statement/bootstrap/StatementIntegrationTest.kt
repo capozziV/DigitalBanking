@@ -5,6 +5,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.TestPropertySource
+import org.testcontainers.containers.GenericContainer
 import org.testcontainers.localstack.LocalStackContainer
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient
 import software.amazon.awssdk.services.dynamodb.model.AttributeDefinition
@@ -38,6 +39,7 @@ abstract class StatementIntegrationTest {
         const val ACCOUNTS_QUEUE = "statement-accounts.fifo"
         const val ACCOUNTS_DLQ = "statement-accounts-dlq.fifo"
         const val MAX_RECEIVE_COUNT = 5
+        const val REDIS_PORT = 6379
 
         /** Short, so a failed message is retried quickly; production uses 30 s. */
         const val VISIBILITY_SECONDS = 1
@@ -45,6 +47,12 @@ abstract class StatementIntegrationTest {
         @JvmStatic
         val localStack: LocalStackContainer by lazy {
             LocalStackTestSupport.container(listOf("dynamodb", "sns", "sqs")).also { it.start() }
+        }
+
+        /** Redis of the first-page cache, shared by all subclasses like the LocalStack container. */
+        @JvmStatic
+        val redis: GenericContainer<*> by lazy {
+            GenericContainer("redis:7-alpine").withExposedPorts(REDIS_PORT).also { it.start() }
         }
 
         /** Raw DynamoDB client, for setup and for inspecting items as stored. */
@@ -63,6 +71,8 @@ abstract class StatementIntegrationTest {
             registry.add("spring.cloud.aws.sqs.endpoint") { localStack.endpoint.toString() }
             registry.add("statement.dynamodb.endpoint") { localStack.endpoint.toString() }
             registry.add("spring.cloud.aws.region.static") { localStack.region }
+            registry.add("spring.data.redis.host") { redis.host }
+            registry.add("spring.data.redis.port") { redis.getMappedPort(REDIS_PORT) }
         }
 
         private fun createTable() {
