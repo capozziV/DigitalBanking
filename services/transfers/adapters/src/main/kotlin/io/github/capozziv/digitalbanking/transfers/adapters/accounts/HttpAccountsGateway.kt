@@ -8,7 +8,7 @@ import io.github.capozziv.digitalbanking.transfers.adapters.accounts.dto.Account
 import io.github.capozziv.digitalbanking.transfers.application.port.AccountLookup
 import io.github.capozziv.digitalbanking.transfers.application.port.AccountsGateway
 import io.github.capozziv.digitalbanking.transfers.application.port.CallResult
-import io.github.capozziv.digitalbanking.transfers.domain.AccountsCall
+import io.github.capozziv.digitalbanking.transfers.domain.StepCall
 import io.github.capozziv.digitalbanking.transfers.domain.StepOutcome
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
@@ -66,17 +66,17 @@ class HttpAccountsGateway(
         }
     }
 
-    override fun perform(call: AccountsCall): CallResult =
+    override fun perform(call: StepCall.Accounts): CallResult =
         when (call) {
-            is AccountsCall.Debit -> {
+            is StepCall.Debit -> {
                 record(call.accountId, "debits", call.idempotencyKey, call.amount.cents, call.description)
             }
 
-            is AccountsCall.Credit -> {
+            is StepCall.Credit -> {
                 record(call.accountId, "credits", call.idempotencyKey, call.amount.cents, call.description)
             }
 
-            is AccountsCall.FindEntry -> {
+            is StepCall.FindEntry -> {
                 send(
                     describe = "find entry ${call.idempotencyKey} of account ${call.accountId}",
                     request =

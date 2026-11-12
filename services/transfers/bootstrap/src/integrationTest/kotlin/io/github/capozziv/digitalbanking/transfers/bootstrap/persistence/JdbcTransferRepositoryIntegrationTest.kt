@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import java.time.Instant
+import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.util.UUID
 import java.util.concurrent.CyclicBarrier
@@ -27,6 +28,7 @@ class JdbcTransferRepositoryIntegrationTest : TransfersIntegrationTest() {
 
     private val allSteps =
         listOf(
+            TransferStep.ReserveLimit,
             TransferStep.Debit,
             TransferStep.ResolveDebit,
             TransferStep.Credit,
@@ -38,7 +40,33 @@ class JdbcTransferRepositoryIntegrationTest : TransfersIntegrationTest() {
         )
 
     @Test
-    fun `round trips every field of a transfer in each of the 8 steps`() {
+    fun `round trips the limit day and the reservation flag`() {
+        val reserved = aTransfer(limitDay = LocalDate.parse("2026-11-12"), limitReserved = true)
+        val notReserved = aTransfer(limitDay = LocalDate.parse("2026-11-13"), limitReserved = false)
+        repository.insert(reserved)
+        repository.insert(notReserved)
+
+        assertThat(repository.findById(reserved.id)!!.limitDay).isEqualTo(LocalDate.parse("2026-11-12"))
+        assertThat(repository.findById(reserved.id)!!.limitReserved).isTrue()
+        assertThat(repository.findById(notReserved.id)!!.limitDay).isEqualTo(LocalDate.parse("2026-11-13"))
+        assertThat(repository.findById(notReserved.id)!!.limitReserved).isFalse()
+    }
+
+    @Test
+    fun `saveIfOwner writes the reservation flag`() {
+        val transfer = aTransfer(step = TransferStep.ReserveLimit)
+        repository.insert(transfer)
+        val now = transfer.createdAt.plusSeconds(1)
+        repository.tryAcquireLease(transfer.id, "a", now.plusSeconds(30), now)
+        val next = transfer.copy(step = TransferStep.Debit, limitReserved = true, updatedAt = now)
+
+        assertThat(repository.saveIfOwner(next, "a", now, now.plusSeconds(60), now)).isTrue()
+
+        assertThat(repository.findById(transfer.id)).isEqualTo(next)
+    }
+
+    @Test
+    fun `round trips every field of a transfer in each of the 9 steps`() {
         allSteps.forEach { step ->
             val transfer = aTransfer(step = step, failureReason = "some-reason", attempts = 3)
             assertThat(repository.insert(transfer)).isTrue()

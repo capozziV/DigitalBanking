@@ -5,12 +5,13 @@ import io.github.capozziv.digitalbanking.transfers.application.fake.FakeAccounts
 import io.github.capozziv.digitalbanking.transfers.application.fake.FakeAccountsGateway.Companion.created
 import io.github.capozziv.digitalbanking.transfers.application.fake.FakeEventOutbox
 import io.github.capozziv.digitalbanking.transfers.application.fake.ImmediateTransactionRunner
+import io.github.capozziv.digitalbanking.transfers.application.fake.InMemoryDailyLimitGateway
 import io.github.capozziv.digitalbanking.transfers.application.fake.InMemoryTransferRepository
 import io.github.capozziv.digitalbanking.transfers.application.fake.InMemoryTransferStepLog
 import io.github.capozziv.digitalbanking.transfers.application.fake.MutableClock
 import io.github.capozziv.digitalbanking.transfers.application.fake.RecordingCorrelationContext
-import io.github.capozziv.digitalbanking.transfers.domain.AccountsCall
 import io.github.capozziv.digitalbanking.transfers.domain.Money
+import io.github.capozziv.digitalbanking.transfers.domain.StepCall
 import io.github.capozziv.digitalbanking.transfers.domain.Transfer
 import io.github.capozziv.digitalbanking.transfers.domain.TransferStatus
 import org.assertj.core.api.Assertions.assertThat
@@ -33,6 +34,7 @@ class ResumeDueTransfersUseCaseTest {
             transfers = repository,
             stepLog = InMemoryTransferStepLog(),
             accounts = accounts,
+            dailyLimits = InMemoryDailyLimitGateway(transactions = tx),
             outbox = FakeEventOutbox(),
             tx = tx,
             backoff = RetryBackoff(Duration.ofSeconds(1), Duration.ofSeconds(15)),
@@ -210,10 +212,10 @@ class ResumeDueTransfersUseCaseTest {
 
     private fun Transfer.accountIds() = setOf(sourceAccountId, destinationAccountId)
 
-    private fun AccountsCall.accountId(): UUID =
+    private fun StepCall.Accounts.accountId(): UUID =
         when (this) {
-            is AccountsCall.Debit -> accountId
-            is AccountsCall.Credit -> accountId
-            is AccountsCall.FindEntry -> accountId
+            is StepCall.Debit -> accountId
+            is StepCall.Credit -> accountId
+            is StepCall.FindEntry -> accountId
         }
 }

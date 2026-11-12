@@ -12,7 +12,7 @@ class DebitStepTest {
     @Test
     fun `calls a debit on the source account with the debit key`() {
         assertThat(TransferStep.Debit.call(t)).isEqualTo(
-            AccountsCall.Debit(
+            StepCall.Debit(
                 accountId = TransferFixtures.source,
                 amount = Money(500),
                 idempotencyKey = "transfer-${TransferFixtures.id}-debit",

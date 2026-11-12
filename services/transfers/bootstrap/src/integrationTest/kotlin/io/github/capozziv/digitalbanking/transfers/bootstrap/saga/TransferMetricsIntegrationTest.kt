@@ -3,6 +3,7 @@ package io.github.capozziv.digitalbanking.transfers.bootstrap.saga
 import io.github.capozziv.digitalbanking.transfers.application.port.TransferRepository
 import io.github.capozziv.digitalbanking.transfers.bootstrap.TransfersIntegrationTest
 import io.github.capozziv.digitalbanking.transfers.bootstrap.web.ApiClient
+import io.github.capozziv.digitalbanking.transfers.domain.DailyLimitDay
 import io.github.capozziv.digitalbanking.transfers.domain.Money
 import io.github.capozziv.digitalbanking.transfers.domain.Transfer
 import io.github.capozziv.digitalbanking.transfers.domain.TransferStep
@@ -90,6 +91,8 @@ class TransferMetricsIntegrationTest : TransfersIntegrationTest() {
             correlationId = null,
             createdAt = at,
             updatedAt = at,
+            limitDay = DailyLimitDay.of(at),
+            limitReserved = false,
         )
     }
 }

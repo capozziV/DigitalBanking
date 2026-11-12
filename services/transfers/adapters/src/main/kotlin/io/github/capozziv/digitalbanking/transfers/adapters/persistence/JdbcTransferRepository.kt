@@ -8,6 +8,7 @@ import org.springframework.jdbc.core.RowMapper
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Repository
 import java.time.Instant
+import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
@@ -42,10 +43,10 @@ class JdbcTransferRepository(
                 """
                 insert into transfer (id, source_account_id, destination_account_id, amount, description, idempotency_key,
                                       status, step, failure_reason, deadline_at, next_attempt_at, attempts, correlation_id,
-                                      created_at, updated_at)
+                                      created_at, updated_at, limit_day, limit_reserved)
                 values (:id, :source, :destination, :amount, :description, :key,
                         :status, :step, :failureReason, :deadline, :nextAttemptAt, :attempts, :correlationId,
-                        :createdAt, :updatedAt)
+                        :createdAt, :updatedAt, :limitDay, :limitReserved)
                 on conflict (idempotency_key) do nothing
                 """.trimIndent(),
             ).param("id", transfer.id)
@@ -63,6 +64,8 @@ class JdbcTransferRepository(
             .param("correlationId", transfer.correlationId)
             .param("createdAt", transfer.createdAt.utc())
             .param("updatedAt", transfer.updatedAt.utc())
+            .param("limitDay", transfer.limitDay)
+            .param("limitReserved", transfer.limitReserved)
             .update() == 1
 
     override fun tryAcquireLease(
@@ -84,7 +87,10 @@ class JdbcTransferRepository(
             .param("now", now.utc())
             .update() == 1
 
-    /** The lease must be valid at [now]; `updated_at` is only data, it takes no part in the decision. */
+    /**
+     * The lease must be valid at [now]; `updated_at` is only data, it takes no part in the decision. `limit_reserved`
+     * was already set by the daily limit gateway under its lock when the reservation was made; this write only repeats it.
+     */
     override fun saveIfOwner(
         transfer: Transfer,
         owner: String,
@@ -96,10 +102,12 @@ class JdbcTransferRepository(
             .sql(
                 """
                 update transfer set status = :status, step = :step, failure_reason = :failureReason, attempts = :attempts,
-                                    next_attempt_at = :nextAttemptAt, locked_until = :leaseUntil, updated_at = :updatedAt
+                                    next_attempt_at = :nextAttemptAt, locked_until = :leaseUntil, updated_at = :updatedAt,
+                                    limit_reserved = :limitReserved
                 where id = :id and lock_owner = :owner and locked_until >= :now
                 """.trimIndent(),
             ).param("status", transfer.status.name)
+            .param("limitReserved", transfer.limitReserved)
             .param("step", transfer.step.name)
             .param("failureReason", transfer.failureReason)
             .param("attempts", transfer.attempts)
@@ -151,7 +159,7 @@ class JdbcTransferRepository(
     private companion object {
         const val COLUMNS =
             "id, source_account_id, destination_account_id, amount, description, idempotency_key, step, failure_reason, " +
-                "deadline_at, attempts, correlation_id, created_at, updated_at"
+                "deadline_at, attempts, correlation_id, created_at, updated_at, limit_day, limit_reserved"
 
         val ROW_MAPPER =
             RowMapper { rs, _ ->
@@ -169,6 +177,8 @@ class JdbcTransferRepository(
                     correlationId = rs.getString("correlation_id"),
                     createdAt = rs.getObject("created_at", OffsetDateTime::class.java).toInstant(),
                     updatedAt = rs.getObject("updated_at", OffsetDateTime::class.java).toInstant(),
+                    limitDay = rs.getObject("limit_day", LocalDate::class.java),
+                    limitReserved = rs.getBoolean("limit_reserved"),
                 )
             }
     }

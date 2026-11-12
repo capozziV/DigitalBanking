@@ -2,6 +2,7 @@ package io.github.capozziv.digitalbanking.transfers.domain
 
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 
 data class Transfer(
@@ -18,6 +19,10 @@ data class Transfer(
     val correlationId: String?,
     val createdAt: Instant,
     val updatedAt: Instant,
+    /** Day of the source account's daily limit this transfer counts on: the São Paulo day of [createdAt], fixed. */
+    val limitDay: LocalDate,
+    /** True once the daily limit was reserved for this transfer; a failed or compensated transfer releases it. */
+    val limitReserved: Boolean,
 ) {
     val status: TransferStatus get() = step.status
 
@@ -35,10 +40,20 @@ data class Transfer(
                 StepOutcome.TransientFailure -> step.onTransientFailure(this, now)
             }
         val reason =
-            if (outcome is StepOutcome.Refused && next == TransferStep.Failed) publicReason(outcome.reason) else failureReason
+            when {
+                next != TransferStep.Failed -> failureReason
+
+                outcome is StepOutcome.Refused -> publicReason(outcome.reason)
+
+                // Only ReserveLimit fails on a transient failure (past the deadline): the limit could not be checked.
+                step == TransferStep.ReserveLimit -> StepOutcome.DAILY_LIMIT_UNAVAILABLE
+
+                else -> failureReason
+            }
         return copy(
             step = next,
             failureReason = reason,
+            limitReserved = limitReserved || (step == TransferStep.ReserveLimit && outcome == StepOutcome.Success),
             attempts = if (next == step) attempts + 1 else 0,
             updatedAt = now,
         )
@@ -95,13 +110,15 @@ data class Transfer(
                 amount = amount,
                 description = description,
                 idempotencyKey = idempotencyKey,
-                step = TransferStep.Debit,
+                step = TransferStep.ReserveLimit,
                 failureReason = null,
                 deadline = now.plus(deadlineAfter),
                 attempts = 0,
                 correlationId = correlationId,
                 createdAt = now,
                 updatedAt = now,
+                limitDay = DailyLimitDay.of(now),
+                limitReserved = false,
             )
         }
     }

@@ -3,6 +3,7 @@ package io.github.capozziv.digitalbanking.transfers.bootstrap
 import io.github.capozziv.digitalbanking.transfers.application.RetryBackoff
 import io.github.capozziv.digitalbanking.transfers.application.port.AccountsGateway
 import io.github.capozziv.digitalbanking.transfers.application.port.CorrelationContext
+import io.github.capozziv.digitalbanking.transfers.application.port.DailyLimitGateway
 import io.github.capozziv.digitalbanking.transfers.application.port.EventOutbox
 import io.github.capozziv.digitalbanking.transfers.application.port.IdGenerator
 import io.github.capozziv.digitalbanking.transfers.application.port.TransactionRunner
@@ -41,12 +42,13 @@ class UseCaseConfiguration {
         transfers: TransferRepository,
         stepLog: TransferStepLog,
         accounts: AccountsGateway,
+        dailyLimits: DailyLimitGateway,
         outbox: EventOutbox,
         tx: TransactionRunner,
         backoff: RetryBackoff,
         settings: SagaSettings,
         clock: Clock,
-    ) = RunTransferSagaUseCase(transfers, stepLog, accounts, outbox, tx, backoff, settings, clock)
+    ) = RunTransferSagaUseCase(transfers, stepLog, accounts, dailyLimits, outbox, tx, backoff, settings, clock)
 
     @Bean
     fun requestTransferUseCase(

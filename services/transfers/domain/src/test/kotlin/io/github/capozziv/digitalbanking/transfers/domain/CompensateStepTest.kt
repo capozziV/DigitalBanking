@@ -12,7 +12,7 @@ class CompensateStepTest {
     @Test
     fun `credits the source account back with the compensation key`() {
         assertThat(TransferStep.Compensate.call(t)).isEqualTo(
-            AccountsCall.Credit(
+            StepCall.Credit(
                 accountId = TransferFixtures.source,
                 amount = Money(500),
                 idempotencyKey = "transfer-${TransferFixtures.id}-compensation",

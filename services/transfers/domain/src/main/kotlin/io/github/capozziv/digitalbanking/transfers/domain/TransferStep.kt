@@ -3,11 +3,12 @@ package io.github.capozziv.digitalbanking.transfers.domain
 import java.time.Instant
 
 /**
- * State pattern for the transfer saga: each step knows which call to make to `accounts`
+ * State pattern for the transfer saga: each step knows which call to make (to the daily limit or to `accounts`)
  * and which step follows each outcome.
  *
  * | Step | Call | Success | Definitive refusal | Transient failure before deadline | Transient failure after deadline |
  * |---|---|---|---|---|---|
+ * | `ReserveLimit` | reserve the source's daily limit on `limitDay` | `Debit` | `Failed` (`daily-limit-exceeded`) | `ReserveLimit` | `Failed` (`daily-limit-unavailable`) |
  * | `Debit` | debit on source, key `transfer-<id>-debit` | `Credit` | `Failed` (refusal reason) | `Debit` | `ResolveDebit` |
  * | `ResolveDebit` | find entry on source by the debit key | `Compensate` | `ENTRY_NOT_FOUND` -> `Failed` | `ResolveDebit` | `ResolveDebit` |
  * | `Credit` | credit on destination, key `transfer-<id>-credit` | `Completed` | `Compensate` | `Credit` | `ResolveCredit` |
@@ -15,7 +16,11 @@ import java.time.Instant
  * | `Compensate` | credit on source, key `transfer-<id>-compensation` | `Compensated` | `Compensate` (a refusal here is a bug) | `Compensate` | `Compensate` |
  * | `Completed`, `Failed`, `Compensated` | none (terminal) | - | - | - | - |
  *
- * The deadline only affects `Debit` and `Credit`; the resolve and compensate steps retry until they succeed.
+ * New transfers start at `ReserveLimit`; transfers requested before the daily limit existed start at `Debit` and
+ * never reserve. A successful `ReserveLimit` sets `Transfer.limitReserved`; the saga releases the reservation when the
+ * transfer ends `Failed` or `Compensated`, and keeps it (as consumption) when it ends `Completed`.
+ *
+ * The deadline only affects `ReserveLimit`, `Debit` and `Credit`; the resolve and compensate steps retry until they succeed.
  * A resolve step refused for any reason other than [StepOutcome.ENTRY_NOT_FOUND] stays in the same step.
  * Terminal steps reject every transition with [IllegalStateException].
  */
@@ -23,7 +28,7 @@ sealed interface TransferStep {
     val name: String
     val status: TransferStatus
 
-    fun call(transfer: Transfer): AccountsCall?
+    fun call(transfer: Transfer): StepCall?
 
     fun onSuccess(transfer: Transfer): TransferStep
 
@@ -37,12 +42,37 @@ sealed interface TransferStep {
         now: Instant,
     ): TransferStep
 
+    data object ReserveLimit : TransferStep {
+        override val name = "RESERVE_LIMIT"
+        override val status = TransferStatus.PENDING
+
+        override fun call(transfer: Transfer) =
+            StepCall.ReserveLimit(
+                accountId = transfer.sourceAccountId,
+                day = transfer.limitDay,
+                transferId = transfer.id,
+                amount = transfer.amount,
+            )
+
+        override fun onSuccess(transfer: Transfer): TransferStep = Debit
+
+        override fun onRefused(
+            transfer: Transfer,
+            reason: String,
+        ): TransferStep = Failed
+
+        override fun onTransientFailure(
+            transfer: Transfer,
+            now: Instant,
+        ): TransferStep = if (transfer.isPastDeadline(now)) Failed else ReserveLimit
+    }
+
     data object Debit : TransferStep {
         override val name = "DEBIT"
         override val status = TransferStatus.PENDING
 
         override fun call(transfer: Transfer) =
-            AccountsCall.Debit(
+            StepCall.Debit(
                 accountId = transfer.sourceAccountId,
                 amount = transfer.amount,
                 idempotencyKey = "transfer-${transfer.id}-debit",
@@ -66,7 +96,7 @@ sealed interface TransferStep {
         override val name = "RESOLVE_DEBIT"
         override val status = TransferStatus.PENDING
 
-        override fun call(transfer: Transfer) = AccountsCall.FindEntry(transfer.sourceAccountId, "transfer-${transfer.id}-debit")
+        override fun call(transfer: Transfer) = StepCall.FindEntry(transfer.sourceAccountId, "transfer-${transfer.id}-debit")
 
         override fun onSuccess(transfer: Transfer): TransferStep = Compensate
 
@@ -86,7 +116,7 @@ sealed interface TransferStep {
         override val status = TransferStatus.PENDING
 
         override fun call(transfer: Transfer) =
-            AccountsCall.Credit(
+            StepCall.Credit(
                 accountId = transfer.destinationAccountId,
                 amount = transfer.amount,
                 idempotencyKey = "transfer-${transfer.id}-credit",
@@ -110,7 +140,7 @@ sealed interface TransferStep {
         override val name = "RESOLVE_CREDIT"
         override val status = TransferStatus.PENDING
 
-        override fun call(transfer: Transfer) = AccountsCall.FindEntry(transfer.destinationAccountId, "transfer-${transfer.id}-credit")
+        override fun call(transfer: Transfer) = StepCall.FindEntry(transfer.destinationAccountId, "transfer-${transfer.id}-credit")
 
         override fun onSuccess(transfer: Transfer): TransferStep = Completed
 
@@ -130,7 +160,7 @@ sealed interface TransferStep {
         override val status = TransferStatus.PENDING
 
         override fun call(transfer: Transfer) =
-            AccountsCall.Credit(
+            StepCall.Credit(
                 accountId = transfer.sourceAccountId,
                 amount = transfer.amount,
                 idempotencyKey = "transfer-${transfer.id}-compensation",
@@ -151,7 +181,7 @@ sealed interface TransferStep {
     }
 
     sealed interface Terminal : TransferStep {
-        override fun call(transfer: Transfer): AccountsCall? = null
+        override fun call(transfer: Transfer): StepCall? = null
 
         override fun onSuccess(transfer: Transfer): TransferStep = error("$name is terminal")
 
@@ -182,7 +212,7 @@ sealed interface TransferStep {
     }
 
     companion object {
-        private val all = listOf(Debit, ResolveDebit, Credit, ResolveCredit, Compensate, Completed, Failed, Compensated)
+        private val all = listOf(ReserveLimit, Debit, ResolveDebit, Credit, ResolveCredit, Compensate, Completed, Failed, Compensated)
 
         fun fromName(name: String): TransferStep =
             all.firstOrNull { it.name == name } ?: throw IllegalArgumentException("unknown transfer step: $name")

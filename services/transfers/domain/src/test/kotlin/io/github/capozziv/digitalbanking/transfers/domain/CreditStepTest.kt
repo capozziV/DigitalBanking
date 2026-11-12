@@ -12,7 +12,7 @@ class CreditStepTest {
     @Test
     fun `calls a credit on the destination account with the credit key`() {
         assertThat(TransferStep.Credit.call(t)).isEqualTo(
-            AccountsCall.Credit(
+            StepCall.Credit(
                 accountId = TransferFixtures.destination,
                 amount = Money(500),
                 idempotencyKey = "transfer-${TransferFixtures.id}-credit",
