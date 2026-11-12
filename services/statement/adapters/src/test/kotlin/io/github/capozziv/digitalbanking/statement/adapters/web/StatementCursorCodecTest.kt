@@ -32,6 +32,15 @@ class StatementCursorCodecTest {
     }
 
     @Test
+    fun `a sequence that is not canonical is rejected`() {
+        listOf("v1:+5", "v1:05", "v1: 5", "v1:5 ", "v1:").forEach { text ->
+            assertThatThrownBy { StatementCursorCodec.decode(base64(text)) }
+                .describedAs(text)
+                .isInstanceOf(InvalidCursorException::class.java)
+        }
+    }
+
+    @Test
     fun `an unknown version is rejected`() {
         assertThatThrownBy { StatementCursorCodec.decode(base64("v2:5")) }.isInstanceOf(InvalidCursorException::class.java)
     }
