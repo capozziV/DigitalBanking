@@ -26,7 +26,7 @@ class OutboxMetricsTest {
 
     @Test
     fun `pending backlog updates the gauges, with the age in seconds`() {
-        metrics.recordBacklog(OutboxBacklog(pending = 3, oldestAge = Duration.ofMillis(2500)))
+        metrics.recordBacklog(OutboxBacklog(pending = 3, oldestAge = Duration.ofMillis(2500), stuckAggregates = 0))
 
         assertThat(registry.get("outbox.pending").gauge().value()).isEqualTo(3.0)
         assertThat(registry.get("outbox.oldest.pending.age").gauge().value()).isEqualTo(2.5)
@@ -40,11 +40,22 @@ class OutboxMetricsTest {
 
     @Test
     fun `an empty backlog resets the age to zero`() {
-        metrics.recordBacklog(OutboxBacklog(pending = 3, oldestAge = Duration.ofSeconds(9)))
-        metrics.recordBacklog(OutboxBacklog(pending = 0, oldestAge = null))
+        metrics.recordBacklog(OutboxBacklog(pending = 3, oldestAge = Duration.ofSeconds(9), stuckAggregates = 0))
+        metrics.recordBacklog(OutboxBacklog(pending = 0, oldestAge = null, stuckAggregates = 0))
 
         assertThat(registry.get("outbox.pending").gauge().value()).isZero()
         assertThat(registry.get("outbox.oldest.pending.age").gauge().value()).isZero()
+    }
+
+    @Test
+    fun `stuck aggregates gauge follows the backlog and starts at zero`() {
+        assertThat(registry.get("outbox.stuck.aggregates").gauge().value()).isZero()
+
+        metrics.recordBacklog(OutboxBacklog(pending = 5, oldestAge = Duration.ofSeconds(1), stuckAggregates = 2))
+        assertThat(registry.get("outbox.stuck.aggregates").gauge().value()).isEqualTo(2.0)
+
+        metrics.recordBacklog(OutboxBacklog(pending = 0, oldestAge = null, stuckAggregates = 0))
+        assertThat(registry.get("outbox.stuck.aggregates").gauge().value()).isZero()
     }
 
     @Test

@@ -53,4 +53,9 @@ tests {
     expect(kinds).to.include("TRANSFER_SENT");
     expect(res.body.unreadCount).to.be.above(0);
   });
+
+  test("data.amountCents da TRANSFER_SENT e numero (centavos)", function () {
+    const sent = res.body.items.find((n) => n.kind === "TRANSFER_SENT");
+    expect(sent.data.amountCents).to.equal(300);
+  });
 }

@@ -2,6 +2,7 @@ package io.github.capozziv.digitalbanking.accounts.bootstrap
 
 import io.github.capozziv.digitalbanking.accounts.bootstrap.web.ApiClient
 import org.assertj.core.api.Assertions.assertThat
+import org.awaitility.Awaitility.await
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.web.server.LocalServerPort
@@ -9,7 +10,6 @@ import org.springframework.context.ConfigurableApplicationContext
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.TestPropertySource
 import java.time.Duration
-import java.time.Instant
 import java.util.UUID
 
 /**
@@ -81,8 +81,8 @@ class OutboxRelayUnreachableBrokerIntegrationTest : AccountsIntegrationTest() {
         account: String,
         atLeast: Int,
     ): Triple<Int, String?, Any?> {
-        val deadline = Instant.now().plus(Duration.ofSeconds(30))
-        while (true) {
+        var result: Triple<Int, String?, Any?>? = null
+        await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(100)).untilAsserted {
             val row =
                 ownerJdbc
                     .sql("select attempts, last_error, published_at from outbox where aggregate_id = :id")
@@ -90,12 +90,11 @@ class OutboxRelayUnreachableBrokerIntegrationTest : AccountsIntegrationTest() {
                     .query()
                     .singleRow()
             val attempts = (row["attempts"] as Number).toInt()
-            if (attempts >= atLeast) return Triple(attempts, row["last_error"] as String?, row["published_at"])
-            check(Instant.now().isBefore(deadline)) {
-                "outbox event of $account reached only $attempts attempts (expected $atLeast); " +
-                    "last_error=${row["last_error"]}"
-            }
-            Thread.sleep(100)
+            assertThat(attempts)
+                .describedAs("attempts of the outbox event of $account (last_error=${row["last_error"]})")
+                .isGreaterThanOrEqualTo(atLeast)
+            result = Triple(attempts, row["last_error"] as String?, row["published_at"])
         }
+        return result!!
     }
 }

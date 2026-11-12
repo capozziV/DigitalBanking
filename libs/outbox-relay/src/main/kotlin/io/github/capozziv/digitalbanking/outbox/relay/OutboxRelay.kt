@@ -31,7 +31,7 @@ class OutboxRelay(
             log.debug("Outbox relay lock held by another instance; skipping cycle")
         }
         metrics.recordCycle()
-        metrics.recordBacklog(store.backlog(clock.instant()))
+        metrics.recordBacklog(store.backlog(clock.instant(), settings.alertAfterAttempts))
     }
 
     private fun publishBatch() {

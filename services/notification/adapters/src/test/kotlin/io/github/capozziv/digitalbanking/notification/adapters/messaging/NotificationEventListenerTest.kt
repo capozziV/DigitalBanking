@@ -132,6 +132,15 @@ class NotificationEventListenerTest {
     }
 
     @Test
+    fun `the failure WARN carries only the exception message, since the container logs the stack trace`() {
+        assertThatThrownBy { listener.onAccountEvent("{", "corr-fail") }.isInstanceOf(MalformedEventException::class.java)
+
+        val warning = logged.list.single { it.level == Level.WARN }
+        assertThat(warning.throwableProxy).isNull()
+        assertThat(warning.formattedMessage).contains(MalformedEventException::class.java.simpleName)
+    }
+
+    @Test
     fun `the correlation ID attribute is in the MDC while the event is consumed and removed afterwards`() {
         listener.onAccountEvent(accountOpened(UUID.randomUUID()), "corr-123")
 

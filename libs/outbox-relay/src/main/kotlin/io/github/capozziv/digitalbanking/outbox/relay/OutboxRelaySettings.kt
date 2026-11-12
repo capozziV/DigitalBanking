@@ -16,14 +16,23 @@ import java.time.Duration
  *   so the leader transaction (and its connection) is never held for long.
  */
 data class OutboxRelaySettings(
-    val batchSize: Int = 100,
-    val alertAfterAttempts: Int = 10,
+    val batchSize: Int = DEFAULT_BATCH_SIZE,
+    val alertAfterAttempts: Int = DEFAULT_ALERT_AFTER_ATTEMPTS,
     val lockKey: Long,
-    val publishTimeout: Duration = Duration.ofSeconds(2),
-    val maxCycleDuration: Duration = Duration.ofSeconds(10),
-    val retryBackoff: Duration = Duration.ofSeconds(1),
-    val maxRetryBackoff: Duration = Duration.ofSeconds(30),
+    val publishTimeout: Duration = DEFAULT_PUBLISH_TIMEOUT,
+    val maxCycleDuration: Duration = DEFAULT_MAX_CYCLE_DURATION,
+    val retryBackoff: Duration = DEFAULT_RETRY_BACKOFF,
+    val maxRetryBackoff: Duration = DEFAULT_MAX_RETRY_BACKOFF,
 ) {
+    companion object {
+        const val DEFAULT_BATCH_SIZE = 100
+        const val DEFAULT_ALERT_AFTER_ATTEMPTS = 10
+        val DEFAULT_PUBLISH_TIMEOUT: Duration = Duration.ofSeconds(2)
+        val DEFAULT_MAX_CYCLE_DURATION: Duration = Duration.ofSeconds(10)
+        val DEFAULT_RETRY_BACKOFF: Duration = Duration.ofSeconds(1)
+        val DEFAULT_MAX_RETRY_BACKOFF: Duration = Duration.ofSeconds(30)
+    }
+
     init {
         require(batchSize > 0) { "batchSize must be positive" }
         require(alertAfterAttempts > 0) { "alertAfterAttempts must be positive" }

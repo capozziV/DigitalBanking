@@ -91,8 +91,11 @@ class NotificationEndToEndIntegrationTest {
         assertThat(transfers.awaitTerminal(id, SAGA_FINISH_TIMEOUT)).isEqualTo("COMPLETED")
         val sent = notifications.awaitKinds(sender, listOf("WELCOME", "TRANSFER_SENT"), NOTIFICATION_TIMEOUT)
         val received = notifications.awaitKinds(receiver, listOf("WELCOME", "TRANSFER_RECEIVED"), NOTIFICATION_TIMEOUT)
-        assertThat(sent.single { it.get("kind").asString() == "TRANSFER_SENT" }.get("body").asString())
-            .isEqualTo("Você enviou R$ 3,00 para a conta $destination.")
+        val sentNotification = sent.single { it.get("kind").asString() == "TRANSFER_SENT" }
+        assertThat(sentNotification.get("body").asString()).isEqualTo("Você enviou R$ 3,00 para a conta $destination.")
+        // Amounts in cents are JSON numbers in data, not strings.
+        assertThat(sentNotification.get("data").get("amountCents").isIntegralNumber).isTrue()
+        assertThat(sentNotification.get("data").get("amountCents").asLong()).isEqualTo(300L)
         assertThat(received.single { it.get("kind").asString() == "TRANSFER_RECEIVED" }.get("body").asString())
             .isEqualTo("Você recebeu R$ 3,00 da conta $source.")
 
@@ -107,7 +110,7 @@ class NotificationEndToEndIntegrationTest {
         assertThat(notifications.all(sender).map { it.get("kind").asString() }).containsExactlyInAnyOrder("WELCOME", "TRANSFER_SENT")
         assertThat(notifications.all(receiver).map { it.get("kind").asString() })
             .containsExactlyInAnyOrder("WELCOME", "TRANSFER_RECEIVED")
-        assertThat(queues.transfersDlqDepth()).isEqualTo(dlqBefore)
+        queues.awaitTransfersDlqDepth(dlqBefore, DLQ_DEPTH_TIMEOUT)
     }
 
     @Test
@@ -174,7 +177,7 @@ class NotificationEndToEndIntegrationTest {
 
     @Test
     @Order(7)
-    fun `a malformed message reaches the DLQ after 5 receives while a transfer of another account is notified`() {
+    fun `a malformed message reaches the DLQ after 5 receives and a transfer of another account is still notified`() {
         val (sender, source) = welcomedAccount()
         val (_, destination) = welcomedAccount()
         accounts.credit(source, 1_000)
@@ -186,13 +189,14 @@ class NotificationEndToEndIntegrationTest {
 
         assertThat(transfers.awaitTerminal(id, SAGA_FINISH_TIMEOUT)).isEqualTo("COMPLETED")
         notifications.awaitKinds(sender, listOf("WELCOME", "TRANSFER_SENT"), NOTIFICATION_TIMEOUT)
-        // The other group went on while the malformed message was still failing: it is not in the DLQ yet.
-        assertThat(queues.transfersDlqDepth()).isEqualTo(dlqBefore)
+        // Group isolation (a malformed message does not block another group) is proved in NotificationConsumptionIntegrationTest.
+        // Here the transfer is only checked to be notified; whether the DLQ is still empty depends on the runner speed.
         val dead = queues.awaitDeadLetter(malformedGroup, DLQ_TIMEOUT)
         assertThat(dead.body).isEqualTo(MALFORMED_BODY)
         // SQS carries the receive count into the DLQ; the receive that reads it here adds one.
         assertThat(dead.receiveCount).isEqualTo(MAX_RECEIVE_COUNT + 1)
-        assertThat(queues.transfersDlqDepth()).isEqualTo(dlqBefore)
+        // Only the malformed message was dead-lettered; the counters lag behind the delete, so poll.
+        queues.awaitTransfersDlqDepth(dlqBefore, DLQ_DEPTH_TIMEOUT)
     }
 
     @Test
@@ -238,6 +242,7 @@ class NotificationEndToEndIntegrationTest {
         val CALL_HELD_TIMEOUT: Duration = Duration.ofSeconds(30)
         val EVENTS_TIMEOUT: Duration = Duration.ofSeconds(30)
         val DRAIN_TIMEOUT: Duration = Duration.ofSeconds(30)
+        val DLQ_DEPTH_TIMEOUT: Duration = Duration.ofSeconds(30)
 
         /** 5 receives 2 s apart plus the time to move the message. */
         val DLQ_TIMEOUT: Duration = Duration.ofSeconds(60)

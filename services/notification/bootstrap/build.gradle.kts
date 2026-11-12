@@ -5,10 +5,6 @@ dependencies {
     implementation(project(":services:notification:domain"))
     implementation(project(":services:notification:application"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
-    implementation("org.springframework.boot:spring-boot-starter-jdbc")
-    implementation("org.springframework.boot:spring-boot-starter-flyway")
-    implementation(libs.flyway.postgresql)
-    runtimeOnly(libs.postgresql)
 
     // The project's AWS SDK BOM sits next to the Spring Cloud AWS one so its (newer) SDK version wins.
     implementation(platform(libs.spring.cloud.aws.bom))
@@ -21,6 +17,7 @@ dependencies {
     integrationTestImplementation(project(":libs:testing-localstack"))
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-webmvc")
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-jdbc")
+    integrationTestImplementation("org.flywaydb:flyway-core")
     integrationTestImplementation(libs.testcontainers.postgresql)
     integrationTestImplementation(libs.testcontainers.junit.jupiter)
 }

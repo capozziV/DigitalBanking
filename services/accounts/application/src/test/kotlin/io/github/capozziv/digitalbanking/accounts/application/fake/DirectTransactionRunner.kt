@@ -6,8 +6,16 @@ class DirectTransactionRunner : TransactionRunner {
     var transactions = 0
         private set
 
+    var readOnlyTransactions = 0
+        private set
+
     override fun <T> inTransaction(block: () -> T): T {
         transactions++
+        return block()
+    }
+
+    override fun <T> inReadOnlyTransaction(block: () -> T): T {
+        readOnlyTransactions++
         return block()
     }
 }

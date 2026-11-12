@@ -1,15 +1,18 @@
 package io.github.capozziv.digitalbanking.accounts.bootstrap.web
 
+import io.github.capozziv.digitalbanking.accounts.application.port.LedgerEntryRepository
 import io.github.capozziv.digitalbanking.accounts.application.usecase.ListAccountTypesUseCase
 import io.github.capozziv.digitalbanking.accounts.bootstrap.AccountsIntegrationTest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
+import org.mockito.Mockito.doReturn
 import org.mockito.Mockito.`when`
 import org.springframework.boot.test.system.CapturedOutput
 import org.springframework.boot.test.system.OutputCaptureExtension
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.test.context.bean.override.mockito.MockitoBean
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean
 import java.util.UUID
 
 /** An exception nobody expects becomes a generic 500 Problem Details, logged as ERROR with the correlation id. */
@@ -20,6 +23,9 @@ class UnexpectedErrorApiIntegrationTest : AccountsIntegrationTest() {
 
     @MockitoBean
     private lateinit var listAccountTypes: ListAccountTypesUseCase
+
+    @MockitoSpyBean
+    private lateinit var entries: LedgerEntryRepository
 
     @Test
     fun `an unexpected exception is 500 internal-error without the internal message, logged as ERROR with the correlation id`(
@@ -35,5 +41,29 @@ class UnexpectedErrorApiIntegrationTest : AccountsIntegrationTest() {
         assertThat(response.header("X-Correlation-Id")).isEqualTo(correlationId)
         assertThat(output.out).containsPattern("ERROR.*$correlationId.*unexpected error")
         assertThat(output.out).contains("secret internal detail")
+    }
+
+    @Test
+    fun `a duplicate ledger entry is 500 internal-error logged as ERROR once, by the handler`(output: CapturedOutput) {
+        val api = ApiClient(port)
+        val accountId =
+            api
+                .post("/accounts", """{"customerId": "${UUID.randomUUID()}"}""", mapOf("Idempotency-Key" to "open-${UUID.randomUUID()}"))
+                .body!!
+                .get("id")
+                .asString()
+        val credit = """{"amount": 100}"""
+        assertThat(api.post("/accounts/$accountId/credits", credit, mapOf("Idempotency-Key" to "credit-1")).status).isEqualTo(201)
+        // Hiding the last entry makes the next credit reuse sequence 1, which the database rejects as a duplicate.
+        doReturn(null).`when`(entries).findLast(UUID.fromString(accountId))
+        val correlationId = UUID.randomUUID().toString()
+
+        val response =
+            api.post("/accounts/$accountId/credits", credit, mapOf("Idempotency-Key" to "credit-2", "X-Correlation-Id" to correlationId))
+
+        assertProblem(response, 500, "internal-error")
+        val errorLines = output.out.lines().filter { it.contains("ERROR") && it.contains(correlationId) }
+        assertThat(errorLines).hasSize(1).allMatch { it.contains("unexpected error") }
+        assertThat(output.out).contains("ledger_entry_account_id_sequence_key")
     }
 }

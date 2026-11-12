@@ -10,6 +10,8 @@ import io.github.capozziv.digitalbanking.outbox.relay.OutboxStore
 import io.github.capozziv.digitalbanking.outbox.relay.SnsEventPublisher
 import io.github.capozziv.digitalbanking.testing.localstack.LocalStackTestSupport
 import org.assertj.core.api.Assertions.assertThat
+import org.awaitility.Awaitility.await
+import org.awaitility.core.ConditionTimeoutException
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
@@ -183,19 +185,16 @@ class OutboxRelayIntegrationTest : AccountsIntegrationTest() {
 
     @Test
     fun `relay meters are exposed on the actuator`() {
-        val deadline = Instant.now().plusSeconds(10)
-        var cycles = 0.0
-        while (cycles <= 0.0) {
-            check(Instant.now().isBefore(deadline)) { "outbox.relay.cycles still 0 after 10 s" }
+        await().atMost(Duration.ofSeconds(10)).pollInterval(Duration.ofMillis(100)).untilAsserted {
             val response = api.get("/actuator/metrics/outbox.relay.cycles")
             assertThat(response.status).isEqualTo(200)
-            cycles =
+            val cycles =
                 response.body!!
                     .get("measurements")
                     .get(0)
                     .get("value")
                     .asDouble()
-            if (cycles <= 0.0) Thread.sleep(100)
+            assertThat(cycles).describedAs("outbox.relay.cycles").isGreaterThan(0.0)
         }
 
         assertThat(api.get("/actuator/metrics/outbox.pending").status).isEqualTo(200)
@@ -230,18 +229,15 @@ class OutboxRelayIntegrationTest : AccountsIntegrationTest() {
         mapOf("Idempotency-Key" to UUID.randomUUID().toString(), "X-Correlation-Id" to correlationId)
 
     private fun awaitNoPendingEvents(accounts: List<String>) {
-        val deadline = Instant.now().plus(DELIVERY_TIMEOUT)
-        while (Instant.now().isBefore(deadline)) {
+        await().atMost(DELIVERY_TIMEOUT).pollInterval(Duration.ofMillis(100)).untilAsserted {
             val pending =
                 ownerJdbc
                     .sql("select count(*) from outbox where published_at is null and aggregate_id in (:ids)")
                     .param("ids", accounts)
                     .query(Long::class.java)
                     .single()
-            if (pending == 0L) return
-            Thread.sleep(100)
+            assertThat(pending).describedAs("outbox events of $accounts still pending").isZero()
         }
-        error("outbox events of $accounts still pending after $DELIVERY_TIMEOUT")
     }
 
     /**
@@ -362,20 +358,21 @@ class OutboxRelayIntegrationTest : AccountsIntegrationTest() {
         private fun awaitInitScripts() {
             val http = HttpClient.newHttpClient()
             val request = HttpRequest.newBuilder(URI.create("${localStack.endpoint}/_localstack/init/ready")).build()
-            val deadline = Instant.now().plusSeconds(60)
-            while (Instant.now().isBefore(deadline)) {
-                val status = mapper.readTree(http.send(request, HttpResponse.BodyHandlers.ofString()).body())
-                if (status.get("completed").asBoolean()) {
-                    val scripts = status.get("scripts")
-                    val states = (0 until scripts.size()).map { scripts.get(it).get("state").asString() }
-                    check(states.isNotEmpty() && states.all { it == "SUCCESSFUL" }) {
-                        "LocalStack init scripts did not succeed: $status\n${localStack.logs}"
-                    }
-                    return
+
+            fun status() = mapper.readTree(http.send(request, HttpResponse.BodyHandlers.ofString()).body())
+            try {
+                await().atMost(Duration.ofSeconds(60)).pollInterval(Duration.ofMillis(250)).until {
+                    status().get("completed").asBoolean()
                 }
-                Thread.sleep(250)
+            } catch (e: ConditionTimeoutException) {
+                error("LocalStack init scripts did not complete:\n${localStack.logs}")
             }
-            error("LocalStack init scripts did not complete:\n${localStack.logs}")
+            val status = status()
+            val scripts = status.get("scripts")
+            val states = (0 until scripts.size()).map { scripts.get(it).get("state").asString() }
+            check(states.isNotEmpty() && states.all { it == "SUCCESSFUL" }) {
+                "LocalStack init scripts did not succeed: $status\n${localStack.logs}"
+            }
         }
     }
 }

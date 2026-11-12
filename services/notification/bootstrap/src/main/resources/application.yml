@@ -18,14 +18,13 @@ spring:
       appUser: ${NOTIFICATION_DB_USER:notification_app}
   cloud:
     aws:
-      # LocalStack and its test credentials by default; the deploy (stage 8) sets the real ones.
+      # Like the outbox relays: a blank endpoint is the real AWS endpoint of the region with the AWS default
+      # credential chain; an endpoint (LocalStack) comes with static test credentials (AwsCredentialsConfiguration).
+      # The local environment (infra/local/.env) and the tests set the LocalStack endpoint explicitly.
       region:
         static: ${NOTIFICATION_AWS_REGION:us-east-1}
-      credentials:
-        access-key: ${NOTIFICATION_AWS_ACCESS_KEY:test}
-        secret-key: ${NOTIFICATION_AWS_SECRET_KEY:test}
       sqs:
-        endpoint: ${NOTIFICATION_AWS_ENDPOINT:http://localhost:4566}
+        endpoint: ${NOTIFICATION_AWS_ENDPOINT:}
 
 notification:
   queues:
@@ -33,6 +32,9 @@ notification:
     transfers: ${NOTIFICATION_TRANSFERS_QUEUE:notification-transfers.fifo}
     accounts-dlq: ${NOTIFICATION_ACCOUNTS_DLQ:notification-accounts-dlq.fifo}
     transfers-dlq: ${NOTIFICATION_TRANSFERS_DLQ:notification-transfers-dlq.fifo}
+  dlq-metrics:
+    # How often the notification.dlq.messages gauge reads the DLQ depths from SQS (a scrape only reads the last value).
+    refresh-interval: ${NOTIFICATION_DLQ_METRICS_REFRESH_INTERVAL:30s}
 
 management:
   endpoints:
