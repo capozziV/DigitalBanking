@@ -3,12 +3,14 @@ package io.github.capozziv.digitalbanking.transfers.application.usecase
 import io.github.capozziv.digitalbanking.transfers.application.RetryBackoff
 import io.github.capozziv.digitalbanking.transfers.application.port.AccountsGateway
 import io.github.capozziv.digitalbanking.transfers.application.port.CallResult
+import io.github.capozziv.digitalbanking.transfers.application.port.DailyLimitGateway
 import io.github.capozziv.digitalbanking.transfers.application.port.EventOutbox
+import io.github.capozziv.digitalbanking.transfers.application.port.ReservationResult
 import io.github.capozziv.digitalbanking.transfers.application.port.StepRecord
 import io.github.capozziv.digitalbanking.transfers.application.port.TransactionRunner
 import io.github.capozziv.digitalbanking.transfers.application.port.TransferRepository
 import io.github.capozziv.digitalbanking.transfers.application.port.TransferStepLog
-import io.github.capozziv.digitalbanking.transfers.domain.AccountsCall
+import io.github.capozziv.digitalbanking.transfers.domain.StepCall
 import io.github.capozziv.digitalbanking.transfers.domain.StepOutcome
 import io.github.capozziv.digitalbanking.transfers.domain.Transfer
 import io.github.capozziv.digitalbanking.transfers.domain.TransferStep
@@ -19,8 +21,9 @@ import java.util.UUID
 /**
  * Runs the transfer saga while [owner] holds the transfer's lease.
  *
- * Each step calls `accounts` outside any transaction, then records the result in one short transaction
- * (lease-guarded save that also renews the lease, step records, terminal event). The loop stops on a terminal step,
+ * Each step calls `accounts` (or the daily limit, for `ReserveLimit`) outside any transaction, then records the result
+ * in one short transaction (lease-guarded save that also renews the lease, step records, terminal event). A transfer
+ * that ends failed or compensated with its daily limit reserved releases it after that transaction (best effort). The loop stops on a terminal step,
  * on a transient failure (the scheduler retries at `next_attempt_at`), when a step does not change after a refusal,
  * when the lease is lost, or when too little of the lease is left to make another call safely.
  */
@@ -28,6 +31,7 @@ class RunTransferSagaUseCase(
     private val transfers: TransferRepository,
     private val stepLog: TransferStepLog,
     private val accounts: AccountsGateway,
+    private val dailyLimits: DailyLimitGateway,
     private val outbox: EventOutbox,
     private val tx: TransactionRunner,
     private val backoff: RetryBackoff,
@@ -127,16 +131,20 @@ class RunTransferSagaUseCase(
                 }
                 leaseUntil = renewedUntil
                 logUnexpected(transfer, result)
+                if (terminal) releaseLimitIfReserved(next)
 
                 transfer = next
                 if (terminal || retryLater) return transfer
             }
         }
 
-        /** Calls `accounts` only while the worst-case call still ends inside the lease; null means stop without writing. */
+        /**
+         * Makes the step's call (`accounts` or the daily limit) only while the worst-case call still ends inside the
+         * lease; null means stop without writing.
+         */
         private fun callIfLeaseAllows(
             transfer: Transfer,
-            call: AccountsCall,
+            call: StepCall,
         ): CallResult? {
             if (!clock.instant().isBefore(leaseUntil.minus(settings.callBudget))) {
                 LOG.log(
@@ -147,8 +155,36 @@ class RunTransferSagaUseCase(
                 )
                 return null
             }
-            return accounts.perform(call)
+            return when (call) {
+                is StepCall.Accounts -> accounts.perform(call)
+                is StepCall.ReserveLimit -> reserveLimit(call)
+            }
         }
+    }
+
+    /** The daily limit answers inside `transfers`, so there is no HTTP status; the result maps onto a step outcome. */
+    private fun reserveLimit(call: StepCall.ReserveLimit): CallResult =
+        when (dailyLimits.reserve(call.transferId, call.accountId, call.day, call.amount)) {
+            ReservationResult.RESERVED -> CallResult(StepOutcome.Success, null, null)
+            ReservationResult.EXCEEDED -> CallResult(StepOutcome.Refused(StepOutcome.DAILY_LIMIT_EXCEEDED), null, null)
+            ReservationResult.UNAVAILABLE -> CallResult(StepOutcome.TransientFailure, null, "daily limit unavailable")
+        }
+
+    /**
+     * A failed or compensated transfer gives its reservation back, after the terminal state is saved. Best effort: the
+     * source of truth already stopped counting the transfer, and the Redis counter is rebuilt when its TTL ends.
+     */
+    private fun releaseLimitIfReserved(transfer: Transfer) {
+        val releases = transfer.limitReserved && (transfer.step == TransferStep.Failed || transfer.step == TransferStep.Compensated)
+        if (!releases) return
+        runCatching { dailyLimits.release(transfer.id, transfer.sourceAccountId, transfer.limitDay) }
+            .onFailure {
+                LOG.log(
+                    System.Logger.Level.WARNING,
+                    "could not release the daily limit of transfer ${transfer.id} (correlation ${transfer.correlationId})",
+                    it,
+                )
+            }
     }
 
     private fun retryDelay(

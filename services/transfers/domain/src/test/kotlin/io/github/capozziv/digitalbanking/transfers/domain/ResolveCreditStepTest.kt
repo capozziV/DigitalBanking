@@ -12,7 +12,7 @@ class ResolveCreditStepTest {
     @Test
     fun `finds the credit entry by its key on the destination account`() {
         assertThat(TransferStep.ResolveCredit.call(t)).isEqualTo(
-            AccountsCall.FindEntry(TransferFixtures.destination, "transfer-${TransferFixtures.id}-credit"),
+            StepCall.FindEntry(TransferFixtures.destination, "transfer-${TransferFixtures.id}-credit"),
         )
     }
 

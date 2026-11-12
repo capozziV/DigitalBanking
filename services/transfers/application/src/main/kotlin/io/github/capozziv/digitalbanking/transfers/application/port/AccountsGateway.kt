@@ -1,6 +1,6 @@
 package io.github.capozziv.digitalbanking.transfers.application.port
 
-import io.github.capozziv.digitalbanking.transfers.domain.AccountsCall
+import io.github.capozziv.digitalbanking.transfers.domain.StepCall
 import io.github.capozziv.digitalbanking.transfers.domain.StepOutcome
 import java.util.UUID
 
@@ -17,5 +17,5 @@ data class CallResult(
 interface AccountsGateway {
     fun lookupAccount(id: UUID): AccountLookup
 
-    fun perform(call: AccountsCall): CallResult
+    fun perform(call: StepCall.Accounts): CallResult
 }

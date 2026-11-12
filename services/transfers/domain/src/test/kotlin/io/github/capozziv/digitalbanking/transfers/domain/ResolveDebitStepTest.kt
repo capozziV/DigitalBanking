@@ -12,7 +12,7 @@ class ResolveDebitStepTest {
     @Test
     fun `finds the debit entry by its key on the source account`() {
         assertThat(TransferStep.ResolveDebit.call(t)).isEqualTo(
-            AccountsCall.FindEntry(TransferFixtures.source, "transfer-${TransferFixtures.id}-debit"),
+            StepCall.FindEntry(TransferFixtures.source, "transfer-${TransferFixtures.id}-debit"),
         )
     }
 

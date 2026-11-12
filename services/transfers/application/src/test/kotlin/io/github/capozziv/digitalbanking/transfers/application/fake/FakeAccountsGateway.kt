@@ -3,7 +3,7 @@ package io.github.capozziv.digitalbanking.transfers.application.fake
 import io.github.capozziv.digitalbanking.transfers.application.port.AccountLookup
 import io.github.capozziv.digitalbanking.transfers.application.port.AccountsGateway
 import io.github.capozziv.digitalbanking.transfers.application.port.CallResult
-import io.github.capozziv.digitalbanking.transfers.domain.AccountsCall
+import io.github.capozziv.digitalbanking.transfers.domain.StepCall
 import io.github.capozziv.digitalbanking.transfers.domain.StepOutcome
 import java.util.UUID
 
@@ -12,7 +12,7 @@ class FakeAccountsGateway(
     private val transactions: ImmediateTransactionRunner? = null,
 ) : AccountsGateway {
     private val script = ArrayDeque<CallResult>()
-    val calls = mutableListOf<AccountsCall>()
+    val calls = mutableListOf<StepCall.Accounts>()
     var lookup = AccountLookup.EXISTS
 
     /** Per-account override of [lookup]. */
@@ -20,7 +20,7 @@ class FakeAccountsGateway(
     val lookups = mutableListOf<UUID>()
 
     /** Runs on every [perform] after the call is recorded, e.g. to advance a test clock by the call's duration. */
-    var onCall: (AccountsCall) -> Unit = {}
+    var onCall: (StepCall.Accounts) -> Unit = {}
 
     fun reply(vararg results: CallResult) {
         script.addAll(results)
@@ -31,7 +31,7 @@ class FakeAccountsGateway(
         return lookupResults[id] ?: lookup
     }
 
-    override fun perform(call: AccountsCall): CallResult {
+    override fun perform(call: StepCall.Accounts): CallResult {
         check(transactions?.open != true) { "accounts called inside a database transaction" }
         calls += call
         onCall(call)

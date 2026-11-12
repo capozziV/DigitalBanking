@@ -18,8 +18,8 @@ import io.github.capozziv.digitalbanking.transfers.adapters.accounts.AccountsRes
 import io.github.capozziv.digitalbanking.transfers.adapters.accounts.HttpAccountsGateway
 import io.github.capozziv.digitalbanking.transfers.application.port.AccountLookup
 import io.github.capozziv.digitalbanking.transfers.application.port.AccountsGateway
-import io.github.capozziv.digitalbanking.transfers.domain.AccountsCall
 import io.github.capozziv.digitalbanking.transfers.domain.Money
+import io.github.capozziv.digitalbanking.transfers.domain.StepCall
 import io.github.capozziv.digitalbanking.transfers.domain.StepOutcome
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -56,7 +56,7 @@ class HttpAccountsGatewayIntegrationTest {
         return HttpAccountsGateway(AccountsClientConfiguration().accountsRestClient(properties), AccountsResponseClassifier())
     }
 
-    private fun debit(key: String = "transfer-1-debit") = AccountsCall.Debit(accountId, Money(1_000), key, "Transfer to someone")
+    private fun debit(key: String = "transfer-1-debit") = StepCall.Debit(accountId, Money(1_000), key, "Transfer to someone")
 
     private fun entryJson() =
         """{"id":"$entryId","accountId":"$accountId","sequence":1,"kind":"DEBIT","amount":1000,"balanceAfter":0,""" +
@@ -101,7 +101,7 @@ class HttpAccountsGatewayIntegrationTest {
                 .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json").withBody(entryJson())),
         )
 
-        val result = gateway.perform(AccountsCall.Credit(accountId, Money(1_000), "transfer-1-credit", "Transfer from x"))
+        val result = gateway.perform(StepCall.Credit(accountId, Money(1_000), "transfer-1-credit", "Transfer from x"))
 
         assertThat(result.outcome).isEqualTo(StepOutcome.Success)
         assertThat(result.httpStatus).isEqualTo(200)
@@ -144,7 +144,7 @@ class HttpAccountsGatewayIntegrationTest {
             post(urlEqualTo("/accounts/$accountId/credits")).willReturn(problem(404, "account-not-found")),
         )
 
-        val result = gateway.perform(AccountsCall.Credit(accountId, Money(5), "transfer-1-credit", "d"))
+        val result = gateway.perform(StepCall.Credit(accountId, Money(5), "transfer-1-credit", "d"))
 
         assertThat(result.outcome).isEqualTo(StepOutcome.Refused("account-not-found"))
     }
@@ -179,7 +179,7 @@ class HttpAccountsGatewayIntegrationTest {
         )
         MDC.put("correlationId", "corr-9")
 
-        val result = gateway.perform(AccountsCall.FindEntry(accountId, "transfer-1-debit"))
+        val result = gateway.perform(StepCall.FindEntry(accountId, "transfer-1-debit"))
 
         assertThat(result.outcome).isEqualTo(StepOutcome.Success)
         server.verify(
@@ -194,7 +194,7 @@ class HttpAccountsGatewayIntegrationTest {
             get(urlPathEqualTo("/accounts/$accountId/entries")).willReturn(aResponse().withStatus(200).withBody(entryJson())),
         )
 
-        gateway.perform(AccountsCall.FindEntry(accountId, "a&b=c d"))
+        gateway.perform(StepCall.FindEntry(accountId, "a&b=c d"))
 
         server.verify(
             getRequestedFor(urlPathEqualTo("/accounts/$accountId/entries"))
@@ -208,7 +208,7 @@ class HttpAccountsGatewayIntegrationTest {
             get(urlPathEqualTo("/accounts/$accountId/entries")).willReturn(problem(404, "entry-not-found")),
         )
 
-        val result = gateway.perform(AccountsCall.FindEntry(accountId, "transfer-1-debit"))
+        val result = gateway.perform(StepCall.FindEntry(accountId, "transfer-1-debit"))
 
         assertThat(result.outcome).isEqualTo(StepOutcome.Refused(StepOutcome.ENTRY_NOT_FOUND))
         assertThat(result.httpStatus).isEqualTo(404)
@@ -236,7 +236,7 @@ class HttpAccountsGatewayIntegrationTest {
             get(urlPathEqualTo("/accounts/$accountId/entries")).willReturn(problem(404, "account-not-found")),
         )
 
-        val result = gateway.perform(AccountsCall.FindEntry(accountId, "k"))
+        val result = gateway.perform(StepCall.FindEntry(accountId, "k"))
 
         assertThat(result.outcome).isEqualTo(StepOutcome.Refused("account-not-found"))
     }
@@ -248,7 +248,7 @@ class HttpAccountsGatewayIntegrationTest {
                 .willReturn(aResponse().withStatus(404).withHeader("Content-Type", "text/html").withBody("<html>not found</html>")),
         )
 
-        assertThat(gateway.perform(AccountsCall.FindEntry(accountId, "k")).outcome).isEqualTo(StepOutcome.Refused("http-404"))
+        assertThat(gateway.perform(StepCall.FindEntry(accountId, "k")).outcome).isEqualTo(StepOutcome.Refused("http-404"))
     }
 
     @Test
@@ -262,7 +262,7 @@ class HttpAccountsGatewayIntegrationTest {
             ),
         )
 
-        assertThat(gateway.perform(AccountsCall.FindEntry(accountId, "k")).outcome).isEqualTo(StepOutcome.Refused("http-404"))
+        assertThat(gateway.perform(StepCall.FindEntry(accountId, "k")).outcome).isEqualTo(StepOutcome.Refused("http-404"))
     }
 
     @Test
@@ -345,7 +345,7 @@ class HttpAccountsGatewayIntegrationTest {
         )
 
         assertThat(gateway.perform(debit()).outcome).isEqualTo(StepOutcome.TransientFailure)
-        assertThat(gateway.perform(AccountsCall.FindEntry(accountId, "k")).outcome).isEqualTo(StepOutcome.TransientFailure)
+        assertThat(gateway.perform(StepCall.FindEntry(accountId, "k")).outcome).isEqualTo(StepOutcome.TransientFailure)
     }
 
     @Test
@@ -371,7 +371,7 @@ class HttpAccountsGatewayIntegrationTest {
         )
 
         assertThat(gateway.perform(debit()).outcome).isEqualTo(StepOutcome.TransientFailure)
-        assertThat(gateway.perform(AccountsCall.Credit(accountId, Money(1), "k", "d")).outcome)
+        assertThat(gateway.perform(StepCall.Credit(accountId, Money(1), "k", "d")).outcome)
             .isEqualTo(StepOutcome.TransientFailure)
     }
 

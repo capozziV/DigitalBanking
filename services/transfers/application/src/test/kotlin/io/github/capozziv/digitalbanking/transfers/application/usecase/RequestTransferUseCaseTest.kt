@@ -6,6 +6,7 @@ import io.github.capozziv.digitalbanking.transfers.application.fake.FakeAccounts
 import io.github.capozziv.digitalbanking.transfers.application.fake.FakeAccountsGateway.Companion.created
 import io.github.capozziv.digitalbanking.transfers.application.fake.FakeEventOutbox
 import io.github.capozziv.digitalbanking.transfers.application.fake.ImmediateTransactionRunner
+import io.github.capozziv.digitalbanking.transfers.application.fake.InMemoryDailyLimitGateway
 import io.github.capozziv.digitalbanking.transfers.application.fake.InMemoryTransferRepository
 import io.github.capozziv.digitalbanking.transfers.application.fake.InMemoryTransferStepLog
 import io.github.capozziv.digitalbanking.transfers.application.fake.MutableClock
@@ -42,6 +43,7 @@ class RequestTransferUseCaseTest {
             transfers = repository,
             stepLog = InMemoryTransferStepLog(),
             accounts = accounts,
+            dailyLimits = InMemoryDailyLimitGateway(transactions = tx),
             outbox = FakeEventOutbox(),
             tx = tx,
             backoff = RetryBackoff(Duration.ofSeconds(1), Duration.ofSeconds(15)),
