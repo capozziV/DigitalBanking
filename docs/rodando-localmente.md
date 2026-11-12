@@ -98,7 +98,7 @@ set -a; . infra/local/.env; set +a
 ```
 O `notification` sobe na porta 8083 e aplica as próprias migrations; o nginx o expõe em `/notifications`.
 
-O `statement` consome os eventos do `accounts` e roda num quarto terminal, com o mesmo `.env` carregado. Não usa PostgreSQL: grava no DynamoDB do LocalStack. Ele lê `STATEMENT_AWS_ENDPOINT` (no `.env.example`: `http://localhost:4566`; vazio usa o endpoint real da AWS) e, se definidas, `STATEMENT_AWS_REGION` (padrão `us-east-1`), `STATEMENT_TABLE` (padrão `statement`), `STATEMENT_ACCOUNTS_QUEUE` (padrão `statement-accounts.fifo`), `STATEMENT_ACCOUNTS_DLQ` (padrão `statement-accounts-dlq.fifo`), `STATEMENT_DLQ_METRICS_REFRESH` (padrão `30s`), `STATEMENT_REDIS_HOST` (padrão `localhost`), `STATEMENT_REDIS_PORT` (padrão `6379`) e `STATEMENT_CACHE_TIMEOUT` (padrão `100ms`, tempo de conexão e de comando ao Redis):
+O `statement` consome os eventos do `accounts` e roda num quarto terminal, com o mesmo `.env` carregado. Não usa PostgreSQL: grava no DynamoDB do LocalStack. Ele lê `STATEMENT_AWS_ENDPOINT` (no `.env.example`: `http://localhost:4566`; vazio usa o endpoint real da AWS) e, se definidas, `STATEMENT_AWS_REGION` (padrão `us-east-1`), `STATEMENT_TABLE` (padrão `statement`), `STATEMENT_ACCOUNTS_QUEUE` (padrão `statement-accounts.fifo`), `STATEMENT_ACCOUNTS_DLQ` (padrão `statement-accounts-dlq.fifo`), `STATEMENT_DLQ_METRICS_REFRESH` (padrão `30s`), `STATEMENT_REDIS_HOST` (padrão `localhost`), `STATEMENT_REDIS_PORT` (padrão `6379`) e `STATEMENT_CACHE_TIMEOUT` (padrão `100ms`, tempo de conexão e de comando ao Redis) e `STATEMENT_CACHE_ENABLED` (padrão `true`; `false` desliga o cache e o extrato sempre lê do DynamoDB):
 ```bash
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 set -a; . infra/local/.env; set +a
@@ -186,7 +186,7 @@ A primeira página do extrato fica no Redis na chave `statement:first-page:v1:{a
 ```bash
 docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml exec redis redis-cli --scan --pattern 'statement:first-page:v1:*'
 ```
-As métricas do cache saem pelo actuator, direto no serviço ou pelo nginx (`statement.cache.requests` com a tag `result` = `hit`, `miss` ou `error`; `statement.cache.evictions` com `result` = `ok` ou `error`):
+As métricas do cache saem pelo actuator, direto no serviço ou pelo nginx (`statement.cache.requests` com a tag `result` = `hit`, `miss` ou `error`, só para leituras; `statement.cache.writes` com `result` = `ok` ou `error`, para a gravação da página; `statement.cache.evictions` com `result` = `ok` ou `error`):
 ```bash
 curl http://localhost:8084/actuator/metrics/statement.cache.requests
 curl http://localhost/statement/actuator/metrics/statement.cache.evictions
