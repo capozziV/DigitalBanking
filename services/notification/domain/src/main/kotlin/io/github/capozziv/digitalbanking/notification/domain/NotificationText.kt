@@ -75,6 +75,8 @@ object NotificationText {
         when (reason) {
             "insufficient-available-balance" -> "saldo disponível insuficiente"
             "debit-not-confirmed" -> "não foi possível confirmar o débito"
+            "daily-limit-exceeded" -> "o limite diário de transferências da conta seria ultrapassado"
+            "daily-limit-unavailable" -> "não foi possível conferir o limite diário agora, tente novamente"
             else -> "não foi possível processar a transferência"
         }
 }
