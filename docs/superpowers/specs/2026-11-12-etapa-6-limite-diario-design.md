@@ -13,7 +13,7 @@ Uma conta não transfere mais que o limite diário num mesmo dia. A conferência
 2. **Dia do calendário em `America/Sao_Paulo`.** O dia da reserva é o dia em que a transferência foi pedida (`created_at`), fixo para ela.
 3. **A reserva conta enquanto a transferência está `PENDING`**, é consumida em `COMPLETED` e liberada em `FAILED` e `COMPENSATED`.
 4. **Reconstrução sob demanda:** o contador ausente no Redis é recalculado do PostgreSQL.
-5. **Redis fora:** a conferência é feita no PostgreSQL, com trava por conta e dia.
+5. **Redis fora:** a conferência é feita no PostgreSQL, com trava por conta e dia. Para não abrir brecha entre as duas vias, **toda reserva passa pela mesma trava no PostgreSQL** e a via do PostgreSQL marca o contador do Redis como desatualizado (seção 4).
 6. **Endpoint `GET /accounts/{accountId}/daily-limit`** no `transfers`, já nesta etapa.
 
 Valor do limite: R$ 5.000,00 = `500000` centavos para todas as contas (ADR 0010, #19), configurável por `transfers.daily-limit.amount`.
@@ -45,7 +45,7 @@ Valor do limite: R$ 5.000,00 = `500000` centavos para todas as contas (ADR 0010,
   - `total + amount > limit` → `EXCEEDED`;
   - senão grava o campo, soma no `total` → `RESERVED`.
 - **`release(accountId, day, transferId)`:** apaga o campo e subtrai o valor, se o campo existir; senão não faz nada.
-- **`seed(accountId, day, reservations, ttl)`:** cria o hash a partir do PostgreSQL só se a chave não existir (`MISSING` → recalcula → `seed` → `reserve` de novo).
+- **`seed(accountId, day, epoch, reservations, ttl)`:** cria o hash (com o campo `epoch`) a partir do PostgreSQL só se a chave não existir (`MISSING` → recalcula → `seed` → `reserve` de novo).
 - **TTL da chave: 10 minutos**, renovado a cada `reserve`. Depois disso o contador é reconstruído do PostgreSQL, o que corrige qualquer divergência: liberação que falhou no Redis ou reserva feita pelo fallback.
 - Timeout de 100 ms nos comandos, como no `statement`.
 
@@ -59,9 +59,24 @@ Valor do limite: R$ 5.000,00 = `500000` centavos para todas as contas (ADR 0010,
 - `Completed` não libera nada: a reserva vira consumo.
 - Transferências antigas, em `PENDING` no passo `Debit` sem reserva, seguem como estão: o passo inicial só vale para as novas.
 
-## 4. Fallback no PostgreSQL (Redis fora)
-- Numa transação: `pg_advisory_xact_lock` da conta e do dia, soma das reservas (seção 1) e, se couber, `limit_reserved = true` na transferência.
-- As duas vias podem rodar ao mesmo tempo em instâncias diferentes, uma com o Redis e outra sem. Nesse caso uma reserva do Redis ainda não gravada no PostgreSQL não entra na soma do fallback, e o limite pode ser passado por pouco. **É aceito e registrado no ADR 0010:** é uma janela de milissegundos durante uma queda parcial do Redis, num banco simulado, e o TTL de 10 min realinha o contador.
+## 4. Trava única e fallback no PostgreSQL
+- **Trava por conta e dia:** toda reserva, pela via do Redis ou do PostgreSQL, roda numa transação que começa com `pg_advisory_xact_lock(hash(accountId, day))`. É uma trava do próprio PostgreSQL, sem tabela e sem fila externa: quem chega enquanto outra reserva da mesma conta e dia está aberta espera o `commit` (milissegundos). Contas e dias diferentes não se esperam.
+- **Via do Redis**, dentro da transação travada:
+  1. lê `daily_limit_epoch` da conta e do dia (seção 1);
+  2. se o epoch for diferente do gravado no hash do Redis (campo `epoch`), apaga a chave e reconstrói do PostgreSQL;
+  3. roda o `reserve` do Lua;
+  4. se reservou, grava `limit_reserved = true` na transferência;
+  5. faz o `commit`, que solta a trava.
+
+  Como a reserva entra no PostgreSQL antes de a trava soltar, a outra via sempre a enxerga.
+- **Via do PostgreSQL (Redis fora)**, na mesma transação travada:
+  1. soma as reservas (seção 1);
+  2. se couber, grava `limit_reserved = true`;
+  3. incrementa `daily_limit_epoch` da conta e do dia, que é o aviso de que o contador do Redis ficou velho.
+
+  Quando o Redis voltar, a primeira reserva vê o epoch diferente e reconstrói o contador antes de conferir.
+- **Resultado:** sem brecha entre as vias. O contador do Redis só pode ficar acima do real, por uma reserva desfeita depois do Lua ou por uma liberação que falhou, nunca abaixo. Ficar acima é o lado seguro, e o TTL de 10 min corrige.
+- Tabela `daily_limit_epoch (account_id uuid, limit_day date, epoch bigint, primary key (account_id, limit_day))`. Sem linha, o epoch é 0.
 
 ## 5. Endpoint de consulta
 - `GET /accounts/{accountId}/daily-limit` → `200` com `DailyLimitDTO { day, limitCents, usedCents, availableCents }`.
@@ -83,18 +98,21 @@ Valor do limite: R$ 5.000,00 = `500000` centavos para todas as contas (ADR 0010,
   - **concorrência:** N transferências simultâneas de uma conta somando mais que o limite e só as que cabem reservam;
   - reconstrução depois de apagar a chave;
   - fallback com o Redis pausado, incluindo a trava por conta;
+  - concorrência mista: reservas pelo Redis e pelo PostgreSQL ao mesmo tempo nunca passam do limite;
+  - Redis volta depois de reservas pelo PostgreSQL: o epoch força a reconstrução e o limite não é passado;
   - liberação ao falhar por saldo e ao compensar;
   - endpoint.
 - **e2e:** duas transferências que juntas passam de R$ 5.000; a segunda termina `FAILED` com `DAILY_LIMIT_EXCEEDED`, e a notificação de transferência recusada chega.
 - **Mutantes a rodar na revisão:**
   - sem a checagem de idempotência no Lua, o teste da retentativa fica vermelho;
   - sem a liberação em `Failed`/`Compensated`, o teste da liberação fica vermelho;
-  - sem a trava no fallback, o teste de concorrência do fallback fica vermelho.
+  - sem a trava no fallback, o teste de concorrência do fallback fica vermelho;
+  - sem a comparação do epoch, o teste "Redis volta depois de reservas pelo PostgreSQL" fica vermelho.
 
 ## 8. Ambiente local, CI e documentação
 - Variáveis `TRANSFERS_REDIS_HOST`, `TRANSFERS_REDIS_PORT` e `TRANSFERS_DAILY_LIMIT` no `.env.example` e no guia local.
 - `libs/testing-redis`: o apoio de Redis do `statement` vira lib compartilhada, agora com o segundo usuário (ruling da etapa 5).
-- ADR 0010 atualizado: dia em São Paulo, TTL do contador, fallback no PostgreSQL e a corrida aceita.
+- ADR 0010 atualizado: dia em São Paulo, TTL do contador, trava única no PostgreSQL, epoch e fallback.
 - O motivo `DAILY_LIMIT_EXCEEDED` aparece na notificação de transferência recusada, se o `notification` mostrar o motivo.
 
 ## Fora de escopo
@@ -103,6 +121,6 @@ Valor do limite: R$ 5.000,00 = `500000` centavos para todas as contas (ADR 0010,
 - Limite por transação ou por horário (noturno): não previsto.
 
 ## Riscos
-- **Corrida entre Redis e fallback:** a seção 4 traz a mitigação, com o limite passado por pouco e só durante uma queda parcial.
+- **Trava no PostgreSQL em toda reserva:** custa uma transação curta por transferência, que o passo já abriria para gravar o estado. Contenção só entre transferências da mesma conta no mesmo dia.
 - **Migração em tabela com dados:** as colunas novas têm padrão; as transferências antigas ficam com `limit_reserved = false` e não contam.
 - **Lua no LocalStack/ElastiCache:** o ElastiCache aceita `EVAL`/`EVALSHA`; o teste roda contra o `redis:7-alpine`.
