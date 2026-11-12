@@ -1,6 +1,6 @@
 # 0001 — Stack: Kotlin + Spring Boot 4 na AWS
 
-- **Status:** aceito
+- **Status:** aceito (a parte do ECS Fargate foi substituída pelo [ADR 0019](0019-runtime-na-aws-com-eks.md))
 - **Data:** 2026-10-21
 
 ## Contexto
@@ -10,7 +10,7 @@ Backend de banco digital simulado, para portfólio, organizado em microsserviço
 - **Linguagem e framework:** Kotlin + Spring Boot 4.1, JDK 21. (Revisado em 2026-10-21: a linha 3 saiu do suporte open source em 2026-06-30.)
 - **Modelo de execução:** Spring MVC com virtual threads (JDK 21).
 - **Build:** Gradle Kotlin DSL multi-módulo, em **monorepo**.
-- **AWS:** RDS PostgreSQL, DynamoDB, SNS, SQS + DLQ, ElastiCache (Redis), Cognito, API Gateway (HTTP API), ECS Fargate.
+- **AWS:** RDS PostgreSQL, DynamoDB, SNS, SQS + DLQ, ElastiCache (Redis), Cognito, API Gateway (HTTP API), ~~ECS Fargate~~ EKS ([ADR 0019](0019-runtime-na-aws-com-eks.md)).
 - **Infraestrutura como código:** Terraform.
 - **Ambiente local:** docker-compose com PostgreSQL, Redis, LocalStack e nginx (no papel do API Gateway). LocalStack escolhido em 2026-10-22, com conta gratuita e `LOCALSTACK_AUTH_TOKEN` (local e segredo no CI), a partir da etapa 1 ([ADR 0015](0015-outbox-relay-lider-e-sns-fifo.md)).
 - **Testes de integração:** Testcontainers.
