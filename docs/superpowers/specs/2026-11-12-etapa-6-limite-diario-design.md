@@ -9,7 +9,7 @@
 Uma conta não transfere mais que o limite diário num mesmo dia. A conferência é atômica sob concorrência: duas transferências simultâneas não passam juntas do limite. Retentativas da saga não consomem o limite duas vezes. Se o Redis perder os dados ou cair, o limite continua valendo pelo PostgreSQL.
 
 ## Decisões desta etapa (usuário, 2026-11-12)
-1. **Passo novo da saga, `ReserveLimit`, antes do débito.** Se o limite estourar, a transferência termina `FAILED` com o motivo `DAILY_LIMIT_EXCEEDED`, como a recusa por saldo.
+1. **Passo novo da saga, `ReserveLimit`, antes do débito.** Se o limite estourar, a transferência termina `FAILED` com o motivo `daily-limit-exceeded`, como a recusa por saldo.
 2. **Dia do calendário em `America/Sao_Paulo`.** O dia da reserva é o dia em que a transferência foi pedida (`created_at`), fixo para ela.
 3. **A reserva conta enquanto a transferência está `PENDING`**, é consumida em `COMPLETED` e liberada em `FAILED` e `COMPENSATED`.
 4. **Reconstrução sob demanda:** o contador ausente no Redis é recalculado do PostgreSQL.
@@ -46,16 +46,16 @@ Valor do limite: R$ 5.000,00 = `500000` centavos para todas as contas (ADR 0010,
   - senão grava o campo, soma no `total` → `RESERVED`.
 - **`release(accountId, day, transferId)`:** apaga o campo e subtrai o valor, se o campo existir; senão não faz nada.
 - **`seed(accountId, day, epoch, reservations, ttl)`:** cria o hash (com o campo `epoch`) a partir do PostgreSQL só se a chave não existir (`MISSING` → recalcula → `seed` → `reserve` de novo).
-- **TTL da chave: 10 minutos**, renovado a cada `reserve`. Depois disso o contador é reconstruído do PostgreSQL, o que corrige qualquer divergência: liberação que falhou no Redis ou reserva feita pelo fallback.
+- **TTL da chave: 10 minutos**, renovado a cada `reserve`. Ele só limpa a chave de uma conta sem reservas nesse prazo; quem corrige divergência é o epoch (seção 4): o `release` que falha no Redis incrementa o epoch, e a próxima reserva reconstrói o contador do PostgreSQL.
 - Timeout de 100 ms nos comandos, como no `statement`.
 
 ## 3. Passo `ReserveLimit` da saga
 - Novo passo inicial: `ReserveLimit` → `Debit`. Ele não chama o `accounts`; o `AccountsCall` ganha um irmão, ou o passo ganha uma chamada própria `LimitCall.Reserve`, a definir no plano, mantendo o padrão State da saga.
 - **Resultados:**
   - reservou → `Debit`, e a transferência grava `limit_reserved = true` na mesma transação do passo;
-  - excedeu → `Failed`, motivo `DAILY_LIMIT_EXCEEDED`;
-  - Redis fora → fallback no PostgreSQL (seção 4); se o PostgreSQL também falhar, falha temporária, com retentativa até o prazo da saga e, depois do prazo, `Failed` com `LIMIT_UNAVAILABLE`.
-- **Liberação:** ao chegar em `Failed` ou `Compensated` com `limit_reserved = true`, a saga chama `release` no Redis depois de salvar o estado terminal. É só melhor esforço: uma falha vira WARN, e o TTL de 10 min com a reconstrução corrige o contador.
+  - excedeu → `Failed`, motivo `daily-limit-exceeded`;
+  - Redis fora → fallback no PostgreSQL (seção 4); se o PostgreSQL também falhar, falha temporária, com retentativa até o prazo da saga e, depois do prazo, `Failed` com `daily-limit-unavailable`.
+- **Liberação:** ao chegar em `Failed` ou `Compensated` com `limit_reserved = true`, a saga chama `release` no Redis depois de salvar o estado terminal. É só melhor esforço: uma falha vira WARN e incrementa o epoch, e a próxima reserva reconstrói o contador.
 - `Completed` não libera nada: a reserva vira consumo.
 - Transferências antigas, em `PENDING` no passo `Debit` sem reserva, seguem como estão: o passo inicial só vale para as novas.
 
@@ -75,7 +75,7 @@ Valor do limite: R$ 5.000,00 = `500000` centavos para todas as contas (ADR 0010,
   3. incrementa `daily_limit_epoch` da conta e do dia, que é o aviso de que o contador do Redis ficou velho.
 
   Quando o Redis voltar, a primeira reserva vê o epoch diferente e reconstrói o contador antes de conferir.
-- **Resultado:** sem brecha entre as vias. O contador do Redis só pode ficar acima do real, por uma reserva desfeita depois do Lua ou por uma liberação que falhou, nunca abaixo. Ficar acima é o lado seguro, e o TTL de 10 min corrige.
+- **Resultado:** sem brecha entre as vias. Reserva desfeita depois do Lua ou liberação que falhou deixam o contador acima do real, o lado seguro, e o epoch faz a próxima reserva reconstruí-lo. Risco aceito: perda parcial de escritas no Redis (failover assíncrono, snapshot antigo) pode deixar o contador abaixo do real com o mesmo epoch; mitigação futura no cartão #160.
 - Tabela `daily_limit_epoch (account_id uuid, limit_day date, epoch bigint, primary key (account_id, limit_day))`. Sem linha, o epoch é 0.
 
 ## 5. Endpoint de consulta
@@ -102,7 +102,7 @@ Valor do limite: R$ 5.000,00 = `500000` centavos para todas as contas (ADR 0010,
   - Redis volta depois de reservas pelo PostgreSQL: o epoch força a reconstrução e o limite não é passado;
   - liberação ao falhar por saldo e ao compensar;
   - endpoint.
-- **e2e:** duas transferências que juntas passam de R$ 5.000; a segunda termina `FAILED` com `DAILY_LIMIT_EXCEEDED`, e a notificação de transferência recusada chega.
+- **e2e:** duas transferências que juntas passam de R$ 5.000; a segunda termina `FAILED` com `daily-limit-exceeded`, e a notificação de transferência recusada chega.
 - **Mutantes a rodar na revisão:**
   - sem a checagem de idempotência no Lua, o teste da retentativa fica vermelho;
   - sem a liberação em `Failed`/`Compensated`, o teste da liberação fica vermelho;
@@ -113,7 +113,7 @@ Valor do limite: R$ 5.000,00 = `500000` centavos para todas as contas (ADR 0010,
 - Variáveis `TRANSFERS_REDIS_HOST`, `TRANSFERS_REDIS_PORT` e `TRANSFERS_DAILY_LIMIT` no `.env.example` e no guia local.
 - `libs/testing-redis`: o apoio de Redis do `statement` vira lib compartilhada, agora com o segundo usuário (ruling da etapa 5).
 - ADR 0010 atualizado: dia em São Paulo, TTL do contador, trava única no PostgreSQL, epoch e fallback.
-- O motivo `DAILY_LIMIT_EXCEEDED` aparece na notificação de transferência recusada, se o `notification` mostrar o motivo.
+- O motivo `daily-limit-exceeded` aparece na notificação de transferência recusada, se o `notification` mostrar o motivo.
 
 ## Fora de escopo
 - Limite por tipo de conta: depois do MVP.
