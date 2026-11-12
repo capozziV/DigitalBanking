@@ -1,7 +1,7 @@
 # Etapa 6 — limite diário: design
 
 - **Data:** 2026-11-12
-- **Status:** aguardando revisão do usuário
+- **Status:** aprovada pelo usuário em 2026-11-12
 - **Roadmap:** etapa 6, "Redis + Lua, reserva idempotente, reconstrução a partir do PostgreSQL".
 - **ADR base:** [0010 — Limite diário com Redis + Lua](../../adr/0010-limite-diario-redis-lua.md).
 
