@@ -9,6 +9,7 @@ import org.testcontainers.utility.MountableFile
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
 import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient
 import software.amazon.awssdk.services.sns.SnsClient
 import software.amazon.awssdk.services.sqs.SqsClient
 import java.time.Duration
@@ -85,6 +86,14 @@ object LocalStackTestSupport {
 
     fun sqsClient(container: LocalStackContainer): SqsClient =
         SqsClient
+            .builder()
+            .endpointOverride(container.endpoint)
+            .region(Region.of(container.region))
+            .credentialsProvider(credentials(container))
+            .build()
+
+    fun dynamoDbClient(container: LocalStackContainer): DynamoDbClient =
+        DynamoDbClient
             .builder()
             .endpointOverride(container.endpoint)
             .region(Region.of(container.region))

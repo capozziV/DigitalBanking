@@ -1,0 +1,25 @@
+meta {
+  name: Primeira pagina (limit 2)
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/accounts/{{accountId}}/statement?limit=2
+  body: none
+  auth: none
+}
+
+script:post-response {
+  if (res.body.nextCursor) {
+    bru.setVar("statementCursor", res.body.nextCursor);
+  }
+}
+
+tests {
+  test("200 com os dois lancamentos mais novos e o cursor da proxima pagina", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.entries.map((e) => e.sequence)).to.eql([3, 2]);
+    expect(res.body.nextCursor).to.be.a("string");
+  });
+}

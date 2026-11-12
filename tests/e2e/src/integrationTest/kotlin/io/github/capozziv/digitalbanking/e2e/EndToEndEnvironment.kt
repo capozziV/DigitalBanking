@@ -18,7 +18,7 @@ import java.time.Instant
 /**
  * Everything the end-to-end tests run against, as in the local environment: one PostgreSQL with the `accounts`,
  * `transfers` and `notification` databases and their owner/app users (created by the compose init script itself),
- * LocalStack with the topics, inspection queues and notification queues of the compose init scripts, the three services
+ * LocalStack with the topics, inspection queues, notification queues and statement queue and table of the compose init scripts, the four services
  * as `java -jar` processes, and [AccountsProxy] between `transfers` and `accounts`.
  *
  * The saga runs with short times (see [SAGA_ARGUMENTS]) so the deadline and lease scenarios take seconds, not minutes.
@@ -41,6 +41,8 @@ class EndToEndEnvironment : AutoCloseable {
         private set
     lateinit var notification: ServiceProcess
         private set
+    lateinit var statement: ServiceProcess
+        private set
     lateinit var proxy: AccountsProxy
         private set
     lateinit var accountsApi: AccountsApiClient
@@ -48,6 +50,8 @@ class EndToEndEnvironment : AutoCloseable {
     lateinit var transfersApi: TransfersApiClient
         private set
     lateinit var notificationApi: NotificationApiClient
+        private set
+    lateinit var statementApi: StatementApiClient
         private set
     lateinit var notificationQueues: NotificationQueues
         private set
@@ -59,11 +63,12 @@ class EndToEndEnvironment : AutoCloseable {
     fun processes(): List<ServiceProcess> =
         listOfNotNull(if (::accounts.isInitialized) accounts else null) +
             listOfNotNull(if (::transfers.isInitialized) transfers else null) +
-            listOfNotNull(if (::notification.isInitialized) notification else null)
+            listOfNotNull(if (::notification.isInitialized) notification else null) +
+            listOfNotNull(if (::statement.isInitialized) statement else null)
 
     /** Starts LocalStack first: without the token the whole class is skipped locally (and fails on CI) right away. */
     fun start() {
-        localStack = LocalStackTestSupport.container(listOf("sns", "sqs")).withEnv(NOTIFICATION_QUEUE_SETTINGS)
+        localStack = LocalStackTestSupport.container(listOf("sns", "sqs", "dynamodb")).withEnv(NOTIFICATION_QUEUE_SETTINGS)
         scripts(systemPath("e2e.localstack-init-dir")).forEach { script ->
             localStack.withCopyFileToContainer(
                 MountableFile.forHostPath(script, EXECUTABLE),
@@ -94,12 +99,16 @@ class EndToEndEnvironment : AutoCloseable {
                 emptyList(),
                 logDir,
             )
+        statement =
+            ServiceProcess("statement", systemPath("e2e.statement-jar"), statementEnvironment(), emptyList(), logDir)
         accounts.start()
         transfers.start()
         notification.start()
+        statement.start()
         accountsApi = AccountsApiClient(accounts.baseUrl)
         transfersApi = TransfersApiClient(transfers.baseUrl)
         notificationApi = NotificationApiClient(notification.baseUrl)
+        statementApi = StatementApiClient(statement.baseUrl)
     }
 
     override fun close() {
@@ -144,6 +153,12 @@ class EndToEndEnvironment : AutoCloseable {
             "NOTIFICATION_DB_OWNER_PASSWORD" to DATABASE_PASSWORDS.getValue("NOTIFICATION_DB_OWNER_PASSWORD"),
             "NOTIFICATION_AWS_ENDPOINT" to localStack.endpoint.toString(),
             "NOTIFICATION_AWS_REGION" to localStack.region,
+        )
+
+    private fun statementEnvironment() =
+        mapOf(
+            "STATEMENT_AWS_ENDPOINT" to localStack.endpoint.toString(),
+            "STATEMENT_AWS_REGION" to localStack.region,
         )
 
     private fun jdbcUrl(database: String) = "jdbc:postgresql://${postgres.host}:${postgres.getMappedPort(POSTGRES_PORT)}/$database"

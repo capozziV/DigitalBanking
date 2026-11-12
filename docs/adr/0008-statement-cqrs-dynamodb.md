@@ -1,6 +1,6 @@
 # 0008 — Extrato (`statement`) com CQRS no DynamoDB
 
-- **Status:** aceito
+- **Status:** aceito; chave de ordenação substituída pelo [ADR 0018](0018-chave-do-extrato-pela-sequencia.md)
 - **Data:** 2026-10-21
 
 ## Contexto
@@ -8,7 +8,7 @@ O extrato é um caso de leitura frequente e não deve sobrecarregar o `accounts`
 
 ## Decisão
 - O serviço `statement` mantém um modelo de leitura (CQRS) no **DynamoDB**.
-- Chave: `accountId` (partição) + `timestamp#entryId` (ordenação).
+- Chave: `accountId` (partição) + `timestamp#entryId` (ordenação). A ordenação passou a ser pela `sequence` do lançamento ([ADR 0018](0018-chave-do-extrato-pela-sequencia.md)).
 - O modelo é alimentado por eventos consumidos via SQS (ver ADR 0003).
 - Gravação idempotente com `PutItem` condicional.
 

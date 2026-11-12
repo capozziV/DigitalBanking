@@ -2,10 +2,10 @@
 
 > Resumo do projeto, atualizado pela coordenadora ao fim de cada tarefa. Tasks, débito técnico, decisões pendentes e tarefas do usuário ficam no board.
 
-**Última atualização:** 2026-11-10
+**Última atualização:** 2026-11-12
 **Board:** [Digital Banking no GitHub Projects](https://github.com/users/capozziV/projects/2)
-**Fase atual:** etapa 3 concluída (merge do PR #114 em 2026-11-10); etapa 4 a começar.
-**Próximo passo:** etapa 4 (`statement`), começando pelo brainstorming (cartão #11).
+**Fase atual:** etapa 4 (`statement`) implementada e revisada; PR #139 aberto, aguardando CI e merge.
+**Próximo passo:** merge do PR #139; depois, etapa 5 (cache do extrato), começando pelo brainstorming.
 
 ## Como usar o board
 - Colunas: **Backlog** (pendência sem resposta, ou etapa anterior fora de Done), **Ready** (sem pendência e etapa anterior em Done), **In progress**, **In review** (revisão da Beatriz) e **Done** (revisado, build, testes e lint verdes, merge feito).
@@ -20,7 +20,8 @@ Detalhes de cada etapa na spec, no plano e nos PRs.
 - **Etapa 0, fundação** ([spec](superpowers/specs/2026-10-21-etapa-0-fundacao-design.md), [plano](superpowers/plans/2026-10-21-etapa-0-fundacao.md); PR #1): Gradle com `build-logic` e ktlint, ArchUnit, esqueleto do `accounts`, docker-compose, CI.
 - **Etapa 1, `accounts`** ([spec](superpowers/specs/2026-10-22-etapa-1-accounts-design.md), [plano](superpowers/plans/2026-10-22-etapa-1-accounts.md); PRs #2–#4): ledger imutável com trava pessimista, idempotência por chave, cheque especial por tipo, Problem Details, correlation ID, OpenAPI; outbox com relay líder e SNS FIFO no LocalStack (ADRs 0012–0015).
 - **Etapa 2, `transfers`** ([spec](superpowers/specs/2026-10-27-etapa-2-transfers-design.md), [plano](superpowers/plans/2026-10-27-etapa-2-transfers.md), [ADR 0016](adr/0016-saga-orquestrada-por-http.md); PRs #91 e #97): saga orquestrada por HTTP com compensação e passos no padrão State, arrendamento, retomada pelo agendador, eventos no `transfers-events.fifo`; relay em `libs/outbox-relay`, regras ArchUnit em `libs/testing-architecture`, CI seletivo com o job `ci-ok` (exigido pela proteção da `main`), testes ponta a ponta em `tests/e2e`. Último build: 533 testes, 0 falhas, 0 pulados.
-- **Etapa 3, mensageria e `notification`** ([spec](superpowers/specs/2026-10-28-etapa-3-mensageria-design.md), [plano](superpowers/plans/2026-10-28-etapa-3-mensageria.md), [ADR 0017](adr/0017-notification-com-banco-e-consumo-sqs.md); PR #114): serviço `notification` (porta 8083, PostgreSQL próprio) com notificações dentro do aplicativo (boas-vindas, troca de tipo de conta, transferência enviada, recebida, recusada e devolvida); consumo com `@SqsListener` em duas filas FIFO com DLQ (5 tentativas, visibilidade 30 s), idempotência por `processed_events`; API `GET /notifications` e `POST /notifications/read`; `AccountTypeChanged` v2 com o limite de cheque especial; relay em `libs/outbox-relay` com espera crescente com o broker fora; lacunas de teste do `transfers` fechadas (#93–#96). Build final: 699 testes, 0 falhas, 0 pulados; smoke e Bruno das três coleções verdes; e2e com os três serviços.
+- **Etapa 3, mensageria e `notification`** ([spec](superpowers/specs/2026-10-28-etapa-3-mensageria-design.md), [plano](superpowers/plans/2026-10-28-etapa-3-mensageria.md), [ADR 0017](adr/0017-notification-com-banco-e-consumo-sqs.md); PR #114): serviço `notification` (porta 8083, PostgreSQL próprio) com notificações dentro do aplicativo (boas-vindas, troca de tipo de conta, transferência enviada, recebida, recusada e devolvida); consumo com `@SqsListener` em duas filas FIFO com DLQ (5 tentativas, visibilidade 30 s), idempotência por `processed_events`; API `GET /notifications` e `POST /notifications/read`; `AccountTypeChanged` v2 com o limite de cheque especial; relay em `libs/outbox-relay` com espera crescente com o broker fora; lacunas de teste do `transfers` fechadas (#93–#96). Build final: 699 testes, 0 falhas, 0 pulados; smoke e Bruno das três coleções verdes; e2e com os três serviços. Na `main`, seguida dos débitos técnicos dos PRs #130–#132.
+- **Etapa 4, `statement`** ([spec](superpowers/specs/2026-11-10-etapa-4-statement-design.md), [plano](superpowers/plans/2026-11-10-etapa-4-statement.md), [ADR 0018](adr/0018-chave-do-extrato-pela-sequencia.md)): serviço `statement` (porta 8084, DynamoDB sem PostgreSQL) que projeta os lançamentos do `accounts` com `PutItem` condicional pela chave `accountId` + `sequence` (idempotência sem tabela de controle); consumo da fila `statement-accounts.fifo` com DLQ e métrica `statement.dlq.messages`; `GET /accounts/{accountId}/statement` com paginação por cursor opaco; e2e, smoke e Bruno das quatro coleções. Build da revisão final: 791 testes, 0 falhas, 0 pulados. Débitos técnicos #134–#138 no board.
 - **Board** no GitHub Projects (2026-10-26) e **guia local no Mac** (PR #6).
 
 ## Como rodar localmente
@@ -31,6 +32,7 @@ Guia completo, para macOS (zsh) e Linux: [`docs/rodando-localmente.md`](rodando-
 - Teste que "passa de primeira" não prova nada: a revisão roda o mutante (desliga a regra) e o teste tem de ficar vermelho. Na etapa 3, o teste de 20 entregas passava sem a deduplicação.
 - LocalStack iniciado logo depois de outros pode passar de 60 s para ficar pronto; o apoio de testes usa 3 min de prazo e imprime os logs do contêiner.
 - Healthchecks e curls dentro de contêineres usam `127.0.0.1`, nunca `localhost`: no runner do GitHub, `localhost` resolve para IPv6 e o nginx escuta só em IPv4 (sem `listen [::]:80`, que derruba o nginx em máquinas sem IPv6).
+- Script novo em `infra/local/localstack/ready.d` quebra os testes de integração de outros serviços que montam a pasta inteira (na etapa 4, o `04-statement.sh` exigiu DynamoDB no LocalStack do `accounts` e do `transfers`): rode o `./gradlew build` completo ao mexer ali.
 - Toda tabela nova do `accounts` precisa de `grant` próprio para o `accounts_app` (sem `ALTER DEFAULT PRIVILEGES`).
 
 ## Ambiente do Claude

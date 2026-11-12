@@ -1,6 +1,6 @@
 # Rodando o projeto localmente (macOS)
 
-Guia para subir a infraestrutura local, os serviços `accounts`, `transfers` e `notification` e conferir as APIs pelo nginx.
+Guia para subir a infraestrutura local, os serviços `accounts`, `transfers`, `notification` e `statement` e conferir as APIs pelo nginx.
 Todos os comandos rodam na raiz do repositório e valem tanto para o zsh (o shell padrão do macOS) quanto para o bash. Os blocos de comando não têm comentários: as explicações ficam no texto antes e depois de cada bloco, porque o zsh do macOS, por padrão, não aceita `# comentário` na linha de comando.
 
 ## Pré-requisitos
@@ -58,7 +58,7 @@ Preencha `LOCALSTACK_AUTH_TOKEN` no `infra/local/.env`. Os outros valores do `.e
 ```bash
 docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml up --wait
 ```
-O comando volta quando os quatro contêineres estão saudáveis. Sem o token, o `up --wait` volta com erro porque o LocalStack encerra, mas PostgreSQL, Redis e nginx ficam de pé. O LocalStack só fica saudável depois que os scripts de `infra/local/localstack/init/ready.d/` criam os tópicos `accounts-events.fifo` e `transfers-events.fifo`, cada um com sua fila de inspeção assinada (`accounts-events-inspection.fifo` e `transfers-events-inspection.fifo`), e as filas do `notification`: `notification-accounts.fifo` (assinada em `accounts-events.fifo`) e `notification-transfers.fifo` (assinada em `transfers-events.fifo`), cada uma com sua DLQ FIFO (`notification-accounts-dlq.fifo` e `notification-transfers-dlq.fifo`). A fila de origem move a mensagem para a DLQ na 5ª recepção (`NOTIFICATION_MAX_RECEIVE_COUNT`) e esconde a mensagem em leitura por 30 s (`NOTIFICATION_VISIBILITY_TIMEOUT_SECONDS`); os dois valores podem ser trocados no `infra/local/.env`. O script de init do PostgreSQL (`infra/local/postgres/init/01-create-service-databases.sh`) cria um banco por serviço, cada um com dois roles: `<serviço>_owner` (dono, usado pelo Flyway) e `<serviço>_app` (só `LOGIN`; as permissões vêm das migrations). Hoje são `accounts`, `transfers` e `notification`. Os dados ficam no volume nomeado `postgres-data`, que sobrevive a `down` e `up`; o script só roda com volume novo, então, se mudar senhas ou o script, recrie com `down -v` (passo 8). O script é idempotente: para rodá-lo de novo sem apagar nada, execute `docker compose exec postgres /docker-entrypoint-initdb.d/01-create-service-databases.sh`. Ele cria só o que falta e não troca a senha de um role que já existe.
+O comando volta quando os quatro contêineres estão saudáveis. Sem o token, o `up --wait` volta com erro porque o LocalStack encerra, mas PostgreSQL, Redis e nginx ficam de pé. O LocalStack só fica saudável depois que os scripts de `infra/local/localstack/init/ready.d/` criam os tópicos `accounts-events.fifo` e `transfers-events.fifo`, cada um com sua fila de inspeção assinada (`accounts-events-inspection.fifo` e `transfers-events-inspection.fifo`), a fila `statement-accounts.fifo` (assinada em `accounts-events.fifo`, com a DLQ `statement-accounts-dlq.fifo`), a tabela DynamoDB `statement` e as filas do `notification`: `notification-accounts.fifo` (assinada em `accounts-events.fifo`) e `notification-transfers.fifo` (assinada em `transfers-events.fifo`), cada uma com sua DLQ FIFO (`notification-accounts-dlq.fifo` e `notification-transfers-dlq.fifo`). A fila de origem move a mensagem para a DLQ na 5ª recepção (`NOTIFICATION_MAX_RECEIVE_COUNT`) e esconde a mensagem em leitura por 30 s (`NOTIFICATION_VISIBILITY_TIMEOUT_SECONDS`); os dois valores podem ser trocados no `infra/local/.env`. O script de init do PostgreSQL (`infra/local/postgres/init/01-create-service-databases.sh`) cria um banco por serviço, cada um com dois roles: `<serviço>_owner` (dono, usado pelo Flyway) e `<serviço>_app` (só `LOGIN`; as permissões vêm das migrations). Hoje são `accounts`, `transfers` e `notification`. Os dados ficam no volume nomeado `postgres-data`, que sobrevive a `down` e `up`; o script só roda com volume novo, então, se mudar senhas ou o script, recrie com `down -v` (passo 8). O script é idempotente: para rodá-lo de novo sem apagar nada, execute `docker compose exec postgres /docker-entrypoint-initdb.d/01-create-service-databases.sh`. Ele cria só o que falta e não troca a senha de um role que já existe.
 
 Para adicionar o banco de um serviço novo: acrescente ao fim do script a linha `create_service_db <serviço> <SERVICO>_DB_OWNER_PASSWORD <SERVICO>_DB_PASSWORD` (os dois últimos argumentos são os nomes das variáveis com as senhas), declare essas duas variáveis no `environment` do `postgres` em `docker-compose.yml` e em `infra/local/.env.example`, e recrie o volume com `down -v`.
 
@@ -73,7 +73,7 @@ Para rodar só os testes unitários, sem Docker:
 ./gradlew test
 ```
 
-## 4. Subir os serviços `accounts`, `transfers` e `notification`
+## 4. Subir os serviços `accounts`, `transfers`, `notification` e `statement`
 O serviço lê as variáveis `ACCOUNTS_DB_*` e `ACCOUNTS_AWS_ENDPOINT` do ambiente. Num terminal novo, carregue o `.env` no shell (e o `JAVA_HOME`, se não estiver no `~/.zshrc`) e rode:
 ```bash
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
@@ -96,15 +96,23 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 set -a; . infra/local/.env; set +a
 ./gradlew :services:notification:bootstrap:bootRun
 ```
-O `notification` sobe na porta 8083 e aplica as próprias migrations; o nginx o expõe em `/notifications`. Use um quarto terminal para os passos seguintes.
+O `notification` sobe na porta 8083 e aplica as próprias migrations; o nginx o expõe em `/notifications`.
+
+O `statement` consome os eventos do `accounts` e roda num quarto terminal, com o mesmo `.env` carregado. Não usa PostgreSQL: grava no DynamoDB do LocalStack. Ele lê `STATEMENT_AWS_ENDPOINT` (no `.env.example`: `http://localhost:4566`; vazio usa o endpoint real da AWS) e, se definidas, `STATEMENT_AWS_REGION` (padrão `us-east-1`), `STATEMENT_TABLE` (padrão `statement`), `STATEMENT_ACCOUNTS_QUEUE` (padrão `statement-accounts.fifo`), `STATEMENT_ACCOUNTS_DLQ` (padrão `statement-accounts-dlq.fifo`) e `STATEMENT_DLQ_METRICS_REFRESH` (padrão `30s`):
+```bash
+export JAVA_HOME=$(/usr/libexec/java_home -v 21)
+set -a; . infra/local/.env; set +a
+./gradlew :services:statement:bootstrap:bootRun
+```
+O `statement` sobe na porta 8084. A tabela DynamoDB `statement` (chave `accountId` texto + `sequence` numérica, cobrança `PAY_PER_REQUEST`) e as filas são criadas pelo `infra/local/localstack/init/ready.d/04-statement.sh`, não pelo serviço. O nginx expõe `GET /accounts/{id}/statement` e `/statement/actuator/`. Use um quinto terminal para os passos seguintes.
 
 ## 5. Conferir a API pelo nginx
-Primeiro o health, que deve responder `"status":"UP"`; depois o smoke, que abre uma conta, credita 1000, debita 300, confere o saldo 700, lê os eventos da conta na fila de inspeção e, com os três serviços no ar, confere as notificações de uma transferência:
+Primeiro o health, que deve responder `"status":"UP"`; depois o smoke, que abre uma conta, credita 1000, debita 300, confere o saldo 700, lê os eventos da conta na fila de inspeção e, com os quatro serviços no ar, confere as notificações de uma transferência e o extrato da primeira conta:
 ```bash
 curl http://localhost/accounts/actuator/health
 infra/local/smoke.sh http://localhost
 ```
-O smoke é o mesmo que roda no CI. Na parte do `accounts`, ele imprime `OK: eventos de <id> na fila accounts-events-inspection.fifo: AccountOpened LedgerEntryRecorded:1 LedgerEntryRecorded:2`; a parte do `transfers` termina em `OK: eventos de <transferId> na fila transfers-events-inspection.fifo: TransferCompleted`. As duas últimas linhas são as do `notification`: o smoke espera até 45 s (45 tentativas de 1 s, acima da visibilidade de 30 s da fila: o evento da transferência pode chegar antes do da conta e voltar à fila só depois de 30 s) e confere `TRANSFER_SENT` para o cliente da origem e `TRANSFER_RECEIVED` para o da conta de destino, lendo `GET /notifications?customerId=` pelo nginx (`OK: cliente <id> recebeu TRANSFER_SENT` e `OK: cliente <id> recebeu TRANSFER_RECEIVED`). Ele apaga da fila só as mensagens da conta que criou; as de outras contas ficam escondidas por 2 minutos depois do smoke. Como a fila não tem consumidor, ela acumula: se o smoke não achar os próprios eventos, recrie o ambiente com `down -v`. A mesma sequência à mão:
+O smoke é o mesmo que roda no CI. Na parte do `accounts`, ele imprime `OK: eventos de <id> na fila accounts-events-inspection.fifo: AccountOpened LedgerEntryRecorded:1 LedgerEntryRecorded:2`; a parte do `transfers` termina em `OK: eventos de <transferId> na fila transfers-events-inspection.fifo: TransferCompleted`. As duas últimas linhas são as do `notification`: o smoke espera até 45 s (45 tentativas de 1 s, acima da visibilidade de 30 s da fila: o evento da transferência pode chegar antes do da conta e voltar à fila só depois de 30 s) e confere `TRANSFER_SENT` para o cliente da origem e `TRANSFER_RECEIVED` para o da conta de destino, lendo `GET /notifications?customerId=` pelo nginx (`OK: cliente <id> recebeu TRANSFER_SENT` e `OK: cliente <id> recebeu TRANSFER_RECEIVED`). A última linha é a do `statement`: o smoke espera até 30 s e confere, em `GET /accounts/<id>/statement` pelo nginx, os dois lançamentos da primeira conta, do mais novo para o mais antigo (`OK: extrato da conta <id>: 2:DEBIT:300:700 1:CREDIT:1000:1000`, no formato `sequence:kind:amount:balanceAfter`). Ele apaga da fila de inspeção `accounts-events-inspection.fifo` só as mensagens da conta que criou; as de outras contas ficam escondidas por 2 minutos depois do smoke. Como a fila de inspeção não tem consumidor (diferente de `statement-accounts.fifo`, que o `statement` consome), ela acumula: se o smoke não achar os próprios eventos, recrie o ambiente com `down -v`. A mesma sequência à mão:
 ```bash
 ACCOUNT_ID=$(curl -sS -X POST http://localhost/accounts \
   -H 'Content-Type: application/json' -H "Idempotency-Key: $(uuidgen)" \
@@ -173,6 +181,34 @@ docker compose -f infra/local/docker-compose.yml exec -T \
 ```
 O consumo é idempotente (`processed_events`), então devolver uma mensagem já processada não duplica a notificação.
 
+### DLQ do statement
+A fila `statement-accounts.fifo` tem a DLQ FIFO `statement-accounts-dlq.fifo`. A mensagem vai para lá na 5ª tentativa que falha (`STATEMENT_MAX_RECEIVE_COUNT`, visibilidade de 30 s em `STATEMENT_VISIBILITY_TIMEOUT_SECONDS`, ambos lidos pelo compose; veja o `.env.example`). A métrica `statement.dlq.messages` também mostra a quantidade (o valor é relido do SQS a cada 30 s, `STATEMENT_DLQ_METRICS_REFRESH`); consulte pelo actuator, direto no serviço ou pelo nginx:
+```bash
+curl http://localhost:8084/actuator/metrics/statement.dlq.messages
+curl http://localhost/statement/actuator/metrics/statement.dlq.messages
+```
+A resposta traz `"measurements":[{"statistic":"VALUE","value":0.0}]` com a DLQ vazia. Para ver as mensagens paradas pela CLI da AWS:
+```bash
+docker compose -f infra/local/docker-compose.yml exec -T \
+  -e AWS_ACCESS_KEY_ID=test -e AWS_SECRET_ACCESS_KEY=test -e AWS_DEFAULT_REGION=us-east-1 \
+  localstack aws --endpoint-url http://127.0.0.1:4566 sqs get-queue-attributes \
+  --queue-url http://127.0.0.1:4566/000000000000/statement-accounts-dlq.fifo \
+  --attribute-names ApproximateNumberOfMessages QueueArn
+```
+Depois de corrigir a causa, devolva as mensagens à fila de origem com o ARN da DLQ (campo `QueueArn` acima) e o da fila (`arn:aws:sqs:us-east-1:000000000000:statement-accounts.fifo`):
+```bash
+docker compose -f infra/local/docker-compose.yml exec -T \
+  -e AWS_ACCESS_KEY_ID=test -e AWS_SECRET_ACCESS_KEY=test -e AWS_DEFAULT_REGION=us-east-1 \
+  localstack aws --endpoint-url http://127.0.0.1:4566 sqs start-message-move-task \
+  --source-arn <arn da DLQ> --destination-arn <arn da fila>
+```
+O consumo é idempotente (`PutItem` condicional pela chave `accountId` + `sequence`), então devolver uma mensagem já gravada não duplica o lançamento. Para conferir a tabela:
+```bash
+docker compose -f infra/local/docker-compose.yml exec -T \
+  -e AWS_ACCESS_KEY_ID=test -e AWS_SECRET_ACCESS_KEY=test -e AWS_DEFAULT_REGION=us-east-1 \
+  localstack aws --endpoint-url http://127.0.0.1:4566 dynamodb scan --table-name statement --max-items 10
+```
+
 ## 7. Coleção Bruno
 A coleção fica em `api/bruno/accounts/`, com uma requisição por endpoint e `Idempotency-Key` nova a cada envio (`{{$guid}}`, ou uma chave gerada no script da requisição). A consulta de lançamento por chave (`08`) usa a chave do crédito (`03`): rode o `03` antes do `08`.
 - **App do Bruno:** "Open Collection" → `api/bruno/accounts`, escolha o ambiente `local` e rode "Abrir conta" primeiro (ela guarda o `accountId` para as outras).
@@ -190,6 +226,14 @@ A coleção `api/bruno/notification/` também roda sozinha: o script da requisi�
   ```
   Esperado: `Requests 5 (5 Passed)`.
 
+### Coleção do `statement`
+A coleção `api/bruno/statement/` também roda sozinha: o script da requisição `01` abre uma conta, faz três créditos (1000, 2000 e 3000) e espera até 30 s pelo extrato ter os três lançamentos. As requisições seguem a ordem: `01` lê o extrato (sequences 3, 2 e 1, saldos 6000, 3000 e 1000), `02` pede a primeira página com `limit=2` e guarda o `nextCursor`, `03` segue o cursor até o último lançamento, `04` mostra o `404` de uma conta desconhecida e `05` o `400` de um `limit` fora de 1 a 100. Precisa do `accounts` e do `statement` no ar.
+- **Terminal:**
+  ```bash
+  (cd api/bruno/statement && bru run --env local)
+  ```
+  Esperado: `Requests 5 (5 Passed)`.
+
 ### Coleção do `transfers`
 A coleção `api/bruno/transfers/` roda sozinha, sem depender da coleção do `accounts`: o script da requisição `01` abre duas contas pelo `accounts`, credita 1000 na origem e guarda a `Idempotency-Key` e os ids em variáveis. Rode as requisições na ordem: `01` cria a transferência (`201`), `02` repete a mesma chave (`200`, mesma transferência) e `03` consulta pelo id. Os dois serviços precisam estar no ar.
 - **App do Bruno:** "Open Collection" → `api/bruno/transfers`, ambiente `local`.
@@ -200,7 +244,7 @@ A coleção `api/bruno/transfers/` roda sozinha, sem depender da coleção do `a
   Esperado: `Requests 3 (3 Passed)`.
 
 ## 8. Derrubar tudo
-Pare os três `bootRun` com Ctrl+C nos terminais deles. Depois derrube os contêineres; o `-v` apaga os dados:
+Pare os quatro `bootRun` com Ctrl+C nos terminais deles. Depois derrube os contêineres; o `-v` apaga os dados:
 ```bash
 docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml down -v
 ```

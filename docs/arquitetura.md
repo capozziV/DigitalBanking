@@ -16,7 +16,7 @@
 | customer | Cadastro e status do cliente | PostgreSQL |
 | accounts | Contas, ledger imutável e saldo (fonte da verdade) | PostgreSQL |
 | transfers | Saga orquestrada de transferência, idempotência, limite diário | PostgreSQL + Redis |
-| statement | Extrato para leitura (CQRS) | DynamoDB + Redis |
+| statement | Extrato para leitura (CQRS) | DynamoDB (Redis para a primeira página chega na etapa 5) |
 | notification | Consome eventos e grava notificações dentro do aplicativo (sininho) | PostgreSQL |
 
 ## Fluxo de entrada
@@ -43,8 +43,8 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 - O saldo pode ficar negativo até o limite de cheque especial, definido pelo tipo de conta (`FREE`, `STANDARD`, `GOLD`, `BLACK`, `DIAMOND`). Os limites ficam numa tabela do `accounts`, alterável pelo endpoint `/admin/account-types/{type}` (protegido na etapa 7). Débito acima do saldo disponível: `422` com tipo `insufficient-available-balance`.
 - Persistência com Spring JDBC (`JdbcClient`), SQL explícito e mapeamento manual.
 - Idempotência por chave no lançamento: `UNIQUE (account_id, idempotency_key)`, conferida sob a trava da conta. Nova tentativa igual devolve o lançamento original; mesma chave com outro tipo ou valor é `422 idempotency-key-reused`. A abertura de conta tem chave de idempotência própria: a mesma chave devolve a conta existente.
-- `statement` no DynamoDB, chave `accountId` + `timestamp#entryId`, gravação idempotente com `PutItem` condicional.
-- (ver [ADR 0007](adr/0007-conta-e-ledger-no-accounts.md), [ADR 0008](adr/0008-statement-cqrs-dynamodb.md), [ADR 0012](adr/0012-saldo-no-lancamento-e-trava-pessimista.md), [ADR 0013](adr/0013-persistencia-com-spring-jdbc.md) e [ADR 0014](adr/0014-tipo-de-conta-e-cheque-especial.md))
+- `statement` no DynamoDB, chave `accountId` + `sequence` do lançamento (numérica), gravação idempotente com `PutItem` condicional.
+- (ver [ADR 0007](adr/0007-conta-e-ledger-no-accounts.md), [ADR 0008](adr/0008-statement-cqrs-dynamodb.md), [ADR 0018](adr/0018-chave-do-extrato-pela-sequencia.md), [ADR 0012](adr/0012-saldo-no-lancamento-e-trava-pessimista.md), [ADR 0013](adr/0013-persistencia-com-spring-jdbc.md) e [ADR 0014](adr/0014-tipo-de-conta-e-cheque-especial.md))
 
 ### Saga de transferência
 - O `transfers` orquestra a saga: débito na origem, crédito no destino e, se o crédito não sai, compensação (crédito de volta na origem, tentado até conseguir). Cada passo é um objeto do padrão State.
@@ -71,7 +71,8 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 - A leitura do lote pula os eventos seguintes de uma conta presa, que não ocupa o lote das outras. Limites de tempo: 2 s por publicação e 10 s por ciclo (configuráveis).
 - O `notification` consome com `@SqsListener` (Spring Cloud AWS) as filas FIFO `notification-accounts.fifo` e `notification-transfers.fifo`, cada uma com DLQ FIFO (`notification-accounts-dlq.fifo`, `notification-transfers-dlq.fifo`); a mensagem vai para a DLQ na 5ª tentativa.
 - Idempotência do consumidor pela tabela `processed_events`, gravada na mesma transação das notificações; a mensagem é confirmada só depois do commit.
-- (ver [ADR 0003](adr/0003-transactional-outbox-e-mensageria.md), [ADR 0015](adr/0015-outbox-relay-lider-e-sns-fifo.md) e [ADR 0017](adr/0017-notification-com-banco-e-consumo-sqs.md))
+- O `statement` (porta 8084, sem PostgreSQL) consome `AccountOpened` e `LedgerEntryRecorded` do `accounts-events.fifo` na fila FIFO `statement-accounts.fifo`, com DLQ `statement-accounts-dlq.fifo` (5 tentativas, visibilidade 30 s). Não usa `processed_events`: o `PutItem` condicional é a idempotência.
+- (ver [ADR 0003](adr/0003-transactional-outbox-e-mensageria.md), [ADR 0015](adr/0015-outbox-relay-lider-e-sns-fifo.md), [ADR 0017](adr/0017-notification-com-banco-e-consumo-sqs.md) e [ADR 0018](adr/0018-chave-do-extrato-pela-sequencia.md))
 
 ### Borda e segurança
 - **API Gateway HTTP API** substitui um gateway em Spring: roteamento por caminho, autorizador JWT nativo do Cognito, VPC Link para ALB interno.

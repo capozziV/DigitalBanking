@@ -1,0 +1,44 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: statement
+  threads:
+    virtual:
+      enabled: true
+  cloud:
+    aws:
+      # Like the outbox relays and notification: a blank endpoint is the real AWS endpoint of the region with the AWS
+      # default credential chain; an endpoint (LocalStack) comes with static test credentials
+      # (AwsCredentialsConfiguration). The local environment (infra/local/.env) and the tests set the LocalStack
+      # endpoint explicitly.
+      region:
+        static: ${STATEMENT_AWS_REGION:us-east-1}
+      sqs:
+        endpoint: ${STATEMENT_AWS_ENDPOINT:}
+
+statement:
+  dynamodb:
+    # Same endpoint as SQS (DynamoDbConfiguration).
+    endpoint: ${STATEMENT_AWS_ENDPOINT:}
+    table: ${STATEMENT_TABLE:statement}
+  queues:
+    accounts: ${STATEMENT_ACCOUNTS_QUEUE:statement-accounts.fifo}
+    accounts-dlq: ${STATEMENT_ACCOUNTS_DLQ:statement-accounts-dlq.fifo}
+  dlq-metrics:
+    # How often the DLQ depth gauge reads SQS (a scrape only reads the last value).
+    refresh-interval: ${STATEMENT_DLQ_METRICS_REFRESH:30s}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # The DLQ depth gauge is read from /actuator/metrics.
+        include: health,metrics
+
+logging:
+  pattern:
+    # Correlation id (MDC key of OutboxEventEnvelope.CORRELATION_ID_MDC_KEY), from the SQS message attribute
+    # while an event is consumed.
+    correlation: "[%X{correlationId:-}] "
