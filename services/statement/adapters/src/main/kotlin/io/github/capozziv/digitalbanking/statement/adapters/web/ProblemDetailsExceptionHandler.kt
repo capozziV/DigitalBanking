@@ -8,7 +8,6 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.HttpStatusCode
 import org.springframework.http.ProblemDetail
 import org.springframework.http.ResponseEntity
-import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.context.request.WebRequest
@@ -36,14 +35,6 @@ class ProblemDetailsExceptionHandler : ResponseEntityExceptionHandler() {
 
     @ExceptionHandler
     fun handle(e: InvalidCursorException) = validationError(listOf(InvalidField("cursor", "is invalid")))
-
-    /** A required query parameter that is absent. */
-    override fun handleMissingServletRequestParameter(
-        ex: MissingServletRequestParameterException,
-        headers: HttpHeaders,
-        status: HttpStatusCode,
-        request: WebRequest,
-    ): ResponseEntity<Any> = badRequest(listOf(InvalidField(ex.parameterName, "is required")))
 
     /** A path or query parameter that does not convert, such as an accountId that is not a UUID or a limit that is not a number. */
     override fun handleTypeMismatch(
