@@ -1,6 +1,6 @@
 # 0019 — Runtime na AWS com EKS
 
-- **Status:** aceito (substitui parcialmente o [ADR 0001](0001-stack-kotlin-spring-boot-aws.md), na parte do ECS Fargate)
+- **Status:** aceito (substitui parcialmente o [ADR 0001](0001-stack-kotlin-spring-boot-aws.md), na parte do ECS Fargate, e o [ADR 0004](0004-api-gateway-http-api-na-borda.md), na parte do ECS Service Connect)
 - **Data:** 2026-11-12
 
 ## Contexto
