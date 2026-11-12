@@ -1,6 +1,7 @@
 package io.github.capozziv.digitalbanking.statement.application.usecase
 
 import io.github.capozziv.digitalbanking.statement.application.ConflictingStatementEntryException
+import io.github.capozziv.digitalbanking.statement.application.fake.InMemoryStatementFirstPageCache
 import io.github.capozziv.digitalbanking.statement.application.fake.InMemoryStatementRepository
 import io.github.capozziv.digitalbanking.statement.application.fake.statementEntry
 import org.assertj.core.api.Assertions.assertThat
@@ -10,7 +11,8 @@ import java.util.UUID
 
 class RecordStatementEntryUseCaseTest {
     private val repository = InMemoryStatementRepository()
-    private val useCase = RecordStatementEntryUseCase(repository)
+    private val cache = InMemoryStatementFirstPageCache()
+    private val useCase = RecordStatementEntryUseCase(repository, cache)
     private val account = UUID.randomUUID()
 
     @Test
@@ -43,5 +45,31 @@ class RecordStatementEntryUseCaseTest {
         assertThat(error.storedEntryId).isEqualTo(stored.entryId)
         assertThat(error.receivedEntryId).isEqualTo(received.entryId)
         assertThat(repository.findEntry(account, 1)).isEqualTo(stored)
+    }
+
+    @Test
+    fun `a recorded entry evicts the first page`() {
+        useCase.execute(statementEntry(account, 1))
+
+        assertThat(cache.evictions[account]).isEqualTo(1)
+    }
+
+    @Test
+    fun `a duplicate entry evicts the first page`() {
+        val entry = statementEntry(account, 1)
+        useCase.execute(entry)
+
+        useCase.execute(entry)
+
+        assertThat(cache.evictions[account]).isEqualTo(2)
+    }
+
+    @Test
+    fun `a conflicting entry does not evict`() {
+        useCase.execute(statementEntry(account, 1))
+
+        catchThrowableOfType(ConflictingStatementEntryException::class.java) { useCase.execute(statementEntry(account, 1)) }
+
+        assertThat(cache.evictions[account]).isEqualTo(1)
     }
 }
