@@ -17,7 +17,7 @@ A primeira página do extrato é a consulta mais comum. Um cache reduz leituras 
 ## Consequências
 - Positivas: menos leituras no DynamoDB na consulta mais comum; jitter evita expiração em massa; indisponibilidade do Redis não derruba o extrato; uma só camada de cache, sem invalidação distribuída entre instâncias.
 - Negativas: janela curta de dado desatualizado entre a gravação do lançamento e a remoção da chave; lógica extra de invalidação no consumidor; sem Caffeine, toda leitura em acerto ainda faz uma ida ao Redis.
-- **Corrida aceita:** uma leitura que erra o cache pode ler a página antiga no DynamoDB e gravá-la no cache depois da remoção feita pelo consumidor. Essa página velha dura no máximo um TTL (até 70 s). O mesmo limite vale se o Redis falhar na remoção. É aceito porque o extrato é leitura e o saldo de autorização nunca vem de cache.
+- **Corrida aceita:** uma leitura que erra o cache pode ler a página antiga no DynamoDB e gravá-la no cache depois da remoção feita pelo consumidor. Essa página velha dura no máximo um TTL (até 70 s). O mesmo limite vale se o Redis falhar na remoção. A 1ª página é lida no DynamoDB com leitura fortemente consistente, para que uma leitura feita depois da remoção sempre veja o lançamento novo. É aceito porque o extrato é leitura e o saldo de autorização nunca vem de cache.
 
 ## Alternativas consideradas
 - **Caffeine local na frente do Redis:** descartada por ora (invalidação em todas as instâncias, ganho pequeno).

@@ -59,7 +59,8 @@ A primeira página do extrato é a consulta mais comum, e o cache tira essa leit
   3. o consumidor grava e faz o `evict`;
   4. a leitura grava no cache a página antiga.
 
-  Essa página velha dura no máximo um TTL (até 70 s). É aceito, conforme o ADR 0009: o extrato é leitura e o saldo de autorização nunca vem de cache. Fica registrado num teste que documenta o limite pelo TTL.
+  Essa página velha dura no máximo um TTL (até 70 s). É aceito, conforme o ADR 0009: o extrato é leitura e o saldo de autorização nunca vem de cache. O limite vem do TTL, já coberto pelo teste que confere a faixa de 50 a 70 s.
+- **Leitura eventual depois do `evict`:** na AWS, uma consulta eventualmente consistente feita logo depois do `evict` poderia não ver o lançamento novo e guardá-lo fora do cache por um TTL. Por isso a 1ª página é lida no DynamoDB com `consistentRead` (decisão da coordenadora na revisão final); as páginas com cursor seguem com leitura eventual.
 - **Redis fora no `evict`:** o mesmo limite de um TTL.
 
 ## 4. Observabilidade
