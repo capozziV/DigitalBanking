@@ -1,35 +1,35 @@
 # Graph Report - DigitalBanking  (2026-11-12)
 
 ## Corpus Check
-- 440 files · ~122,591 words
+- 470 files · ~130,574 words
 - Verdict: corpus is large enough that graph structure adds value.
-- Unclassified: 29 file(s) not represented in the graph (top: .bru 19, (none) 3, .properties 2)
+- Unclassified: 35 file(s) not represented in the graph (top: .bru 25, (none) 3, .properties 2)
 
 ## Summary
-- 3819 nodes · 9170 edges · 241 communities (112 shown, 129 thin omitted)
-- Extraction: 92% EXTRACTED · 8% INFERRED · 0% AMBIGUOUS · INFERRED: 715 edges (avg confidence: 0.89)
+- 4135 nodes · 9947 edges · 279 communities (119 shown, 160 thin omitted)
+- Extraction: 93% EXTRACTED · 7% INFERRED · 0% AMBIGUOUS · INFERRED: 727 edges (avg confidence: 0.89)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `99798eba`
+- Built from commit: `f7b3bdef`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
-- .outbox
+- StatementApiIntegrationTest
 - SqsListenerFifoIntegrationTest.kt
 - AccountApiIntegrationTest
-- ChangeAccountTypeUseCaseTest
+- ChangeAccountTypeUseCaseTest.kt
 - TransferApiIntegrationTest
 - JdbcNotificationRepositoryIntegrationTest
 - ServiceArchitectureRulesTest
 - PendingEvent
 - Account
-- accounts/bootstrap/UseCaseConfiguration.kt
+- SpringTransactionRunner
 - ListNotificationsUseCaseTest
 - ProblemDetailsExceptionHandler.kt
 - OutboxRelayIntegrationTest.kt
-- TransfersIntegrationTest
+- HttpAccountsGateway.kt
 - LedgerEntry
 - Account
 - OutboxRelayTest
@@ -43,7 +43,8 @@
 - 0004 — API Gateway HTTP API na borda
 - 0005 — Frontend Angular e BFF em NestJS
 - 0006 — Observabilidade só com correlation ID
-- TransferSagaEndToEndIntegrationTest
+- Order
+- StatementConsumptionIntegrationTest
 - Rodando o projeto localmente (macOS)
 - AccountController.kt
 - 0008 — Extrato (`statement`) com CQRS no DynamoDB
@@ -52,12 +53,12 @@
 - 0013 — Persistência com Spring JDBC (`JdbcClient`)
 - 0012 — Saldo no lançamento e trava pessimista por conta
 - KnownAccountRepository
-- Order
+- RunTransferSagaUseCaseTest.kt
 - dev-frontend.md
 - dev-kotlin.md
 - infra.md
 - 0003 — Transactional Outbox e mensageria SNS/SQS
-- ConsumeEventUseCase
+- TransferSagaEndToEndIntegrationTest
 - 0011 — Contratos de API
 - Versões novas da etapa 1
 - documentador.md
@@ -65,23 +66,23 @@
 - 01-create-service-databases.sh
 - LocalStackInitScripts
 - outbox_stuck_idx
-- EventEnvelopeReaderTest
+- JdbcRepositoriesIntegrationTest.kt
 - notification/adapters/web/ProblemDetailsExceptionHandler.kt
 - account
-- Balance
+- Test
 - outbox-table.sql
 - V4__outbox.sql
 - LedgerEntryRecorded
-- JdbcOutboxWriter
+- OutboxRelayConfigurationSupportTest.kt
 - JdbcTransferRepositoryIntegrationTest
 - SagaPropertiesTest.kt
 - NotificationConsumptionIntegrationTest
-- NotificationRepository
+- Frente A — `notification`
 - smoke.sh
-- NotificationQueues
-- Etapa 0 — Fundação: design
-- HttpAccountsGateway
-- AccountsApplicationIntegrationTest.kt
+- statement/adapters/web/ProblemDetailsExceptionHandler.kt
+- AvailableBalance
+- RunTransferSagaUseCase
+- statement/bootstrap/DlqMetricsConfiguration.kt
 - 01-accounts-topic.sh
 - StatementEntry
 - OutboxRelayScheduler
@@ -92,21 +93,21 @@
 - RunTransferSagaUseCase
 - OrderResource
 - RunTransferSagaUseCaseTest
-- OutboxMessage
+- JdbcOutboxWriterIntegrationTest.kt
 - LocalStackTestSupport
-- MdcCorrelationContextTest.kt
-- Money
+- NotificationEventListenerTest
+- loggerfactory
 - AccountTypeAdminController.kt
-- InMemoryTransferRepository
+- InMemoryTransferRepositoryTest.kt
 - retryWhileAccountBusy
 - TransferEventsIntegrationTest.kt
 - Etapa 3 — Mensageria e `notification`: design
 - MarkNotificationsReadUseCaseTest
 - NotificationApiIntegrationTest
-- TransferSchemaIntegrationTest
+- TransfersIntegrationTest
 - OutboxRelayConfigurationSupport.kt
 - Etapa 4 — `statement` (extrato com CQRS no DynamoDB): design
-- TransferController.kt
+- transfers/adapters/web/ProblemDetailsExceptionHandler.kt
 - LegacyResource.kt
 - PlaceOrderHandler
 - LegacyController.kt
@@ -127,8 +128,8 @@
 - TransferSagaResumeIntegrationTest.kt
 - RequestTransferUseCaseTest
 - AccountsProxy.kt
-- OpenApiIntegrationTest
-- AccountsCall
+- InMemoryTransferRepository
+- DynamoDbStatementRepositoryIntegrationTest
 - ResumeDueTransfersUseCaseTest
 - AccountRequestDTOs.kt
 - NotificationIntegrationTest
@@ -137,90 +138,128 @@
 - ConcurrencyIntegrationTest
 - UseCaseConfiguration
 - Notification
-- ResumeDueTransfersUseCase
-- StepRecord
+- Bloco 2 — o `transfers` (branch `etapa-2-bloco-2` a partir da `main` com o bloco 1, PR 2)
+- CorrelationContext
 - AccountsResponseClassifierTest
 - OutboxEventAppenderIntegrationTest.kt
 - EndToEndEnvironment
-- LocalStackTestSupportIntegrationTest.kt
+- StatementIntegrationTest
 - TransferMetricsIntegrationTest.kt
-- SnsEventPublisherTest.kt
+- OutboxMetrics.kt
 - OutboxRelayUnreachableBrokerIntegrationTest.kt
 - JdbcTransferRepository
 - AccountTypeAdminApiIntegrationTest
-- TransferSagaScheduler
+- duration
 - TransferStatus
-- OutboxRelaySettingsTest.kt
+- EventEnvelopeReaderTest
 - TransferMetricsConfiguration.kt
-- transfers/adapters/web/OpenApiConfiguration.kt
+- TransferSagaSchedulerTest.kt
 - ApiClient
-- ProcessLogsOnFailureExtension
+- accounts/bootstrap/web/UnexpectedErrorApiIntegrationTest.kt
 - ServiceProcess
 - LocalStackFifoIntegrationTest.kt
 - IdGenerator
 - SchedulerLeaseOwners
-- RunTransferSagaUseCaseTest.kt
+- transfers/adapters/persistence/OutboxEventAppender.kt
 - EndToEndInputs
 - InMemoryStatementRepository
 - .entry
-- Test
+- notification/bootstrap/UseCaseConfiguration.kt
 - TransactionRunner
-- Bloco 2 — o `transfers` (branch `etapa-2-bloco-2` a partir da `main` com o bloco 1, PR 2)
-- NotificationEventListenerTest.kt
-- accounts/adapters/persistence/OutboxEventAppender.kt
-- TransferEvent
-- uuid
+- FakeAccountsGatewayTest.kt
+- .handle
+- OpenAccountUseCase
+- ConsumeEventUseCaseTest
+- ProcessLogsOnFailureExtension
 - TransferStep
-- transfers/adapters/persistence/OutboxEventAppender.kt
+- AccountsApplicationIntegrationTest.kt
 - LocalStackInitScripts
-- .resumeDueOver
+- SnsEventPublisherTest.kt
+- BlockingRepository
+- .repeat
 - 02-transfers-topic.sh
 - OpenApiIntegrationTest
 - DlqMetricsConfiguration.kt
 - transfer
 - .container
 - GetStatementUseCaseTest
+- uuid
 - 03-notification-queues.sh
 - V3__outbox.sql
-- accounts/bootstrap/web/UnexpectedErrorApiIntegrationTest.kt
-- notification/adapters/web/OpenApiConfiguration.kt
 - OrderController.kt
+- transfers/adapters/web/OpenApiConfiguration.kt
+- .request
 - NotificationCursor
-- OutboxRelay
+- assertthat
 - 0014 — Tipo de conta e cheque especial
-- ConsumeEventUseCaseTest
+- NotificationText
 - Order
 - 0007 — Conta e ledger no mesmo serviço (`accounts`)
-- ConflictingStatementEntryException
+- Notification
 - transfers/adapters/web/CorrelationIdFilter.kt
-- BlockingRepository
-- Regras inegociáveis
-- TransactionRunner
-- accounts/adapters/web/CorrelationIdFilter.kt
-- V1__notification_schema.sql
 - Bloco 1 — `accounts` gravando no outbox
+- Banco digital em microsserviços
+- accounts/adapters/web/OpenApiConfiguration.kt
+- accounts/adapters/web/CorrelationIdFilter.kt
+- notification/adapters/web/OpenApiConfiguration.kt
+- statement/adapters/web/CorrelationIdFilter.kt
+- .decode
+- V1__notification_schema.sql
+- ConsumeEventUseCase
 - AccountsIntegrationTest
 - StatementEntryTest
 - 0017 — `notification` com banco próprio e consumo SQS com Spring Cloud AWS
-- TransferRepository
-- AccountsApplication.kt
-- 2026-10-21-etapa-0-fundacao-design.md
+- OutboxRelay
+- Etapa 0 — Fundação: design
+- MdcCorrelationContextTest.kt
 - Frente B — débitos técnicos
 - 04-statement.sh
-- TransfersApplicationIntegrationTest.kt
-- Review Focus
+- .brl
+- AccountController.kt
+- NotificationEventListenerTest.kt
 - .transfer
-- roadmap.md
+- 0001 — Stack: Kotlin + Spring Boot 4 na AWS
+- NotificationCursor
 - Handler
 - Status do projeto
+- EventEnvelopeReaderTest
+- NotificationKind
 - SpringTransactionRunner
-- .inTransaction
-- transfers/adapters/persistence/OutboxWriterConfiguration.kt
+- uri
+- JdbcOutboxWriter
 - 0016 — Saga de transferência orquestrada por HTTP síncrono
 - .record
+- TransfersDatabase
+- .run
+- RecordDebitUseCase.kt
+- NotificationEventListener.kt
+- DynamoDbStatementRepository
 - TestListeners
-- accounts/bootstrap/OutboxRelayConfiguration.kt
-- EntryKind
+- runapplication
+- DebitStepTest
+- CreditStepTest
+- ResolveCreditStepTest
+- ResolveDebitStepTest
+- StatementEndToEndIntegrationTest
+- RequestTransferDTO
+- TransferStatus
+- CompensateStepTest
+- 0018 — Extrato ordenado pela sequência do ledger
+- statement/bootstrap/web/ApiClient.kt
+- OutboxWriterClockIntegrationTest.kt
+- JdbcProcessedEventRepositoryIntegrationTest
+- SchedulingConfiguration.kt
+- BlockingRepository
+- JdbcTransferStepLogIntegrationTest.kt
+- TransfersApplicationIntegrationTest.kt
+- OutboxRelaySettings
+- statement/adapters/web/OpenApiConfiguration.kt
+- OpenApiIntegrationTest
+- SagaIntegrationSupport.kt
+- bootstrap/OutboxSchemaIntegrationTest.kt
+- persistence/OutboxSchemaIntegrationTest.kt
+- QueueProperties
+- StatementWebIntegrationTest
 
 ## God Nodes (most connected - your core abstractions)
 1. `Transfer` - 110 edges
@@ -229,79 +268,67 @@
 4. `AccountApiIntegrationTest` - 61 edges
 5. `LedgerEntry` - 58 edges
 6. `TransferStep` - 53 edges
-7. `Money` - 49 edges
-8. `AccountType` - 49 edges
-9. `Balance` - 49 edges
+7. `AccountType` - 49 edges
+8. `Balance` - 49 edges
+9. `Money` - 49 edges
 10. `assertProblem()` - 47 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `Decisão` --references--> `LedgerEntry`  [INFERRED]
-  docs/adr/0012-saldo-no-lancamento-e-trava-pessimista.md → services/accounts/domain/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/domain/LedgerEntry.kt
-- `Task 10: Pedir, consultar e retomar transferências (Marina, `dev-kotlin`)` --references--> `ResumeDueTransfersUseCase`  [INFERRED]
-  docs/superpowers/plans/2026-10-27-etapa-2-transfers.md → services/transfers/application/src/main/kotlin/io/github/capozziv/digitalbanking/transfers/application/usecase/ResumeDueTransfersUseCase.kt
-- `Objetivo` --references--> `Transfer`  [INFERRED]
-  docs/superpowers/specs/2026-10-27-etapa-2-transfers-design.md → services/transfers/domain/src/main/kotlin/io/github/capozziv/digitalbanking/transfers/domain/Transfer.kt
-- `Decisão` --references--> `TransferStep`  [INFERRED]
-  docs/adr/0016-saga-orquestrada-por-http.md → services/transfers/domain/src/main/kotlin/io/github/capozziv/digitalbanking/transfers/domain/TransferStep.kt
-- `Task A7: `AccountTypeChanged` versão 2 no `accounts` (Marina, `dev-kotlin`) — paralela desde o início` --references--> `LedgerEntryRecorded`  [INFERRED]
-  docs/superpowers/plans/2026-10-28-etapa-3-mensageria.md → services/accounts/domain/src/main/kotlin/io/github/capozziv/digitalbanking/accounts/domain/AccountEvent.kt
+- `Mensageria` --references--> `OutboxRelay`  [INFERRED]
+  docs/arquitetura.md → libs/outbox-relay/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/relay/OutboxRelay.kt
+- `Task 14: Agendador, relay e eventos no `transfers` (Marina, `dev-kotlin`)` --references--> `OutboxRelayScheduler`  [INFERRED]
+  docs/superpowers/plans/2026-10-27-etapa-2-transfers.md → libs/outbox-relay/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/relay/spring/OutboxRelayScheduler.kt
+- `Task 7: `libs/outbox` — envelope e writer (Marie, `dev-kotlin`; em paralelo às Tasks 2–6)` --references--> `OutboxEventEnvelope`  [INFERRED]
+  docs/superpowers/plans/2026-10-22-etapa-1-accounts.md → libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/OutboxEventEnvelope.kt
+- `6. Eventos consumidos e mudança no `accounts`` --references--> `OutboxEventEnvelope`  [INFERRED]
+  docs/superpowers/specs/2026-10-28-etapa-3-mensageria-design.md → libs/outbox/src/main/kotlin/io/github/capozziv/digitalbanking/outbox/OutboxEventEnvelope.kt
+- `Task 1: Source set `integrationTest` e versões novas (Rafael, `infra`)` --references--> `AccountsApplicationIntegrationTest`  [INFERRED]
+  docs/superpowers/plans/2026-10-22-etapa-1-accounts.md → services/accounts/bootstrap/src/integrationTest/kotlin/io/github/capozziv/digitalbanking/accounts/bootstrap/AccountsApplicationIntegrationTest.kt
 
 ## Import Cycles
 - None detected.
 
-## Communities (241 total, 129 thin omitted)
+## Communities (279 total, 160 thin omitted)
 
-### Community 0 - ".outbox"
-Cohesion: 0.33
-Nodes (4): Etapa 1 — `accounts` Implementation Plan, Global Constraints, Review Focus, EventOutbox
-
-### Community 3 - "ChangeAccountTypeUseCaseTest"
-Cohesion: 0.11
-Nodes (8): EventOutbox, ChangeAccountTypeUseCase, CallLog, AccountTypeRepository, RecordingEventOutbox, ChangeAccountTypeUseCaseTest, AccountEvent, AccountTypeChanged
+### Community 3 - "ChangeAccountTypeUseCaseTest.kt"
+Cohesion: 0.10
+Nodes (8): OutboxEventAppender, CallLog, EventOutbox, DirectTransactionRunner, RecordingEventOutbox, ChangeAccountTypeUseCaseTest, AccountEvent, AccountTypeChanged
 
 ### Community 5 - "JdbcNotificationRepositoryIntegrationTest"
-Cohesion: 0.14
-Nodes (4): JdbcNotificationRepositoryIntegrationTest, JdbcProcessedEventRepositoryIntegrationTest, aNotification(), microsNow()
+Cohesion: 0.24
+Nodes (3): JdbcNotificationRepositoryIntegrationTest, aNotification(), microsNow()
 
 ### Community 6 - "ServiceArchitectureRulesTest"
 Cohesion: 0.06
-Nodes (5): ServiceArchitectureRules, ServiceArchitectureRulesTest, ArchitectureTest, ArchitectureTest, ArchitectureTest
+Nodes (6): ServiceArchitectureRules, ServiceArchitectureRulesTest, ArchitectureTest, ArchitectureTest, ArchitectureTest, ArchitectureTest
 
 ### Community 7 - "PendingEvent"
-Cohesion: 0.11
-Nodes (8): Bloco 2 — relay e SNS FIFO, Task 15: Relay e publicador SNS (Marina, `dev-kotlin`), EventPublisher, JdbcOutboxStore, NoOpPublisher, PendingEvent, OutboxEventEnvelopeTest, RecordingEventPublisher
+Cohesion: 0.09
+Nodes (15): Bloco 2 — relay e SNS FIFO, Task 15: Relay e publicador SNS (Marina, `dev-kotlin`), Bloco 1 — preparação para o 2º serviço (branch `etapa-2-transfers`, PR 1), Task 1: Gradle para vários serviços (Rafael, `infra`) — cartão #37, Task 2: Relay em módulo próprio e teste de esquema (Marina, `dev-kotlin`) — cartões #25 e #30, Task 4: Consulta de lançamento pela chave no `accounts` (Marina, `dev-kotlin`), Task 5: PostgreSQL com um banco por serviço (Rafael, `infra`) — cartão #38, Task 6: Build seletivo no CI (Rafael, `infra`) (+7 more)
 
 ### Community 8 - "Account"
-Cohesion: 0.05
-Nodes (28): Clientes e contas, Task 4: Portas e casos de uso de abrir e consultar conta (Marina, `dev-kotlin`), Task 8: Esquema, usuários de banco e repositórios JDBC (Marina, `dev-kotlin`; o script de init do compose segue o padrão do Rafael), Global Constraints, 4. Fluxos, JdbcAccountRepository, AccountBusyException, CustomerAlreadyHasAccountException (+20 more)
-
-### Community 9 - "accounts/bootstrap/UseCaseConfiguration.kt"
-Cohesion: 0.06
-Nodes (13): Task 5: Casos de uso de crédito e débito (Marina, `dev-kotlin`), IdGenerator, TransactionRunner, GetAccountUseCase, IdempotentEntryLookup, RecordCreditUseCase, DebitOutcome, RecordDebitUseCase (+5 more)
+Cohesion: 0.08
+Nodes (11): Regras inegociáveis, JdbcAccountRepository, AccountRepository, InsertAccountResult, DUPLICATE_CUSTOMER, DUPLICATE_OPENING_KEY, INSERTED, InMemoryAccountRepository (+3 more)
 
 ### Community 11 - "ProblemDetailsExceptionHandler.kt"
-Cohesion: 0.09
+Cohesion: 0.10
 Nodes (8): IdempotencyKeyHeader, ProblemDetailsExceptionHandler, AccountTypeNotFoundException, EntryNotFoundException, InsufficientAvailableBalanceException, InvalidField, InvalidRequestException, BalanceOverflowException
 
 ### Community 12 - "OutboxRelayIntegrationTest.kt"
 Cohesion: 0.09
 Nodes (3): OutboxRelayIntegrationTest, ReceivedEvent, RecordingPublisherConfiguration
 
-### Community 13 - "TransfersIntegrationTest"
-Cohesion: 0.14
-Nodes (3): ClockWiringIntegrationTest, TransfersIntegrationTest, UnexpectedErrorApiIntegrationTest
+### Community 13 - "HttpAccountsGateway.kt"
+Cohesion: 0.12
+Nodes (8): 4. Fluxos, AccountsResponseClassifier, AccountsAccountResponseDTO, AccountsEntryRequestDTO, AccountsEntryResponseDTO, AccountsProblemDTO, HttpAccountsGateway, RawResponse
 
 ### Community 14 - "LedgerEntry"
-Cohesion: 0.08
-Nodes (11): JdbcLedgerEntryRepository, AccountNotFoundException, LedgerEntryRepository, FindEntryByIdempotencyKeyUseCase, InMemoryLedgerEntryRepository, FindEntryByIdempotencyKeyUseCaseTest, DebitResult, EntryRecorded (+3 more)
-
-### Community 16 - "OutboxRelayTest"
-Cohesion: 0.11
-Nodes (5): FakeEventPublisher, MutableClock, OutboxRelayTest, Lease, TransfersDatabase
+Cohesion: 0.09
+Nodes (11): JdbcLedgerEntryRepository, AccountBusyException, AccountNotFoundException, IdempotencyKeyReusedException, LedgerEntryRepository, FindEntryByIdempotencyKeyUseCase, InMemoryLedgerEntryRepository, EntryKind (+3 more)
 
 ### Community 17 - "AccountTypeLimit"
-Cohesion: 0.08
-Nodes (10): 1. Módulos e camadas, JdbcAccountTypeRepository, AccountTypeRepository, ChangeOverdraftLimitUseCase, ListAccountTypesUseCase, InMemoryAccountTypeRepository, ChangeOverdraftLimitUseCaseTest, ListAccountTypesUseCaseTest (+2 more)
+Cohesion: 0.07
+Nodes (18): Clientes e contas, Global Constraints, 1. Módulos e camadas, JdbcAccountTypeRepository, AccountTypeRepository, ChangeOverdraftLimitUseCase, ListAccountTypesUseCase, InMemoryAccountTypeRepository (+10 more)
 
 ### Community 18 - "Decisões tomadas"
 Cohesion: 0.13
@@ -324,11 +351,11 @@ Cohesion: 0.40
 Nodes (5): 0006 — Observabilidade só com correlation ID, Alternativas consideradas, Consequências, Contexto, Decisão
 
 ### Community 29 - "Rodando o projeto localmente (macOS)"
-Cohesion: 0.13
-Nodes (15): 1. Configurar o ambiente, 2. Subir a infraestrutura (PostgreSQL, Redis, nginx, LocalStack), 3. Build e testes, 4. Subir os serviços `accounts`, `transfers` e `notification`, 5. Conferir a API pelo nginx, 6. Ver os eventos na fila de inspeção, 7. Coleção Bruno, 8. Derrubar tudo (+7 more)
+Cohesion: 0.12
+Nodes (17): 1. Configurar o ambiente, 2. Subir a infraestrutura (PostgreSQL, Redis, nginx, LocalStack), 3. Build e testes, 4. Subir os serviços `accounts`, `transfers`, `notification` e `statement`, 5. Conferir a API pelo nginx, 6. Ver os eventos na fila de inspeção, 7. Coleção Bruno, 8. Derrubar tudo (+9 more)
 
 ### Community 30 - "AccountController.kt"
-Cohesion: 0.23
+Cohesion: 0.22
 Nodes (3): AccountController, AccountDTO, LedgerEntryDTO
 
 ### Community 31 - "0008 — Extrato (`statement`) com CQRS no DynamoDB"
@@ -355,6 +382,10 @@ Nodes (5): 0012 — Saldo no lançamento e trava pessimista por conta, Alternati
 Cohesion: 0.17
 Nodes (3): JdbcKnownAccountRepository, KnownAccountRepository, InMemoryKnownAccountRepository
 
+### Community 37 - "RunTransferSagaUseCaseTest.kt"
+Cohesion: 0.09
+Nodes (7): Task 9: Portas e execução da saga (Marina, `dev-kotlin`), IdempotencyKeyReusedException, RetryBackoff, FakeEventOutbox, InMemoryTransferStepLog, MutableClock, RetryBackoffTest
+
 ### Community 38 - "dev-frontend.md"
 Cohesion: 0.50
 Nodes (3): Antes de devolver, Como trabalhar, Regras
@@ -371,10 +402,6 @@ Nodes (3): Antes de devolver, Escopo, Regras
 Cohesion: 0.50
 Nodes (4): 0003 — Transactional Outbox e mensageria SNS/SQS, Consequências, Contexto, Decisão
 
-### Community 42 - "ConsumeEventUseCase"
-Cohesion: 0.11
-Nodes (9): NotificationEventListener, IdGenerator, UnknownAccountException, ConsumeEventUseCase, ConsumeOutcome, DUPLICATE, IGNORED, PROCESSED (+1 more)
-
 ### Community 43 - "0011 — Contratos de API"
 Cohesion: 0.50
 Nodes (4): 0011 — Contratos de API, Consequências, Contexto, Decisão
@@ -383,69 +410,61 @@ Nodes (4): 0011 — Contratos de API, Consequências, Contexto, Decisão
 Cohesion: 0.50
 Nodes (3): Observações, springdoc e Spring Boot 4.1.x, Versões novas da etapa 1
 
-### Community 61 - "EventEnvelopeReaderTest"
-Cohesion: 0.12
-Nodes (9): EventEnvelopeReaderTest, AccountOpened, AccountTypeChanged, ReceivedEvent, TransferCompensated, TransferCompleted, TransferFailed, Unsupported (+1 more)
+### Community 61 - "JdbcRepositoriesIntegrationTest.kt"
+Cohesion: 0.10
+Nodes (6): 4. Fluxos, EventOutbox, IdGenerator, TransactionRunner, ChangeAccountTypeUseCase, GetAccountUseCase
 
 ### Community 63 - "account"
 Cohesion: 0.33
 Nodes (3): account_type, account, ledger_entry
-
-### Community 64 - "Balance"
-Cohesion: 0.10
-Nodes (11): Ledger, 2. Modelo de domínio, AccountView, GetAccountUseCaseTest, AvailableBalance, Balance, currentBalance(), Money (+3 more)
 
 ### Community 65 - "outbox-table.sql"
 Cohesion: 0.83
 Nodes (3): outbox, outbox_stuck_idx, outbox_unpublished_idx
 
 ### Community 69 - "LedgerEntryRecorded"
-Cohesion: 0.11
-Nodes (12): 0018 — Extrato ordenado pela sequência do ledger, Alternativas consideradas, Consequências, Contexto, Decisão, RecordEntryCommand, RecordEntryResult, DirectTransactionRunner (+4 more)
-
-### Community 70 - "JdbcOutboxWriter"
 Cohesion: 0.09
-Nodes (20): Task 7: `libs/outbox` — envelope e writer (Marie, `dev-kotlin`; em paralelo às Tasks 2–6), 10. Documentação que acompanha, 3. Esquema do banco, 5. Outbox e relay (`libs/outbox`), 6. API, 7. Testes, 8. Ambiente local e CI, 9. Entrega em dois blocos (+12 more)
+Nodes (12): Task 5: Casos de uso de crédito e débito (Marina, `dev-kotlin`), IdempotentEntryLookup, RecordCreditUseCase, DebitOutcome, RecordDebitUseCase, Recorded, Refused, RecordEntryCommand (+4 more)
+
+### Community 70 - "OutboxRelayConfigurationSupportTest.kt"
+Cohesion: 0.14
+Nodes (3): DemoRelayConfiguration, InfrastructureConfiguration, OutboxRelayConfigurationSupportTest
 
 ### Community 71 - "JdbcTransferRepositoryIntegrationTest"
-Cohesion: 0.17
+Cohesion: 0.14
 Nodes (3): JdbcTransferRepositoryIntegrationTest, aTransfer(), microsNow()
 
 ### Community 72 - "SagaPropertiesTest.kt"
 Cohesion: 0.07
 Nodes (7): AccountsClientConfiguration, AccountsClientProperties, SagaTimeoutsValidator, PropertiesConfiguration, SagaPropertiesTest, SagaTimeoutsValidatorTest, ValidatorConfiguration
 
-### Community 74 - "NotificationRepository"
-Cohesion: 0.13
-Nodes (9): Task A3: Casos de uso e portas (Marina, `dev-kotlin`), Task A6: API das notificações (Marina, `dev-kotlin`) — paralela à A5, 2. Módulos e camadas, NotificationNotFoundException, NotificationRepository, ProcessedEventRepository, ListNotificationsUseCase, MarkNotificationsReadUseCase (+1 more)
+### Community 73 - "NotificationConsumptionIntegrationTest"
+Cohesion: 0.06
+Nodes (7): NotificationConsumptionIntegrationTest, NotificationApplication, DeadLetter, NotificationQueues, PublishedMessage, ReceivedEvent, TransferEventsQueue
+
+### Community 74 - "Frente A — `notification`"
+Cohesion: 0.22
+Nodes (9): Frente A — `notification`, Task A10: Documentação (Clara, `documentador`) — paralela desde o início, Task A1: Esqueleto do `notification` e prova do `@SqsListener` (Marina, `dev-kotlin`), Task A2: Domínio das notificações (Marina, `dev-kotlin`), Task A4: Persistência (Marina, `dev-kotlin`), Task A5: Consumo das filas (Marina, `dev-kotlin`) — paralela à A6, Task A7: `AccountTypeChanged` versão 2 no `accounts` (Marina, `dev-kotlin`) — paralela desde o início, Task A8: Infra local, Bruno, smoke e CI do `notification` (Rafael, `infra`) (+1 more)
 
 ### Community 75 - "smoke.sh"
 Cohesion: 0.62
 Nodes (6): aws_local(), call(), check_events(), check_notification(), smoke.sh script, uuid()
 
-### Community 76 - "NotificationQueues"
-Cohesion: 0.12
-Nodes (5): DeadLetter, NotificationQueues, PublishedMessage, ReceivedEvent, TransferEventsQueue
+### Community 77 - "AvailableBalance"
+Cohesion: 0.09
+Nodes (11): Ledger, 2. Modelo de domínio, AccountView, GetAccountUseCaseTest, AvailableBalance, Balance, currentBalance(), Money (+3 more)
 
-### Community 77 - "Etapa 0 — Fundação: design"
-Cohesion: 0.22
-Nodes (9): 2. Build e convenções, 4. Ambiente local, 5. CI (GitHub Actions), Critério de pronto, Etapa 0 — Fundação: design, Fora de escopo (e onde foi registrado), Objetivo, Restrições (de `CLAUDE.md` e ADRs) (+1 more)
-
-### Community 78 - "HttpAccountsGateway"
-Cohesion: 0.12
-Nodes (7): 4. Fluxos, AccountsResponseClassifier, AccountsAccountResponseDTO, AccountsEntryResponseDTO, AccountsProblemDTO, HttpAccountsGateway, RawResponse
-
-### Community 79 - "AccountsApplicationIntegrationTest.kt"
-Cohesion: 0.16
-Nodes (5): Task 1: Source set `integrationTest` e versões novas (Rafael, `infra`), AccountsApplicationIntegrationTest, ParameterizedTypeReference, RequestThreadProbe, RequestThreadProbeConfiguration
+### Community 78 - "RunTransferSagaUseCase"
+Cohesion: 0.07
+Nodes (19): Task 12: Cliente HTTP do `accounts` (Marina, `dev-kotlin`), AccountLookup, EXISTS, NOT_FOUND, UNAVAILABLE, AccountsGateway, CallResult, Run (+11 more)
 
 ### Community 80 - "01-accounts-topic.sh"
 Cohesion: 0.40
 Nodes (5): AWS_ACCESS_KEY_ID, AWS_DEFAULT_REGION, aws_local(), AWS_SECRET_ACCESS_KEY, 01-accounts-topic.sh script
 
 ### Community 81 - "StatementEntry"
-Cohesion: 0.15
-Nodes (10): 10. Documentação que acompanha, 2. Módulos e camadas, 3. Modelo de domínio, 4. Tabela no DynamoDB, AccountNotFoundException, StatementRepository, GetStatementUseCase, StatementCursor (+2 more)
+Cohesion: 0.12
+Nodes (10): 2. Módulos e camadas, 3. Modelo de domínio, AccountNotFoundException, StatementRepository, GetStatementUseCase, RegisterAccountUseCase, UseCaseConfiguration, StatementCursor (+2 more)
 
 ### Community 82 - "OutboxRelayScheduler"
 Cohesion: 0.10
@@ -456,68 +475,68 @@ Cohesion: 0.12
 Nodes (4): OutboxBacklog, OutboxStore, OutboxMetricsTest, FakeOutboxStore
 
 ### Community 85 - "Foco de revisão"
-Cohesion: 0.18
-Nodes (10): Ambiente de execução, Etapa 0 — Fundação: plano de implementação, Foco de revisão, Restrições globais, Task 1: Esqueleto do build (wrapper, catálogo, `build-logic`, módulos vazios, ktlint), Task 2: Regras de arquitetura (ArchUnit), Task 4: Ambiente local (docker-compose), Task 5: CI no GitHub Actions (+2 more)
+Cohesion: 0.08
+Nodes (19): 0002 — Clean Architecture por serviço, Alternativas consideradas, Consequências, Contexto, Decisão, Ambiente de execução, Etapa 0 — Fundação: plano de implementação, Foco de revisão (+11 more)
 
 ### Community 88 - "RunTransferSagaUseCase"
-Cohesion: 0.14
+Cohesion: 0.13
 Nodes (3): SagaSettings, SagaProperties, UseCaseConfiguration
 
 ### Community 89 - "OrderResource"
 Cohesion: 0.27
 Nodes (5): PersistenceUsesWeb, OrderResource, WebUsesPersistence, ApplicationUsesAdapters, DomainUsesAdapters
 
-### Community 93 - "MdcCorrelationContextTest.kt"
-Cohesion: 0.16
-Nodes (3): MdcCorrelationContext, MdcCorrelationContextTest, CorrelationContext
-
-### Community 94 - "Money"
+### Community 91 - "JdbcOutboxWriterIntegrationTest.kt"
 Cohesion: 0.18
-Nodes (4): FakeAccountsGatewayTest, GetTransferUseCaseTest, Money, MoneyTest
+Nodes (3): Task 8: Esquema, usuários de banco e repositórios JDBC (Marina, `dev-kotlin`; o script de init do compose segue o padrão do Rafael), JdbcOutboxWriterIntegrationTest, OutboxMessage
 
-### Community 96 - "InMemoryTransferRepository"
-Cohesion: 0.15
-Nodes (3): InMemoryTransferRepository, Lease, InMemoryTransferRepositoryTest
+### Community 94 - "loggerfactory"
+Cohesion: 0.17
+Nodes (8): Task 5: Consumo SQS e métrica da DLQ (Marina, `dev-kotlin`; paralela à Task 6), 5. Fluxo de consumo, StatementEventListener, ConflictingStatementEntryException, RecordOutcome, DUPLICATE, RECORDED, RecordStatementEntryUseCase
 
 ### Community 97 - "retryWhileAccountBusy"
 Cohesion: 0.23
 Nodes (3): isAccountBusy(), retryWhileAccountBusy(), RetryWhileAccountBusyTest
 
 ### Community 98 - "TransferEventsIntegrationTest.kt"
-Cohesion: 0.12
+Cohesion: 0.11
 Nodes (3): ReceivedEvent, SentTransfer, TransferEventsIntegrationTest
 
 ### Community 99 - "Etapa 3 — Mensageria e `notification`: design"
-Cohesion: 0.08
-Nodes (25): Banco digital, Consulta e avisos, 10. Ambiente local e CI, 11. Documentação que acompanha, 1. Frentes de trabalho, 3. Modelo de domínio, 4. Fluxo de consumo, 5. Esquema do banco (`notification`) (+17 more)
+Cohesion: 0.13
+Nodes (15): 10. Ambiente local e CI, 1. Frentes de trabalho, 4. Fluxo de consumo, 5. Esquema do banco (`notification`), 6. Eventos consumidos e mudança no `accounts`, 7. API, nginx e Bruno, 8. Operação, 9. Testes (+7 more)
+
+### Community 100 - "MarkNotificationsReadUseCaseTest"
+Cohesion: 0.19
+Nodes (3): MarkNotificationsReadUseCase, MutableClock, MarkNotificationsReadUseCaseTest
 
 ### Community 101 - "NotificationApiIntegrationTest"
+Cohesion: 0.05
+Nodes (14): EventEnvelopeReader, MalformedEventException, EventEnvelopeReaderTest, AccountOpened, AccountTypeChanged, ReceivedEvent, TransferCompensated, TransferCompleted (+6 more)
+
+### Community 102 - "TransfersIntegrationTest"
 Cohesion: 0.08
-Nodes (7): Task A5: Consumo das filas (Marina, `dev-kotlin`) — paralela à A6, EventEnvelopeReader, MalformedEventException, ApiClient, ApiResponse, assertProblem(), NotificationApiIntegrationTest
+Nodes (5): ClockWiringIntegrationTest, TransferSchemaIntegrationTest, TransfersIntegrationTest, OpenApiIntegrationTest, UnexpectedErrorApiIntegrationTest
 
 ### Community 103 - "OutboxRelayConfigurationSupport.kt"
-Cohesion: 0.14
-Nodes (6): Task 16: Relay no `accounts`, LocalStack no compose e CI (Rafael, `infra`, com a configuração Spring feita pela Marina na mesma task se o diff de Kotlin for a maior parte — decidir pelo diff), OutboxRelaySettings, AwsProperties, OutboxRelayConfigurationSupport, OutboxRelayProperties, OutboxRelayConfiguration
+Cohesion: 0.09
+Nodes (7): Task 16: Relay no `accounts`, LocalStack no compose e CI (Rafael, `infra`, com a configuração Spring feita pela Marina na mesma task se o diff de Kotlin for a maior parte — decidir pelo diff), AwsProperties, OutboxRelayConfigurationSupport, OutboxRelayProperties, OutboxRelayConfiguration, AwsCredentialsConfiguration, OutboxRelayConfiguration
 
 ### Community 105 - "Etapa 4 — `statement` (extrato com CQRS no DynamoDB): design"
-Cohesion: 0.18
-Nodes (11): 1. Frentes de trabalho, 6. API, nginx e Bruno, 7. Operação, 9. Ambiente local e CI, Critério de pronto, Decisões desta etapa (usuário, 2026-11-10), Etapa 4 — `statement` (extrato com CQRS no DynamoDB): design, Fora de escopo (e onde fica registrado) (+3 more)
-
-### Community 106 - "TransferController.kt"
-Cohesion: 0.05
-Nodes (20): RequestTransferDTO, TransferDTO, IdempotencyKeyHeader, ProblemDetailsExceptionHandler, TransferController, AccountsUnavailableException, InvalidField, InvalidRequestException (+12 more)
+Cohesion: 0.15
+Nodes (13): 10. Documentação que acompanha, 1. Frentes de trabalho, 4. Tabela no DynamoDB, 6. API, nginx e Bruno, 7. Operação, 9. Ambiente local e CI, Critério de pronto, Decisões desta etapa (usuário, 2026-11-10) (+5 more)
 
 ### Community 128 - "RequestTransferUseCaseTest"
-Cohesion: 0.20
-Nodes (4): RequestTransferUseCase, RequestTransferUseCaseTest, TransferRepository, TransferRepository
+Cohesion: 0.22
+Nodes (3): RequestTransferUseCaseTest, TransferRepository, TransferRepository
 
 ### Community 129 - "AccountsProxy.kt"
-Cohesion: 0.17
+Cohesion: 0.13
 Nodes (3): AccountsProxy, HeldRequest, Hold
 
-### Community 132 - "AccountsCall"
-Cohesion: 0.07
-Nodes (19): Task 12: Cliente HTTP do `accounts` (Marina, `dev-kotlin`), AccountsEntryRequestDTO, AccountLookup, EXISTS, NOT_FOUND, UNAVAILABLE, AccountsGateway, CallResult (+11 more)
+### Community 131 - "InMemoryTransferRepository"
+Cohesion: 0.11
+Nodes (5): 2. Módulos e camadas, GetTransferUseCase, InMemoryTransferRepository, Lease, GetTransferUseCaseTest
 
 ### Community 134 - "AccountRequestDTOs.kt"
 Cohesion: 0.33
@@ -528,76 +547,96 @@ Cohesion: 0.10
 Nodes (4): NotificationIntegrationTest, JdbcKnownAccountRepositoryIntegrationTest, NotificationWebIntegrationTest, OpenApiIntegrationTest
 
 ### Community 136 - "OutboxRelayConfigurationSupportTest.kt"
-Cohesion: 0.06
-Nodes (12): DemoRelayConfiguration, InfrastructureConfiguration, OutboxRelayConfigurationSupportTest, OutboxSchemaAssertionsIntegrationTest, assertOutboxSchemaMatchesModel(), createModelSchema(), currentSchema(), OutboxSchemaSnapshot (+4 more)
+Cohesion: 0.16
+Nodes (5): OutboxSchemaAssertionsIntegrationTest, assertOutboxSchemaMatchesModel(), createModelSchema(), currentSchema(), OutboxSchemaSnapshot
 
 ### Community 137 - "ServiceApiClients.kt"
-Cohesion: 0.19
-Nodes (5): AccountsApiClient, HttpResult, NotificationApiClient, send(), TransfersApiClient
+Cohesion: 0.15
+Nodes (6): AccountsApiClient, HttpResult, NotificationApiClient, send(), StatementApiClient, TransfersApiClient
 
-### Community 140 - "Notification"
+### Community 141 - "Bloco 2 — o `transfers` (branch `etapa-2-bloco-2` a partir da `main` com o bloco 1, PR 2)"
+Cohesion: 0.25
+Nodes (8): Bloco 2 — o `transfers` (branch `etapa-2-bloco-2` a partir da `main` com o bloco 1, PR 2), Task 10: Pedir, consultar e retomar transferências (Marina, `dev-kotlin`), Task 11: Persistência do `transfers` (Marina, `dev-kotlin`), Task 13: API HTTP do `transfers` (Marina, `dev-kotlin`), Task 14: Agendador, relay e eventos no `transfers` (Marina, `dev-kotlin`), Task 15: Infra local, Bruno, smoke e CI do `transfers` (Rafael, `infra`), Task 16: Testes ponta a ponta (Marina, `dev-kotlin`; Gradle do módulo pode vir do Rafael), Task 7: Esqueleto do `transfers` (Marina, `dev-kotlin`)
+
+### Community 144 - "OutboxEventAppenderIntegrationTest.kt"
+Cohesion: 0.18
+Nodes (4): OutboxEventAppenderIntegrationTest, OutboxRow, Money, MoneyTest
+
+### Community 152 - "duration"
 Cohesion: 0.09
-Nodes (8): JdbcNotificationRepository, NotificationDTO, NotificationPageDTO, NotificationCursorCodec, NotificationCursor, NotificationPage, InMemoryNotificationRepository, Notification
-
-### Community 141 - "ResumeDueTransfersUseCase"
-Cohesion: 0.12
-Nodes (12): Bloco 1 — preparação para o 2º serviço (branch `etapa-2-transfers`, PR 1), Task 1: Gradle para vários serviços (Rafael, `infra`) — cartão #37, Task 3: Regras ArchUnit compartilhadas (Marina, `dev-kotlin`) — cartão #32, Task 4: Consulta de lançamento pela chave no `accounts` (Marina, `dev-kotlin`), Task 5: PostgreSQL com um banco por serviço (Rafael, `infra`) — cartão #38, Task 6: Build seletivo no CI (Rafael, `infra`), Outcome, INTERRUPTED (+4 more)
-
-### Community 142 - "StepRecord"
-Cohesion: 0.16
-Nodes (3): JdbcTransferStepLog, StepRecord, JdbcTransferStepLogIntegrationTest
+Nodes (9): Task 3: Regras ArchUnit compartilhadas (Marina, `dev-kotlin`) — cartão #32, Outcome, INTERRUPTED, SKIPPED, TAKEN, ResumeDueTransfersUseCase, TransferSagaScheduler, TransferSagaSchedulerConfiguration (+1 more)
 
 ### Community 153 - "TransferStatus"
-Cohesion: 0.10
-Nodes (21): Transferências, Etapa 2 — `transfers` + saga Implementation Plan, Global Constraints, Review Focus, 10. Documentação que acompanha, 5. Esquema do banco (`transfers`), 6. Eventos, 7. API, nginx e Bruno (+13 more)
+Cohesion: 0.18
+Nodes (11): 5. Esquema do banco (`transfers`), 6. Eventos, 7. API, nginx e Bruno, 8. Testes, 9. Ambiente local e CI, Critério de pronto, Decisões desta etapa (usuário, 2026-10-27), Etapa 2 — `transfers` + saga: design (+3 more)
+
+### Community 154 - "EventEnvelopeReaderTest"
+Cohesion: 0.12
+Nodes (10): AccountOpened, EventEnvelopeReader, Ignored, LedgerEntryRecorded, MalformedEventException, ReceivedEvent, StatementDTO, StatementEntryDTO (+2 more)
 
 ### Community 155 - "TransferMetricsConfiguration.kt"
-Cohesion: 0.26
+Cohesion: 0.23
 Nodes (4): JdbcPendingTransferStats, PendingTransfers, TransferMetrics, TransferMetricsConfiguration
+
+### Community 156 - "TransferSagaSchedulerTest.kt"
+Cohesion: 0.11
+Nodes (9): JdbcTransferStepLog, EventOutbox, TransactionRunner, StepRecord, TransferStepLog, TransferCompensated, TransferCompleted, TransferEvent (+1 more)
 
 ### Community 161 - "IdGenerator"
 Cohesion: 0.12
 Nodes (4): UuidV7IdGenerator, UuidV7IdGenerator, UuidV7IdGenerator, IdGenerator
 
-### Community 163 - "RunTransferSagaUseCaseTest.kt"
-Cohesion: 0.09
-Nodes (6): Task 9: Portas e execução da saga (Marina, `dev-kotlin`), RetryBackoff, FakeEventOutbox, InMemoryTransferStepLog, MutableClock, RetryBackoffTest
-
 ### Community 169 - "InMemoryStatementRepository"
-Cohesion: 0.16
-Nodes (5): Task 3: Domínio e casos de uso (Marina, `dev-kotlin`), 8. Testes, InMemoryStatementRepository, RecordStatementEntryUseCaseTest, RegisterAccountUseCaseTest
+Cohesion: 0.14
+Nodes (10): Review Focus, Task 1: Esqueleto Gradle e cliente DynamoDB no apoio de testes (Rafael, `infra`), Task 2: LocalStack, compose, nginx e CI (Rafael, `infra`), Task 3: Domínio e casos de uso (Marina, `dev-kotlin`), Task 4: Repositório DynamoDB e bootstrap (Marina, `dev-kotlin`), Task 7: e2e, smoke e Bruno (Marina, `dev-kotlin`), Task 8: Documentação (Clara, `documentador`), 8. Testes (+2 more)
 
-### Community 173 - "Bloco 2 — o `transfers` (branch `etapa-2-bloco-2` a partir da `main` com o bloco 1, PR 2)"
-Cohesion: 0.29
-Nodes (7): Bloco 2 — o `transfers` (branch `etapa-2-bloco-2` a partir da `main` com o bloco 1, PR 2), Task 10: Pedir, consultar e retomar transferências (Marina, `dev-kotlin`), Task 11: Persistência do `transfers` (Marina, `dev-kotlin`), Task 13: API HTTP do `transfers` (Marina, `dev-kotlin`), Task 14: Agendador, relay e eventos no `transfers` (Marina, `dev-kotlin`), Task 15: Infra local, Bruno, smoke e CI do `transfers` (Rafael, `infra`), Task 7: Esqueleto do `transfers` (Marina, `dev-kotlin`)
+### Community 174 - ".handle"
+Cohesion: 0.22
+Nodes (8): IdempotencyKeyHeader, AccountsUnavailableException, InvalidField, InvalidRequestException, SameAccountTransferException, TransferAccountNotFoundException, TransferFailedException, TransferNotFoundException
 
-### Community 176 - "TransferEvent"
-Cohesion: 0.29
-Nodes (5): EventOutbox, TransferCompensated, TransferCompleted, TransferEvent, TransferFailed
+### Community 175 - "OpenAccountUseCase"
+Cohesion: 0.13
+Nodes (9): Task 4: Portas e casos de uso de abrir e consultar conta (Marina, `dev-kotlin`), Restrições (de `CLAUDE.md` e ADRs), CustomerAlreadyHasAccountException, OpenAccountCommand, OpenAccountResult, OpenAccountUseCase, SequentialIdGenerator, OpenAccountUseCaseTest (+1 more)
 
-### Community 177 - "uuid"
-Cohesion: 0.05
-Nodes (7): ClockWiringIntegrationTest, JdbcProcessedEventRepository, InMemoryProcessedEventRepository, NotificationTest, TransferStepLog, FixedClockConfiguration, OutboxWriterClockIntegrationTest
+### Community 176 - "ConsumeEventUseCaseTest"
+Cohesion: 0.17
+Nodes (3): InMemoryProcessedEventRepository, SequentialIdGenerator, ConsumeEventUseCaseTest
 
 ### Community 178 - "TransferStep"
 Cohesion: 0.10
 Nodes (14): Task 8: Domínio da transferência e passos da saga (Marina, `dev-kotlin`), 3. Modelo de domínio, Riscos, Transfer, Compensate, Compensated, Completed, Credit (+6 more)
 
-### Community 181 - ".resumeDueOver"
+### Community 179 - "AccountsApplicationIntegrationTest.kt"
+Cohesion: 0.16
+Nodes (4): AccountsApplicationIntegrationTest, ParameterizedTypeReference, RequestThreadProbe, RequestThreadProbeConfiguration
+
+### Community 182 - "BlockingRepository"
 Cohesion: 0.14
 Nodes (4): CorrelationContext, EventOutbox, TransactionRunner, TransferStepLog
+
+### Community 183 - ".repeat"
+Cohesion: 0.19
+Nodes (8): RequestTransferCommand, AccountNotFound, AccountsUnavailable, Created, Existing, RequestTransferOutcome, RequestTransferUseCase, SameAccount
 
 ### Community 184 - "02-transfers-topic.sh"
 Cohesion: 0.40
 Nodes (5): AWS_ACCESS_KEY_ID, AWS_DEFAULT_REGION, aws_local(), AWS_SECRET_ACCESS_KEY, 02-transfers-topic.sh script
 
 ### Community 186 - "DlqMetricsConfiguration.kt"
-Cohesion: 0.21
+Cohesion: 0.27
 Nodes (3): QueueProperties, DlqDepthProbe, DlqMetricsConfiguration
 
 ### Community 187 - "transfer"
 Cohesion: 0.47
 Nodes (4): transfer, transfer_due_idx, transfer_step, transfer_step_transfer_idx
+
+### Community 189 - "GetStatementUseCaseTest"
+Cohesion: 0.18
+Nodes (3): statementEntry(), GetStatementUseCaseTest, RecordStatementEntryUseCaseTest
+
+### Community 190 - "uuid"
+Cohesion: 0.05
+Nodes (7): ClockWiringIntegrationTest, JdbcProcessedEventRepository, IdGenerator, ProcessedEventRepository, TransactionRunner, NotificationTest, TransferRepository
 
 ### Community 191 - "03-notification-queues.sh"
 Cohesion: 0.39
@@ -607,11 +646,7 @@ Nodes (7): AWS_ACCESS_KEY_ID, AWS_DEFAULT_REGION, aws_local(), AWS_SECRET_ACCESS
 Cohesion: 0.83
 Nodes (3): outbox, outbox_stuck_idx, outbox_unpublished_idx
 
-### Community 198 - "notification/adapters/web/OpenApiConfiguration.kt"
-Cohesion: 0.15
-Nodes (4): ApiDocs, OpenApiConfiguration, ApiDocs, OpenApiConfiguration
-
-### Community 199 - "OrderController.kt"
+### Community 193 - "OrderController.kt"
 Cohesion: 0.25
 Nodes (4): OrderController, PlaceOrderCommand, PlaceOrderResult, PlaceOrderUseCase
 
@@ -619,105 +654,137 @@ Nodes (4): OrderController, PlaceOrderCommand, PlaceOrderResult, PlaceOrderUseCa
 Cohesion: 0.16
 Nodes (5): MarkedNotificationsDTO, MarkNotificationsReadDTO, NotificationController, InvalidField, InvalidRequestException
 
-### Community 201 - "OutboxRelay"
-Cohesion: 0.25
-Nodes (3): Task 2: Relay em módulo próprio e teste de esquema (Marina, `dev-kotlin`) — cartões #25 e #30, OutboxMetrics, OutboxRelay
-
 ### Community 202 - "0014 — Tipo de conta e cheque especial"
 Cohesion: 0.40
 Nodes (5): 0014 — Tipo de conta e cheque especial, Alternativas consideradas, Consequências, Contexto, Decisão
 
-### Community 203 - "ConsumeEventUseCaseTest"
-Cohesion: 0.07
-Nodes (15): Frente A — `notification`, Task A10: Documentação (Clara, `documentador`) — paralela desde o início, Task A1: Esqueleto do `notification` e prova do `@SqsListener` (Marina, `dev-kotlin`), Task A2: Domínio das notificações (Marina, `dev-kotlin`), Task A4: Persistência (Marina, `dev-kotlin`), Task A7: `AccountTypeChanged` versão 2 no `accounts` (Marina, `dev-kotlin`) — paralela desde o início, Task A8: Infra local, Bruno, smoke e CI do `notification` (Rafael, `infra`), Task A9: Testes ponta a ponta (Marina, `dev-kotlin`) — depois de A5, A6, A7, A8 e B5 (+7 more)
+### Community 203 - "NotificationText"
+Cohesion: 0.19
+Nodes (3): NotificationContent, NotificationText, NotificationTextTest
 
 ### Community 205 - "0007 — Conta e ledger no mesmo serviço (`accounts`)"
 Cohesion: 0.50
 Nodes (4): 0007 — Conta e ledger no mesmo serviço (`accounts`), Consequências, Contexto, Decisão
 
-### Community 206 - "ConflictingStatementEntryException"
-Cohesion: 0.20
-Nodes (8): Task 5: Consumo SQS e métrica da DLQ (Marina, `dev-kotlin`; paralela à Task 6), 5. Fluxo de consumo, ConflictingStatementEntryException, RecordOutcome, DUPLICATE, RECORDED, RecordStatementEntryUseCase, RegisterAccountUseCase
+### Community 206 - "Notification"
+Cohesion: 0.18
+Nodes (6): Task A6: API das notificações (Marina, `dev-kotlin`) — paralela à A5, 2. Módulos e camadas, NotificationRepository, ListNotificationsUseCase, InMemoryNotificationRepository, Notification
 
-### Community 209 - "Regras inegociáveis"
-Cohesion: 0.25
-Nodes (8): Agentes do projeto, Ao terminar uma tarefa, Banco digital em microsserviços, Contexto, Fluxo de trabalho (skills), Git, Grafo do código (graphify), Regras inegociáveis
+### Community 208 - "Bloco 1 — `accounts` gravando no outbox"
+Cohesion: 0.18
+Nodes (11): Bloco 1 — `accounts` gravando no outbox, Task 10: OpenAPI, concorrência e idempotência ponta a ponta (Marina, `dev-kotlin`), Task 11: Regras ArchUnit e melhorias da etapa 0 (Marina, `dev-kotlin`), Task 12: nginx, coleção Bruno e smoke (Rafael, `infra`), Task 13: Documentação do bloco 1 e das decisões da etapa (Clara, `documentador`; em paralelo às Tasks 8–12), Task 1: Source set `integrationTest` e versões novas (Rafael, `infra`), Task 2: Valores monetários e tipos (Marina, `dev-kotlin`), Task 3: Conta, lançamento e eventos de domínio (Marina, `dev-kotlin`) (+3 more)
+
+### Community 209 - "Banco digital em microsserviços"
+Cohesion: 0.13
+Nodes (11): Agentes do projeto, Ao terminar uma tarefa, Banco digital em microsserviços, Contexto, Fluxo de trabalho (skills), Git, Grafo do código (graphify), Roadmap (+3 more)
+
+### Community 214 - ".decode"
+Cohesion: 0.22
+Nodes (4): Task 6: API do extrato (Marina, `dev-kotlin`; paralela à Task 5), InvalidCursorException, StatementCursorCodec, StatementCursorCodecTest
 
 ### Community 215 - "V1__notification_schema.sql"
 Cohesion: 0.50
 Nodes (4): known_accounts, notifications, notifications_customer_page_idx, processed_events
 
-### Community 216 - "Bloco 1 — `accounts` gravando no outbox"
-Cohesion: 0.22
-Nodes (9): Bloco 1 — `accounts` gravando no outbox, Task 10: OpenAPI, concorrência e idempotência ponta a ponta (Marina, `dev-kotlin`), Task 11: Regras ArchUnit e melhorias da etapa 0 (Marina, `dev-kotlin`), Task 12: nginx, coleção Bruno e smoke (Rafael, `infra`), Task 13: Documentação do bloco 1 e das decisões da etapa (Clara, `documentador`; em paralelo às Tasks 8–12), Task 2: Valores monetários e tipos (Marina, `dev-kotlin`), Task 3: Conta, lançamento e eventos de domínio (Marina, `dev-kotlin`), Task 6: Casos de uso de tipo e limites (Marina, `dev-kotlin`) (+1 more)
+### Community 216 - "ConsumeEventUseCase"
+Cohesion: 0.25
+Nodes (4): Task A3: Casos de uso e portas (Marina, `dev-kotlin`), UnknownAccountException, ConsumeEventUseCase, Draft
 
 ### Community 220 - "0017 — `notification` com banco próprio e consumo SQS com Spring Cloud AWS"
 Cohesion: 0.40
 Nodes (5): 0017 — `notification` com banco próprio e consumo SQS com Spring Cloud AWS, Alternativas consideradas, Consequências, Contexto, Decisão
 
-### Community 223 - "TransferRepository"
-Cohesion: 0.15
-Nodes (3): 2. Módulos e camadas, TransferRepository, GetTransferUseCase
+### Community 223 - "OutboxRelay"
+Cohesion: 0.13
+Nodes (13): 10. Documentação que acompanha, 3. Esquema do banco, 5. Outbox e relay (`libs/outbox`), 6. API, 7. Testes, 8. Ambiente local e CI, 9. Entrega em dois blocos, Critério de pronto (+5 more)
 
-### Community 224 - "AccountsApplication.kt"
-Cohesion: 0.20
-Nodes (5): Task 3: Aplicação `accounts` com health do banco (Testcontainers), 3. Esqueleto do `accounts`, Testes (no `bootstrap`, que enxerga todos os módulos), AccountsApplication, TransfersApplication
-
-### Community 225 - "2026-10-21-etapa-0-fundacao-design.md"
-Cohesion: 0.14
-Nodes (10): 0001 — Stack: Kotlin + Spring Boot 4 na AWS, Alternativas consideradas, Consequências, Contexto, Decisão, 0002 — Clean Architecture por serviço, Alternativas consideradas, Consequências (+2 more)
+### Community 224 - "Etapa 0 — Fundação: design"
+Cohesion: 0.18
+Nodes (11): 2. Build e convenções, 3. Esqueleto do `accounts`, 4. Ambiente local, 5. CI (GitHub Actions), Critério de pronto, Etapa 0 — Fundação: design, Fora de escopo (e onde foi registrado), Objetivo (+3 more)
 
 ### Community 226 - "Frente B — débitos técnicos"
-Cohesion: 0.20
+Cohesion: 0.19
 Nodes (9): Etapa 3 — Mensageria e `notification` Implementation Plan, Frente B — débitos técnicos, Frentes e ordem, Review Focus, Task B1: Configuração do relay em `libs/outbox-relay` (Marina, `dev-kotlin`) — cartão #92, Task B2: Backoff do relay e testes (Marina, `dev-kotlin`) — cartões #24 e #26, depois da B1, Task B3: Domínio e persistência do `transfers` (Marina, `dev-kotlin`) — cartões #95 e #93, Task B4: Aplicação e adapters do `transfers` (Marina, `dev-kotlin`) — cartão #94, depois da B3 (+1 more)
 
 ### Community 227 - "04-statement.sh"
 Cohesion: 0.43
 Nodes (6): AWS_ACCESS_KEY_ID, AWS_DEFAULT_REGION, aws_local(), AWS_SECRET_ACCESS_KEY, queue_arn(), 04-statement.sh script
 
-### Community 230 - "Review Focus"
-Cohesion: 0.29
-Nodes (7): Review Focus, Task 1: Esqueleto Gradle e cliente DynamoDB no apoio de testes (Rafael, `infra`), Task 2: LocalStack, compose, nginx e CI (Rafael, `infra`), Task 4: Repositório DynamoDB e bootstrap (Marina, `dev-kotlin`), Task 6: API do extrato (Marina, `dev-kotlin`; paralela à Task 5), Task 7: e2e, smoke e Bruno (Marina, `dev-kotlin`), Task 8: Documentação (Clara, `documentador`)
+### Community 232 - "0001 — Stack: Kotlin + Spring Boot 4 na AWS"
+Cohesion: 0.40
+Nodes (5): 0001 — Stack: Kotlin + Spring Boot 4 na AWS, Alternativas consideradas, Consequências, Contexto, Decisão
 
-### Community 231 - ".transfer"
-Cohesion: 0.05
-Nodes (9): CompensateStepTest, CreditStepTest, DebitStepTest, ResolveCreditStepTest, ResolveDebitStepTest, TerminalStepsTest, TransferFixtures, TransferSagaPathsTest (+1 more)
-
-### Community 233 - "roadmap.md"
-Cohesion: 0.25
-Nodes (4): Roadmap, Etapa 4 — `statement`: plano de implementação, Global Constraints, Ordem e paralelismo
+### Community 233 - "NotificationCursor"
+Cohesion: 0.31
+Nodes (4): NotificationPageDTO, NotificationCursorCodec, NotificationCursor, NotificationPage
 
 ### Community 235 - "Status do projeto"
 Cohesion: 0.33
 Nodes (6): Ambiente do Claude, Como rodar localmente, Como usar o board, Concluído, Convenções que já custaram caro, Status do projeto
 
+### Community 237 - "NotificationKind"
+Cohesion: 0.13
+Nodes (12): Banco digital, Consulta e avisos, 11. Documentação que acompanha, 3. Modelo de domínio, NotificationDTO, NotificationKind, ACCOUNT_TYPE_CHANGED, TRANSFER_COMPENSATED (+4 more)
+
+### Community 240 - "JdbcOutboxWriter"
+Cohesion: 0.20
+Nodes (3): JdbcOutboxWriter, OutboxWriterConfiguration, OutboxWriterConfiguration
+
 ### Community 241 - "0016 — Saga de transferência orquestrada por HTTP síncrono"
 Cohesion: 0.40
 Nodes (5): 0016 — Saga de transferência orquestrada por HTTP síncrono, Alternativas consideradas, Consequências, Contexto, Decisão
 
-### Community 251 - "EntryKind"
-Cohesion: 0.50
-Nodes (3): EntryKind, CREDIT, DEBIT
+### Community 243 - ".record"
+Cohesion: 0.14
+Nodes (4): AccountRepository, LedgerEntryRepository, TransactionRunner, AccountTypeRepository
+
+### Community 249 - "RecordDebitUseCase.kt"
+Cohesion: 0.23
+Nodes (4): DebitResult, EntryRecorded, Recorded, Refused
+
+### Community 250 - "NotificationEventListener.kt"
+Cohesion: 0.22
+Nodes (5): NotificationEventListener, ConsumeOutcome, DUPLICATE, IGNORED, PROCESSED
+
+### Community 251 - "DynamoDbStatementRepository"
+Cohesion: 0.19
+Nodes (4): DynamoDbStatementRepository, EntryKind, CREDIT, DEBIT
+
+### Community 253 - "runapplication"
+Cohesion: 0.19
+Nodes (3): AccountsApplication, StatementApplication, TransfersApplication
+
+### Community 261 - "TransferStatus"
+Cohesion: 0.20
+Nodes (10): Transferências, Etapa 2 — `transfers` + saga Implementation Plan, Global Constraints, Review Focus, 10. Documentação que acompanha, TransferStatus, COMPENSATED, COMPLETED (+2 more)
+
+### Community 263 - "0018 — Extrato ordenado pela sequência do ledger"
+Cohesion: 0.40
+Nodes (5): 0018 — Extrato ordenado pela sequência do ledger, Alternativas consideradas, Consequências, Contexto, Decisão
+
+### Community 264 - "statement/bootstrap/web/ApiClient.kt"
+Cohesion: 0.35
+Nodes (3): ApiClient, ApiResponse, assertProblem()
 
 ## Knowledge Gaps
-- **50 isolated node(s):** `Success`, `SameAccount`, `TransferCompensated`, `TransferCompleted`, `TransferFailed` (+45 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 671 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **129 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **52 isolated node(s):** `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (+47 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 685 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **160 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Transfer` connect `TransferStep` to `InMemoryTransferRepository`, `RequestTransferUseCaseTest`, `RunTransferSagaUseCaseTest.kt`, `AccountsCall`, `ResumeDueTransfersUseCaseTest`, `JdbcTransferRepositoryIntegrationTest`, `Account`, `.transfer`, `TransferController.kt`, `Bloco 2 — o `transfers` (branch `etapa-2-bloco-2` a partir da `main` com o bloco 1, PR 2)`, `BlockingRepository`, `uuid`, `TransferMetricsIntegrationTest.kt`, `SpringTransactionRunnerIntegrationTest.kt`, `JdbcTransferRepository`, `TransferStatus`, `RunTransferSagaUseCaseTest`, `TransferRepository`?**
-  _High betweenness centrality (0.067) - this node is a cross-community bridge._
+- **Why does `Transfer` connect `TransferStep` to `RequestTransferUseCaseTest`, `InMemoryTransferRepository`, `TransferStatus`, `ResumeDueTransfersUseCaseTest`, `BlockingRepository`, `Bloco 2 — o `transfers` (branch `etapa-2-bloco-2` a partir da `main` com o bloco 1, PR 2)`, `AccountTypeLimit`, `TransferMetricsIntegrationTest.kt`, `SpringTransactionRunnerIntegrationTest.kt`, `JdbcTransferRepository`, `TransferStatus`, `TransferSagaSchedulerTest.kt`, `RunTransferSagaUseCaseTest.kt`, `.handle`, `.repeat`, `uuid`, `.request`, `JdbcTransferRepositoryIntegrationTest`, `assertthat`, `RunTransferSagaUseCase`, `RunTransferSagaUseCaseTest`, `InMemoryTransferRepositoryTest.kt`, `AccountController.kt`, `.transfer`, `.run`?**
+  _High betweenness centrality (0.048) - this node is a cross-community bridge._
 - **Are the 6 inferred relationships involving `Transfer` (e.g. with `Transferências` and `Global Constraints`) actually correct?**
   _`Transfer` has 6 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `Success`, `SameAccount`, `TransferCompensated` to the rest of the system?**
-  _50 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **What connects `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` to the rest of the system?**
+  _52 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `AccountApiIntegrationTest` be split into smaller, more focused modules?**
   _Cohesion score 0.1357142857142857 - nodes in this community are weakly interconnected._
-- **Why does `Account` connect `Account` to `Balance`, `ChangeAccountTypeUseCaseTest`, `LedgerEntryRecorded`, `JdbcOutboxWriter`, `LedgerEntry`, `Account`, `Regras inegociáveis`, `uuid`, `.record`?**
-  _High betweenness centrality (0.025) - this node is a cross-community bridge._
+- **Why does `OutboxRelay` connect `OutboxRelay` to `NotificationEventListenerTest.kt`, `PendingEvent`, `OutboxRelayConfigurationSupport.kt`, `OutboxRelayConfigurationSupportTest.kt`, `OutboxRelayIntegrationTest.kt`, `OpenAccountUseCase`, `OutboxRelaySettings`, `OutboxRelayTest`, `OutboxRelayScheduler`, `Decisões tomadas`, `OutboxMetrics.kt`, `OutboxMetrics`?**
+  _High betweenness centrality (0.030) - this node is a cross-community bridge._
 - **Are the 8 inferred relationships involving `Account` (e.g. with `Regras inegociáveis` and `Clientes e contas`) actually correct?**
   _`Account` has 8 INFERRED edges - model-reasoned connections that need verification._
-- **Should `ChangeAccountTypeUseCaseTest` be split into smaller, more focused modules?**
-  _Cohesion score 0.10606060606060606 - nodes in this community are weakly interconnected._
+- **Should `ChangeAccountTypeUseCaseTest.kt` be split into smaller, more focused modules?**
+  _Cohesion score 0.09841269841269841 - nodes in this community are weakly interconnected._
