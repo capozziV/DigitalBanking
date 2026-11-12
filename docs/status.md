@@ -2,10 +2,10 @@
 
 > Resumo do projeto, atualizado pela coordenadora ao fim de cada tarefa. Tasks, débito técnico, decisões pendentes e tarefas do usuário ficam no board.
 
-**Última atualização:** 2026-10-29
+**Última atualização:** 2026-11-12
 **Board:** [Digital Banking no GitHub Projects](https://github.com/users/capozziV/projects/2)
-**Fase atual:** etapa 3 implementada e revisada na branch `etapa-3-mensageria`, com PR aberto aguardando CI e merge.
-**Próximo passo:** merge do PR da etapa 3; depois, etapa 4 (`statement`), começando pelo brainstorming (cartão #11).
+**Fase atual:** etapa 4 (`statement`) na branch `etapa-4-statement`: Tasks 1–3 juntadas; Task 4 (repositório DynamoDB e bootstrap) implementada na branch `etapa-4/task-4`, em revisão.
+**Próximo passo:** com a Task 4 aprovada, Tasks 5 (consumo SQS e DLQ), 6 (API do extrato) e 8 (docs) em paralelo; depois a Task 7 (e2e, smoke e Bruno) e a revisão da branch.
 
 ## Como usar o board
 - Colunas: **Backlog** (pendência sem resposta, ou etapa anterior fora de Done), **Ready** (sem pendência e etapa anterior em Done), **In progress**, **In review** (revisão da Beatriz) e **Done** (revisado, build, testes e lint verdes, merge feito).
@@ -20,7 +20,7 @@ Detalhes de cada etapa na spec, no plano e nos PRs.
 - **Etapa 0, fundação** ([spec](superpowers/specs/2026-10-21-etapa-0-fundacao-design.md), [plano](superpowers/plans/2026-10-21-etapa-0-fundacao.md); PR #1): Gradle com `build-logic` e ktlint, ArchUnit, esqueleto do `accounts`, docker-compose, CI.
 - **Etapa 1, `accounts`** ([spec](superpowers/specs/2026-10-22-etapa-1-accounts-design.md), [plano](superpowers/plans/2026-10-22-etapa-1-accounts.md); PRs #2–#4): ledger imutável com trava pessimista, idempotência por chave, cheque especial por tipo, Problem Details, correlation ID, OpenAPI; outbox com relay líder e SNS FIFO no LocalStack (ADRs 0012–0015).
 - **Etapa 2, `transfers`** ([spec](superpowers/specs/2026-10-27-etapa-2-transfers-design.md), [plano](superpowers/plans/2026-10-27-etapa-2-transfers.md), [ADR 0016](adr/0016-saga-orquestrada-por-http.md); PRs #91 e #97): saga orquestrada por HTTP com compensação e passos no padrão State, arrendamento, retomada pelo agendador, eventos no `transfers-events.fifo`; relay em `libs/outbox-relay`, regras ArchUnit em `libs/testing-architecture`, CI seletivo com o job `ci-ok` (exigido pela proteção da `main`), testes ponta a ponta em `tests/e2e`. Último build: 533 testes, 0 falhas, 0 pulados.
-- **Etapa 3, mensageria e `notification`** ([spec](superpowers/specs/2026-10-28-etapa-3-mensageria-design.md), [plano](superpowers/plans/2026-10-28-etapa-3-mensageria.md), [ADR 0017](adr/0017-notification-com-banco-e-consumo-sqs.md)): serviço `notification` (porta 8083, PostgreSQL próprio) com notificações dentro do aplicativo (boas-vindas, troca de tipo de conta, transferência enviada, recebida, recusada e devolvida); consumo com `@SqsListener` em duas filas FIFO com DLQ (5 tentativas, visibilidade 30 s), idempotência por `processed_events`; API `GET /notifications` e `POST /notifications/read`; `AccountTypeChanged` v2 com o limite de cheque especial; relay em `libs/outbox-relay` com espera crescente com o broker fora; lacunas de teste do `transfers` fechadas (#93–#96). Build final: 699 testes, 0 falhas, 0 pulados; smoke e Bruno das três coleções verdes; e2e com os três serviços.
+- **Etapa 3, mensageria e `notification`** ([spec](superpowers/specs/2026-10-28-etapa-3-mensageria-design.md), [plano](superpowers/plans/2026-10-28-etapa-3-mensageria.md), [ADR 0017](adr/0017-notification-com-banco-e-consumo-sqs.md)): serviço `notification` (porta 8083, PostgreSQL próprio) com notificações dentro do aplicativo (boas-vindas, troca de tipo de conta, transferência enviada, recebida, recusada e devolvida); consumo com `@SqsListener` em duas filas FIFO com DLQ (5 tentativas, visibilidade 30 s), idempotência por `processed_events`; API `GET /notifications` e `POST /notifications/read`; `AccountTypeChanged` v2 com o limite de cheque especial; relay em `libs/outbox-relay` com espera crescente com o broker fora; lacunas de teste do `transfers` fechadas (#93–#96). Build final: 699 testes, 0 falhas, 0 pulados; smoke e Bruno das três coleções verdes; e2e com os três serviços. Na `main`, seguida dos débitos técnicos dos PRs #130–#132.
 - **Board** no GitHub Projects (2026-10-26) e **guia local no Mac** (PR #6).
 
 ## Como rodar localmente
