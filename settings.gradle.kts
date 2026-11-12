@@ -16,6 +16,7 @@ include(
     ":libs:outbox-relay",
     ":libs:testing-architecture",
     ":libs:testing-localstack",
+    ":libs:testing-redis",
     ":services:accounts:domain",
     ":services:accounts:application",
     ":services:accounts:adapters",

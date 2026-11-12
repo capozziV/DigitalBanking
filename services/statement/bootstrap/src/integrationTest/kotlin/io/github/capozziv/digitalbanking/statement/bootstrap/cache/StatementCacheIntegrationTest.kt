@@ -7,6 +7,7 @@ import io.github.capozziv.digitalbanking.statement.bootstrap.web.ApiResponse
 import io.github.capozziv.digitalbanking.statement.bootstrap.web.assertProblem
 import io.github.capozziv.digitalbanking.statement.domain.EntryKind
 import io.github.capozziv.digitalbanking.statement.domain.StatementEntry
+import io.github.capozziv.digitalbanking.testing.redis.RedisTestSupport
 import io.micrometer.core.instrument.MeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.awaitility.Awaitility.await
@@ -82,12 +83,12 @@ class StatementCacheIntegrationTest : StatementIntegrationTest() {
         val errors = counter("statement.cache.requests", "error")
 
         var response: ApiResponse? = null
-        redis.dockerClient.pauseContainerCmd(redis.containerId).exec()
+        RedisTestSupport.pause(redis)
         val elapsed =
             try {
                 measureTimeMillis { response = api.get("/accounts/$account/statement") }
             } finally {
-                redis.dockerClient.unpauseContainerCmd(redis.containerId).exec()
+                RedisTestSupport.unpause(redis)
             }
 
         assertThat(elapsed).isLessThan(1_000)
