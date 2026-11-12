@@ -22,6 +22,13 @@ Na revisão final do bloco 1 da etapa 2 (2026-10-27), as tasks estavam limpas um
 - Menor adiado de docs ("uma fila + DLQ por consumidor") estava errado em dois lugares (arquitetura.md e ADR 0003); ADR novo que refina um antigo precisa citá-lo. Confira os ADRs base, não só o novo.
 - Metade dos menores adiados já estava resolvida no HEAD: confira cada um no código antes de mandar para o board.
 - Etapa 4 (revisão final, 2026-11-12): sem ferramenta de subagente na sessão, os dois eixos do `code-review` foram feitos em linha. De novo: texto do `ci.yml` ("três jars", comentário do job e2e) e `docs/status.md` atrás do código; spec com campo que o produtor não publica (`openedAt` no item da conta, ausente do payload `AccountOpened`). Confira cada campo da tabela/modelo da spec contra o payload real do produtor (`OutboxEventAppender`). Decisão de spec que depende de dado de outro serviço ("a transferência aparece pela `description`") costuma ficar sem asserção no e2e.
+- Etapa 6 (revisão final, 2026-11-12): pronta para PR. Build completo deu 917 testes em 12 min. Script de 10 mutantes num `git archive`, rodando só as classes-alvo: cerca de 8 min, todos vermelhos. Três problemas recorrentes:
+  - Drift de docs de novo. O ruling de nome (`daily-limit-unavailable`) não chegou ao ADR nem à spec, que ainda dizem `LIMIT_UNAVAILABLE`.
+  - A frase "o TTL corrige" sobreviveu ao ruling do epoch, mas é falsa com TTL renovado a cada uso.
+  - ADR base com regra afetada (0016, prazo só em débito e crédito) não foi tocado.
+- Em contador de cache com versão (epoch), procure **perda parcial** de escritas (failover com réplica assíncrona, snapshot antigo). A chave fica com o mesmo epoch e abaixo do real, e o ADR só cobre perda total.
+- Coluna gravada pelo adapter sob trava e de novo pelo save do agregado, a partir da memória, é um segundo escritor fora da trava. O mutante "domínio não marca" mostra a sobrescrita no IT.
+- Mutante que apaga uma chamada a função privada quebra o build (`allWarningsAsErrors`, função não usada). Use uma guarda falsa, como `if (id == UUID(0, 0))`, ou esvazie o lambda.
 - Menores adiados que são "plano reservava outro arquivo"/"fora da lista do brief" e já seguem a spec: triagem "sem ação", não issue.
 
 Relacionado: [[gate-revisao-task]]

@@ -8,12 +8,32 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import java.time.Duration
+import java.time.LocalDate
 
 class TransferTest {
     @Test
-    fun `request starts pending at debit with the deadline computed`() {
+    fun `a new transfer starts reserving the limit`() {
+        val t =
+            Transfer.request(
+                id = TransferFixtures.id,
+                sourceAccountId = TransferFixtures.source,
+                destinationAccountId = TransferFixtures.destination,
+                amount = Money(500),
+                description = "rent",
+                idempotencyKey = "key-1",
+                correlationId = "corr-1",
+                now = created,
+                deadlineAfter = Duration.ofMinutes(2),
+            )
+        assertThat(t.step).isEqualTo(TransferStep.ReserveLimit)
+        assertThat(t.status).isEqualTo(TransferStatus.PENDING)
+        assertThat(t.limitDay).isEqualTo(LocalDate.parse("2026-10-27"))
+        assertThat(t.limitReserved).isFalse()
+    }
+
+    @Test
+    fun `request starts pending with the deadline computed`() {
         val t = transfer()
-        assertThat(t.step).isEqualTo(TransferStep.Debit)
         assertThat(t.status).isEqualTo(TransferStatus.PENDING)
         assertThat(t.deadline).isEqualTo(created.plus(Duration.ofMinutes(2)))
         assertThat(t.attempts).isZero()
@@ -79,6 +99,7 @@ class TransferTest {
 
     private val nonTerminalSteps =
         listOf(
+            TransferStep.ReserveLimit,
             TransferStep.Debit,
             TransferStep.ResolveDebit,
             TransferStep.Credit,
@@ -138,9 +159,10 @@ class TransferTest {
     }
 
     @Test
-    fun `from name round trips the eight steps`() {
+    fun `from name round trips the nine steps`() {
         val all =
             listOf(
+                TransferStep.ReserveLimit,
                 TransferStep.Debit,
                 TransferStep.ResolveDebit,
                 TransferStep.Credit,
@@ -151,7 +173,7 @@ class TransferTest {
                 TransferStep.Compensated,
             )
         all.forEach { assertThat(TransferStep.fromName(it.name)).isSameAs(it) }
-        assertThat(all.map { it.name }.toSet()).hasSize(8)
+        assertThat(all.map { it.name }.toSet()).hasSize(9)
         assertThatThrownBy { TransferStep.fromName("NOPE") }.isInstanceOf(IllegalArgumentException::class.java)
     }
 }

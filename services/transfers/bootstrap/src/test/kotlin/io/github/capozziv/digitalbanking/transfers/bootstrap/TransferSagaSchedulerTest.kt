@@ -5,7 +5,10 @@ import io.github.capozziv.digitalbanking.transfers.application.port.AccountLooku
 import io.github.capozziv.digitalbanking.transfers.application.port.AccountsGateway
 import io.github.capozziv.digitalbanking.transfers.application.port.CallResult
 import io.github.capozziv.digitalbanking.transfers.application.port.CorrelationContext
+import io.github.capozziv.digitalbanking.transfers.application.port.DailyLimitGateway
+import io.github.capozziv.digitalbanking.transfers.application.port.DailyLimitUsage
 import io.github.capozziv.digitalbanking.transfers.application.port.EventOutbox
+import io.github.capozziv.digitalbanking.transfers.application.port.ReservationResult
 import io.github.capozziv.digitalbanking.transfers.application.port.StepRecord
 import io.github.capozziv.digitalbanking.transfers.application.port.TransactionRunner
 import io.github.capozziv.digitalbanking.transfers.application.port.TransferRepository
@@ -13,7 +16,8 @@ import io.github.capozziv.digitalbanking.transfers.application.port.TransferStep
 import io.github.capozziv.digitalbanking.transfers.application.usecase.ResumeDueTransfersUseCase
 import io.github.capozziv.digitalbanking.transfers.application.usecase.RunTransferSagaUseCase
 import io.github.capozziv.digitalbanking.transfers.application.usecase.SagaSettings
-import io.github.capozziv.digitalbanking.transfers.domain.AccountsCall
+import io.github.capozziv.digitalbanking.transfers.domain.Money
+import io.github.capozziv.digitalbanking.transfers.domain.StepCall
 import io.github.capozziv.digitalbanking.transfers.domain.Transfer
 import io.github.capozziv.digitalbanking.transfers.domain.TransferEvent
 import org.assertj.core.api.Assertions.assertThat
@@ -21,6 +25,7 @@ import org.junit.jupiter.api.Test
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneOffset
 import java.util.Collections
 import java.util.UUID
@@ -176,7 +181,7 @@ class TransferSagaSchedulerTest {
                 object : AccountsGateway {
                     override fun lookupAccount(id: UUID): AccountLookup = error("unused")
 
-                    override fun perform(call: AccountsCall): CallResult = error("unused")
+                    override fun perform(call: StepCall.Accounts): CallResult = error("unused")
                 }
             val tx =
                 object : TransactionRunner {
@@ -190,6 +195,26 @@ class TransferSagaSchedulerTest {
                             override fun append(record: StepRecord) = error("unused")
                         },
                     accounts = unusedGateway,
+                    dailyLimits =
+                        object : DailyLimitGateway {
+                            override fun reserve(
+                                transferId: UUID,
+                                accountId: UUID,
+                                day: LocalDate,
+                                amount: Money,
+                            ): ReservationResult = error("unused")
+
+                            override fun release(
+                                transferId: UUID,
+                                accountId: UUID,
+                                day: LocalDate,
+                            ) = error("unused")
+
+                            override fun usage(
+                                accountId: UUID,
+                                day: LocalDate,
+                            ): DailyLimitUsage = error("unused")
+                        },
                     outbox =
                         object : EventOutbox {
                             override fun append(event: TransferEvent) = error("unused")

@@ -14,5 +14,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation(libs.flyway.postgresql)
     implementation(libs.java.uuid.generator)
+    // Daily limit counter (Lua scripts) and its metrics.
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
+    implementation("io.micrometer:micrometer-core")
     runtimeOnly(libs.postgresql)
 }

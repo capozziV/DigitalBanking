@@ -8,11 +8,12 @@ import io.github.capozziv.digitalbanking.transfers.application.fake.FakeAccounts
 import io.github.capozziv.digitalbanking.transfers.application.fake.FakeAccountsGateway.Companion.timeout
 import io.github.capozziv.digitalbanking.transfers.application.fake.FakeEventOutbox
 import io.github.capozziv.digitalbanking.transfers.application.fake.ImmediateTransactionRunner
+import io.github.capozziv.digitalbanking.transfers.application.fake.InMemoryDailyLimitGateway
 import io.github.capozziv.digitalbanking.transfers.application.fake.InMemoryTransferRepository
 import io.github.capozziv.digitalbanking.transfers.application.fake.InMemoryTransferStepLog
 import io.github.capozziv.digitalbanking.transfers.application.fake.MutableClock
-import io.github.capozziv.digitalbanking.transfers.domain.AccountsCall
 import io.github.capozziv.digitalbanking.transfers.domain.Money
+import io.github.capozziv.digitalbanking.transfers.domain.StepCall
 import io.github.capozziv.digitalbanking.transfers.domain.StepOutcome
 import io.github.capozziv.digitalbanking.transfers.domain.Transfer
 import io.github.capozziv.digitalbanking.transfers.domain.TransferEvent
@@ -37,11 +38,13 @@ class RunTransferSagaUseCaseTest {
     private val outbox = FakeEventOutbox()
     private val tx = ImmediateTransactionRunner()
     private val accounts = FakeAccountsGateway(tx)
+    private val dailyLimits = InMemoryDailyLimitGateway(transactions = tx)
     private val useCase =
         RunTransferSagaUseCase(
             transfers = repository,
             stepLog = stepLog,
             accounts = accounts,
+            dailyLimits = dailyLimits,
             outbox = outbox,
             tx = tx,
             backoff = RetryBackoff(Duration.ofSeconds(1), Duration.ofSeconds(15)),
@@ -93,8 +96,8 @@ class RunTransferSagaUseCaseTest {
 
         assertThat(accounts.calls)
             .containsExactly(
-                AccountsCall.Debit(source, Money(500), "transfer-$id-debit", "Transfer to $destination"),
-                AccountsCall.Credit(destination, Money(500), "transfer-$id-credit", "Transfer from $source"),
+                StepCall.Debit(source, Money(500), "transfer-$id-debit", "Transfer to $destination"),
+                StepCall.Credit(destination, Money(500), "transfer-$id-credit", "Transfer from $source"),
             )
     }
 
@@ -107,7 +110,7 @@ class RunTransferSagaUseCaseTest {
 
         assertThat(result!!.status).isEqualTo(TransferStatus.COMPENSATED)
         assertThat(accounts.calls.last())
-            .isEqualTo(AccountsCall.Credit(source, Money(500), "transfer-$id-compensation", "Transfer $id compensation"))
+            .isEqualTo(StepCall.Credit(source, Money(500), "transfer-$id-compensation", "Transfer $id compensation"))
         assertThat(outbox.events).containsExactly(TransferEvent.TransferCompensated(id, source, destination, Money(500), "rent"))
     }
 
@@ -413,6 +416,167 @@ class RunTransferSagaUseCaseTest {
         }
 
         val warning = records.single { it.message.contains("could not release the lease") }
+        assertThat(warning.level).isEqualTo(java.util.logging.Level.WARNING)
+        assertThat(warning.message).contains(id.toString()).contains("corr-1")
+    }
+
+    @Test
+    fun `a reserved limit goes on to debit and records the reservation`() {
+        givenTransfer(TransferStep.ReserveLimit)
+        accounts.reply(created, created)
+
+        useCase.execute(id, "owner-a")
+
+        assertThat(dailyLimits.reserveCalls).containsExactly(id)
+        assertThat(stepLog.records.map { it.step }).containsExactly("RESERVE_LIMIT", "DEBIT", "CREDIT")
+        assertThat(stepLog.records.first().outcome).isEqualTo("SUCCESS")
+        assertThat(stepLog.records.first().httpStatus).isNull()
+    }
+
+    @Test
+    fun `an exceeded limit fails the transfer without calling accounts`() {
+        val transfer = givenTransfer(TransferStep.ReserveLimit)
+        dailyLimits.reserve(UUID.randomUUID(), source, transfer.limitDay, Money(499_600))
+
+        val result = useCase.execute(id, "owner-a")
+
+        assertThat(result!!.status).isEqualTo(TransferStatus.FAILED)
+        assertThat(result.failureReason).isEqualTo(StepOutcome.DAILY_LIMIT_EXCEEDED)
+        assertThat(result.limitReserved).isFalse()
+        assertThat(accounts.calls).isEmpty()
+        assertThat(dailyLimits.releaseCalls).isEmpty()
+        assertThat(outbox.events)
+            .containsExactly(
+                TransferEvent.TransferFailed(id, source, destination, Money(500), "rent", StepOutcome.DAILY_LIMIT_EXCEEDED),
+            )
+        assertThat(stepLog.records.single().outcome).isEqualTo("REFUSED")
+        assertThat(stepLog.records.single().detail).isEqualTo(StepOutcome.DAILY_LIMIT_EXCEEDED)
+    }
+
+    @Test
+    fun `an unavailable limit stays reserving and schedules a retry without calling accounts`() {
+        givenTransfer(TransferStep.ReserveLimit)
+        dailyLimits.unavailable = true
+
+        val result = useCase.execute(id, "owner-a")
+
+        assertThat(result!!.step).isEqualTo(TransferStep.ReserveLimit)
+        assertThat(result.attempts).isEqualTo(1)
+        assertThat(accounts.calls).isEmpty()
+        assertThat(repository.nextAttemptAt(id)).isEqualTo(start.plusSeconds(1))
+        assertThat(stepLog.records.single().outcome).isEqualTo("TRANSIENT_FAILURE")
+    }
+
+    @Test
+    fun `an unavailable limit past the deadline fails the transfer with daily-limit-unavailable`() {
+        givenTransfer(TransferStep.ReserveLimit)
+        dailyLimits.unavailable = true
+        clock.advance(Duration.ofMinutes(3))
+
+        val result = useCase.execute(id, "owner-a")
+
+        assertThat(result!!.status).isEqualTo(TransferStatus.FAILED)
+        assertThat(result.failureReason).isEqualTo(StepOutcome.DAILY_LIMIT_UNAVAILABLE)
+        assertThat(accounts.calls).isEmpty()
+        assertThat(dailyLimits.releaseCalls).isEmpty()
+    }
+
+    @Test
+    fun `a failed debit after a reservation releases the limit`() {
+        givenTransfer(TransferStep.ReserveLimit)
+        accounts.reply(refused(StepOutcome.INSUFFICIENT_AVAILABLE_BALANCE))
+
+        val result = useCase.execute(id, "owner-a")
+
+        assertThat(result!!.status).isEqualTo(TransferStatus.FAILED)
+        assertThat(result.failureReason).isEqualTo(StepOutcome.INSUFFICIENT_AVAILABLE_BALANCE)
+        assertThat(repository.findById(id)!!.limitReserved).isTrue()
+        assertThat(dailyLimits.releaseCalls).containsExactly(id)
+        assertThat(dailyLimits.isReserved(id)).isFalse()
+    }
+
+    @Test
+    fun `the limit is released only after the terminal state is saved`() {
+        givenTransfer(TransferStep.ReserveLimit)
+        accounts.reply(refused(StepOutcome.INSUFFICIENT_AVAILABLE_BALANCE))
+        val savedStepAtRelease = mutableListOf<TransferStep>()
+        dailyLimits.onRelease = { savedStepAtRelease += repository.findById(it)!!.step }
+
+        useCase.execute(id, "owner-a")
+
+        assertThat(savedStepAtRelease).containsExactly(TransferStep.Failed)
+    }
+
+    @Test
+    fun `a compensated transfer releases the limit`() {
+        givenTransfer(TransferStep.ReserveLimit)
+        accounts.reply(created, refused("account-not-found"), created)
+
+        val result = useCase.execute(id, "owner-a")
+
+        assertThat(result!!.status).isEqualTo(TransferStatus.COMPENSATED)
+        assertThat(dailyLimits.releaseCalls).containsExactly(id)
+        assertThat(dailyLimits.isReserved(id)).isFalse()
+    }
+
+    @Test
+    fun `a completed transfer keeps the reservation`() {
+        givenTransfer(TransferStep.ReserveLimit)
+        accounts.reply(created, created)
+
+        val result = useCase.execute(id, "owner-a")
+
+        assertThat(result!!.status).isEqualTo(TransferStatus.COMPLETED)
+        assertThat(repository.findById(id)!!.limitReserved).isTrue()
+        assertThat(dailyLimits.releaseCalls).isEmpty()
+        assertThat(dailyLimits.isReserved(id)).isTrue()
+    }
+
+    @Test
+    fun `a failed transfer that never reserved does not release`() {
+        givenTransfer(TransferStep.Debit)
+        accounts.reply(refused(StepOutcome.INSUFFICIENT_AVAILABLE_BALANCE))
+
+        useCase.execute(id, "owner-a")
+
+        assertThat(dailyLimits.reserveCalls).isEmpty()
+        assertThat(dailyLimits.releaseCalls).isEmpty()
+    }
+
+    @Test
+    fun `a release failure does not change the terminal transfer`() {
+        givenTransfer(TransferStep.ReserveLimit)
+        accounts.reply(refused(StepOutcome.INSUFFICIENT_AVAILABLE_BALANCE))
+        dailyLimits.failOnRelease = true
+        val records = mutableListOf<java.util.logging.LogRecord>()
+        val handler =
+            object : java.util.logging.Handler() {
+                override fun publish(record: java.util.logging.LogRecord) {
+                    records += record
+                }
+
+                override fun flush() = Unit
+
+                override fun close() = Unit
+            }
+        val logger =
+            java.util.logging.Logger
+                .getLogger(RunTransferSagaUseCase::class.java.name)
+        logger.addHandler(handler)
+        val result =
+            try {
+                useCase.execute(id, "owner-a")
+            } finally {
+                logger.removeHandler(handler)
+            }
+
+        assertThat(result!!.status).isEqualTo(TransferStatus.FAILED)
+        assertThat(repository.findById(id)!!.status).isEqualTo(TransferStatus.FAILED)
+        assertThat(repository.nextAttemptAt(id)).isNull()
+        assertThat(repository.leaseOwner(id)).isNull()
+        assertThat(outbox.events).hasSize(1)
+        assertThat(dailyLimits.releaseCalls).containsExactly(id)
+        val warning = records.single { it.message.contains("could not release the daily limit") }
         assertThat(warning.level).isEqualTo(java.util.logging.Level.WARNING)
         assertThat(warning.message).contains(id.toString()).contains("corr-1")
     }

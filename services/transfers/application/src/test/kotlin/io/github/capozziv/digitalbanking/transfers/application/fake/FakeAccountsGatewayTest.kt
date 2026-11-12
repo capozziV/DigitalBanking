@@ -1,7 +1,7 @@
 package io.github.capozziv.digitalbanking.transfers.application.fake
 
-import io.github.capozziv.digitalbanking.transfers.domain.AccountsCall
 import io.github.capozziv.digitalbanking.transfers.domain.Money
+import io.github.capozziv.digitalbanking.transfers.domain.StepCall
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -10,7 +10,7 @@ import java.util.UUID
 class FakeAccountsGatewayTest {
     private val tx = ImmediateTransactionRunner()
     private val gateway = FakeAccountsGateway(tx)
-    private val call = AccountsCall.Debit(UUID.randomUUID(), Money(1), "key", "description")
+    private val call = StepCall.Debit(UUID.randomUUID(), Money(1), "key", "description")
 
     @Test
     fun `calling accounts inside a transaction is detected`() {

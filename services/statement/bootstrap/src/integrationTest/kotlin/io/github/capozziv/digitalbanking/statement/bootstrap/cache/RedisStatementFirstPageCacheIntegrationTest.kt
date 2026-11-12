@@ -6,6 +6,7 @@ import io.github.capozziv.digitalbanking.statement.domain.EntryKind
 import io.github.capozziv.digitalbanking.statement.domain.StatementCursor
 import io.github.capozziv.digitalbanking.statement.domain.StatementEntry
 import io.github.capozziv.digitalbanking.statement.domain.StatementPage
+import io.github.capozziv.digitalbanking.testing.redis.RedisTestSupport
 import io.micrometer.core.instrument.MeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -137,7 +138,7 @@ class RedisStatementFirstPageCacheIntegrationTest : StatementIntegrationTest() {
         val writeErrors = counter("statement.cache.writes", "error")
         val evictionErrors = counter("statement.cache.evictions", "error")
 
-        redis.dockerClient.pauseContainerCmd(redis.containerId).exec()
+        RedisTestSupport.pause(redis)
         try {
             var result: StatementPage? = page
             val elapsed = measureTimeMillis { result = cache.get(accountId) }
@@ -147,7 +148,7 @@ class RedisStatementFirstPageCacheIntegrationTest : StatementIntegrationTest() {
             assertThat(result).isNull()
             assertThat(elapsed).isLessThan(1_000)
         } finally {
-            redis.dockerClient.unpauseContainerCmd(redis.containerId).exec()
+            RedisTestSupport.unpause(redis)
         }
 
         // Reads and writes are counted apart: the get is a request error, the put a write error.

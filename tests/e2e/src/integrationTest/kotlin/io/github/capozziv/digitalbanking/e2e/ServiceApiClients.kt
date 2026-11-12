@@ -137,6 +137,24 @@ class TransfersApiClient(
         return result.json().get("status").asString()
     }
 
+    /** `failureReason` of the transfer, or null when it has none. */
+    fun failureReason(id: String): String? {
+        val result = send("GET", "$baseUrl/transfers/$id")
+        check(result.status == 200) { "get transfer: ${result.status} ${result.body}" }
+        return result
+            .json()
+            .get("failureReason")
+            ?.takeUnless { it.isNull }
+            ?.asString()
+    }
+
+    /** The daily limit of [account] today: the JSON of `GET /accounts/{id}/daily-limit`. */
+    fun dailyLimit(account: UUID): JsonNode {
+        val result = send("GET", "$baseUrl/accounts/$account/daily-limit")
+        check(result.status == 200) { "get daily limit: ${result.status} ${result.body}" }
+        return result.json()
+    }
+
     /** Polls until the transfer leaves PENDING; returns the terminal status. */
     fun awaitTerminal(
         id: String,

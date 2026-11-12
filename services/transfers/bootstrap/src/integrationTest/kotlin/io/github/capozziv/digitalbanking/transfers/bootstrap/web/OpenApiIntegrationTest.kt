@@ -18,8 +18,37 @@ class OpenApiIntegrationTest : TransfersIntegrationTest() {
     }
 
     @Test
-    fun `the contract has exactly the two operations of the spec`() {
-        assertThat(operations().map { it.first }).containsExactlyInAnyOrder("POST /transfers", "GET /transfers/{id}")
+    fun `the contract has exactly the three operations of the API`() {
+        assertThat(operations().map { it.first })
+            .containsExactlyInAnyOrder("POST /transfers", "GET /transfers/{id}", "GET /accounts/{accountId}/daily-limit")
+    }
+
+    @Test
+    fun `the daily limit operation documents the zero usage of an unknown account and the invalid id`() {
+        val responses = operation("GET /accounts/{accountId}/daily-limit").get("responses")
+
+        assertThat(responses.get("200").get("description").asString()).contains("unknown account").contains("zero")
+        assertThat(responses.get("400").get("description").asString()).contains("validation-error")
+        assertThat(
+            docs
+                .get("components")
+                .get("schemas")
+                .get("DailyLimitDTO")
+                .get("properties")
+                .propertyNames(),
+        ).containsExactlyInAnyOrder("day", "limitCents", "usedCents", "availableCents")
+    }
+
+    @Test
+    fun `the refusal by the daily limit is documented among the reasons of transfer-failed`() {
+        val unprocessable =
+            operation("POST /transfers")
+                .get("responses")
+                .get("422")
+                .get("description")
+                .asString()
+
+        assertThat(unprocessable).contains("daily-limit-exceeded").contains("daily-limit-unavailable")
     }
 
     @Test

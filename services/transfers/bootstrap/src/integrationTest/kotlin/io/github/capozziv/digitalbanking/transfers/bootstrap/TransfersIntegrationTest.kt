@@ -2,19 +2,22 @@ package io.github.capozziv.digitalbanking.transfers.bootstrap
 
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration.options
+import io.github.capozziv.digitalbanking.testing.redis.RedisTestSupport
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.jdbc.datasource.DriverManagerDataSource
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.TestPropertySource
+import org.testcontainers.containers.GenericContainer
 import org.testcontainers.postgresql.PostgreSQLContainer
 
 /**
  * Base of every integration test of the transfers service. One PostgreSQL container is shared by all subclasses
  * (singleton container, so the cached Spring context keeps a valid connection). The application connects as
  * [APP_USER]; Flyway runs as the container's owner user, mirroring transfers_owner / transfers_app of the
- * local environment. A shared WireMock server stands in for `accounts`; tests that use it reset it first.
+ * local environment. A shared WireMock server stands in for `accounts`; tests that use it reset it first. One Redis
+ * container holds the daily limit counters; tests use random account ids, so they never share a counter.
  * The saga scheduler and the outbox relay are off, so transfers and outbox rows stay as the requests left them; the
  * tests that exercise them turn them on (a subclass @TestPropertySource overrides this one).
  */
@@ -36,6 +39,10 @@ abstract class TransfersIntegrationTest {
                 .withInitScript("db/create-app-role.sql")
                 .apply { start() }
 
+        /** Redis of the daily limit counters; tests that pause it unpause it in a `finally`. */
+        @JvmStatic
+        val redis: GenericContainer<*> = RedisTestSupport.container().apply { start() }
+
         /** Stands in for the accounts service; `transfers.accounts.url` points to it. */
         @JvmStatic
         val accountsServer: WireMockServer = WireMockServer(options().dynamicPort()).apply { start() }
@@ -50,6 +57,8 @@ abstract class TransfersIntegrationTest {
             registry.add("spring.flyway.password") { postgres.password }
             registry.add("spring.flyway.placeholders.appUser") { APP_USER }
             registry.add("transfers.accounts.url") { "http://localhost:${accountsServer.port()}" }
+            registry.add("spring.data.redis.host") { redis.host }
+            registry.add("spring.data.redis.port") { redis.getMappedPort(RedisTestSupport.PORT) }
         }
     }
 }

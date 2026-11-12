@@ -74,7 +74,7 @@ class TransferSagaResumeIntegrationTest : TransfersIntegrationTest() {
         val credits = stubs.requestsFor(destination)
         assertThat(credits).hasSize(3)
         assertThat(credits).allSatisfy { assertThat(it.getHeader("X-Correlation-Id")).isEqualTo("corr-resume-1") }
-        assertThat(ownerJdbc.recordedSteps(id)).containsExactly("DEBIT", "CREDIT", "CREDIT", "CREDIT")
+        assertThat(ownerJdbc.recordedSteps(id)).containsExactly("RESERVE_LIMIT", "DEBIT", "CREDIT", "CREDIT", "CREDIT")
         assertThat(ownerJdbc.outboxCorrelationIds(id)).containsExactlyEntriesOf(mapOf("TransferCompleted" to "corr-resume-1"))
         assertThat(
             api
@@ -168,9 +168,10 @@ class TransferSagaResumeIntegrationTest : TransfersIntegrationTest() {
                 """
                 insert into transfer (id, source_account_id, destination_account_id, amount, description, idempotency_key,
                                       status, step, deadline_at, next_attempt_at, attempts, locked_until, lock_owner,
-                                      correlation_id, created_at, updated_at)
+                                      correlation_id, created_at, updated_at, limit_day)
                 values (:id, :source, :destination, 2500, 'rent', :key, 'PENDING', 'CREDIT', :deadline, :past, 1,
-                        :lockedUntil, 'request-of-a-dead-process', 'corr-dead-process', :past, :past)
+                        :lockedUntil, 'request-of-a-dead-process', 'corr-dead-process', :past, :past,
+                        (:past at time zone 'America/Sao_Paulo')::date)
                 """.trimIndent(),
             ).param("id", id)
             .param("source", source)

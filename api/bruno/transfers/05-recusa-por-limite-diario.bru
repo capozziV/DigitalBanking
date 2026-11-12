@@ -1,0 +1,34 @@
+meta {
+  name: Recusa por limite diario
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/transfers
+  body: json
+  auth: none
+}
+
+headers {
+  Idempotency-Key: {{$guid}}
+}
+
+body:json {
+  {
+    "sourceAccountId": "{{sourceAccountId}}",
+    "destinationAccountId": "{{destinationAccountId}}",
+    "amount": 500000,
+    "description": "bruno acima do limite"
+  }
+}
+
+tests {
+  // A origem ja usou 300 do limite de 500000 (requisicao 01): 500000 passaria do limite e nada sai da conta.
+  test("422 transfer-failed com o motivo daily-limit-exceeded", function () {
+    expect(res.status).to.equal(422);
+    expect(res.body.type).to.equal("/problems/transfer-failed");
+    expect(res.body.reason).to.equal("daily-limit-exceeded");
+    expect(res.body.transferId).to.be.a("string");
+  });
+}

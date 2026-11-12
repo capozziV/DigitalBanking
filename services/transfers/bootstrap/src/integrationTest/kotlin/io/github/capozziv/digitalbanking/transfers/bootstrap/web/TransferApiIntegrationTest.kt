@@ -135,13 +135,13 @@ class TransferApiIntegrationTest : TransfersIntegrationTest() {
         )
         val key = key()
 
-        val first = api.post("/transfers", transferJson(amount = "999999"), key)
+        val first = api.post("/transfers", transferJson(amount = "450000"), key)
 
         assertProblem(first, 422, "insufficient-available-balance")
         val transferId = first.body!!.get("transferId").asString()
         assertThat(UUID.fromString(transferId)).isNotNull()
 
-        val repeated = api.post("/transfers", transferJson(amount = "999999"), key)
+        val repeated = api.post("/transfers", transferJson(amount = "450000"), key)
 
         assertProblem(repeated, 422, "insufficient-available-balance")
         assertThat(repeated.body!!.get("transferId").asString()).isEqualTo(transferId)

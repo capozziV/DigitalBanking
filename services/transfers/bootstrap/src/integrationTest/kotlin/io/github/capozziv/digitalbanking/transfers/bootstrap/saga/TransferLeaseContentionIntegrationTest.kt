@@ -95,7 +95,7 @@ class TransferLeaseContentionIntegrationTest : TransfersIntegrationTest() {
             assertThat(stubs.requestsFor(destination).filter { it.url.endsWith("/credits") })
                 .describedAs("credits of transfer $id")
                 .hasSize(steps.count { it == "CREDIT" })
-            assertThat(steps).containsExactly("DEBIT", "CREDIT", "CREDIT", "CREDIT")
+            assertThat(steps).containsExactly("RESERVE_LIMIT", "DEBIT", "CREDIT", "CREDIT", "CREDIT")
             assertThat(ownerJdbc.outboxCorrelationIds(id).keys).containsExactly("TransferCompleted")
         }
     }

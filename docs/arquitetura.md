@@ -59,9 +59,12 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 - (ver [ADR 0009](adr/0009-cache-do-extrato.md) e [ADR 0007](adr/0007-conta-e-ledger-no-accounts.md))
 
 ### Limite diário
-- Contador no Redis com script Lua (reservar e liberar), reserva idempotente por `transferId`.
+- Passo `ReserveLimit` da saga antes do débito; limite estourado termina `FAILED` com `DAILY_LIMIT_EXCEEDED`. Dia em `America/Sao_Paulo`.
+- A reserva conta em `PENDING`, é consumida em `COMPLETED` e liberada em `FAILED` e `COMPENSATED`.
+- Contador no Redis com script Lua (reservar, liberar, semear), reserva idempotente por `transferId`, TTL de 10 min e reconstrução sob demanda.
+- PostgreSQL do `transfers` é a fonte da verdade (`limit_day` e `limit_reserved` em `transfer`).
+- Trava única `pg_advisory_xact_lock` por conta e dia nas duas vias; o `daily_limit_epoch` força a reconstrução do contador depois de reservas feitas pelo PostgreSQL. Com o Redis fora, a conferência é feita no PostgreSQL.
 - Valor padrão: R$ 5.000,00 (500000 centavos), único para todas as contas no MVP; variação por tipo de conta fica para depois do MVP.
-- PostgreSQL do `transfers` é a fonte da verdade; o contador é reconstruído a partir dele.
 - (ver [ADR 0010](adr/0010-limite-diario-redis-lua.md))
 
 ### Mensageria

@@ -1,9 +1,11 @@
 package io.github.capozziv.digitalbanking.transfers.bootstrap.persistence
 
+import io.github.capozziv.digitalbanking.transfers.domain.DailyLimitDay
 import io.github.capozziv.digitalbanking.transfers.domain.Money
 import io.github.capozziv.digitalbanking.transfers.domain.Transfer
 import io.github.capozziv.digitalbanking.transfers.domain.TransferStep
 import java.time.Instant
+import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 
@@ -16,6 +18,8 @@ internal fun aTransfer(
     idempotencyKey: String = "key-${UUID.randomUUID()}",
     failureReason: String? = null,
     attempts: Int = 0,
+    limitDay: LocalDate = DailyLimitDay.of(createdAt),
+    limitReserved: Boolean = false,
 ): Transfer =
     Transfer(
         id = UUID.randomUUID(),
@@ -31,4 +35,6 @@ internal fun aTransfer(
         correlationId = "corr-1",
         createdAt = createdAt,
         updatedAt = createdAt,
+        limitDay = limitDay,
+        limitReserved = limitReserved,
     )
