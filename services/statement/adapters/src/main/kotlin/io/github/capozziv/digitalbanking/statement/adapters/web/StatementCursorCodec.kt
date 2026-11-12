@@ -21,10 +21,11 @@ object StatementCursorCodec {
             } catch (e: IllegalArgumentException) {
                 throw InvalidCursorException()
             }
-        val sequence = text.removePrefixOrNull()?.toLongOrNull()
-        if (sequence == null || sequence < 1) throw InvalidCursorException()
+        // Only what encode produces: no sign, no leading zero, no spaces. toLongOrNull alone would take "+5" and "05".
+        if (!CANONICAL.matches(text)) throw InvalidCursorException()
+        val sequence = text.removePrefix(PREFIX).toLongOrNull() ?: throw InvalidCursorException()
         return StatementCursor(sequence)
     }
 
-    private fun String.removePrefixOrNull(): String? = if (startsWith(PREFIX)) removePrefix(PREFIX) else null
+    private val CANONICAL = Regex("""v1:[1-9][0-9]*""")
 }
