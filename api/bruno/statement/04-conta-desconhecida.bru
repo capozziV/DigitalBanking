@@ -1,0 +1,18 @@
+meta {
+  name: Conta desconhecida
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/accounts/{{$guid}}/statement
+  body: none
+  auth: none
+}
+
+tests {
+  test("404 account-not-found", function () {
+    expect(res.status).to.equal(404);
+    expect(res.body.type).to.contain("account-not-found");
+  });
+}

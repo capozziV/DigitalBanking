@@ -328,7 +328,7 @@ class OutboxRelayIntegrationTest : AccountsIntegrationTest() {
         @BeforeAll
         fun startLocalStack() {
             val initDir = Path.of(System.getProperty("accounts.localstack.init-dir"))
-            localStack = LocalStackTestSupport.container(listOf("sns", "sqs"))
+            localStack = LocalStackTestSupport.container(listOf("sns", "sqs", "dynamodb"))
             Files.list(initDir).use { scripts ->
                 scripts.forEach { script ->
                     localStack.withCopyFileToContainer(

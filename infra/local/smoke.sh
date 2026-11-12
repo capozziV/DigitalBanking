@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Smoke da API pelo nginx, com os servicos accounts, transfers e notification de pe:
+# Smoke da API pelo nginx, com os servicos accounts, transfers, notification e statement de pe:
 # 1. accounts: abre conta, credita 1000, debita 300 e confere saldo 700; le a fila de inspecao do
 #    LocalStack e confere os eventos da conta, em ordem: AccountOpened, LedgerEntryRecorded (sequence 1)
 #    e LedgerEntryRecorded (sequence 2).
@@ -7,6 +7,8 @@
 #    saldos 600 (origem) e 400 (destino) e o evento TransferCompleted na fila transfers-events-inspection.fifo.
 # 3. notification: espera ate 45 s (45 tentativas de 1 s) e confere TRANSFER_SENT para o remetente e TRANSFER_RECEIVED para o
 #    destinatario em GET /notifications?customerId=.
+# 4. statement: espera ate 30 s e confere, em GET /accounts/{id}/statement, os lancamentos da conta do passo 1:
+#    sequence 2 (debito de 300, saldo 700) e sequence 1 (credito de 1000, saldo 1000), do mais novo para o mais antigo.
 # Uso: infra/local/smoke.sh [url-base]   (padrao http://127.0.0.1; exige o compose de pe)
 set -euo pipefail
 
@@ -155,3 +157,17 @@ check_notification() {
 
 check_notification "$source_customer" TRANSFER_SENT
 check_notification "$destination_customer" TRANSFER_RECEIVED
+
+# --- statement ---
+# O statement consome a fila statement-accounts.fifo; espera ate 30 s pelos dois lancamentos da conta do passo 1.
+statement=""
+for _ in $(seq 1 30); do
+  statement=$(call "200|404" GET "/accounts/$id/statement?limit=10" | jq -r '[.entries[]? | "\(.sequence):\(.kind):\(.amount):\(.balanceAfter)"] | join(" ")')
+  [ "$statement" != "2:DEBIT:300:700 1:CREDIT:1000:1000" ] || break
+  sleep 1
+done
+if [ "$statement" != "2:DEBIT:300:700 1:CREDIT:1000:1000" ]; then
+  echo "FALHA: extrato da conta $id: '$statement' (esperado '2:DEBIT:300:700 1:CREDIT:1000:1000')" >&2
+  exit 1
+fi
+echo "OK: extrato da conta $id: $statement"

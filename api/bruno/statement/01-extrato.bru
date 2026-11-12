@@ -1,0 +1,46 @@
+meta {
+  name: Extrato da conta
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/accounts/{{accountId}}/statement
+  body: none
+  auth: none
+}
+
+script:pre-request {
+  // Gera os lancamentos: abre uma conta e faz tres creditos; depois espera o extrato ter os tres (ate 30 s).
+  const axios = require("axios");
+  const base = bru.getEnvVar("baseUrl");
+  const guid = () => bru.interpolate("{{$guid}}");
+  const opened = await axios.post(`${base}/accounts`, { customerId: guid() },
+    { headers: { "Idempotency-Key": guid() } });
+  const accountId = opened.data.id;
+  for (const amount of [1000, 2000, 3000]) {
+    await axios.post(`${base}/accounts/${accountId}/credits`, { amount, description: "bruno credito" },
+      { headers: { "Idempotency-Key": guid() } });
+  }
+  bru.setVar("accountId", accountId);
+
+  for (let i = 0; i < 30; i++) {
+    // 404 enquanto o statement ainda nao conhece a conta: o axios rejeita, e a espera continua.
+    const r = await axios.get(`${base}/accounts/${accountId}/statement`).catch(() => null);
+    if (r && r.data.entries.length === 3) break;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    if (i === 29) throw new Error("FALHA: o extrato nao chegou a 3 lancamentos em 30 s");
+  }
+}
+
+tests {
+  test("200 com os tres creditos, do mais novo para o mais antigo", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.accountId).to.equal(bru.getVar("accountId"));
+    expect(res.body.entries.map((e) => e.sequence)).to.eql([3, 2, 1]);
+    expect(res.body.entries.map((e) => e.kind)).to.eql(["CREDIT", "CREDIT", "CREDIT"]);
+    expect(res.body.entries.map((e) => e.amount)).to.eql([3000, 2000, 1000]);
+    expect(res.body.entries.map((e) => e.balanceAfter)).to.eql([6000, 3000, 1000]);
+    expect(res.body.nextCursor).to.equal(null);
+  });
+}
