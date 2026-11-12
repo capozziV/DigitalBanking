@@ -22,3 +22,4 @@ Registros de decisões arquiteturais. Formato: `NNNN-titulo-em-kebab-case.md`.
 | 0016 | Saga de transferência orquestrada por HTTP síncrono | aceito | [0016](0016-saga-orquestrada-por-http.md) |
 | 0017 | `notification` com banco próprio e consumo SQS com Spring Cloud AWS | aceito | [0017](0017-notification-com-banco-e-consumo-sqs.md) |
 | 0018 | Extrato ordenado pela sequência do ledger | aceito | [0018](0018-chave-do-extrato-pela-sequencia.md) |
+| 0019 | Runtime na AWS com EKS (substitui parcialmente o 0001) | aceito | [0019](0019-runtime-na-aws-com-eks.md) |

@@ -10,6 +10,7 @@ O projeto terá frontend na **etapa 9**. Até lá, testes manuais usam uma cole�
 - **Angular** (standalone components, signals) + **BFF em Node/NestJS**.
 - Tokens Cognito ficam **só no BFF** (login OAuth2 com `openid-client`, sessão no Redis, refresh de token).
 - Navegador usa **cookie `HttpOnly` + token CSRF**.
+- **Angular Material** como biblioteca de componentes (decidido em 2026-11-12).
 - BFF expõe **endpoints por tela** (agregação).
 - Front e BFF na **mesma origem**: ALB público roteando `/` (Angular) e `/bff` (BFF), sem CORS.
 - BFF gera o correlation ID (via `AsyncLocalStorage`) e envia `X-Correlation-Id` e o Bearer token ao API Gateway.
@@ -22,3 +23,4 @@ O projeto terá frontend na **etapa 9**. Até lá, testes manuais usam uma cole�
 
 ## Alternativas consideradas
 - **Proxy genérico no BFF:** descartado em favor de endpoints por tela.
+- **PrimeNG:** descartado em favor do Angular Material.
