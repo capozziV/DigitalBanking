@@ -128,6 +128,27 @@ class StatementApiIntegrationTest : StatementWebIntegrationTest() {
     }
 
     @Test
+    fun `the cursor past the oldest entry gets an empty page without a next cursor`() {
+        repository.insertEntry(entry(1))
+
+        val response = api.get("/accounts/$account/statement?cursor=djE6MQ")
+
+        assertThat(response.status).describedAs(response.rawBody).isEqualTo(200)
+        assertThat(response.body!!.get("entries").size()).isZero()
+        assertThat(response.body.get("nextCursor").isNull).isTrue()
+    }
+
+    @Test
+    fun `a valid cursor on an unknown account gets an empty page, not 404`() {
+        val response = api.get("/accounts/$account/statement?cursor=djE6NQ")
+
+        assertThat(response.status).describedAs(response.rawBody).isEqualTo(200)
+        assertThat(response.body!!.get("accountId").asString()).isEqualTo(account.toString())
+        assertThat(response.body.get("entries").size()).isZero()
+        assertThat(response.body.get("nextCursor").isNull).isTrue()
+    }
+
+    @Test
     fun `an accountId that is not a UUID is 400 validation-error`() {
         val response = api.get("/accounts/nope/statement")
 
