@@ -10,13 +10,12 @@ import io.github.capozziv.digitalbanking.transfers.bootstrap.saga.AccountsStubs.
 import io.github.capozziv.digitalbanking.transfers.bootstrap.saga.AccountsStubs.Companion.problem
 import io.github.capozziv.digitalbanking.transfers.bootstrap.web.ApiClient
 import io.github.capozziv.digitalbanking.transfers.bootstrap.web.ApiResponse
-import io.github.capozziv.digitalbanking.transfers.domain.DailyLimitDay
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.web.server.LocalServerPort
-import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 
 /** The daily limit inside the saga, through `POST /transfers`, with the default limit of 500000 cents. */
@@ -68,7 +67,7 @@ class DailyLimitSagaIntegrationTest : TransfersIntegrationTest() {
         assertThat(statusAndReason(refusedId)).isEqualTo("FAILED" to "insufficient-available-balance")
         // Reserved first, so the reservation was made and then released.
         assertThat(limitReserved(refusedId)).isTrue()
-        assertThat(dailyLimits.usage(source, DailyLimitDay.of(Instant.now())).used).isZero()
+        assertThat(dailyLimits.usage(source, limitDay(refusedId)).used).isZero()
 
         accountsServer.resetAll()
         stubs.accountExists(source)
@@ -100,6 +99,14 @@ class DailyLimitSagaIntegrationTest : TransfersIntegrationTest() {
             .sql("select status, failure_reason from transfer where id = :id")
             .param("id", id)
             .query { rs, _ -> rs.getString("status") to rs.getString("failure_reason") }
+            .single()
+
+    /** The day the transfer counted in, so the check never races the midnight of São Paulo. */
+    private fun limitDay(id: UUID): LocalDate =
+        ownerJdbc
+            .sql("select limit_day from transfer where id = :id")
+            .param("id", id)
+            .query(LocalDate::class.java)
             .single()
 
     private fun limitReserved(id: UUID): Boolean =
