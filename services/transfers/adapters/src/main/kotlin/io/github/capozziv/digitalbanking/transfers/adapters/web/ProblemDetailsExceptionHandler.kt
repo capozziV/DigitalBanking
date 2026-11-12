@@ -53,7 +53,10 @@ class ProblemDetailsExceptionHandler : ResponseEntityExceptionHandler() {
             "The Idempotency-Key was already used for another transfer",
         )
 
-    /** A transfer that ended in FAILED: refused for lack of balance, or for any other reason of `accounts`. */
+    /**
+     * A transfer that ended in FAILED: refused for lack of balance, or for any other reason, which comes with `reason`:
+     * the daily limit (`daily-limit-exceeded`, `daily-limit-unavailable`) or another refusal of `accounts`.
+     */
     @ExceptionHandler
     fun handle(e: TransferFailedException): ProblemDetail {
         val transfer = e.transfer
