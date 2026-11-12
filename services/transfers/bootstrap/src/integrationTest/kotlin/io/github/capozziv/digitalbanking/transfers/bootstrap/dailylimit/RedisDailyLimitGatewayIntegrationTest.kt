@@ -164,6 +164,17 @@ class RedisDailyLimitGatewayIntegrationTest : TransfersIntegrationTest() {
     }
 
     @Test
+    fun `an idempotent reservation renews the ttl of the counter`() {
+        val transfer = transferOf(1_000)
+        reserve(transfer, 1_000)
+        redisTemplate.expire(key(), java.time.Duration.ofSeconds(5))
+
+        assertThat(reserve(transfer, 1_000)).isEqualTo(RESERVED)
+
+        assertThat(redisTemplate.getExpire(key(), TimeUnit.SECONDS)).isBetween(590L, 600L)
+    }
+
+    @Test
     fun `release returns the amount and is idempotent`() {
         val first = transferOf(300_000)
         val second = transferOf(200_000)
