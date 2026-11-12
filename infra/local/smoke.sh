@@ -5,6 +5,7 @@
 #    e LedgerEntryRecorded (sequence 2).
 # 2. transfers: abre duas contas, credita 1000 na origem, transfere 400, espera COMPLETED, confere
 #    saldos 600 (origem) e 400 (destino) e o evento TransferCompleted na fila transfers-events-inspection.fifo.
+#    Depois confere o limite diario da origem em GET /accounts/{id}/daily-limit (500000:400:499600).
 # 3. notification: espera ate 45 s (45 tentativas de 1 s) e confere TRANSFER_SENT para o remetente e TRANSFER_RECEIVED para o
 #    destinatario em GET /notifications?customerId=.
 # 4. statement: espera ate 30 s e confere, em GET /accounts/{id}/statement, os lancamentos da conta do passo 1:
@@ -138,6 +139,14 @@ fi
 echo "OK: transferencia $transfer_id concluida (origem $source_balance, destino $destination_balance)"
 
 check_events "$transfers_queue_name" .payload.transferId "$transfer_id" "TransferCompleted" 1
+
+# O limite diario da origem (padrao 500000) mostra so a transferencia de 400. A rota e do transfers.
+daily_limit=$(call 200 GET "/accounts/$source_id/daily-limit" | jq -r '"\(.limitCents):\(.usedCents):\(.availableCents)"')
+if [ "$daily_limit" != "500000:400:499600" ]; then
+  echo "FALHA: limite diario da conta $source_id: '$daily_limit' (esperado '500000:400:499600')" >&2
+  exit 1
+fi
+echo "OK: limite diario da conta $source_id (limite:usado:disponivel): $daily_limit"
 
 # --- notification ---
 # O notification consome as filas notification-accounts.fifo e notification-transfers.fifo; espera ate 45 s (se o evento chegar antes da conta conhecida, a mensagem so volta apos 30 s de visibilidade).
