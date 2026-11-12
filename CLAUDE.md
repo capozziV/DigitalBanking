@@ -76,6 +76,7 @@ Os papéis do fluxo são executados pelos agentes de `.claude/agents/`:
 
 ## Git
 Commits e pushes saem só com o autor do usuário (capozziV <vitorcapozzi4@gmail.com>), sem trailers `Co-Authored-By` ou `Claude-Session`.
+PR aprovado pela Beatriz e com o `ci-ok` verde: a coordenadora faz o merge (`gh pr merge --merge`) sem esperar o usuário. CI vermelho volta para o especialista.
 
 ## Ao terminar uma tarefa
 Atualizar o board e o `docs/status.md` (o coordenador faz isso; especialistas reportam o que mudou).
