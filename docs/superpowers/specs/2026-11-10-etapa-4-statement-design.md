@@ -65,7 +65,7 @@ A e B correm em paralelo; o Rafael é o único a editar `settings.gradle.kts` e 
 ## 4. Tabela no DynamoDB
 Tabela única `statement`, chave `accountId` (`S`, partição) + `sequence` (`N`, ordenação).
 - **Item de lançamento:** `sequence` ≥ 1 e os campos de `StatementEntry`.
-- **Item da conta:** `sequence = 0`, com `customerId` e `openedAt`. Fica fora da listagem porque a consulta usa `sequence > 0`.
+- **Item da conta:** `sequence = 0`, com `itemType` = `ACCOUNT` e `customerId` (o payload do `AccountOpened` não traz data de abertura). Fica fora da listagem porque a consulta usa `sequence > 0`.
 - Listagem: `Query` com `accountId = :id AND sequence > 0` (ou `< :cursor`), `ScanIndexForward = false`, `Limit = limit`. Se a página vier vazia sem cursor, `GetItem` do item da conta decide entre `404` e lista vazia.
 
 ## 5. Fluxo de consumo

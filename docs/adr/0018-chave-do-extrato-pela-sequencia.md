@@ -4,7 +4,7 @@
 - **Data:** 2026-11-10
 
 ## Contexto
-O [ADR 0008](0008-statement-cqrs-dynamodb.md) definiu a chave do item do extrato como `accountId` + `timestamp#entryId`. Essa ordenação não basta: dois lançamentos podem ter o mesmo instante, e o relógio não é a ordem do ledger. A ordem verdadeira já existe na `sequence` do lançamento (`LedgerEntry.sequence`), atribuída pelo `accounts` em ordem, a partir de 1, única por conta, sob a trava pessimista ([ADR 0012](0012-saldo-no-lancamento-e-trava-pessimista.md)). O `statement` é o segundo consumidor de eventos, depois do `notification` ([ADR 0017](0017-notification-com-banco-e-consumo-sqs.md)).
+O [ADR 0008](0008-statement-cqrs-dynamodb.md) definiu a chave do item do extrato como `accountId` + `timestamp#entryId`. Essa ordenação não basta: dois lançamentos podem ter o mesmo instante, e o relógio não é a ordem do ledger. A ordem verdadeira já existe na `sequence` do lançamento (`LedgerEntry.sequence`), atribuída pelo `accounts` em ordem, a partir de 1, única por conta, sob a trava pessimista ([ADR 0012](0012-saldo-no-lancamento-e-trava-pessimista.md)). O `statement` é o segundo consumidor de eventos, depois do `notification` ([ADR 0017](0017-notification-com-banco-e-consumo-sqs.md)). Como todo consumidor do [ADR 0003](0003-transactional-outbox-e-mensageria.md), ele tem fila e DLQ próprias e precisa ser idempotente, porque a entrega é pelo menos uma vez; este ADR define como.
 
 ## Decisão
 - **Chave do item:** `accountId` (partição) + `sequence` (ordenação), com `sequence` como atributo numérico (`N`) no DynamoDB. Substitui só a chave de ordenação do ADR 0008.
