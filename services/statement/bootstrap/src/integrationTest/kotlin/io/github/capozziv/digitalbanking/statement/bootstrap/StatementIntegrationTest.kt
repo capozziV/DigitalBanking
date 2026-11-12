@@ -1,6 +1,7 @@
 package io.github.capozziv.digitalbanking.statement.bootstrap
 
 import io.github.capozziv.digitalbanking.testing.localstack.LocalStackTestSupport
+import io.github.capozziv.digitalbanking.testing.redis.RedisTestSupport
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
@@ -39,7 +40,6 @@ abstract class StatementIntegrationTest {
         const val ACCOUNTS_QUEUE = "statement-accounts.fifo"
         const val ACCOUNTS_DLQ = "statement-accounts-dlq.fifo"
         const val MAX_RECEIVE_COUNT = 5
-        const val REDIS_PORT = 6379
 
         /** Short, so a failed message is retried quickly; production uses 30 s. */
         const val VISIBILITY_SECONDS = 1
@@ -52,7 +52,7 @@ abstract class StatementIntegrationTest {
         /** Redis of the first-page cache, shared by all subclasses like the LocalStack container. */
         @JvmStatic
         val redis: GenericContainer<*> by lazy {
-            GenericContainer("redis:7-alpine").withExposedPorts(REDIS_PORT).also { it.start() }
+            RedisTestSupport.container().also { it.start() }
         }
 
         /** Raw DynamoDB client, for setup and for inspecting items as stored. */
@@ -72,7 +72,7 @@ abstract class StatementIntegrationTest {
             registry.add("statement.dynamodb.endpoint") { localStack.endpoint.toString() }
             registry.add("spring.cloud.aws.region.static") { localStack.region }
             registry.add("spring.data.redis.host") { redis.host }
-            registry.add("spring.data.redis.port") { redis.getMappedPort(REDIS_PORT) }
+            registry.add("spring.data.redis.port") { redis.getMappedPort(RedisTestSupport.PORT) }
         }
 
         private fun createTable() {

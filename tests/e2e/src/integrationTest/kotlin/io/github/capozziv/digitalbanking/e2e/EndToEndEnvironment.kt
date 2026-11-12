@@ -146,6 +146,8 @@ class EndToEndEnvironment : AutoCloseable {
             "TRANSFERS_AWS_ENDPOINT" to localStack.endpoint.toString(),
             "TRANSFERS_AWS_REGION" to localStack.region,
             "TRANSFERS_TOPIC_ARN" to topicArn("transfers-events.fifo"),
+            "TRANSFERS_REDIS_HOST" to redis.host,
+            "TRANSFERS_REDIS_PORT" to redis.getMappedPort(REDIS_PORT).toString(),
         )
 
     private fun notificationEnvironment() =
