@@ -3,7 +3,7 @@
 ## Stack
 - **Backend:** Kotlin + Spring Boot 4.1, JDK 21, Spring MVC com virtual threads, Spring JDBC (`JdbcClient`) na persistência, Gradle Kotlin DSL multi-módulo, monorepo.
 - **Arquitetura por serviço:** Clean Architecture (`domain` → `application` → `adapters` → `bootstrap`), um módulo Gradle por camada, regras validadas com ArchUnit. Pacote raiz `io.github.capozziv.digitalbanking`.
-- **AWS:** RDS PostgreSQL, DynamoDB, SNS, SQS + DLQ, ElastiCache (Redis), Cognito, API Gateway (HTTP API), ECS Fargate.
+- **AWS:** RDS PostgreSQL, DynamoDB, SNS, SQS + DLQ, ElastiCache (Redis), Cognito, API Gateway (HTTP API), EKS ([ADR 0019](adr/0019-runtime-na-aws-com-eks.md)). O ambiente na AWS é efêmero: sobe por cerca de 1 dia e é destruído e recriado sob demanda com Terraform.
 - **Lint:** ktlint.
 - **Infraestrutura como código:** Terraform.
 - **Local:** docker-compose em `infra/local/` com PostgreSQL (um banco por serviço), Redis e nginx (no papel do API Gateway) e LocalStack (SNS/SQS, conta gratuita com token, desde o bloco 2 da etapa 1; cobrirá também o DynamoDB na etapa 4). Testes de integração com Testcontainers.
@@ -32,7 +32,7 @@ ALB público ── /     → Angular (nginx)
                           │ VPC Link
                           ▼
                  ALB interno → customer / accounts / transfers / statement
-                               (chamadas entre serviços via ECS Service Connect)
+                               (chamadas entre serviços pelo DNS de Service do Kubernetes)
 ```
 Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia versionada no repositório.
 
@@ -60,6 +60,7 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 
 ### Limite diário
 - Contador no Redis com script Lua (reservar e liberar), reserva idempotente por `transferId`.
+- Valor padrão: R$ 5.000,00 (500000 centavos), único para todas as contas no MVP; variação por tipo de conta fica para depois do MVP.
 - PostgreSQL do `transfers` é a fonte da verdade; o contador é reconstruído a partir dele.
 - (ver [ADR 0010](adr/0010-limite-diario-redis-lua.md))
 
@@ -77,7 +78,8 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 ### Borda e segurança
 - **API Gateway HTTP API** substitui um gateway em Spring: roteamento por caminho, autorizador JWT nativo do Cognito, VPC Link para ALB interno.
 - Os serviços **também** validam o JWT (Spring Security resource server); não confiam só na borda.
-- Localmente, nginx faz o roteamento por caminho. Cognito no LocalStack é recurso pago: prever modo local com usuários/tokens de teste.
+- Localmente, nginx faz o roteamento por caminho. Cognito no LocalStack é recurso pago: localmente, o `mock-oauth2-server` no docker-compose emite JWT com JWKS e os serviços o validam como validam o do Cognito.
+- Na AWS os serviços rodam no EKS e se chamam pelo DNS de Service do Kubernetes ([ADR 0019](adr/0019-runtime-na-aws-com-eks.md)). Nenhum deploy na AWS antes da derrubada automática com tempo máximo ligado e do alarme de orçamento (#146).
 - (ver [ADR 0004](adr/0004-api-gateway-http-api-na-borda.md))
 
 ### Contratos
@@ -93,7 +95,7 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 - (ver [ADR 0006](adr/0006-observabilidade-com-correlation-id.md))
 
 ### Frontend (etapa 9, detalhar depois)
-- Angular (standalone components, signals); biblioteca de componentes em aberto.
+- Angular (standalone components, signals); Angular Material como biblioteca de componentes.
 - BFF em NestJS: login OAuth2 com Cognito (`openid-client`), sessão no Redis, cookie `HttpOnly`, CSRF, refresh de token, correlation ID via `AsyncLocalStorage`, logs JSON com pino.
 - BFF expõe endpoints por tela (agregação), não proxy genérico.
 - `Idempotency-Key` gerada no Angular ao abrir o formulário de transferência; o BFF só repassa.
@@ -105,12 +107,6 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 ## Em aberto
 Fonte única das decisões pendentes; cada item tem um cartão `Decision` no [board](https://github.com/users/capozziV/projects/2). Ao decidir, registre no ADR indicado (ou crie um), remova o item daqui e feche o cartão.
 
-**Antes das etapas 2 a 7**
-- Valor padrão do limite diário, único para todas as contas no MVP, a definir antes da etapa 6; variação por tipo de conta fica para depois do MVP ([ADR 0010](adr/0010-limite-diario-redis-lua.md)).
-- Estratégia de autenticação no ambiente local, sem Cognito ([ADR 0004](adr/0004-api-gateway-http-api-na-borda.md)).
-
 **Etapa 8**
-- ECS Service Connect para as chamadas entre serviços: decidir e registrar em ADR próprio (cartão [#55](https://github.com/capozziV/DigitalBanking/issues/55)).
-
-**Etapa 9**
-- Angular Material ou PrimeNG ([ADR 0005](adr/0005-frontend-angular-e-bff-nestjs.md)).
+- EKS: nós EC2 ou Fargate ([ADR 0019](adr/0019-runtime-na-aws-com-eks.md)).
+- Tempo máximo ligado e mecanismo de derrubada automática do ambiente AWS; bloqueia o deploy (cartão [#146](https://github.com/capozziV/DigitalBanking/issues/146)).

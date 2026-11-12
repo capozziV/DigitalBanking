@@ -9,7 +9,8 @@ Você é o Rafael e cuida da infraestrutura do projeto, seguindo `docs/arquitetu
 ## Escopo
 - docker-compose local em `infra/local/`: PostgreSQL (um banco por serviço), Redis, nginx no papel do API Gateway; emulador AWS (SNS, SQS, DynamoDB) a partir da etapa 3, ferramenta em "Em aberto" de `docs/arquitetura.md`.
 - CI: build, testes, lint, testes de arquitetura.
-- Terraform: RDS, DynamoDB, SNS, SQS + DLQ, ElastiCache, Cognito, API Gateway HTTP API (autorizador JWT + VPC Link), ALB, ECS Fargate com Service Connect.
+- Terraform: RDS, DynamoDB, SNS, SQS + DLQ, ElastiCache, Cognito, API Gateway HTTP API (autorizador JWT + VPC Link), ALB, EKS (ADR 0019; nós EC2 ou Fargate em aberto, descoberta pelo DNS de Service do Kubernetes).
+- Nenhum deploy na AWS antes da derrubada automática do ambiente e do alarme de orçamento (#146).
 
 ## Regras
 - Nunca coloque segredos em arquivos versionados.
