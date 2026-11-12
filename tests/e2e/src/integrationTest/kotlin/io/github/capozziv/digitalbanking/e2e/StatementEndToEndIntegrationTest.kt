@@ -72,8 +72,29 @@ class StatementEndToEndIntegrationTest {
         assertThat(statement.status(UUID.randomUUID())).isEqualTo(404)
     }
 
+    @Test
+    fun `a read before a transfer does not hide the new debit`() {
+        val source = accounts.openAccount()
+        val destination = accounts.openAccount()
+        accounts.credit(source, 10_000)
+        // Wait for the credit with a read that skips the cache (limit=100). Polling the cached first page with a long
+        // TTL could pin an empty page: a read may see the table before the consume and cache it after the evict (the
+        // accepted race of the spec, bounded by the TTL).
+        statement.awaitEntries(source, 1, STATEMENT_TIMEOUT)
+        // One single cached read warms the first-page cache of the source with the credit only.
+        assertThat(statement.firstPage(source)).hasSize(1)
+
+        val id = transfers.requestTransfer(source, destination, 2_000).transferId()
+
+        assertThat(transfers.awaitTerminal(id, SAGA_FINISH_TIMEOUT)).isEqualTo("COMPLETED")
+        // Below the 50 s minimum cache TTL: only the eviction on consume can make the debit show in time.
+        val entries = statement.awaitFirstPage(source, 2, CACHE_EVICTION_TIMEOUT)
+        assertThat(entries.map { it.get("kind").asString() }).containsExactly("DEBIT", "CREDIT")
+    }
+
     private companion object {
         val SAGA_FINISH_TIMEOUT: Duration = Duration.ofSeconds(90)
         val STATEMENT_TIMEOUT: Duration = Duration.ofSeconds(30)
+        val CACHE_EVICTION_TIMEOUT: Duration = Duration.ofSeconds(30)
     }
 }

@@ -17,8 +17,20 @@ spring:
         static: ${STATEMENT_AWS_REGION:us-east-1}
       sqs:
         endpoint: ${STATEMENT_AWS_ENDPOINT:}
+  data:
+    redis:
+      host: ${STATEMENT_REDIS_HOST:localhost}
+      port: ${STATEMENT_REDIS_PORT:6379}
+      # With Redis down a command fails fast and the statement is read from DynamoDB (RedisStatementFirstPageCache).
+      timeout: ${STATEMENT_CACHE_TIMEOUT:100ms}
+      connect-timeout: ${STATEMENT_CACHE_TIMEOUT:100ms}
 
 statement:
+  cache:
+    # false swaps the Redis cache for a no-op one.
+    enabled: ${STATEMENT_CACHE_ENABLED:true}
+    ttl: 60s
+    ttl-jitter: 10s
   dynamodb:
     # Same endpoint as SQS (DynamoDbConfiguration).
     endpoint: ${STATEMENT_AWS_ENDPOINT:}
@@ -31,6 +43,10 @@ statement:
     refresh-interval: ${STATEMENT_DLQ_METRICS_REFRESH:30s}
 
 management:
+  health:
+    redis:
+      # The cache is optional: a Redis outage must not turn the service DOWN.
+      enabled: false
   endpoints:
     web:
       exposure:

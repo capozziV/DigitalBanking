@@ -10,6 +10,9 @@ dependencies {
     implementation(project(":services:statement:domain"))
     implementation(project(":services:statement:application"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
+    // CacheConfiguration injects the auto-configured JsonMapper (Jackson 3).
+    implementation("org.springframework.boot:spring-boot-starter-jackson")
 
     // The project's AWS SDK BOM sits next to the Spring Cloud AWS one so its (newer) SDK version wins.
     implementation(platform(libs.spring.cloud.aws.bom))

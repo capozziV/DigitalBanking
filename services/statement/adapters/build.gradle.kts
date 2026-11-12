@@ -18,6 +18,8 @@ dependencies {
     implementation(platform(libs.aws.sdk.bom))
     implementation(libs.spring.cloud.aws.starter.sqs)
     implementation(libs.aws.sdk.dynamodb)
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
+    implementation("io.micrometer:micrometer-core")
     // Spring Cloud AWS only registers its SQS message converter when Jackson 3 (tools.jackson) is on the classpath.
     implementation("org.springframework.boot:spring-boot-starter-jackson")
     implementation("tools.jackson.module:jackson-module-kotlin")

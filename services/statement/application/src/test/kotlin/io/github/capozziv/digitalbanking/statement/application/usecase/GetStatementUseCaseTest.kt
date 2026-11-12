@@ -1,9 +1,11 @@
 package io.github.capozziv.digitalbanking.statement.application.usecase
 
 import io.github.capozziv.digitalbanking.statement.application.AccountNotFoundException
+import io.github.capozziv.digitalbanking.statement.application.fake.InMemoryStatementFirstPageCache
 import io.github.capozziv.digitalbanking.statement.application.fake.InMemoryStatementRepository
 import io.github.capozziv.digitalbanking.statement.application.fake.statementEntry
 import io.github.capozziv.digitalbanking.statement.domain.StatementCursor
+import io.github.capozziv.digitalbanking.statement.domain.StatementPage
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.assertj.core.api.Assertions.catchThrowableOfType
@@ -14,7 +16,8 @@ import java.util.UUID
 
 class GetStatementUseCaseTest {
     private val repository = InMemoryStatementRepository()
-    private val useCase = GetStatementUseCase(repository)
+    private val cache = InMemoryStatementFirstPageCache()
+    private val useCase = GetStatementUseCase(repository, cache)
     private val account = UUID.randomUUID()
 
     @Test
@@ -115,5 +118,66 @@ class GetStatementUseCaseTest {
         repository.insertAccount(account, UUID.randomUUID())
 
         assertThat(useCase.execute(account, null, limit).entries).isEmpty()
+    }
+
+    @Test
+    fun `a cached first page is returned without reading the repository`() {
+        val cached = StatementPage(listOf(statementEntry(account, 7)), null)
+        cache.seed(account, cached)
+
+        val page = useCase.execute(account, null, GetStatementUseCase.DEFAULT_LIMIT)
+
+        assertThat(page).isEqualTo(cached)
+    }
+
+    @Test
+    fun `a miss reads the repository and caches the page`() {
+        (1L..3L).forEach { repository.insertEntry(statementEntry(account, it)) }
+
+        val page = useCase.execute(account, null, GetStatementUseCase.DEFAULT_LIMIT)
+
+        assertThat(cache.puts).isEqualTo(1)
+        assertThat(cache.peek(account)).isEqualTo(page)
+    }
+
+    @Test
+    fun `an empty first page of a known account is cached`() {
+        repository.insertAccount(account, UUID.randomUUID())
+
+        val page = useCase.execute(account, null, GetStatementUseCase.DEFAULT_LIMIT)
+
+        assertThat(page.entries).isEmpty()
+        assertThat(cache.puts).isEqualTo(1)
+        assertThat(cache.peek(account)).isEqualTo(page)
+    }
+
+    @Test
+    fun `an unknown account is not cached`() {
+        repeat(2) {
+            assertThatThrownBy { useCase.execute(account, null, GetStatementUseCase.DEFAULT_LIMIT) }
+                .isInstanceOf(AccountNotFoundException::class.java)
+        }
+
+        assertThat(cache.puts).isEqualTo(0)
+    }
+
+    @Test
+    fun `a cursor never touches the cache`() {
+        (1L..3L).forEach { repository.insertEntry(statementEntry(account, it)) }
+
+        useCase.execute(account, StatementCursor(3), GetStatementUseCase.DEFAULT_LIMIT)
+
+        assertThat(cache.gets).isEqualTo(0)
+        assertThat(cache.puts).isEqualTo(0)
+    }
+
+    @Test
+    fun `a limit other than the default never touches the cache`() {
+        (1L..3L).forEach { repository.insertEntry(statementEntry(account, it)) }
+
+        useCase.execute(account, null, GetStatementUseCase.DEFAULT_LIMIT + 1)
+
+        assertThat(cache.gets).isEqualTo(0)
+        assertThat(cache.puts).isEqualTo(0)
     }
 }

@@ -54,7 +54,7 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 - (ver [ADR 0016](adr/0016-saga-orquestrada-por-http.md) e a [spec da etapa 2](superpowers/specs/2026-10-27-etapa-2-transfers-design.md))
 
 ### Cache
-- Extrato: cache-aside só da primeira página, TTL curto com jitter, invalidação ao consumir evento, fallback para DynamoDB se o Redis cair.
+- Extrato: cache-aside só no Redis (sem Caffeine), só a 1ª página com `limit` 20, TTL 60 s ± 10 s, invalidação por remoção da chave ao consumir o lançamento, fallback para o DynamoDB com timeout de 100 ms se o Redis cair (sem circuit breaker). Corrida aceita: página velha por no máximo um TTL.
 - Saldo para autorizar débito nunca vem de cache.
 - (ver [ADR 0009](adr/0009-cache-do-extrato.md) e [ADR 0007](adr/0007-conta-e-ledger-no-accounts.md))
 
@@ -106,9 +106,6 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 
 ## Em aberto
 Fonte única das decisões pendentes; cada item tem um cartão `Decision` no [board](https://github.com/users/capozziV/projects/2). Ao decidir, registre no ADR indicado (ou crie um), remova o item daqui e feche o cartão.
-
-**Antes das etapas 2 a 7**
-- Cache local (Caffeine) na frente do Redis ou só Redis ([ADR 0009](adr/0009-cache-do-extrato.md)).
 
 **Etapa 8**
 - EKS: nós EC2 ou Fargate ([ADR 0019](adr/0019-runtime-na-aws-com-eks.md)).
