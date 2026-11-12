@@ -88,7 +88,7 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 set -a; . infra/local/.env; set +a
 ./gradlew :services:transfers:bootstrap:bootRun
 ```
-O `transfers` sobe na porta 8082 e aplica as próprias migrations.
+O `transfers` sobe na porta 8082 e aplica as próprias migrations. O nginx expõe `GET /accounts/{id}/daily-limit` (limite de 500000 centavos por conta e por dia de São Paulo, o usado e o disponível; conta desconhecida volta com uso zero) pelo `transfers`, com uma regra mais específica que a do prefixo `/accounts/`, que é do `accounts`. A transferência que passaria do limite termina `FAILED` com o motivo `daily-limit-exceeded` (`422 transfer-failed`); sem resposta do Redis nem do PostgreSQL, com `daily-limit-unavailable`. As métricas do limite saem em `/transfers/actuator/metrics`: `transfers.daily_limit.reservations` (tag `result` = `reserved`, `exceeded`, `fallback` ou `error`; `fallback` é a reserva decidida no PostgreSQL com o Redis fora) e `transfers.daily_limit.rebuilds` (vezes em que o contador do Redis foi reconstruído a partir do PostgreSQL).
 
 O `notification` consome os eventos dos dois serviços e roda num terceiro terminal, com o mesmo `.env` carregado. Ele lê as variáveis `NOTIFICATION_*` (banco e LocalStack) e consome as filas `notification-accounts.fifo` e `notification-transfers.fifo`:
 ```bash
@@ -112,7 +112,7 @@ Primeiro o health, que deve responder `"status":"UP"`; depois o smoke, que abre 
 curl http://localhost/accounts/actuator/health
 infra/local/smoke.sh http://localhost
 ```
-O smoke é o mesmo que roda no CI. Na parte do `accounts`, ele imprime `OK: eventos de <id> na fila accounts-events-inspection.fifo: AccountOpened LedgerEntryRecorded:1 LedgerEntryRecorded:2`; a parte do `transfers` termina em `OK: eventos de <transferId> na fila transfers-events-inspection.fifo: TransferCompleted`. As duas últimas linhas são as do `notification`: o smoke espera até 45 s (45 tentativas de 1 s, acima da visibilidade de 30 s da fila: o evento da transferência pode chegar antes do da conta e voltar à fila só depois de 30 s) e confere `TRANSFER_SENT` para o cliente da origem e `TRANSFER_RECEIVED` para o da conta de destino, lendo `GET /notifications?customerId=` pelo nginx (`OK: cliente <id> recebeu TRANSFER_SENT` e `OK: cliente <id> recebeu TRANSFER_RECEIVED`). A última linha é a do `statement`: o smoke espera até 30 s e confere, em `GET /accounts/<id>/statement` pelo nginx, os dois lançamentos da primeira conta, do mais novo para o mais antigo (`OK: extrato da conta <id>: 2:DEBIT:300:700 1:CREDIT:1000:1000`, no formato `sequence:kind:amount:balanceAfter`). Ele apaga da fila de inspeção `accounts-events-inspection.fifo` só as mensagens da conta que criou; as de outras contas ficam escondidas por 2 minutos depois do smoke. Como a fila de inspeção não tem consumidor (diferente de `statement-accounts.fifo`, que o `statement` consome), ela acumula: se o smoke não achar os próprios eventos, recrie o ambiente com `down -v`. A mesma sequência à mão:
+O smoke é o mesmo que roda no CI. Na parte do `accounts`, ele imprime `OK: eventos de <id> na fila accounts-events-inspection.fifo: AccountOpened LedgerEntryRecorded:1 LedgerEntryRecorded:2`; a parte do `transfers` termina em `OK: eventos de <transferId> na fila transfers-events-inspection.fifo: TransferCompleted`; em seguida o smoke confere, em `GET /accounts/<origem>/daily-limit` pelo nginx, o limite diário da origem (`OK: limite diario da conta <id> (limite:usado:disponivel): 500000:400:499600`). As duas últimas linhas são as do `notification`: o smoke espera até 45 s (45 tentativas de 1 s, acima da visibilidade de 30 s da fila: o evento da transferência pode chegar antes do da conta e voltar à fila só depois de 30 s) e confere `TRANSFER_SENT` para o cliente da origem e `TRANSFER_RECEIVED` para o da conta de destino, lendo `GET /notifications?customerId=` pelo nginx (`OK: cliente <id> recebeu TRANSFER_SENT` e `OK: cliente <id> recebeu TRANSFER_RECEIVED`). A última linha é a do `statement`: o smoke espera até 30 s e confere, em `GET /accounts/<id>/statement` pelo nginx, os dois lançamentos da primeira conta, do mais novo para o mais antigo (`OK: extrato da conta <id>: 2:DEBIT:300:700 1:CREDIT:1000:1000`, no formato `sequence:kind:amount:balanceAfter`). Ele apaga da fila de inspeção `accounts-events-inspection.fifo` só as mensagens da conta que criou; as de outras contas ficam escondidas por 2 minutos depois do smoke. Como a fila de inspeção não tem consumidor (diferente de `statement-accounts.fifo`, que o `statement` consome), ela acumula: se o smoke não achar os próprios eventos, recrie o ambiente com `down -v`. A mesma sequência à mão:
 ```bash
 ACCOUNT_ID=$(curl -sS -X POST http://localhost/accounts \
   -H 'Content-Type: application/json' -H "Idempotency-Key: $(uuidgen)" \
@@ -246,13 +246,13 @@ A coleção `api/bruno/statement/` também roda sozinha: o script da requisiçã
   Esperado: `Requests 5 (5 Passed)`.
 
 ### Coleção do `transfers`
-A coleção `api/bruno/transfers/` roda sozinha, sem depender da coleção do `accounts`: o script da requisição `01` abre duas contas pelo `accounts`, credita 1000 na origem e guarda a `Idempotency-Key` e os ids em variáveis. Rode as requisições na ordem: `01` cria a transferência (`201`), `02` repete a mesma chave (`200`, mesma transferência) e `03` consulta pelo id. Os dois serviços precisam estar no ar.
+A coleção `api/bruno/transfers/` roda sozinha, sem depender da coleção do `accounts`: o script da requisição `01` abre duas contas pelo `accounts`, credita 1000 na origem e guarda a `Idempotency-Key` e os ids em variáveis. Rode as requisições na ordem: `01` cria a transferência (`201`), `02` repete a mesma chave (`200`, mesma transferência) e `03` consulta pelo id, `04` consulta o limite diário da origem (300 usados de 500000), `05` pede uma transferência de 500000 e recebe `422 transfer-failed` com o motivo `daily-limit-exceeded` e `06` confere que a recusa não consumiu o limite. Os dois serviços precisam estar no ar.
 - **App do Bruno:** "Open Collection" → `api/bruno/transfers`, ambiente `local`.
 - **Terminal:**
   ```bash
   (cd api/bruno/transfers && bru run --env local)
   ```
-  Esperado: `Requests 3 (3 Passed)`.
+  Esperado: `Requests 6 (6 Passed)`.
 
 ## 8. Derrubar tudo
 Pare os quatro `bootRun` com Ctrl+C nos terminais deles. Depois derrube os contêineres; o `-v` apaga os dados:

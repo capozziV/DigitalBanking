@@ -1,0 +1,22 @@
+meta {
+  name: Consultar limite diario
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/accounts/{{sourceAccountId}}/daily-limit
+  body: none
+  auth: none
+}
+
+tests {
+  // A origem da requisicao 01 transferiu 300 hoje; o limite padrao e 500000. A rota e do transfers (nginx).
+  test("200 com o limite, o usado e o disponivel", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.day).to.match(/^\d{4}-\d{2}-\d{2}$/);
+    expect(res.body.limitCents).to.equal(500000);
+    expect(res.body.usedCents).to.equal(300);
+    expect(res.body.availableCents).to.equal(499700);
+  });
+}

@@ -74,7 +74,9 @@ class TransferController(
             responseCode = "422",
             description =
                 "/problems/insufficient-available-balance: the source account cannot cover the transfer (`transferId`; also on " +
-                    "retries). /problems/transfer-failed: refused by accounts for another `reason` (`transferId`). " +
+                    "retries). /problems/transfer-failed: refused for another `reason` (`transferId`): " +
+                    "`daily-limit-exceeded` (the source account would pass its daily limit), " +
+                    "`daily-limit-unavailable` (the daily limit could not be checked in time) or any other reason of accounts. " +
                     "/problems/same-account-transfer: source and destination are the same account. " +
                     "/problems/account-not-found: an account does not exist (`accountId`); nothing is stored. " +
                     "/problems/idempotency-key-reused: the key was used for another source, destination or amount.",

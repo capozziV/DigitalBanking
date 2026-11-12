@@ -1,0 +1,19 @@
+meta {
+  name: Limite apos a recusa
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/accounts/{{sourceAccountId}}/daily-limit
+  body: none
+  auth: none
+}
+
+tests {
+  test("a transferencia recusada nao consumiu o limite", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.usedCents).to.equal(300);
+    expect(res.body.availableCents).to.equal(499700);
+  });
+}

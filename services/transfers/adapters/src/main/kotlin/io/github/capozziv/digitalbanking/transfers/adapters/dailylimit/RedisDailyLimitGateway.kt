@@ -66,6 +66,22 @@ class RedisDailyLimitGateway(
             redisCall { redis.execute(scripts.release, listOf(key(accountId, day)), transferId.toString()) }
         } catch (e: RedisUnavailableException) {
             log.warn("daily limit release of transfer {} failed in redis (account {}, day {}): {}", transferId, accountId, day, e.message)
+            invalidateCounter(accountId, day)
+        }
+    }
+
+    /**
+     * The counter now holds the released amount, and the TTL renewed by every reservation could keep it for the whole
+     * day. Bumping the epoch (no lock needed: the upsert is atomic) makes the next reservation rebuild it.
+     */
+    private fun invalidateCounter(
+        accountId: UUID,
+        day: LocalDate,
+    ) {
+        try {
+            transactions.executeWithoutResult { store.bumpEpoch(accountId, day) }
+        } catch (e: RuntimeException) {
+            log.warn("daily limit counter of account {} on {} could not be invalidated: {}", accountId, day, e.message)
         }
     }
 

@@ -9,6 +9,7 @@ import io.github.capozziv.digitalbanking.transfers.application.port.IdGenerator
 import io.github.capozziv.digitalbanking.transfers.application.port.TransactionRunner
 import io.github.capozziv.digitalbanking.transfers.application.port.TransferRepository
 import io.github.capozziv.digitalbanking.transfers.application.port.TransferStepLog
+import io.github.capozziv.digitalbanking.transfers.application.usecase.GetDailyLimitUseCase
 import io.github.capozziv.digitalbanking.transfers.application.usecase.GetTransferUseCase
 import io.github.capozziv.digitalbanking.transfers.application.usecase.RequestTransferUseCase
 import io.github.capozziv.digitalbanking.transfers.application.usecase.ResumeDueTransfersUseCase
@@ -62,6 +63,12 @@ class UseCaseConfiguration {
 
     @Bean
     fun getTransferUseCase(transfers: TransferRepository) = GetTransferUseCase(transfers)
+
+    @Bean
+    fun getDailyLimitUseCase(
+        dailyLimits: DailyLimitGateway,
+        clock: Clock,
+    ) = GetDailyLimitUseCase(dailyLimits, clock)
 
     /** Every saga run of the scheduler takes the lease under a new owner (see [SchedulerLeaseOwners]). */
     @Bean

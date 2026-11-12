@@ -60,6 +60,16 @@ class NotificationTextTest {
     }
 
     @Test
+    fun `transfer failed explains the daily limit reasons`() {
+        assertThat(NotificationText.transferFailed(1000, other, "daily-limit-exceeded").body).isEqualTo(
+            "Sua transferência de R$ 10,00 para a conta $other foi recusada: o limite diário de transferências da conta seria ultrapassado. Nenhum valor saiu da sua conta.",
+        )
+        assertThat(NotificationText.transferFailed(1000, other, "daily-limit-unavailable").body).isEqualTo(
+            "Sua transferência de R$ 10,00 para a conta $other foi recusada: não foi possível conferir o limite diário agora, tente novamente. Nenhum valor saiu da sua conta.",
+        )
+    }
+
+    @Test
     fun `transfer failed falls back for unknown reasons`() {
         assertThat(NotificationText.transferFailed(1000, other, "anything-else").body).isEqualTo(
             "Sua transferência de R$ 10,00 para a conta $other foi recusada: não foi possível processar a transferência. Nenhum valor saiu da sua conta.",

@@ -122,6 +122,76 @@ class RedisDailyLimitGatewayIntegrationTest : TransfersIntegrationTest() {
     }
 
     @Test
+    fun `the lock is taken before the epoch is read, so a reservation that waited sees the fallback's epoch`() {
+        reserve(transferOf(50_000), 50_000)
+        val behindFallback = transferOf(400_000)
+        val waiting = transferOf(200_000)
+        val pool = Executors.newSingleThreadExecutor()
+        DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password).use { connection ->
+            connection.autoCommit = false
+            connection
+                .prepareStatement("select pg_advisory_xact_lock(hashtextextended(? || ':' || ?, 0))")
+                .use { lock ->
+                    lock.setString(1, account.toString())
+                    lock.setString(2, day.toString())
+                    lock.executeQuery().close()
+                }
+            try {
+                val blocked = pool.submit<ReservationResult> { reserve(waiting, 200_000) }
+                awaitBlockedOnAdvisoryLock()
+
+                // What the fallback does while it holds the lock: mark the transfer and bump the epoch.
+                connection.prepareStatement("update transfer set limit_reserved = true where id = ?").use {
+                    it.setObject(1, behindFallback)
+                    it.executeUpdate()
+                }
+                connection
+                    .prepareStatement("insert into daily_limit_epoch (account_id, limit_day, epoch) values (?, ?, 1)")
+                    .use {
+                        it.setObject(1, account)
+                        it.setObject(2, day)
+                        it.executeUpdate()
+                    }
+                connection.commit()
+
+                assertThat(blocked.get(10, TimeUnit.SECONDS)).isEqualTo(EXCEEDED)
+                assertThat(redisTemplate.opsForHash<String, String>().get(key(), "total")).isEqualTo("450000")
+            } finally {
+                connection.rollback()
+                pool.shutdownNow()
+            }
+        }
+    }
+
+    @Test
+    fun `an idempotent reservation renews the ttl of the counter`() {
+        val transfer = transferOf(1_000)
+        reserve(transfer, 1_000)
+        redisTemplate.expire(key(), java.time.Duration.ofSeconds(5))
+
+        assertThat(reserve(transfer, 1_000)).isEqualTo(RESERVED)
+
+        assertThat(redisTemplate.getExpire(key(), TimeUnit.SECONDS)).isBetween(590L, 600L)
+    }
+
+    @Test
+    fun `a release that fails in redis makes the next reservation rebuild the counter`() {
+        val first = transferOf(400_000)
+        val second = transferOf(200_000)
+        reserve(first, 400_000)
+        fail(first)
+
+        whilePaused { gateway.release(first, account, day) }
+        val rebuilds = rebuilds()
+
+        // The command may still reach Redis after it comes back, so the proof is the epoch and the rebuild.
+        assertThat(epochInPostgres()).isEqualTo(1)
+        assertThat(reserve(second, 200_000)).isEqualTo(RESERVED)
+        assertThat(rebuilds()).isEqualTo(rebuilds + 1)
+        assertThat(redisTemplate.opsForHash<String, String>().get(key(), "total")).isEqualTo("200000")
+    }
+
+    @Test
     fun `release returns the amount and is idempotent`() {
         val first = transferOf(300_000)
         val second = transferOf(200_000)
@@ -262,6 +332,21 @@ class RedisDailyLimitGatewayIntegrationTest : TransfersIntegrationTest() {
                 .copy(sourceAccountId = accountId, amount = Money(amount))
         transfers.insert(transfer)
         return transfer.id
+    }
+
+    /** Waits until a backend is blocked on an advisory lock, i.e. the reservation reached the lock. */
+    private fun awaitBlockedOnAdvisoryLock() {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+        while (System.nanoTime() < deadline) {
+            val waiting =
+                ownerJdbc
+                    .sql("select count(*) from pg_stat_activity where wait_event_type = 'Lock' and wait_event = 'advisory'")
+                    .query(Long::class.java)
+                    .single()
+            if (waiting > 0) return
+            Thread.sleep(20)
+        }
+        error("no reservation got blocked on the advisory lock")
     }
 
     private fun fail(transferId: UUID) {
