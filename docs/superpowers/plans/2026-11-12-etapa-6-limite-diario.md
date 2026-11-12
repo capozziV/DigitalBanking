@@ -172,5 +172,6 @@ Qualquer erro do Redis nos passos 3 e 4 → **fallback** na mesma transação tr
 Mutantes da spec, cada um tem de deixar teste vermelho:
 - sem a checagem do campo do `transferId` no `reserve.lua` → `the same transfer reserved twice counts once`;
 - sem a liberação em `Failed`/`Compensated` → os testes de liberação (Task 2 e Task 3);
-- sem a trava → `concurrent reservations never exceed the limit` e `mixed paths never exceed the limit`;
+- sem a trava → `mixed paths never exceed the limit` e o teste que segura a advisory lock por JDBC (o Lua já serializa a via só do Redis, então `concurrent reservations` não pega esse mutante);
+- epoch lido antes da trava → teste determinístico da ordem trava → epoch (Task 4);
 - sem a comparação do epoch → `after reservations through postgres, the redis counter is rebuilt before deciding`.
