@@ -4,7 +4,10 @@ dependencies {
     implementation(project(":services:statement:domain"))
     implementation(project(":services:statement:application"))
     // Only for OutboxEventEnvelope.CORRELATION_ID_MDC_KEY, the MDC key shared by every service.
-    implementation(project(":libs:outbox"))
+    // statement has no relational database: the outbox's JDBC starter would make Spring Boot require a DataSource.
+    implementation(project(":libs:outbox")) {
+        exclude(group = "org.springframework.boot", module = "spring-boot-starter-jdbc")
+    }
 
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-validation")

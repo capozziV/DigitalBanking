@@ -60,6 +60,16 @@ class GetStatementUseCaseTest {
     }
 
     @Test
+    fun `a full page ending at sequence 1 has no next cursor`() {
+        (1L..2L).forEach { repository.insertEntry(statementEntry(account, it)) }
+
+        val page = useCase.execute(account, null, 2)
+
+        assertThat(page.entries.map { it.sequence }).containsExactly(2L, 1L)
+        assertThat(page.nextCursor).isNull()
+    }
+
+    @Test
     fun `cursor past the last page is an empty page`() {
         (1L..3L).forEach { repository.insertEntry(statementEntry(account, it)) }
 
