@@ -14,14 +14,17 @@ import io.github.capozziv.digitalbanking.transfers.domain.Money
 import io.github.capozziv.digitalbanking.transfers.domain.TransferStep
 import io.micrometer.core.instrument.MeterRegistry
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.data.redis.core.StringRedisTemplate
+import java.sql.DriverManager
 import java.time.LocalDate
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 /**
  * The daily limit against a real Redis and PostgreSQL, with the default limit of 500000 cents. Every reservation is
@@ -76,13 +79,46 @@ class RedisDailyLimitGatewayIntegrationTest : TransfersIntegrationTest() {
 
     @Test
     fun `concurrent reservations never exceed the limit`() {
-        val ids = List(20) { transferOf(50_000) }
+        // Several rounds, each on a new account whose counter is not in Redis yet, so every round races the rebuild too.
+        repeat(ROUNDS) {
+            val accountId = UUID.randomUUID()
+            val ids = List(20) { transferOf(50_000, accountId) }
 
-        val results = concurrently(ids.map { id -> { reserve(id, 50_000) } })
+            val results = concurrently(ids.map { id -> { reserve(id, 50_000, accountId) } })
 
-        assertThat(results.count { it == RESERVED }).isEqualTo(10)
-        assertThat(results.count { it == EXCEEDED }).isEqualTo(10)
-        assertThat(reservedSumInPostgres()).isEqualTo(500_000)
+            assertThat(results.count { it == RESERVED }).isEqualTo(10)
+            assertThat(results.count { it == EXCEEDED }).isEqualTo(10)
+            assertThat(reservedSumInPostgres(accountId)).isEqualTo(500_000)
+        }
+    }
+
+    @Test
+    fun `a reservation waits for the lock of its account and day, and only for that one`() {
+        val waiting = transferOf(1_000)
+        val otherAccount = UUID.randomUUID()
+        val elsewhere = transferOf(1_000, otherAccount)
+        val pool = Executors.newSingleThreadExecutor()
+        DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password).use { connection ->
+            connection.autoCommit = false
+            connection
+                .prepareStatement("select pg_advisory_xact_lock(hashtextextended(? || ':' || ?, 0))")
+                .use { lock ->
+                    lock.setString(1, account.toString())
+                    lock.setString(2, day.toString())
+                    lock.executeQuery().close()
+                }
+            try {
+                val blocked = pool.submit<ReservationResult> { reserve(waiting, 1_000) }
+
+                assertThat(reserve(elsewhere, 1_000, otherAccount)).isEqualTo(RESERVED)
+                assertThatThrownBy { blocked.get(500, TimeUnit.MILLISECONDS) }.isInstanceOf(TimeoutException::class.java)
+                connection.commit()
+                assertThat(blocked.get(10, TimeUnit.SECONDS)).isEqualTo(RESERVED)
+            } finally {
+                connection.rollback()
+                pool.shutdownNow()
+            }
+        }
     }
 
     @Test
@@ -213,13 +249,17 @@ class RedisDailyLimitGatewayIntegrationTest : TransfersIntegrationTest() {
     private fun reserve(
         transferId: UUID,
         amount: Long,
-    ): ReservationResult = gateway.reserve(transferId, account, day, Money(amount))
+        accountId: UUID = account,
+    ): ReservationResult = gateway.reserve(transferId, accountId, day, Money(amount))
 
-    /** Inserts a pending transfer of [amount] from [account] on [day], at the step that reserves the limit. */
-    private fun transferOf(amount: Long): UUID {
+    /** Inserts a pending transfer of [amount] from [accountId] on [day], at the step that reserves the limit. */
+    private fun transferOf(
+        amount: Long,
+        accountId: UUID = account,
+    ): UUID {
         val transfer =
             aTransfer(step = TransferStep.ReserveLimit, limitDay = day)
-                .copy(sourceAccountId = account, amount = Money(amount))
+                .copy(sourceAccountId = accountId, amount = Money(amount))
         transfers.insert(transfer)
         return transfer.id
     }
@@ -238,12 +278,12 @@ class RedisDailyLimitGatewayIntegrationTest : TransfersIntegrationTest() {
             .query(Boolean::class.java)
             .single()
 
-    private fun reservedSumInPostgres(): Long =
+    private fun reservedSumInPostgres(accountId: UUID = account): Long =
         ownerJdbc
             .sql(
                 "select coalesce(sum(amount), 0) from transfer " +
                     "where source_account_id = :account and limit_day = :day and limit_reserved",
-            ).param("account", account)
+            ).param("account", accountId)
             .param("day", day)
             .query(Long::class.java)
             .single()
@@ -287,5 +327,9 @@ class RedisDailyLimitGatewayIntegrationTest : TransfersIntegrationTest() {
         } finally {
             pool.shutdownNow()
         }
+    }
+
+    private companion object {
+        const val ROUNDS = 5
     }
 }
