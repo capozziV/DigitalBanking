@@ -496,6 +496,18 @@ class RunTransferSagaUseCaseTest {
     }
 
     @Test
+    fun `the limit is released only after the terminal state is saved`() {
+        givenTransfer(TransferStep.ReserveLimit)
+        accounts.reply(refused(StepOutcome.INSUFFICIENT_AVAILABLE_BALANCE))
+        val savedStepAtRelease = mutableListOf<TransferStep>()
+        dailyLimits.onRelease = { savedStepAtRelease += repository.findById(it)!!.step }
+
+        useCase.execute(id, "owner-a")
+
+        assertThat(savedStepAtRelease).containsExactly(TransferStep.Failed)
+    }
+
+    @Test
     fun `a compensated transfer releases the limit`() {
         givenTransfer(TransferStep.ReserveLimit)
         accounts.reply(created, refused("account-not-found"), created)

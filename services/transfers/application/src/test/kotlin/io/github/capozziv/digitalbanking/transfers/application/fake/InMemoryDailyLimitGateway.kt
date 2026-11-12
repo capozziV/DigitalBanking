@@ -31,6 +31,9 @@ class InMemoryDailyLimitGateway(
 
     var unavailable = false
 
+    /** Runs at the start of every [release], with the transfer ID: lets a test look at what was saved before it. */
+    var onRelease: (UUID) -> Unit = {}
+
     /** When true, [release] throws after recording the call, as a broken Redis would. */
     var failOnRelease = false
 
@@ -57,6 +60,7 @@ class InMemoryDailyLimitGateway(
         day: LocalDate,
     ) {
         check(transactions?.open != true) { "daily limit released inside a database transaction" }
+        onRelease(transferId)
         releaseCalls += transferId
         check(!failOnRelease) { "release failed" }
         reservations.remove(transferId)

@@ -17,6 +17,7 @@ junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
 spring-boot-bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
 archunit = { module = "com.tngtech.archunit:archunit", version.ref = "archunit" }
+testcontainers-core = { module = "org.testcontainers:testcontainers" }
 testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql" }
 testcontainers-junit-jupiter = { module = "org.testcontainers:testcontainers-junit-jupiter" }
 flyway-postgresql = { module = "org.flywaydb:flyway-database-postgresql" }
