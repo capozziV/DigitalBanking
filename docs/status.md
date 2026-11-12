@@ -4,8 +4,8 @@
 
 **Última atualização:** 2026-11-12
 **Board:** [Digital Banking no GitHub Projects](https://github.com/users/capozziV/projects/2)
-**Fase atual:** etapa 4 concluída (merge do PR #139 em 2026-11-12); débitos técnicos da etapa 4 em andamento (#126, #133, #134–#136, #138, #140).
-**Próximo passo:** etapa 5 (cache do extrato), que espera do usuário a decisão #18 (Caffeine na frente do Redis ou só Redis) e o brainstorming (cartão #12).
+**Fase atual:** etapa 4 concluída (PR #139) e seus débitos técnicos fechados (PRs #142–#144; #113 auditado e fechado). Etapa 5 (cache do extrato): decisões tomadas (#18, só Redis), spec e ADR 0009 revisado na branch `etapa-5-cache`, aguardando revisão do usuário.
+**Próximo passo:** usuário revisa a spec da etapa 5 (`superpowers/specs/2026-11-12-etapa-5-cache-do-extrato-design.md`); com ela aprovada, plano (`writing-plans`) e execução.
 
 ## Como usar o board
 - Colunas: **Backlog** (pendência sem resposta, ou etapa anterior fora de Done), **Ready** (sem pendência e etapa anterior em Done), **In progress**, **In review** (revisão da Beatriz) e **Done** (revisado, build, testes e lint verdes, merge feito).
