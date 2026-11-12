@@ -1,7 +1,7 @@
 # Etapa 5 — cache do extrato: design
 
 - **Data:** 2026-11-12
-- **Status:** aguardando revisão do usuário
+- **Status:** aprovada pelo usuário em 2026-11-12
 - **Roadmap:** etapa 5, "Cache-aside da 1ª página, TTL com jitter, invalidação por evento, fallback".
 - **ADR base:** [0009 — Cache do extrato](../../adr/0009-cache-do-extrato.md).
 
