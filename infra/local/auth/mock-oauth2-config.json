@@ -1,0 +1,35 @@
+{
+  "interactiveLogin": false,
+  "tokenCallbacks": [
+    {
+      "issuerId": "default",
+      "tokenExpiry": 3600,
+      "requestMappings": [
+        {
+          "requestParam": "user_groups",
+          "match": "admin",
+          "claims": {
+            "sub": "${username}",
+            "groups": ["admin"]
+          }
+        },
+        {
+          "requestParam": "username",
+          "match": ".+",
+          "claims": {
+            "sub": "${username}",
+            "groups": []
+          }
+        },
+        {
+          "requestParam": "scope",
+          "match": "digitalbanking/internal",
+          "claims": {
+            "sub": "${clientId}",
+            "scope": "digitalbanking/internal"
+          }
+        }
+      ]
+    }
+  ]
+}
