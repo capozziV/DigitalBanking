@@ -12,11 +12,15 @@ dependencyResolutionManagement {
 rootProject.name = "digitalbanking"
 
 include(
+    ":libs:observabilidade",
     ":libs:outbox",
     ":libs:outbox-relay",
+    ":libs:security",
+    ":libs:security-caller",
     ":libs:testing-architecture",
     ":libs:testing-localstack",
     ":libs:testing-redis",
+    ":libs:testing-security",
     ":services:accounts:domain",
     ":services:accounts:application",
     ":services:accounts:adapters",
