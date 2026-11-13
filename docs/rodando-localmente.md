@@ -254,6 +254,22 @@ A coleção `api/bruno/transfers/` roda sozinha, sem depender da coleção do `a
   ```
   Esperado: `Requests 6 (6 Passed)`.
 
+## Identidade local (mock-oauth2-server)
+O compose sobe o `mock-oauth2-server` (`ghcr.io/navikt/mock-oauth2-server`) na porta 8090 (`MOCK_OAUTH2_PORT`), no lugar do Cognito. O emissor é `http://localhost:8090/default`; os serviços o recebem em `*_JWT_ISSUER_URI` (`ACCOUNTS_`, `TRANSFERS_`, `NOTIFICATION_`, `STATEMENT_` e `CUSTOMER_`, veja o `.env.example`). Os serviços que chamam outros serviços usam um cliente de máquina (client credentials, escopo `digitalbanking/internal`): `ACCOUNTS_OAUTH_CLIENT_ID`/`_SECRET` e `TRANSFERS_OAUTH_CLIENT_ID`/`_SECRET`. O mock aceita qualquer segredo, então `local-secret` serve; são valores só de desenvolvimento local.
+
+A configuração dos tokens fica em `infra/local/auth/mock-oauth2-config.json` (montada no contêiner e lida por `JSON_CONFIG_PATH`; o login interativo fica desligado). O mock emite o `sub` e o claim `groups` pedidos na requisição:
+- **Usuário** (`password grant`): o `sub` é o `username` enviado, que deve ser um UUID (o id do cliente é o `sub`); `groups` é `["admin"]` com o parâmetro `user_groups=admin` e `[]` sem ele. Não leva o escopo `digitalbanking/internal`.
+- **Serviço** (`client_credentials` com `scope=digitalbanking/internal`): `sub` igual ao `client_id` e `scope` igual a `digitalbanking/internal`.
+
+Para pegar um token, use `infra/local/auth/token.sh` (precisa de `curl` e `jq`; a URL do emissor muda com `MOCK_OAUTH2_URL`):
+```bash
+infra/local/auth/token.sh user 11111111-1111-7111-8111-111111111111        # cliente
+infra/local/auth/token.sh user 00000000-0000-7000-8000-000000000001 admin  # usuário de teste do dono (admin e cliente)
+infra/local/auth/token.sh service                                          # serviço (client_id accounts); outro: service transfers
+curl -H "Authorization: Bearer $(infra/local/auth/token.sh user <uuid>)" http://localhost/...
+```
+O usuário de teste do dono tem `sub` `00000000-0000-7000-8000-000000000001`, nome `Owner Test`, e-mail `owner@example.test` e o grupo `admin`; o nome e o e-mail entram no cadastro do `customer` pelo seed local. Os tokens duram 1 hora.
+
 ## 8. Derrubar tudo
 Pare os quatro `bootRun` com Ctrl+C nos terminais deles. Depois derrube os contêineres; o `-v` apaga os dados:
 ```bash
