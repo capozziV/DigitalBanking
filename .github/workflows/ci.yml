@@ -27,6 +27,7 @@ jobs:
       statement: ${{ steps.filter.outputs.statement }}
       shared: ${{ steps.filter.outputs.shared }}
       e2e: ${{ steps.filter.outputs.e2e }}
+      terraform: ${{ steps.filter.outputs.terraform }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4.0.3
@@ -43,6 +44,8 @@ jobs:
               - 'services/statement/**'
             e2e:
               - 'tests/e2e/**'
+            terraform:
+              - 'infra/terraform/**'
             shared:
               - 'libs/**'
               - 'build-logic/**'
@@ -311,10 +314,28 @@ jobs:
             tests/e2e/build/reports/tests/
             tests/e2e/build/e2e-logs/
 
+  # Terraform so valida (sem credenciais da AWS e sem apply): fmt, init sem backend e validate.
+  terraform:
+    needs: changes
+    if: ${{ needs.changes.outputs.terraform == 'true' || needs.changes.outputs.shared == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: '1.17.2'
+      - name: Formato
+        run: terraform fmt -check -recursive infra/terraform
+      - name: Init sem backend
+        run: terraform -chdir=infra/terraform/envs/aws init -backend=false -lockfile=readonly
+      - name: Validate
+        run: terraform -chdir=infra/terraform/envs/aws validate
+
   # Check unico exigido pela protecao da main: falha se algum job falhou ou foi cancelado;
   # job pulado pelo filtro de caminhos conta como sucesso.
   ci-ok:
-    needs: [changes, accounts, transfers, notification, statement, libs, smoke, e2e]
+    needs: [changes, accounts, transfers, notification, statement, libs, smoke, e2e, terraform]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
