@@ -62,4 +62,11 @@ resource "aws_cognito_user_pool_client" "machine" {
   supported_identity_providers         = ["COGNITO"]
 }
 
+# Sem dominio nao existe /oauth2/token e o client_credentials nao funciona.
+# O prefixo precisa ser unico na regiao.
+resource "aws_cognito_user_pool_domain" "this" {
+  domain       = var.domain_prefix
+  user_pool_id = aws_cognito_user_pool.this.id
+}
+
 data "aws_region" "current" {}

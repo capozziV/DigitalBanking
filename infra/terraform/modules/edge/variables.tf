@@ -39,3 +39,21 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "throttling_rate_limit" {
+  description = "Requisicoes por segundo permitidas no stage (padrao baixo: ambiente de portfolio)."
+  type        = number
+  default     = 10
+}
+
+variable "throttling_burst_limit" {
+  description = "Rajada maxima de requisicoes no stage."
+  type        = number
+  default     = 20
+}
+
+variable "access_log_retention_days" {
+  description = "Retencao do log de acesso no CloudWatch."
+  type        = number
+  default     = 7
+}

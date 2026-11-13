@@ -53,4 +53,29 @@ resource "aws_apigatewayv2_stage" "default" {
   name        = "$default"
   auto_deploy = true
   tags        = var.tags
+
+  default_route_settings {
+    throttling_rate_limit  = var.throttling_rate_limit
+    throttling_burst_limit = var.throttling_burst_limit
+  }
+
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.access.arn
+    format = jsonencode({
+      requestId        = "$context.requestId"
+      ip               = "$context.identity.sourceIp"
+      requestTime      = "$context.requestTime"
+      httpMethod       = "$context.httpMethod"
+      routeKey         = "$context.routeKey"
+      status           = "$context.status"
+      responseLength   = "$context.responseLength"
+      integrationError = "$context.integrationErrorMessage"
+    })
+  }
+}
+
+resource "aws_cloudwatch_log_group" "access" {
+  name              = "/aws/apigateway/${var.name}-http/access"
+  retention_in_days = var.access_log_retention_days
+  tags              = var.tags
 }

@@ -18,3 +18,8 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "domain_prefix" {
+  description = "Prefixo do dominio hospedado do Cognito (<prefixo>.auth.<regiao>.amazoncognito.com); unico na regiao."
+  type        = string
+}

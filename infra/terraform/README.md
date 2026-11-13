@@ -9,6 +9,14 @@ Infraestrutura na AWS do banco digital. Nesta etapa (7) só a identidade e a bor
 - `modules/edge`: API Gateway HTTP API, autorizador JWT do Cognito, VPC Link e uma integração `HTTP_PROXY` para o listener do ALB interno. Rotas `ANY /prefixo` e `ANY /prefixo/{proxy+}` para `/accounts`, `/transfers`, `/notifications`, `/customers` e `/admin`; extrato e limite diário ficam sob `/accounts` e `/transfers`. Todas exigem JWT.
 - `envs/aws`: compõe os dois módulos. Estado local, sem backend remoto (ambiente efêmero).
 
+## Cognito: domínio e PKCE
+- O módulo `identity` cria o `aws_cognito_user_pool_domain`; sem ele não existe `/oauth2/token` e o `client_credentials` não funciona. O prefixo vem da variável `cognito_domain_prefix` (sem padrão, precisa ser único na região). Saídas: `cognito_domain` e `token_endpoint_url`.
+- O Cognito não impõe PKCE no servidor. Quem aplica é o frontend (etapa 9), que usa o app client web, público e sem segredo.
+
+## Borda: limites e log de acesso
+- O stage `$default` limita taxa e rajada (`throttling_rate_limit`, padrão 10 req/s; `throttling_burst_limit`, padrão 20), baixos por ser ambiente de portfólio.
+- O log de acesso vai para um Log Group do CloudWatch (`/aws/apigateway/<nome>-http/access`) com retenção de 7 dias (`access_log_retention_days`).
+
 ## Entradas da etapa 8
 `alb_listener_arn`, `subnet_ids` e `security_group_ids` não têm valor padrão: vêm da rede, do EKS e do ALB da etapa 8.
 

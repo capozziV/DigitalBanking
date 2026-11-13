@@ -19,3 +19,13 @@ output "machine_client_secret" {
   value     = aws_cognito_user_pool_client.machine.client_secret
   sensitive = true
 }
+
+output "domain" {
+  description = "Dominio hospedado do Cognito."
+  value       = "${aws_cognito_user_pool_domain.this.domain}.auth.${data.aws_region.current.region}.amazoncognito.com"
+}
+
+output "token_endpoint_url" {
+  description = "Endpoint de token (client_credentials e troca do codigo)."
+  value       = "https://${aws_cognito_user_pool_domain.this.domain}.auth.${data.aws_region.current.region}.amazoncognito.com/oauth2/token"
+}

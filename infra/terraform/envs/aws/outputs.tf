@@ -18,3 +18,11 @@ output "machine_client_secret" {
   value     = module.identity.machine_client_secret
   sensitive = true
 }
+
+output "cognito_domain" {
+  value = module.identity.domain
+}
+
+output "token_endpoint_url" {
+  value = module.identity.token_endpoint_url
+}
