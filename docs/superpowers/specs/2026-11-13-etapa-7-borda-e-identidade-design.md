@@ -1,7 +1,7 @@
 # Etapa 7 — borda e identidade: design
 
 - **Data:** 2026-11-13
-- **Status:** aguardando revisão do usuário
+- **Status:** aprovada pelo usuário em 2026-11-13
 - **Roadmap:** etapa 7: `customer`, Cognito, API Gateway HTTP API (autorizador JWT + VPC Link), validação JWT nos serviços, correlation ID em `libs/observabilidade`, `/admin` com grupo de administradores, `/actuator/health` restrito, exceções de segurança e desconexão do cliente fora do handler de 500.
 - **ADRs base:** [0004 — API Gateway HTTP API na borda](../../adr/0004-api-gateway-http-api-na-borda.md), [0019 — EKS](../../adr/0019-runtime-na-aws-com-eks.md).
 
@@ -82,6 +82,7 @@ Toda requisição de cliente chega com um JWT, e cada serviço só deixa o clien
 ## 7. Ambiente local
 - `mock-oauth2-server` no compose (porta `8090`), emissor `default`, com `sub` UUID e o claim `groups` configurados por requisição de token. Usuários de teste documentados: um cliente, outro cliente e um admin. Client credentials para os serviços.
 - nginx: rota `/customers` e `/admin/customers` para o `customer`, as demais como hoje.
+- **Usuário de teste do dono do projeto** (pedido do usuário, 2026-11-13): um usuário fixo, cliente e admin ao mesmo tempo, com `sub` fixo, nome fictício (`Owner Test`) e e-mail fictício. Ele tem cadastro no `customer`, duas contas e saldo inicial, criados por um script de seed local (`infra/local/seed.sh`) depois do compose. Serve para testar transferências entre as próprias contas e operar tudo como admin. Na AWS ele vira um usuário do Cognito no grupo `admin`, criado na etapa 8. Um admin que também é cliente opera as próprias contas como cliente, e o resto pelo papel de admin.
 - `infra/local/smoke.sh` e as coleções Bruno pegam tokens no mock antes das chamadas. Coleção nova `api/bruno/customer`.
 - Os testes de integração usam um emissor de JWT de teste (chave gerada no teste, `JwtDecoder` apontando para ela) e não dependem do mock. O e2e sobe o `mock-oauth2-server` em Testcontainers.
 
