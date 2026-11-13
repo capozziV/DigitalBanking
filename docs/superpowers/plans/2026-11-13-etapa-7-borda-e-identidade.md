@@ -11,7 +11,8 @@
 **Spec:** [`docs/superpowers/specs/2026-11-13-etapa-7-borda-e-identidade-design.md`](../specs/2026-11-13-etapa-7-borda-e-identidade-design.md)
 
 ## Global Constraints
-- `Caller` (em `libs/security`, sem Spring no tipo):
+- `Caller` (em `libs/security-caller`, sem Spring; o resto em `libs/security`). Rotas sem regra são negadas: cada serviço lista todas as suas rotas, e as de cliente incluem `ADMIN`.
+- `Caller` (forma):
   - `sealed interface Caller { data class Customer(val customerId: UUID); data class Admin(val userId: UUID); data object Service }`;
   - um admin é `Admin`, mas pode agir como cliente nas próprias contas: `Caller.actsAsCustomer(customerId)` retorna verdadeiro para `Customer` com o mesmo id e para `Admin` com `userId == customerId`.
 - Claims: `sub` UUID; grupos em `digitalbanking.security.groups-claim` (padrão `groups`; na AWS `cognito:groups`); escopo de máquina `digitalbanking/internal` em `scope`.
@@ -23,7 +24,7 @@
 - `customer`: porta `8085`, banco `customer` (`customer_owner`/`customer_app`, grants próprios), tópico `customer-events.fifo`.
 - Ambiente local:
   - `mock-oauth2-server` na porta `8090`, emissor `http://localhost:8090/default`;
-  - variáveis `*_JWT_ISSUER_URI`, `*_OAUTH_CLIENT_ID` e `*_OAUTH_CLIENT_SECRET` por serviço.
+  - variáveis `*_JWT_ISSUER_URI`, `*_OAUTH_TOKEN_URI` (local `http://localhost:8090/default/token`; na AWS, a saída `token_endpoint_url` do Terraform), `*_OAUTH_CLIENT_ID` e `*_OAUTH_CLIENT_SECRET` por serviço.
 - Usuário de teste do dono: `sub` `00000000-0000-7000-8000-000000000001`, nome `Owner Test`, e-mail `owner@example.test`, grupo `admin`.
 - Código, testes e logs em inglês; docs em português. Testes terminam em `Test` ou `IntegrationTest`.
 - Agentes em worktree não regeneram nem commitam `graphify-out/`.

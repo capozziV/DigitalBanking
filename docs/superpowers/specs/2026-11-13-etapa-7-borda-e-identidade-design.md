@@ -31,10 +31,11 @@ Toda requisição de cliente chega com um JWT, e cada serviço só deixa o clien
 ## 1. Identidade e o id do cliente
 - **O id do cliente é o `sub` do usuário** (UUID). Um usuário tem no máximo um cliente. Com isso, todo serviço sabe quem é o cliente só pelo token, sem consulta extra. O Cognito emite `sub` UUID; o mock é configurado para emitir UUID.
 - O `customerId` some dos corpos e parâmetros em que hoje vem do chamador (`POST /accounts`, `GET /notifications?customerId=`).
+- **Negar por padrão:** rota sem regra explícita responde `403`; cada serviço lista todas as suas rotas.
 - **Três tipos de chamador** (`Caller`), resolvidos de um JWT validado (Spring Security resource server, emissor e JWKS configuráveis):
   - **cliente:** token de usuário sem o grupo `admin`; `customerId = sub`;
   - **admin:** token de usuário com o grupo `admin`;
-  - **serviço:** token de máquina (client credentials) com o escopo `digitalbanking/internal`.
+  - **serviço:** token de máquina (client credentials) com o escopo `digitalbanking/internal`, sem `sub` UUID e sem grupos. Token de usuário com o escopo interno é rejeitado (`401`).
 
 ## 2. Serviço `customer`
 - Porta **8085**, PostgreSQL próprio (banco `customer`, usuários `customer_owner`/`customer_app`), Clean Architecture como os outros e `libs/outbox` + `libs/outbox-relay` (tópico `customer-events.fifo`).
@@ -75,7 +76,7 @@ Toda requisição de cliente chega com um JWT, e cada serviço só deixa o clien
 
 ## 6. Segurança transversal
 - **Problem Details** para `401` (`/problems/unauthorized`) e `403` (`/problems/forbidden`), fora do handler genérico de `500`.
-- Desconexão do cliente (`AsyncRequestNotUsableException`, `ClientAbortException`, `IOException` de "broken pipe") não vira `500` nem log de ERROR: vira DEBUG, sem resposta.
+- Desconexão do cliente (`AsyncRequestNotUsableException`, `ClientAbortException`; uma `IOException` genérica não entra, para não mascarar erros reais) não vira `500` nem log de ERROR: vira DEBUG, sem resposta.
 - `/actuator/health` aberto sem detalhes (`show-details: when-authorized`, só admin); `/actuator/metrics` e o resto do actuator só para admin.
 - OpenAPI de cada serviço declara o esquema `bearerAuth`.
 
