@@ -16,7 +16,7 @@ include(
     ":libs:outbox",
     ":libs:outbox-relay",
     ":libs:security",
-    ":libs:security:caller",
+    ":libs:security-caller",
     ":libs:testing-architecture",
     ":libs:testing-localstack",
     ":libs:testing-redis",

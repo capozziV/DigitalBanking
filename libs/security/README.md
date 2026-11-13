@@ -3,14 +3,15 @@
 Segurança comum dos serviços: resource server JWT, o `Caller`, as respostas `401`/`403` em Problem Details, o token de máquina entre serviços e o tratamento de cliente desconectado. Tudo entra por autoconfiguração do Spring Boot.
 
 ## Módulos
-- `:libs:security:caller`: só o tipo `Caller`, sem Spring. O `application` de cada serviço depende **só** dele.
-- `:libs:security`: o resto (depende do `caller` com `api`). Entra no `adapters` do serviço.
+- `:libs:security-caller`: só o tipo `Caller`, sem Spring. O `application` de cada serviço depende **só** dele.
+- `:libs:security`: o resto (depende do `:libs:security-caller` com `api`). Entra no `adapters` do serviço.
 - `:libs:testing-security`: `JwtTestSupport` para os testes de integração (ver abaixo).
 
 ## O que a lib faz sozinha
 - Valida o JWT com o `JwtDecoder` que o Spring Boot monta a partir de `spring.security.oauth2.resourceserver.jwt.issuer-uri`.
 - Resolve o `Caller` (`CallerResolver`):
-  - escopo `digitalbanking/internal` (em `scope` ou `scp`) → `Caller.Service`;
+  - escopo `digitalbanking/internal` (em `scope` ou `scp`) num token de máquina → `Caller.Service`. Token de máquina: o `sub` não é UUID (no Cognito, é o client id) e não há o claim de grupos;
+  - escopo interno num token de usuário (`sub` UUID ou com o claim de grupos) → `401`. A lib não depende de o emissor negar esse escopo aos usuários;
   - grupo `admin` no claim de grupos → `Caller.Admin(sub)`;
   - qualquer outro → `Caller.Customer(sub)`;
   - `sub` que não é UUID num token de usuário → `401`.
