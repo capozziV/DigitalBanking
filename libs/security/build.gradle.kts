@@ -16,6 +16,8 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 
     integrationTestImplementation(project(":libs:testing-security"))
+    // Services use both libs: proves 401/403 keep the X-Correlation-Id (the correlation filter runs first).
+    integrationTestImplementation(project(":libs:observabilidade"))
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-test")
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-actuator")
 }

@@ -17,9 +17,11 @@ class TestHttp(
     fun get(
         path: String,
         token: String? = null,
+        headers: Map<String, String> = emptyMap(),
     ): HttpResponse<String> {
         val request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port$path")).GET()
         if (token != null) request.header("Authorization", "Bearer $token")
+        headers.forEach { (name, value) -> request.header(name, value) }
         return client.send(request.build(), HttpResponse.BodyHandlers.ofString())
     }
 }

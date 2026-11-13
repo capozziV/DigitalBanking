@@ -33,6 +33,19 @@ class SecurityAutoConfigurationIntegrationTest {
     }
 
     @Test
+    fun `401 and 403 carry the correlation id of the request`() {
+        val correlation = mapOf("X-Correlation-Id" to "corr-401-403")
+
+        val unauthorized = http.get("/caller", headers = correlation)
+        val forbidden = http.get("/admin/ping", JwtTestSupport.customerToken(userId), correlation)
+
+        assertProblem(unauthorized, 401, "unauthorized")
+        assertThat(unauthorized.headers().firstValue("X-Correlation-Id")).hasValue("corr-401-403")
+        assertProblem(forbidden, 403, "forbidden")
+        assertThat(forbidden.headers().firstValue("X-Correlation-Id")).hasValue("corr-401-403")
+    }
+
+    @Test
     fun `an expired token is 401`() {
         assertProblem(http.get("/caller", JwtTestSupport.token(userId.toString(), expiresIn = Duration.ofMinutes(-5))), 401, "unauthorized")
     }
