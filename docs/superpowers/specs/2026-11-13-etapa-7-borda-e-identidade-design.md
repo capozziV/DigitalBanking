@@ -20,7 +20,7 @@ Toda requisição de cliente chega com um JWT, e cada serviço só deixa o clien
 - Build completo verde (ktlint, unidade, integração, ArchUnit, e2e).
 - `terraform fmt -check` e `terraform validate` verdes no CI, sem `apply`.
 - Smoke e Bruno das cinco coleções verdes, com tokens do `mock-oauth2-server`.
-- Testes provam: sem token → `401`; token de outro cliente → `403`; admin passa; cliente bloqueado não transfere; serviço chamando serviço com token de máquina.
+- Testes provam: sem token → `401`; recurso de outro cliente → `404`; rota de admin sem o grupo → `403`; admin passa; cliente bloqueado não transfere; serviço chamando serviço com token de máquina.
 - Revisão de cada task e revisão final da branch pela Beatriz, com mutantes vermelhos.
 
 ## Restrições
@@ -84,7 +84,7 @@ Toda requisição de cliente chega com um JWT, e cada serviço só deixa o clien
 - nginx: rota `/customers` e `/admin/customers` para o `customer`, as demais como hoje.
 - **Usuário de teste do dono do projeto** (pedido do usuário, 2026-11-13): um usuário fixo, cliente e admin ao mesmo tempo, com `sub` fixo, nome fictício (`Owner Test`) e e-mail fictício. Ele tem cadastro no `customer`, duas contas e saldo inicial, criados por um script de seed local (`infra/local/seed.sh`) depois do compose. Serve para testar transferências entre as próprias contas e operar tudo como admin. Na AWS ele vira um usuário do Cognito no grupo `admin`, criado na etapa 8. Um admin que também é cliente opera as próprias contas como cliente, e o resto pelo papel de admin.
 - `infra/local/smoke.sh` e as coleções Bruno pegam tokens no mock antes das chamadas. Coleção nova `api/bruno/customer`.
-- Os testes de integração usam um emissor de JWT de teste (chave gerada no teste, `JwtDecoder` apontando para ela) e não dependem do mock. O e2e sobe o `mock-oauth2-server` em Testcontainers.
+- Os testes de integração usam um emissor de JWT de teste da `libs/testing-security` (chave gerada no teste, `JwtDecoder` apontando para ela) e não dependem do mock. O e2e sobe o `mock-oauth2-server` em Testcontainers.
 
 ## 8. Terraform (sem aplicar)
 - `infra/terraform/modules/identity`: User Pool do Cognito, grupo `admin`, app client do frontend (authorization code + PKCE), resource server `digitalbanking` com o escopo `internal` e app client de máquina (client credentials).
