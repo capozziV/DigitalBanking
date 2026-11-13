@@ -73,6 +73,17 @@ class SecurityAutoConfigurationIntegrationTest {
     }
 
     @Test
+    fun `a user token that carries the internal scope is 401 on internal routes, not a service`() {
+        val adminWithInternalScope =
+            JwtTestSupport.token(userId.toString(), groups = listOf("admin"), scopes = listOf("digitalbanking/internal"))
+        val customerWithInternalScope = JwtTestSupport.token(userId.toString(), scopes = listOf("digitalbanking/internal"))
+
+        assertProblem(http.get("/internal/ping", adminWithInternalScope), 401, "unauthorized")
+        assertProblem(http.get("/internal/ping", customerWithInternalScope), 401, "unauthorized")
+        assertProblem(http.get("/caller", adminWithInternalScope), 401, "unauthorized")
+    }
+
+    @Test
     fun `admin routes without a token are 401, not 403`() {
         assertProblem(http.get("/admin/ping"), 401, "unauthorized")
     }

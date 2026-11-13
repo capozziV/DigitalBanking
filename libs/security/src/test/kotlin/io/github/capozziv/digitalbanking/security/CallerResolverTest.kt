@@ -45,6 +45,38 @@ class CallerResolverTest {
     }
 
     @Test
+    fun `a user token with the internal scope is not a service and is rejected`() {
+        val token = jwt(sub = userId.toString(), claims = mapOf("scope" to "digitalbanking/internal"))
+
+        assertThatThrownBy { resolver.resolve(token) }.isInstanceOf(InvalidCallerException::class.java)
+    }
+
+    @Test
+    fun `an admin token with the internal scope is not a service and is rejected`() {
+        val token =
+            jwt(sub = userId.toString(), claims = mapOf("scope" to "digitalbanking/internal", "groups" to listOf("admin")))
+
+        assertThatThrownBy { resolver.resolve(token) }.isInstanceOf(InvalidCallerException::class.java)
+    }
+
+    @Test
+    fun `a token with the internal scope and a groups claim is rejected, even when its sub is a client id`() {
+        val token =
+            jwt(sub = "transfers-client", claims = mapOf("scp" to listOf("digitalbanking/internal"), "groups" to emptyList<String>()))
+
+        assertThatThrownBy { resolver.resolve(token) }.isInstanceOf(InvalidCallerException::class.java)
+    }
+
+    @Test
+    fun `the user check of an internal token uses the configured groups claim`() {
+        val cognito = CallerResolver(groupsClaim = "cognito:groups")
+        val token =
+            jwt(sub = "transfers-client", claims = mapOf("scope" to "digitalbanking/internal", "cognito:groups" to listOf("admin")))
+
+        assertThatThrownBy { cognito.resolve(token) }.isInstanceOf(InvalidCallerException::class.java)
+    }
+
+    @Test
     fun `a scope that only contains the internal one as a substring is not a service`() {
         val caller = resolver.resolve(jwt(sub = userId.toString(), claims = mapOf("scope" to "digitalbanking/internal-read")))
 
