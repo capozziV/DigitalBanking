@@ -35,7 +35,7 @@ digitalbanking.security:
     token-uri: ${ACCOUNTS_OAUTH_TOKEN_URI:http://localhost:8090/default/token}
     client-id: ${ACCOUNTS_OAUTH_CLIENT_ID:accounts}
     client-secret: ${ACCOUNTS_OAUTH_CLIENT_SECRET:accounts-secret}
-    # scope: digitalbanking/internal (padrão); timeout: 2s (padrão)
+    # scope: digitalbanking/internal (padrão); connect-timeout: 500ms e read-timeout: 1500ms (padrões)
 management.endpoint.health:
   show-details: when-authorized
   roles: ADMIN
@@ -63,5 +63,11 @@ RestClient.builder()
     .requestInterceptor(serviceTokenClient.interceptor())
 ```
 Sem token (emissor fora, timeout, erro), a chamada falha com `ResourceAccessException`, como um par inalcançável. O gateway do serviço já responde a isso com `503` ou nova tentativa.
+
+Tempo do token:
+- O token fica em cache até 30 s antes de vencer (ou até a metade da validade, se ela for de 60 s ou menos).
+- Pior caso de uma chamada a `accessToken()`: `serviceTokenClient.maxFetchDuration` = `connect-timeout` + `read-timeout` (2 s no padrão). O prazo cobre o pedido inteiro, corpo incluído.
+- Uma falha vale para todas as threads que esperavam o mesmo pedido e, por 1 s (`ServiceTokenClient.FAILURE_BACKOFF`), para as chamadas seguintes, sem novo pedido ao emissor. Assim nenhuma chamada espera mais de um pedido de token.
+- Serviço com orçamento de tempo por chamada (o `call-budget` do `transfers`) soma `maxFetchDuration` aos timeouts HTTP do par.
 
 Nos testes de integração, `@Import(JwtTestSupport.DecoderConfiguration::class)` troca o decoder por um que confia na chave do teste. Os tokens saem de `JwtTestSupport.customerToken(id)`, `adminToken(id)`, `serviceToken()` ou `token(sub, groups, scopes, expiresIn, issuer)`.

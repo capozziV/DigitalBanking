@@ -26,21 +26,31 @@ class ServiceTokenAutoConfiguration {
             clientId = properties.clientId,
             clientSecret = properties.clientSecret,
             scope = properties.scope,
-            timeout = properties.timeout,
+            connectTimeout = properties.connectTimeout,
+            readTimeout = properties.readTimeout,
         )
 }
 
-/** `digitalbanking.security.service-token.*`. */
+/**
+ * `digitalbanking.security.service-token.*`. Not a data class: [toString] masks the [clientSecret], so the properties
+ * can show up in a log or a failure analysis without leaking it.
+ */
 @ConfigurationProperties(ServiceTokenProperties.PREFIX)
-data class ServiceTokenProperties(
+class ServiceTokenProperties(
     /** Token endpoint: `http://localhost:8090/default/token` locally, `https://<domain>/oauth2/token` on Cognito. */
     val tokenUri: URI,
     val clientId: String,
     val clientSecret: String,
     val scope: String = CallerResolver.SERVICE_SCOPE,
-    /** Connect and response timeout of the token endpoint. */
-    val timeout: Duration = Duration.ofSeconds(2),
+    /** Connection to the token endpoint; with [readTimeout], the worst case of a token request (2 s by default). */
+    val connectTimeout: Duration = ServiceTokenClient.DEFAULT_CONNECT_TIMEOUT,
+    /** From the request sent to the whole response read. */
+    val readTimeout: Duration = ServiceTokenClient.DEFAULT_READ_TIMEOUT,
 ) {
+    override fun toString() =
+        "ServiceTokenProperties(tokenUri=$tokenUri, clientId=$clientId, clientSecret=****, scope=$scope, " +
+            "connectTimeout=$connectTimeout, readTimeout=$readTimeout)"
+
     companion object {
         const val PREFIX = "digitalbanking.security.service-token"
     }

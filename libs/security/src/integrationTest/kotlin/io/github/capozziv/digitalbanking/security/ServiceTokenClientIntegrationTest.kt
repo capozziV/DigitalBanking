@@ -72,7 +72,8 @@ class ServiceTokenClientIntegrationTest {
             tokenUri = tokenUri,
             clientId = "transfers",
             clientSecret = "s3cret",
-            timeout = Duration.ofSeconds(1),
+            connectTimeout = Duration.ofMillis(300),
+            readTimeout = Duration.ofMillis(700),
             clock = clock,
         )
 
@@ -126,6 +127,79 @@ class ServiceTokenClientIntegrationTest {
         assertThat(results.map { it.get(5, TimeUnit.SECONDS) }).containsOnly("token-1")
         assertThat(tokenRequests).hasSize(1)
         pool.shutdown()
+    }
+
+    @Test
+    fun `a short-lived token is cached for half of its validity`() {
+        expiresIn = 20
+        val client = client()
+
+        client.accessToken()
+        clock.advance(Duration.ofSeconds(9))
+        assertThat(client.accessToken()).isEqualTo("token-1")
+        clock.advance(Duration.ofSeconds(1))
+
+        assertThat(client.accessToken()).isEqualTo("token-2")
+        assertThat(tokenRequests).hasSize(2)
+    }
+
+    @Test
+    fun `the worst case of a token request is the connect timeout plus the read timeout`() {
+        assertThat(client().maxFetchDuration).isEqualTo(Duration.ofSeconds(1))
+        assertThat(ServiceTokenClient.DEFAULT_CONNECT_TIMEOUT.plus(ServiceTokenClient.DEFAULT_READ_TIMEOUT))
+            .isLessThanOrEqualTo(Duration.ofSeconds(2))
+    }
+
+    @Test
+    fun `with the token endpoint down, threads waiting for the same request share its failure`() {
+        tokenStatus = 503
+        tokenDelay = Duration.ofMillis(300)
+        val client = client()
+        val threads = 8
+        val start = CountDownLatch(1)
+        val pool = Executors.newFixedThreadPool(threads)
+        val results = (1..threads).map { pool.submit<Any> { start.await().let { runCatching { client.accessToken() }.exceptionOrNull() } } }
+
+        start.countDown()
+
+        assertThat(results.map { it.get(5, TimeUnit.SECONDS) }).allMatch { it is ServiceTokenUnavailableException }
+        assertThat(tokenRequests).hasSize(1)
+        pool.shutdown()
+    }
+
+    @Test
+    fun `with the token endpoint hanging, queued threads wait about one timeout, not one each`() {
+        tokenDelay = Duration.ofSeconds(5)
+        val client = client()
+        val threads = 4
+        val start = CountDownLatch(1)
+        val pool = Executors.newFixedThreadPool(threads)
+        val results = (1..threads).map { pool.submit<Any> { start.await().let { runCatching { client.accessToken() }.exceptionOrNull() } } }
+
+        val startedAt = System.nanoTime()
+        start.countDown()
+        val failures = results.map { it.get(10, TimeUnit.SECONDS) }
+        val elapsed = Duration.ofNanos(System.nanoTime() - startedAt)
+
+        assertThat(failures).allMatch { it is ServiceTokenUnavailableException }
+        assertThat(tokenRequests).hasSize(1)
+        assertThat(elapsed).isLessThan(client.maxFetchDuration.multipliedBy(2))
+        pool.shutdown()
+    }
+
+    @Test
+    fun `right after a failure the next call fails fast, and the endpoint is tried again a second later`() {
+        tokenStatus = 503
+        val client = client()
+        assertThatThrownBy { client.accessToken() }.isInstanceOf(ServiceTokenUnavailableException::class.java)
+        tokenStatus = 200
+
+        assertThatThrownBy { client.accessToken() }.isInstanceOf(ServiceTokenUnavailableException::class.java)
+        assertThat(tokenRequests).hasSize(1)
+
+        clock.advance(ServiceTokenClient.FAILURE_BACKOFF)
+        assertThat(client.accessToken()).isEqualTo("token-1")
+        assertThat(tokenRequests).hasSize(2)
     }
 
     @Test
