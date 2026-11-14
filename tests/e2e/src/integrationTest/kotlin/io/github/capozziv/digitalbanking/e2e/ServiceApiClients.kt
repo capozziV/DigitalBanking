@@ -21,10 +21,11 @@ private val http: HttpClient =
         .connectTimeout(Duration.ofSeconds(2))
         .build()
 
-/** Status and raw body of a response. */
+/** Status, raw body and headers of a response. */
 data class HttpResult(
     val status: Int,
     val body: String,
+    val headers: Map<String, List<String>> = emptyMap(),
 ) {
     fun json(): JsonNode = mapper.readTree(body)
 
@@ -52,7 +53,7 @@ private fun send(
     if (token != null) request.header("Authorization", "Bearer $token")
     headers.forEach(request::header)
     val response = http.send(request.build(), HttpResponse.BodyHandlers.ofString())
-    return HttpResult(response.statusCode(), response.body())
+    return HttpResult(response.statusCode(), response.body(), response.headers().map())
 }
 
 /**

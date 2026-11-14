@@ -84,8 +84,9 @@ val statementBootJar = project(":services:statement:bootstrap").tasks.named<Boot
 val customerBootJar = project(":services:customer:bootstrap").tasks.named<BootJar>("bootJar")
 
 tasks.named<Test>("integrationTest") {
-    // Five service processes and their restarts: room for the suite, but a stuck process never hangs the build.
-    timeout = Duration.ofMinutes(15)
+    // Five service processes, the token mock and their restarts: the suite takes ~14 min in a full build, so 20 min
+    // leaves room on a loaded machine, and a stuck process still never hangs the build (the CI job allows 30 min).
+    timeout = Duration.ofMinutes(20)
     jvmArgumentProviders.add(
         objects.newInstance<EndToEndInputs>().apply {
             val root = rootProject.layout.projectDirectory

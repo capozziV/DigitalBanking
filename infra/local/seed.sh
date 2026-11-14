@@ -7,6 +7,7 @@
 # 3. credita o saldo inicial pelo admin: R$ 10.000,00.
 # Idempotente: as chaves de idempotencia sao fixas, entao rodar de novo devolve a mesma conta e nao credita
 # outra vez. Para comecar do zero, recrie o ambiente com `docker compose down -v`.
+# Saida: as duas ultimas linhas sao OWNER_ACCOUNT=<id> e OWNER_BALANCE=<centavos>.
 # Uso: infra/local/seed.sh [url-base]   (padrao http://127.0.0.1; exige o compose e os cinco servicos de pe)
 set -euo pipefail
 
@@ -54,4 +55,6 @@ call "201|200" POST "/accounts/$id/credits" \
 
 balance=$(call 200 GET "/accounts/$id" | jq -r .balance)
 echo "OK: conta $id do dono com saldo $balance"
-echo "Conta do dono: OWNER_ACCOUNT=$id"
+# Duas ultimas linhas legiveis por maquina (o CI compara duas execucoes seguidas para provar a idempotencia).
+echo "OWNER_ACCOUNT=$id"
+echo "OWNER_BALANCE=$balance"

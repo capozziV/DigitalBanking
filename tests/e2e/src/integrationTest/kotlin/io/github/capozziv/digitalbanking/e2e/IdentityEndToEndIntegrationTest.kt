@@ -60,9 +60,16 @@ class IdentityEndToEndIntegrationTest {
 
         customers.changeStatus(owner, "BLOCKED")
 
-        val refused = transfers.requestTransfer(source, destination, 1_000, token = tokens.customer(owner))
+        val refusedKey = UUID.randomUUID().toString()
+        val refused =
+            transfers.requestTransfer(source, destination, 1_000, idempotencyKey = refusedKey, token = tokens.customer(owner))
         assertThat(refused.status).describedAs(refused.body).isEqualTo(422)
         assertThat(refused.json().get("type").asString()).endsWith("/problems/customer-blocked")
+        // Refused without creating the transfer: no id, no Location and no row for that idempotency key.
+        assertThat(refused.json().has("id")).describedAs(refused.body).isFalse()
+        assertThat(refused.json().has("transferId")).describedAs(refused.body).isFalse()
+        assertThat(refused.headers.keys.map { it.lowercase() }).doesNotContain("location")
+        assertThat(environment.transfersDatabase.transferCount(refusedKey)).isZero()
         // Nothing left the source: only the first transfer was debited.
         assertThat(accounts.balance(source)).isEqualTo(9_000L)
         assertThat(accounts.balance(destination)).isEqualTo(1_000L)
