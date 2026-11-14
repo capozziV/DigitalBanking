@@ -463,6 +463,27 @@ class HttpAccountsGatewayIntegrationTest {
     }
 
     @Test
+    fun `a debit with the service token rejected (401 or 403) is transient`() {
+        for ((status, slug) in listOf(401 to "unauthorized", 403 to "forbidden")) {
+            server.stubFor(post(urlEqualTo("/accounts/$accountId/debits")).willReturn(problem(status, slug)))
+
+            val result = gateway.perform(debit())
+
+            assertThat(result.outcome).describedAs("status $status").isEqualTo(StepOutcome.TransientFailure)
+            assertThat(result.httpStatus).isEqualTo(status)
+        }
+    }
+
+    @Test
+    fun `lookup account returns Unavailable when accounts rejects the service token (401 or 403)`() {
+        server.stubFor(get(urlEqualTo("/accounts/$accountId")).willReturn(problem(401, "unauthorized")))
+        assertThat(gateway.lookupAccount(accountId)).isEqualTo(AccountLookup.Unavailable)
+
+        server.stubFor(get(urlEqualTo("/accounts/$accountId")).willReturn(problem(403, "forbidden")))
+        assertThat(gateway.lookupAccount(accountId)).isEqualTo(AccountLookup.Unavailable)
+    }
+
+    @Test
     fun `lookup account fails loudly on any other 4xx because it points to a bug`() {
         server.stubFor(get(urlEqualTo("/accounts/$accountId")).willReturn(problem(400, "validation-error")))
 

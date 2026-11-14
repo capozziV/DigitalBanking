@@ -17,6 +17,8 @@ import io.github.capozziv.digitalbanking.transfers.bootstrap.saga.AccountsStubs.
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.test.web.server.LocalServerPort
@@ -179,6 +181,7 @@ class TransferAuthorizationIntegrationTest : TransfersIntegrationTest() {
         assertProblem(response, 503, "customers-unavailable")
         assertThat(response.header("Retry-After")).isEqualTo("1")
         assertThat(transferCount()).isEqualTo(before)
+        accountsServer.verify(0, postRequestedFor(urlPathMatching("/accounts/.*")))
     }
 
     @Test
@@ -196,6 +199,48 @@ class TransferAuthorizationIntegrationTest : TransfersIntegrationTest() {
 
         assertProblem(api.post("/transfers", transferJson(), key()), 503, "customers-unavailable")
         assertThat(transferCount()).isEqualTo(before)
+        accountsServer.verify(0, postRequestedFor(urlPathMatching("/accounts/.*")))
+    }
+
+    // --- accounts rejecting the service token is an infrastructure failure, never a refusal ---
+
+    @ParameterizedTest
+    @ValueSource(ints = [401, 403])
+    fun `accounts rejecting the service token on the lookup is 503 accounts-unavailable and nothing is stored or debited`(status: Int) {
+        accountsServer.stubFor(get(urlEqualTo("/accounts/$source")).willReturn(problem(status, rejectionSlug(status))))
+        val before = transferCount()
+
+        val response = api.post("/transfers", transferJson(), key())
+
+        assertProblem(response, 503, "accounts-unavailable")
+        assertThat(transferCount()).isEqualTo(before)
+        accountsServer.verify(0, postRequestedFor(urlPathMatching("/accounts/.*")))
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [401, 403])
+    fun `accounts rejecting the service token on the debit leaves the transfer PENDING, not FAILED`(status: Int) {
+        accountsServer.stubFor(post(urlEqualTo("/accounts/$source/debits")).willReturn(problem(status, rejectionSlug(status))))
+
+        val response = api.post("/transfers", transferJson(), key())
+
+        assertThat(response.status).describedAs(response.rawBody).isEqualTo(202)
+        assertThat(response.body!!.get("status").asString()).isEqualTo("PENDING")
+        assertThat(statusOf(UUID.fromString(response.body.get("id").asString()))).isEqualTo("PENDING")
+        accountsServer.verify(0, postRequestedFor(urlEqualTo("/accounts/$destination/credits")))
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [401, 403])
+    fun `accounts rejecting the service token on the credit leaves the transfer PENDING, not COMPENSATED`(status: Int) {
+        accountsServer.stubFor(post(urlEqualTo("/accounts/$destination/credits")).willReturn(problem(status, rejectionSlug(status))))
+
+        val response = api.post("/transfers", transferJson(), key())
+
+        assertThat(response.status).describedAs(response.rawBody).isEqualTo(202)
+        assertThat(response.body!!.get("status").asString()).isEqualTo("PENDING")
+        assertThat(statusOf(UUID.fromString(response.body.get("id").asString()))).isEqualTo("PENDING")
+        accountsServer.verify(0, postRequestedFor(urlEqualTo("/accounts/$source/credits")))
     }
 
     // --- calls to the other services carry the machine token ---
@@ -301,6 +346,15 @@ class TransferAuthorizationIntegrationTest : TransfersIntegrationTest() {
         """{"sourceAccountId":"$sourceId","destinationAccountId":"$destination","amount":10}"""
 
     private fun transferCount(): Int = ownerJdbc.sql("select count(*) from transfer").query(Int::class.java).single()
+
+    private fun rejectionSlug(status: Int) = if (status == 401) "unauthorized" else "forbidden"
+
+    private fun statusOf(transferId: UUID): String =
+        ownerJdbc
+            .sql("select status from transfer where id = :id")
+            .param("id", transferId)
+            .query(String::class.java)
+            .single()
 
     private fun sourceCustomerOf(transferId: UUID): UUID? =
         ownerJdbc

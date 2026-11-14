@@ -227,6 +227,7 @@ class TransferApiIntegrationTest : TransfersIntegrationTest() {
         assertProblem(response, 503, "accounts-unavailable")
         assertThat(response.header("Retry-After")).isEqualTo("1")
         assertThat(transferCount()).isEqualTo(before)
+        accountsServer.verify(0, postRequestedFor(urlPathMatching("/accounts/.*")))
     }
 
     @Test

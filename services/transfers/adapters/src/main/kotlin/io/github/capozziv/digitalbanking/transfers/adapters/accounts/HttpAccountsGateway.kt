@@ -27,7 +27,7 @@ import java.util.UUID
  * classified [StepOutcome.Refused], so the saga retries instead of skipping a step or compensating.
  *
  * [lookupAccount] follows the same rule for the network and the peer (they become [AccountLookup.Unavailable], and so
- * does a 200 without the owner of the account), but
+ * do a 200 without the owner of the account and a 401 or 403 that rejects the service token), but
  * throws [IllegalStateException] on a 4xx other than "account not found": that is a bug in this client or a
  * misrouted request, and it must not be taken for a missing account.
  *
