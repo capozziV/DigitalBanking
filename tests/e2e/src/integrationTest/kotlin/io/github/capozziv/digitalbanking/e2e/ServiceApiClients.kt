@@ -10,6 +10,7 @@ import java.net.http.HttpResponse
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 private val mapper: JsonMapper = JsonMapper.builder().build()
 
@@ -20,10 +21,11 @@ private val http: HttpClient =
         .connectTimeout(Duration.ofSeconds(2))
         .build()
 
-/** Status and raw body of a response. */
+/** Status, raw body and headers of a response. */
 data class HttpResult(
     val status: Int,
     val body: String,
+    val headers: Map<String, List<String>> = emptyMap(),
 ) {
     fun json(): JsonNode = mapper.readTree(body)
 
@@ -34,9 +36,11 @@ data class HttpResult(
     }
 }
 
+/** Sends the request with `Authorization: Bearer [token]`, or without the header when [token] is null. */
 private fun send(
     method: String,
     url: String,
+    token: String?,
     body: String? = null,
     headers: Map<String, String> = emptyMap(),
 ): HttpResult {
@@ -46,27 +50,44 @@ private fun send(
             .timeout(Duration.ofSeconds(30))
             .method(method, body?.let(HttpRequest.BodyPublishers::ofString) ?: HttpRequest.BodyPublishers.noBody())
     if (body != null) request.header("Content-Type", "application/json")
+    if (token != null) request.header("Authorization", "Bearer $token")
     headers.forEach(request::header)
     val response = http.send(request.build(), HttpResponse.BodyHandlers.ofString())
-    return HttpResult(response.statusCode(), response.body())
+    return HttpResult(response.statusCode(), response.body(), response.headers().map())
 }
 
-/** Talks to `accounts` directly (not through the proxy), for setup and for checking balances and ledger entries. */
+/**
+ * Talks to `accounts` directly (not through the proxy), for setup and for checking balances and ledger entries. An
+ * account is opened by its customer (registered in `customer` first, as the spec asks); the setup credits, debits and
+ * reads go with an admin token, and the entry lookup with a machine token, as the saga makes it. It remembers the owner
+ * of every account it opened ([ownerOf]), so a transfer goes with the token of the customer of its source.
+ */
 class AccountsApiClient(
     private val baseUrl: String,
+    private val customers: CustomerApiClient,
+    private val tokens: TokenIssuer,
 ) {
+    private val owners = ConcurrentHashMap<UUID, UUID>()
+
+    /** Registers [customerId] in `customer` (idempotent) and opens an account for them with their own token. */
     fun openAccount(customerId: UUID = UUID.randomUUID()): UUID {
+        customers.register(customerId)
         val result =
-            send("POST", "$baseUrl/accounts", """{"customerId":"$customerId"}""", mapOf("Idempotency-Key" to newKey()))
+            send("POST", "$baseUrl/accounts", tokens.customer(customerId), headers = mapOf("Idempotency-Key" to newKey()))
         check(result.status == 201) { "open account: ${result.status} ${result.body}" }
-        return UUID.fromString(result.json().get("id").asString())
+        val account = UUID.fromString(result.json().get("id").asString())
+        owners[account] = customerId
+        return account
     }
+
+    /** The customer an account was opened for by [openAccount], or null for one it did not open. */
+    fun ownerOf(account: UUID): UUID? = owners[account]
 
     fun changeType(
         account: UUID,
         type: String,
     ) {
-        val result = send("PUT", "$baseUrl/accounts/$account/type", """{"type":"$type"}""")
+        val result = send("PUT", "$baseUrl/accounts/$account/type", tokens.admin(), """{"type":"$type"}""")
         check(result.status == 200) { "change type: ${result.status} ${result.body}" }
     }
 
@@ -78,6 +99,7 @@ class AccountsApiClient(
             send(
                 "POST",
                 "$baseUrl/accounts/$account/credits",
+                tokens.admin(),
                 """{"amount":$amount,"description":"e2e setup"}""",
                 mapOf("Idempotency-Key" to newKey()),
             )
@@ -92,6 +114,7 @@ class AccountsApiClient(
             send(
                 "POST",
                 "$baseUrl/accounts/$account/debits",
+                tokens.admin(),
                 """{"amount":$amount,"description":"e2e setup"}""",
                 mapOf("Idempotency-Key" to newKey()),
             )
@@ -99,7 +122,7 @@ class AccountsApiClient(
     }
 
     fun account(account: UUID): JsonNode {
-        val result = send("GET", "$baseUrl/accounts/$account")
+        val result = send("GET", "$baseUrl/accounts/$account", tokens.admin())
         check(result.status == 200) { "get account: ${result.status} ${result.body}" }
         return result.json()
     }
@@ -110,36 +133,49 @@ class AccountsApiClient(
     fun entryStatus(
         account: UUID,
         idempotencyKey: String,
-    ): Int = send("GET", "$baseUrl/accounts/$account/entries?idempotencyKey=${URLEncoder.encode(idempotencyKey, Charsets.UTF_8)}").status
+    ): Int =
+        send(
+            "GET",
+            "$baseUrl/accounts/$account/entries?idempotencyKey=${URLEncoder.encode(idempotencyKey, Charsets.UTF_8)}",
+            tokens.service(),
+        ).status
 
     private fun newKey() = UUID.randomUUID().toString()
 }
 
+/**
+ * Talks to `transfers`. A transfer goes with the token of the customer that owns the source ([ownerOf]; an admin token
+ * for a source of unknown owner); the reads go with an admin token.
+ */
 class TransfersApiClient(
     private val baseUrl: String,
+    private val tokens: TokenIssuer,
+    private val ownerOf: (UUID) -> UUID?,
 ) {
     fun requestTransfer(
         source: UUID,
         destination: UUID,
         amount: Long,
         idempotencyKey: String = UUID.randomUUID().toString(),
+        token: String = ownerOf(source)?.let(tokens::customer) ?: tokens.admin(),
     ): HttpResult =
         send(
             "POST",
             "$baseUrl/transfers",
+            token,
             """{"sourceAccountId":"$source","destinationAccountId":"$destination","amount":$amount,"description":"e2e"}""",
             mapOf("Idempotency-Key" to idempotencyKey, "X-Correlation-Id" to correlationIdFor(idempotencyKey)),
         )
 
     fun status(id: String): String {
-        val result = send("GET", "$baseUrl/transfers/$id")
+        val result = send("GET", "$baseUrl/transfers/$id", tokens.admin())
         check(result.status == 200) { "get transfer: ${result.status} ${result.body}" }
         return result.json().get("status").asString()
     }
 
     /** `failureReason` of the transfer, or null when it has none. */
     fun failureReason(id: String): String? {
-        val result = send("GET", "$baseUrl/transfers/$id")
+        val result = send("GET", "$baseUrl/transfers/$id", tokens.admin())
         check(result.status == 200) { "get transfer: ${result.status} ${result.body}" }
         return result
             .json()
@@ -150,7 +186,7 @@ class TransfersApiClient(
 
     /** The daily limit of [account] today: the JSON of `GET /accounts/{id}/daily-limit`. */
     fun dailyLimit(account: UUID): JsonNode {
-        val result = send("GET", "$baseUrl/accounts/$account/daily-limit")
+        val result = send("GET", "$baseUrl/accounts/$account/daily-limit", tokens.admin())
         check(result.status == 200) { "get daily limit: ${result.status} ${result.body}" }
         return result.json()
     }
@@ -177,16 +213,18 @@ class TransfersApiClient(
     }
 }
 
+/** Talks to `notification` as the customer: the token says whose notifications are listed. */
 class NotificationApiClient(
     private val baseUrl: String,
+    private val tokens: TokenIssuer,
 ) {
-    /** Every notification of [customerId], following the cursor through all pages, most recent first. */
+    /** Every notification of [customerId], with their own token, following the cursor through all pages, most recent first. */
     fun all(customerId: UUID): List<JsonNode> {
         val items = mutableListOf<JsonNode>()
         var cursor: String? = null
         do {
-            val query = "customerId=$customerId" + (cursor?.let { "&cursor=${URLEncoder.encode(it, Charsets.UTF_8)}" } ?: "")
-            val result = send("GET", "$baseUrl/notifications?$query")
+            val query = cursor?.let { "?cursor=${URLEncoder.encode(it, Charsets.UTF_8)}" } ?: ""
+            val result = send("GET", "$baseUrl/notifications$query", tokens.customer(customerId))
             check(result.status == 200) { "list notifications: ${result.status} ${result.body}" }
             val page = result.json()
             val pageItems = page.get("items")
@@ -220,18 +258,23 @@ class NotificationApiClient(
     }
 }
 
+/** Talks to `statement`, with an admin token unless a call names another one. */
 class StatementApiClient(
     private val baseUrl: String,
+    private val tokens: TokenIssuer,
 ) {
-    /** HTTP status of the first page of the statement of [account]. */
-    fun status(account: UUID): Int = send("GET", "$baseUrl/accounts/$account/statement").status
+    /** HTTP status of the first page of the statement of [account], read with [token] (an admin token by default). */
+    fun status(
+        account: UUID,
+        token: String = tokens.admin(),
+    ): Int = send("GET", "$baseUrl/accounts/$account/statement", token).status
 
     /**
      * Entries of the first page with the default limit and no cursor, the only read the cache serves. Fails unless the
      * status is 200.
      */
     fun firstPage(account: UUID): List<JsonNode> {
-        val result = send("GET", "$baseUrl/accounts/$account/statement")
+        val result = send("GET", "$baseUrl/accounts/$account/statement", tokens.admin())
         check(result.status == 200) { "get first page: ${result.status} ${result.body}" }
         val entries = result.json().get("entries")
         return (0 until entries.size()).map { entries.get(it) }
@@ -248,7 +291,7 @@ class StatementApiClient(
     ): List<JsonNode> {
         val deadline = Instant.now().plus(timeout)
         while (true) {
-            val result = send("GET", "$baseUrl/accounts/$account/statement")
+            val result = send("GET", "$baseUrl/accounts/$account/statement", tokens.admin())
             check(result.status == 200 || result.status == 404) { "get first page: ${result.status} ${result.body}" }
             val entries =
                 if (result.status == 200) result.json().get("entries").let { e -> (0 until e.size()).map { e.get(it) } } else emptyList()
@@ -275,7 +318,7 @@ class StatementApiClient(
         var cursor: String? = null
         do {
             val query = "limit=$limit" + (cursor?.let { "&cursor=${URLEncoder.encode(it, Charsets.UTF_8)}" } ?: "")
-            val result = send("GET", "$baseUrl/accounts/$account/statement?$query")
+            val result = send("GET", "$baseUrl/accounts/$account/statement?$query", tokens.admin())
             if (result.status == 404) return null
             check(result.status == 200) { "get statement: ${result.status} ${result.body}" }
             val page = result.json()
@@ -309,5 +352,32 @@ class StatementApiClient(
 
     private companion object {
         val POLL: Duration = Duration.ofMillis(200)
+    }
+}
+
+/** Talks to `customer`: a customer registers with their own token, an admin changes the status. */
+class CustomerApiClient(
+    private val baseUrl: String,
+    private val tokens: TokenIssuer,
+) {
+    /** Registers [customerId] with fictitious data; `201` the first time, `200` when already registered. */
+    fun register(customerId: UUID) {
+        val result =
+            send(
+                "POST",
+                "$baseUrl/customers",
+                tokens.customer(customerId),
+                """{"name":"E2E Customer","email":"e2e-$customerId@example.test"}""",
+            )
+        check(result.status == 201 || result.status == 200) { "register customer: ${result.status} ${result.body}" }
+    }
+
+    /** `ACTIVE` or `BLOCKED`, set by an admin. */
+    fun changeStatus(
+        customerId: UUID,
+        status: String,
+    ) {
+        val result = send("PUT", "$baseUrl/admin/customers/$customerId/status", tokens.admin(), """{"status":"$status"}""")
+        check(result.status == 200) { "change customer status: ${result.status} ${result.body}" }
     }
 }

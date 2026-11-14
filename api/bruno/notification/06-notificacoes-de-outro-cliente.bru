@@ -1,0 +1,19 @@
+meta {
+  name: Notificacoes de outro cliente
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/notifications?customerId={{otherCustomerId}}
+  body: none
+  auth: inherit
+}
+
+tests {
+  // So o admin pode nomear outro cliente; um cliente recebe 404, sem saber se o outro existe.
+  test("404 notification-not-found", function () {
+    expect(res.status).to.equal(404);
+    expect(res.body.type).to.contain("notification-not-found");
+  });
+}

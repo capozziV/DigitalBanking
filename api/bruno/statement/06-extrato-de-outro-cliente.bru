@@ -1,0 +1,21 @@
+meta {
+  name: Extrato de outro cliente
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/accounts/{{accountId}}/statement
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{otherCustomerToken}}
+}
+
+tests {
+  test("404 para o extrato de outro cliente, sem revelar que a conta existe", function () {
+    expect(res.status).to.equal(404);
+  });
+}

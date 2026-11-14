@@ -246,14 +246,15 @@ jobs:
 
   smoke:
     # Pulado (nao falho) conta como sucesso nos `needs`; `!failure()` deixa o smoke rodar quando
-    # o accounts, o transfers, o notification, o statement ou o libs foram pulados.
-    needs: [changes, accounts, transfers, notification, statement, libs]
+    # o accounts, o transfers, o notification, o statement, o customer ou o libs foram pulados.
+    needs: [changes, accounts, transfers, notification, statement, customer, libs]
     if: >-
       ${{ !failure() && !cancelled() &&
       (needs.changes.outputs.accounts == 'true' ||
       needs.changes.outputs.transfers == 'true' ||
       needs.changes.outputs.notification == 'true' ||
       needs.changes.outputs.statement == 'true' ||
+      needs.changes.outputs.customer == 'true' ||
       needs.changes.outputs.shared == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -265,8 +266,8 @@ jobs:
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v6
       - name: Gerar os jars executaveis
-        run: ./gradlew :services:accounts:bootstrap:bootJar :services:transfers:bootstrap:bootJar :services:notification:bootstrap:bootJar :services:statement:bootstrap:bootJar
-      - name: Subir a infra local (PostgreSQL, Redis, nginx, LocalStack)
+        run: ./gradlew :services:accounts:bootstrap:bootJar :services:transfers:bootstrap:bootJar :services:notification:bootstrap:bootJar :services:statement:bootstrap:bootJar :services:customer:bootstrap:bootJar
+      - name: Subir a infra local (PostgreSQL, Redis, nginx, LocalStack, mock-oauth2-server)
         env:
           LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
         run: |
@@ -275,18 +276,19 @@ jobs:
             exit 1
           fi
           docker compose --env-file infra/local/.env.example -f infra/local/docker-compose.yml up --wait
-      - name: Subir os servicos accounts, transfers, notification e statement
+      - name: Subir os servicos customer, accounts, transfers, notification e statement
         run: |
           set -a
           . infra/local/.env.example
           set +a
+          java -jar services/customer/bootstrap/build/libs/bootstrap.jar > customer.log 2>&1 &
           java -jar services/accounts/bootstrap/build/libs/bootstrap.jar > accounts.log 2>&1 &
           java -jar services/transfers/bootstrap/build/libs/bootstrap.jar > transfers.log 2>&1 &
           java -jar services/notification/bootstrap/build/libs/bootstrap.jar > notification.log 2>&1 &
           java -jar services/statement/bootstrap/build/libs/bootstrap.jar > statement.log 2>&1 &
-      - name: Health dos quatro servicos via nginx
+      - name: Health dos cinco servicos via nginx
         run: |
-          for service in accounts transfers notifications statement; do
+          for service in accounts transfers notifications statement customers; do
             ok=false
             for _ in $(seq 1 60); do
               if body=$(curl -fsS "http://127.0.0.1/$service/actuator/health") && echo "$body" | grep -q '"status":"UP"'; then
@@ -301,7 +303,9 @@ jobs:
               exit 1
             fi
           done
-      - name: Operacoes via nginx e eventos na fila de inspecao do LocalStack
+      - name: Seed do usuario de teste do dono (duas vezes, comparadas, para provar a idempotencia)
+        run: bash infra/local/seed-check.sh http://127.0.0.1 1000000
+      - name: Operacoes via nginx com tokens e eventos na fila de inspecao do LocalStack
         run: bash infra/local/smoke.sh http://127.0.0.1
       - name: Log dos servicos e do LocalStack em caso de falha
         if: failure()
@@ -310,13 +314,14 @@ jobs:
           cat transfers.log || true
           cat notification.log || true
           cat statement.log || true
+          cat customer.log || true
           docker compose --env-file infra/local/.env.example -f infra/local/docker-compose.yml logs localstack || true
       - name: Derrubar a infra local
         if: always()
         run: docker compose --env-file infra/local/.env.example -f infra/local/docker-compose.yml down -v
 
-  # Testes ponta a ponta da saga: accounts, transfers, notification e statement como processos (java -jar), PostgreSQL, Redis e LocalStack por
-  # Testcontainers. Roda quando muda qualquer servico, o proprio e2e ou o que afeta todos (`shared`).
+  # Testes ponta a ponta: accounts, transfers, notification, statement e customer como processos (java -jar), PostgreSQL, Redis,
+  # LocalStack e mock-oauth2-server por Testcontainers. Roda quando muda qualquer servico, o proprio e2e ou o que afeta todos (`shared`).
   e2e:
     needs: changes
     if: >-
@@ -324,10 +329,12 @@ jobs:
       needs.changes.outputs.transfers == 'true' ||
       needs.changes.outputs.notification == 'true' ||
       needs.changes.outputs.statement == 'true' ||
+      needs.changes.outputs.customer == 'true' ||
       needs.changes.outputs.shared == 'true' ||
       needs.changes.outputs.e2e == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # Acima do timeout de 20 min do integrationTest do e2e mais a compilacao dos cinco jars.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
@@ -335,7 +342,7 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v6
-      - name: Testes ponta a ponta (gera os quatro jars e sobe os processos)
+      - name: Testes ponta a ponta (gera os cinco jars e sobe os processos)
         env:
           # Sem o segredo, o teste falha no CI em vez de ser pulado.
           LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}

@@ -1,0 +1,35 @@
+meta {
+  name: Origem de outro cliente
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/transfers
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{otherCustomerToken}}
+}
+
+headers {
+  Idempotency-Key: {{$guid}}
+}
+
+body:json {
+  {
+    "sourceAccountId": "{{sourceAccountId}}",
+    "destinationAccountId": "{{destinationAccountId}}",
+    "amount": 100,
+    "description": "bruno origem alheia"
+  }
+}
+
+tests {
+  test("404 account-not-found: a origem nao e do cliente do token", function () {
+    expect(res.status).to.equal(404);
+    expect(res.body.type).to.contain("account-not-found");
+  });
+}

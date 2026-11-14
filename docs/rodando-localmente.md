@@ -52,13 +52,13 @@ Os comandos `brew` abaixo valem só para Mac com chip Apple (M1 em diante): o Ho
 ```bash
 cp infra/local/.env.example infra/local/.env
 ```
-Preencha `LOCALSTACK_AUTH_TOKEN` no `infra/local/.env`. Os outros valores do `.env.example` servem para desenvolvimento. Se a porta 80 ou 5432 já estiver em uso, troque `NGINX_PORT` ou `POSTGRES_PORT` no `infra/local/.env`. Ao trocar `POSTGRES_PORT`, ajuste a porta em `ACCOUNTS_DB_URL`, `TRANSFERS_DB_URL` e `NOTIFICATION_DB_URL` no mesmo arquivo. Ao trocar `NGINX_PORT`, use a porta nova nas URLs abaixo (`http://localhost:<porta>`) e no `baseUrl` de `local.bru` de cada coleção em `api/bruno/*/environments/`.
+Preencha `LOCALSTACK_AUTH_TOKEN` no `infra/local/.env`. Os outros valores do `.env.example` servem para desenvolvimento. Se a porta 80 ou 5432 já estiver em uso, troque `NGINX_PORT` ou `POSTGRES_PORT` no `infra/local/.env`. Ao trocar `POSTGRES_PORT`, ajuste a porta em `ACCOUNTS_DB_URL`, `TRANSFERS_DB_URL`, `NOTIFICATION_DB_URL` e `CUSTOMER_DB_URL` no mesmo arquivo. Ao trocar `NGINX_PORT`, use a porta nova nas URLs abaixo (`http://localhost:<porta>`) e no `baseUrl` de `local.bru` de cada coleção em `api/bruno/*/environments/`.
 
-## 2. Subir a infraestrutura (PostgreSQL, Redis, nginx, LocalStack)
+## 2. Subir a infraestrutura (PostgreSQL, Redis, nginx, LocalStack, mock-oauth2-server)
 ```bash
 docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml up --wait
 ```
-O comando volta quando os quatro contêineres estão saudáveis. Sem o token, o `up --wait` volta com erro porque o LocalStack encerra, mas PostgreSQL, Redis e nginx ficam de pé. O LocalStack só fica saudável depois que os scripts de `infra/local/localstack/init/ready.d/` criam os tópicos `accounts-events.fifo` e `transfers-events.fifo`, cada um com sua fila de inspeção assinada (`accounts-events-inspection.fifo` e `transfers-events-inspection.fifo`), a fila `statement-accounts.fifo` (assinada em `accounts-events.fifo`, com a DLQ `statement-accounts-dlq.fifo`), a tabela DynamoDB `statement` e as filas do `notification`: `notification-accounts.fifo` (assinada em `accounts-events.fifo`) e `notification-transfers.fifo` (assinada em `transfers-events.fifo`), cada uma com sua DLQ FIFO (`notification-accounts-dlq.fifo` e `notification-transfers-dlq.fifo`). A fila de origem move a mensagem para a DLQ na 5ª recepção (`NOTIFICATION_MAX_RECEIVE_COUNT`) e esconde a mensagem em leitura por 30 s (`NOTIFICATION_VISIBILITY_TIMEOUT_SECONDS`); os dois valores podem ser trocados no `infra/local/.env`. O script de init do PostgreSQL (`infra/local/postgres/init/01-create-service-databases.sh`) cria um banco por serviço, cada um com dois roles: `<serviço>_owner` (dono, usado pelo Flyway) e `<serviço>_app` (só `LOGIN`; as permissões vêm das migrations). Hoje são `accounts`, `transfers` e `notification`. Os dados ficam no volume nomeado `postgres-data`, que sobrevive a `down` e `up`; o script só roda com volume novo, então, se mudar senhas ou o script, recrie com `down -v` (passo 8). O script é idempotente: para rodá-lo de novo sem apagar nada, execute `docker compose exec postgres /docker-entrypoint-initdb.d/01-create-service-databases.sh`. Ele cria só o que falta e não troca a senha de um role que já existe.
+O comando volta quando os cinco contêineres estão saudáveis. Sem o token, o `up --wait` volta com erro porque o LocalStack encerra, mas PostgreSQL, Redis e nginx ficam de pé. O LocalStack só fica saudável depois que os scripts de `infra/local/localstack/init/ready.d/` criam os tópicos `accounts-events.fifo` e `transfers-events.fifo`, cada um com sua fila de inspeção assinada (`accounts-events-inspection.fifo` e `transfers-events-inspection.fifo`), a fila `statement-accounts.fifo` (assinada em `accounts-events.fifo`, com a DLQ `statement-accounts-dlq.fifo`), a tabela DynamoDB `statement` e as filas do `notification`: `notification-accounts.fifo` (assinada em `accounts-events.fifo`) e `notification-transfers.fifo` (assinada em `transfers-events.fifo`), cada uma com sua DLQ FIFO (`notification-accounts-dlq.fifo` e `notification-transfers-dlq.fifo`), e o tópico `customer-events.fifo` (sem consumidor nesta etapa). A fila de origem move a mensagem para a DLQ na 5ª recepção (`NOTIFICATION_MAX_RECEIVE_COUNT`) e esconde a mensagem em leitura por 30 s (`NOTIFICATION_VISIBILITY_TIMEOUT_SECONDS`); os dois valores podem ser trocados no `infra/local/.env`. O script de init do PostgreSQL (`infra/local/postgres/init/01-create-service-databases.sh`) cria um banco por serviço, cada um com dois roles: `<serviço>_owner` (dono, usado pelo Flyway) e `<serviço>_app` (só `LOGIN`; as permissões vêm das migrations). Hoje são `accounts`, `transfers`, `notification` e `customer`. Os dados ficam no volume nomeado `postgres-data`, que sobrevive a `down` e `up`; o script só roda com volume novo, então, se mudar senhas ou o script, recrie com `down -v` (passo 8). O script é idempotente: para rodá-lo de novo sem apagar nada, execute `docker compose exec postgres /docker-entrypoint-initdb.d/01-create-service-databases.sh`. Ele cria só o que falta e não troca a senha de um role que já existe.
 
 Para adicionar o banco de um serviço novo: acrescente ao fim do script a linha `create_service_db <serviço> <SERVICO>_DB_OWNER_PASSWORD <SERVICO>_DB_PASSWORD` (os dois últimos argumentos são os nomes das variáveis com as senhas), declare essas duas variáveis no `environment` do `postgres` em `docker-compose.yml` e em `infra/local/.env.example`, e recrie o volume com `down -v`.
 
@@ -73,8 +73,18 @@ Para rodar só os testes unitários, sem Docker:
 ./gradlew test
 ```
 
-## 4. Subir os serviços `accounts`, `transfers`, `notification` e `statement`
-O serviço lê as variáveis `ACCOUNTS_DB_*` e `ACCOUNTS_AWS_ENDPOINT` do ambiente. Num terminal novo, carregue o `.env` no shell (e o `JAVA_HOME`, se não estiver no `~/.zshrc`) e rode:
+## 4. Subir os serviços `customer`, `accounts`, `transfers`, `notification` e `statement`
+Todos validam o JWT do `mock-oauth2-server` (`*_JWT_ISSUER_URI`; veja [Identidade local](#identidade-local-mock-oauth2-server)). O `customer` sobe primeiro: o `accounts` o consulta a cada abertura de conta e o `transfers` a cada pedido de transferência, direto e com token de máquina (`ACCOUNTS_CUSTOMER_BASE_URL` e `TRANSFERS_CUSTOMER_BASE_URL`, padrão `http://localhost:8085`; tempo máximo `ACCOUNTS_CUSTOMER_TIMEOUT` e `TRANSFERS_CUSTOMER_TIMEOUT`, padrão `500ms`). Com o `customer` fora, essas duas operações respondem `503 customers-unavailable`.
+
+O `customer` lê `CUSTOMER_DB_*`, `CUSTOMER_AWS_ENDPOINT` (LocalStack) e `CUSTOMER_JWT_ISSUER_URI`, e publica `CustomerRegistered`, `CustomerBlocked` e `CustomerUnblocked` no tópico `customer-events.fifo` pelo outbox. Num terminal novo:
+```bash
+export JAVA_HOME=$(/usr/libexec/java_home -v 21)
+set -a; . infra/local/.env; set +a
+./gradlew :services:customer:bootstrap:bootRun
+```
+O `customer` sobe na porta 8085 e aplica as próprias migrations. O nginx expõe `/customers` (`POST /customers` e `GET /customers/me`), `/admin/customers/**` e `/customers/actuator/`; o `/internal/customers/{id}` fica fora da borda, só para os serviços.
+
+O `accounts` lê as variáveis `ACCOUNTS_DB_*`, `ACCOUNTS_AWS_ENDPOINT`, `ACCOUNTS_JWT_ISSUER_URI`, `ACCOUNTS_OAUTH_*` (token de máquina) e `ACCOUNTS_CUSTOMER_*` do ambiente. Num segundo terminal, carregue o `.env` no shell (e o `JAVA_HOME`, se não estiver no `~/.zshrc`) e rode:
 ```bash
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 set -a; . infra/local/.env; set +a
@@ -82,7 +92,7 @@ set -a; . infra/local/.env; set +a
 ```
 O serviço sobe na porta 8081 e aplica as migrations (Flyway) ao iniciar. A cada 500 ms o relay publica os eventos pendentes do outbox no tópico SNS do LocalStack. Deixe esse terminal aberto.
 
-O `transfers` precisa do `accounts` no ar e roda num segundo terminal, com o mesmo `.env` carregado. Ele lê `TRANSFERS_DB_*`, `TRANSFERS_ACCOUNTS_URL` (padrão `http://localhost:8081`, o `accounts` chamado direto, sem o nginx), `TRANSFERS_AWS_*` (LocalStack) e, para o limite diário, `TRANSFERS_REDIS_HOST` (padrão `localhost`), `TRANSFERS_REDIS_PORT` (padrão `6379`), `TRANSFERS_REDIS_TIMEOUT` (padrão `100ms`) e `TRANSFERS_DAILY_LIMIT` (padrão `500000` centavos). As métricas `transfers.pending` e `transfers.oldest.pending.age` ficam em `/transfers/actuator/metrics`:
+O `transfers` precisa do `accounts` e do `customer` no ar e roda num terceiro terminal, com o mesmo `.env` carregado. Ele lê `TRANSFERS_DB_*`, `TRANSFERS_ACCOUNTS_URL` (padrão `http://localhost:8081`, o `accounts` chamado direto, sem o nginx), `TRANSFERS_JWT_ISSUER_URI`, `TRANSFERS_OAUTH_*` (token de máquina para o `accounts` e o `customer`), `TRANSFERS_CUSTOMER_*`, `TRANSFERS_AWS_*` (LocalStack) e, para o limite diário, `TRANSFERS_REDIS_HOST` (padrão `localhost`), `TRANSFERS_REDIS_PORT` (padrão `6379`), `TRANSFERS_REDIS_TIMEOUT` (padrão `100ms`) e `TRANSFERS_DAILY_LIMIT` (padrão `500000` centavos). As métricas `transfers.pending` e `transfers.oldest.pending.age` ficam em `/transfers/actuator/metrics`:
 ```bash
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 set -a; . infra/local/.env; set +a
@@ -90,7 +100,7 @@ set -a; . infra/local/.env; set +a
 ```
 O `transfers` sobe na porta 8082 e aplica as próprias migrations. O nginx expõe `GET /accounts/{id}/daily-limit` (limite de 500000 centavos por conta e por dia de São Paulo, o usado e o disponível; conta desconhecida volta com uso zero) pelo `transfers`, com uma regra mais específica que a do prefixo `/accounts/`, que é do `accounts`. A transferência que passaria do limite termina `FAILED` com o motivo `daily-limit-exceeded` (`422 transfer-failed`); sem resposta do Redis nem do PostgreSQL, com `daily-limit-unavailable`. As métricas do limite saem em `/transfers/actuator/metrics`: `transfers.daily_limit.reservations` (tag `result` = `reserved`, `exceeded`, `fallback` ou `error`; `fallback` é a reserva decidida no PostgreSQL com o Redis fora) e `transfers.daily_limit.rebuilds` (vezes em que o contador do Redis foi reconstruído a partir do PostgreSQL).
 
-O `notification` consome os eventos dos dois serviços e roda num terceiro terminal, com o mesmo `.env` carregado. Ele lê as variáveis `NOTIFICATION_*` (banco e LocalStack) e consome as filas `notification-accounts.fifo` e `notification-transfers.fifo`:
+O `notification` consome os eventos dos dois serviços e roda num quarto terminal, com o mesmo `.env` carregado. Ele lê as variáveis `NOTIFICATION_*` (banco e LocalStack) e consome as filas `notification-accounts.fifo` e `notification-transfers.fifo`:
 ```bash
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 set -a; . infra/local/.env; set +a
@@ -98,54 +108,70 @@ set -a; . infra/local/.env; set +a
 ```
 O `notification` sobe na porta 8083 e aplica as próprias migrations; o nginx o expõe em `/notifications`.
 
-O `statement` consome os eventos do `accounts` e roda num quarto terminal, com o mesmo `.env` carregado. Não usa PostgreSQL: grava no DynamoDB do LocalStack. Ele lê `STATEMENT_AWS_ENDPOINT` (no `.env.example`: `http://localhost:4566`; vazio usa o endpoint real da AWS) e, se definidas, `STATEMENT_AWS_REGION` (padrão `us-east-1`), `STATEMENT_TABLE` (padrão `statement`), `STATEMENT_ACCOUNTS_QUEUE` (padrão `statement-accounts.fifo`), `STATEMENT_ACCOUNTS_DLQ` (padrão `statement-accounts-dlq.fifo`), `STATEMENT_DLQ_METRICS_REFRESH` (padrão `30s`), `STATEMENT_REDIS_HOST` (padrão `localhost`), `STATEMENT_REDIS_PORT` (padrão `6379`), `STATEMENT_CACHE_TIMEOUT` (padrão `100ms`, tempo de conexão e de comando ao Redis) e `STATEMENT_CACHE_ENABLED` (padrão `true`; `false` desliga o cache e o extrato sempre lê do DynamoDB):
+O `statement` consome os eventos do `accounts` e roda num quinto terminal, com o mesmo `.env` carregado. Não usa PostgreSQL: grava no DynamoDB do LocalStack. Ele lê `STATEMENT_AWS_ENDPOINT` (no `.env.example`: `http://localhost:4566`; vazio usa o endpoint real da AWS) e, se definidas, `STATEMENT_AWS_REGION` (padrão `us-east-1`), `STATEMENT_TABLE` (padrão `statement`), `STATEMENT_ACCOUNTS_QUEUE` (padrão `statement-accounts.fifo`), `STATEMENT_ACCOUNTS_DLQ` (padrão `statement-accounts-dlq.fifo`), `STATEMENT_DLQ_METRICS_REFRESH` (padrão `30s`), `STATEMENT_REDIS_HOST` (padrão `localhost`), `STATEMENT_REDIS_PORT` (padrão `6379`), `STATEMENT_CACHE_TIMEOUT` (padrão `100ms`, tempo de conexão e de comando ao Redis) e `STATEMENT_CACHE_ENABLED` (padrão `true`; `false` desliga o cache e o extrato sempre lê do DynamoDB):
 ```bash
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 set -a; . infra/local/.env; set +a
 ./gradlew :services:statement:bootstrap:bootRun
 ```
-O `statement` sobe na porta 8084. O `statement` guarda no Redis do compose a primeira página do extrato (20 lançamentos, sem cursor) por cerca de 60 s; com o Redis fora, ele lê do DynamoDB. A tabela DynamoDB `statement` (chave `accountId` texto + `sequence` numérica, cobrança `PAY_PER_REQUEST`) e as filas são criadas pelo `infra/local/localstack/init/ready.d/04-statement.sh`, não pelo serviço. O nginx expõe `GET /accounts/{id}/statement` e `/statement/actuator/`. Use um quinto terminal para os passos seguintes.
+O `statement` sobe na porta 8084. O `statement` guarda no Redis do compose a primeira página do extrato (20 lançamentos, sem cursor) por cerca de 60 s; com o Redis fora, ele lê do DynamoDB. A tabela DynamoDB `statement` (chave `accountId` texto + `sequence` numérica, cobrança `PAY_PER_REQUEST`) e as filas são criadas pelo `infra/local/localstack/init/ready.d/04-statement.sh`, não pelo serviço. O nginx expõe `GET /accounts/{id}/statement` e `/statement/actuator/`. Use um sexto terminal para os passos seguintes.
 
 ## 5. Conferir a API pelo nginx
-Primeiro o health, que deve responder `"status":"UP"`; depois o smoke, que abre uma conta, credita 1000, debita 300, confere o saldo 700, lê os eventos da conta na fila de inspeção e, com os quatro serviços no ar, confere as notificações de uma transferência e o extrato da primeira conta:
+Primeiro o health, que deve responder `"status":"UP"` (aberto, sem token; os detalhes só para admin). Depois o seed do dono (abaixo) e o smoke. Os dois pegam tokens no `mock-oauth2-server` com `infra/local/auth/token.sh` e precisam dos cinco serviços no ar:
 ```bash
 curl http://localhost/accounts/actuator/health
+infra/local/seed.sh http://localhost
 infra/local/smoke.sh http://localhost
 ```
-O smoke é o mesmo que roda no CI. Na parte do `accounts`, ele imprime `OK: eventos de <id> na fila accounts-events-inspection.fifo: AccountOpened LedgerEntryRecorded:1 LedgerEntryRecorded:2`; a parte do `transfers` termina em `OK: eventos de <transferId> na fila transfers-events-inspection.fifo: TransferCompleted`; em seguida o smoke confere, em `GET /accounts/<origem>/daily-limit` pelo nginx, o limite diário da origem (`OK: limite diario da conta <id> (limite:usado:disponivel): 500000:400:499600`). As duas últimas linhas são as do `notification`: o smoke espera até 45 s (45 tentativas de 1 s, acima da visibilidade de 30 s da fila: o evento da transferência pode chegar antes do da conta e voltar à fila só depois de 30 s) e confere `TRANSFER_SENT` para o cliente da origem e `TRANSFER_RECEIVED` para o da conta de destino, lendo `GET /notifications?customerId=` pelo nginx (`OK: cliente <id> recebeu TRANSFER_SENT` e `OK: cliente <id> recebeu TRANSFER_RECEIVED`). A última linha é a do `statement`: o smoke espera até 30 s e confere, em `GET /accounts/<id>/statement` pelo nginx, os dois lançamentos da primeira conta, do mais novo para o mais antigo (`OK: extrato da conta <id>: 2:DEBIT:300:700 1:CREDIT:1000:1000`, no formato `sequence:kind:amount:balanceAfter`). Ele apaga da fila de inspeção `accounts-events-inspection.fifo` só as mensagens da conta que criou; as de outras contas ficam escondidas por 2 minutos depois do smoke. Como a fila de inspeção não tem consumidor (diferente de `statement-accounts.fifo`, que o `statement` consome), ela acumula: se o smoke não achar os próprios eventos, recrie o ambiente com `down -v`. A mesma sequência à mão:
-```bash
-ACCOUNT_ID=$(curl -sS -X POST http://localhost/accounts \
-  -H 'Content-Type: application/json' -H "Idempotency-Key: $(uuidgen)" \
-  -d "{\"customerId\":\"$(uuidgen)\"}" | jq -r .id)
+O smoke é o mesmo que roda no CI. Cada cliente do smoke é um `sub` novo, cadastrado no `customer` com o próprio token; créditos e débitos de preparo vão com o token de admin do usuário de teste do dono (sem depender do seed). Ele começa pela identidade: `GET /customers/me` sem token dá `401`, o cadastro novo fica `ACTIVE` (`OK: cliente <id> cadastrado e ACTIVE`), e a conta aberta pelo cliente dá `401` sem token e `404` para outro cliente (`OK: conta <id> sem token 401 e de outro cliente 404`). Na parte do `accounts`, ele imprime `OK: eventos de <id> na fila accounts-events-inspection.fifo: AccountOpened LedgerEntryRecorded:1 LedgerEntryRecorded:2`; a parte do `transfers` (transferência com o token do cliente da origem) termina em `OK: eventos de <transferId> na fila transfers-events-inspection.fifo: TransferCompleted`; em seguida o smoke confere, em `GET /accounts/<origem>/daily-limit` pelo nginx, o limite diário da origem (`OK: limite diario da conta <id> (limite:usado:disponivel): 500000:400:499600`). As duas linhas seguintes são as do `notification`: o smoke espera até 45 s (45 tentativas de 1 s, acima da visibilidade de 30 s da fila: o evento da transferência pode chegar antes do da conta e voltar à fila só depois de 30 s) e confere `TRANSFER_SENT` para o cliente da origem e `TRANSFER_RECEIVED` para o da conta de destino, lendo `GET /notifications` pelo nginx com o token de cada um (`OK: cliente <id> recebeu TRANSFER_SENT` e `OK: cliente <id> recebeu TRANSFER_RECEIVED`). A última linha é a do `statement`: o smoke espera até 30 s e confere, em `GET /accounts/<id>/statement` pelo nginx, os dois lançamentos da primeira conta, do mais novo para o mais antigo (`OK: extrato da conta <id>: 2:DEBIT:300:700 1:CREDIT:1000:1000`, no formato `sequence:kind:amount:balanceAfter`). Ele apaga da fila de inspeção `accounts-events-inspection.fifo` só as mensagens da conta que criou; as de outras contas ficam escondidas por 2 minutos depois do smoke. Como a fila de inspeção não tem consumidor (diferente de `statement-accounts.fifo`, que o `statement` consome), ela acumula: se o smoke não achar os próprios eventos, recrie o ambiente com `down -v`.
 
-curl -sS -X POST http://localhost/accounts/$ACCOUNT_ID/credits \
+### Seed do usuário de teste do dono
+`infra/local/seed.sh` prepara o usuário de teste do dono (`sub` `00000000-0000-7000-8000-000000000001`, `Owner Test`, `owner@example.test`, grupo `admin`): cadastra o cliente no `customer`, o deixa `ACTIVE` pelo papel de admin, abre a conta dele e credita o saldo inicial pelo admin (1000000 centavos). Uma conta só: o `accounts` aceita uma conta por cliente (regra da etapa 1, `409 customer-already-has-account`). As chaves de idempotência são fixas: rodar de novo devolve a mesma conta e não credita outra vez. As duas últimas linhas trazem o id e o saldo, legíveis por máquina (`OWNER_ACCOUNT=<id>` e `OWNER_BALANCE=<centavos>`); o CI roda o seed duas vezes e compara as duas com `infra/local/seed-check.sh` (o mesmo script serve à mão). Para começar do zero, recrie o ambiente com `down -v`.
+
+### A mesma sequência à mão
+Toda chamada leva `Authorization: Bearer <token>`. O cliente se cadastra no `customer` antes de abrir a conta, e o cliente da conta vem do token (sem `customerId` no corpo). Créditos e débitos são do admin (e da saga, com token de máquina); um cliente recebe `403`:
+```bash
+CUSTOMER=$(uuidgen | tr 'A-Z' 'a-z')
+CUSTOMER_TOKEN=$(infra/local/auth/token.sh user $CUSTOMER)
+ADMIN_TOKEN=$(infra/local/auth/token.sh user 00000000-0000-7000-8000-000000000001 admin)
+
+curl -sS -X POST http://localhost/customers -H "Authorization: Bearer $CUSTOMER_TOKEN" \
+  -H 'Content-Type: application/json' -d '{"name":"Cliente Teste","email":"cliente@example.test"}'
+
+ACCOUNT_ID=$(curl -sS -X POST http://localhost/accounts -H "Authorization: Bearer $CUSTOMER_TOKEN" \
+  -H "Idempotency-Key: $(uuidgen)" | jq -r .id)
+
+curl -sS -X POST http://localhost/accounts/$ACCOUNT_ID/credits -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H 'Content-Type: application/json' -H "Idempotency-Key: $(uuidgen)" \
   -d '{"amount":1000,"description":"credito"}'
 
-curl -sS -X POST http://localhost/accounts/$ACCOUNT_ID/debits \
+curl -sS -X POST http://localhost/accounts/$ACCOUNT_ID/debits -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H 'Content-Type: application/json' -H "Idempotency-Key: $(uuidgen)" \
   -d '{"amount":300,"description":"debito"}'
 
-curl -sS http://localhost/accounts/$ACCOUNT_ID
+curl -sS http://localhost/accounts/$ACCOUNT_ID -H "Authorization: Bearer $CUSTOMER_TOKEN"
 ```
-A última resposta mostra `"balance":700`. Valores em centavos. `Idempotency-Key` é obrigatório nos `POST`; repetir a mesma chave devolve `200` com o resultado original. O header `X-Correlation-Id` é repassado pelo nginx e devolvido na resposta.
+A última resposta mostra `"balance":700`. Valores em centavos. `Idempotency-Key` é obrigatório nos `POST` do `accounts` e do `transfers`; repetir a mesma chave devolve `200` com o resultado original. O header `X-Correlation-Id` é repassado pelo nginx e devolvido na resposta.
 
 ### Transferência
-O smoke acima também cobre o `transfers`: abre duas contas, credita 1000 na origem, transfere 400, espera o status `COMPLETED`, confere os saldos (600 na origem, 400 no destino) e o evento `TransferCompleted` na fila `transfers-events-inspection.fifo`. A mesma sequência à mão (reaproveita o `ACCOUNT_ID` do passo anterior como origem, que precisa de saldo para os 400; com o saldo 700 do passo anterior, sobra 300):
+O smoke acima também cobre o `transfers`: abre duas contas, credita 1000 na origem, transfere 400, espera o status `COMPLETED`, confere os saldos (600 na origem, 400 no destino) e o evento `TransferCompleted` na fila `transfers-events-inspection.fifo`. A mesma sequência à mão (reaproveita o `ACCOUNT_ID` e o `CUSTOMER_TOKEN` do passo anterior como origem, que precisa de saldo para os 400; com o saldo 700 do passo anterior, sobra 300). A transferência vai com o token do cliente da origem; origem de outro cliente dá `404 account-not-found`, e cliente bloqueado (`PUT /admin/customers/{id}/status` com `{"status":"BLOCKED"}`) dá `422 customer-blocked`:
 ```bash
-DESTINATION_ID=$(curl -sS -X POST http://localhost/accounts \
-  -H 'Content-Type: application/json' -H "Idempotency-Key: $(uuidgen)" \
-  -d "{\"customerId\":\"$(uuidgen)\"}" | jq -r .id)
+OTHER=$(uuidgen | tr 'A-Z' 'a-z')
+OTHER_TOKEN=$(infra/local/auth/token.sh user $OTHER)
+curl -sS -X POST http://localhost/customers -H "Authorization: Bearer $OTHER_TOKEN" \
+  -H 'Content-Type: application/json' -d '{"name":"Outro Cliente","email":"outro@example.test"}'
+DESTINATION_ID=$(curl -sS -X POST http://localhost/accounts -H "Authorization: Bearer $OTHER_TOKEN" \
+  -H "Idempotency-Key: $(uuidgen)" | jq -r .id)
 
 TRANSFER_KEY=$(uuidgen)
-curl -sS -i -X POST http://localhost/transfers \
+curl -sS -i -X POST http://localhost/transfers -H "Authorization: Bearer $CUSTOMER_TOKEN" \
   -H 'Content-Type: application/json' -H "Idempotency-Key: $TRANSFER_KEY" \
   -d "{\"sourceAccountId\":\"$ACCOUNT_ID\",\"destinationAccountId\":\"$DESTINATION_ID\",\"amount\":400,\"description\":\"transferencia\"}"
 ```
 A primeira resposta é `201` com `"status":"COMPLETED"` (ou `202` se a saga ainda estiver em andamento; consulte `GET /transfers/<id>` até concluir). Repetir o mesmo comando com a mesma `Idempotency-Key` devolve `200` com a mesma transferência, sem novo débito. Os saldos ficam em 300 (origem) e 400 (destino):
 ```bash
-curl -sS http://localhost/accounts/$ACCOUNT_ID | jq .balance
-curl -sS http://localhost/accounts/$DESTINATION_ID | jq .balance
+curl -sS http://localhost/accounts/$ACCOUNT_ID -H "Authorization: Bearer $CUSTOMER_TOKEN" | jq .balance
+curl -sS http://localhost/accounts/$DESTINATION_ID -H "Authorization: Bearer $OTHER_TOKEN" | jq .balance
 ```
 O health do serviço sai em `http://localhost/transfers/actuator/health`.
 
@@ -221,38 +247,49 @@ docker compose -f infra/local/docker-compose.yml exec -T \
 ```
 
 ## 7. Coleção Bruno
-A coleção fica em `api/bruno/accounts/`, com uma requisição por endpoint e `Idempotency-Key` nova a cada envio (`{{$guid}}`, ou uma chave gerada no script da requisição). A consulta de lançamento por chave (`08`) usa a chave do crédito (`03`): rode o `03` antes do `08`.
+São cinco coleções em `api/bruno/` (`accounts`, `transfers`, `notification`, `statement` e `customer`), cada uma com o ambiente `local` (`baseUrl`, `tokenUrl` do `mock-oauth2-server` e `adminSub`, o usuário de teste do dono). O script da coleção (`collection.bru`) pega os tokens no mock uma vez por execução: `customerToken` (um cliente novo, já cadastrado no `customer`; nas quatro primeiras coleções é o token padrão das requisições, por herança), `otherCustomerToken` (outro cliente cadastrado, para o `404` do recurso alheio) e `adminToken`. As requisições de admin (créditos, débitos, troca de tipo, `/admin/**`) usam o `adminToken`. Precisa do compose e dos cinco serviços no ar.
+
+### Coleção do `accounts`
+A coleção fica em `api/bruno/accounts/`, com uma requisição por endpoint e `Idempotency-Key` nova a cada envio (`{{$guid}}`, ou uma chave gerada no script da requisição). A consulta de lançamento por chave (`08`) usa a chave do crédito (`03`): rode o `03` antes do `08`. Depois vêm `09` (conta de outro cliente, `404`), `10` (sem token, `401`) e `11` (crédito com o token do cliente, `403`).
 - **App do Bruno:** "Open Collection" → `api/bruno/accounts`, escolha o ambiente `local` e rode "Abrir conta" primeiro (ela guarda o `accountId` para as outras).
 - **Terminal** (precisa da CLI dos pré-requisitos opcionais):
   ```bash
   (cd api/bruno/accounts && bru run --env local)
   ```
-  Esperado: `Requests 8 (8 Passed)`. A requisição de limite grava o valor da migration (`GOLD` = 200000), sem alterar o ambiente.
+  Esperado: `Requests 11 (11 Passed)`. A requisição de limite grava o valor da migration (`GOLD` = 200000), sem alterar o ambiente.
 
 ### Coleção do `notification`
-A coleção `api/bruno/notification/` também roda sozinha: o script da requisição `01` abre duas contas, credita a origem, faz uma transferência pelo `transfers` e espera até 45 s pela notificação (acima da visibilidade de 30 s da fila: o evento da transferência pode chegar antes do da conta e voltar à fila só depois de 30 s). As requisições seguem a ordem: `01` lista as notificações do remetente (`TRANSFER_SENT`), `02` as do destinatário (`TRANSFER_RECEIVED`), `03` marca como lidas até a mais recente, `04` confere `unreadCount` zero e `05` mostra o `400` de um `customerId` que não é UUID. Os três serviços precisam estar no ar.
+A coleção `api/bruno/notification/` também roda sozinha: o script da requisição `01` abre uma conta para o cliente e outra para o outro cliente, credita a origem pelo admin, transfere com o token do cliente e espera até 45 s pela notificação (acima da visibilidade de 30 s da fila: o evento da transferência pode chegar antes do da conta e voltar à fila só depois de 30 s). O token diz de quem são as notificações. As requisições seguem a ordem: `01` lista as notificações do remetente (`TRANSFER_SENT`), `02` as do destinatário com o token dele (`TRANSFER_RECEIVED`), `03` marca como lidas até a mais recente, `04` confere `unreadCount` zero, `05` mostra o `400` de um `customerId` que não é UUID e `06` o `404` de um cliente que pede as notificações de outro.
 - **Terminal:**
   ```bash
   (cd api/bruno/notification && bru run --env local)
   ```
-  Esperado: `Requests 5 (5 Passed)`.
+  Esperado: `Requests 6 (6 Passed)`.
 
 ### Coleção do `statement`
-A coleção `api/bruno/statement/` também roda sozinha: o script da requisição `01` abre uma conta, faz três créditos (1000, 2000 e 3000) e espera até 30 s pelo extrato ter os três lançamentos. As requisições seguem a ordem: `01` lê o extrato (sequences 3, 2 e 1, saldos 6000, 3000 e 1000), `02` pede a primeira página com `limit=2` e guarda o `nextCursor`, `03` segue o cursor até o último lançamento, `04` mostra o `404` de uma conta desconhecida e `05` o `400` de um `limit` fora de 1 a 100. Precisa do `accounts` e do `statement` no ar.
+A coleção `api/bruno/statement/` também roda sozinha: o script da requisição `01` abre uma conta para o cliente, faz três créditos pelo admin (1000, 2000 e 3000) e espera até 30 s pelo extrato ter os três lançamentos. As requisições seguem a ordem: `01` lê o extrato (sequences 3, 2 e 1, saldos 6000, 3000 e 1000), `02` pede a primeira página com `limit=2` e guarda o `nextCursor`, `03` segue o cursor até o último lançamento, `04` mostra o `404` de uma conta desconhecida, `05` o `400` de um `limit` fora de 1 a 100 e `06` o `404` do extrato lido por outro cliente.
 - **Terminal:**
   ```bash
   (cd api/bruno/statement && bru run --env local)
   ```
-  Esperado: `Requests 5 (5 Passed)`.
+  Esperado: `Requests 6 (6 Passed)`.
 
 ### Coleção do `transfers`
-A coleção `api/bruno/transfers/` roda sozinha, sem depender da coleção do `accounts`: o script da requisição `01` abre duas contas pelo `accounts`, credita 1000 na origem e guarda a `Idempotency-Key` e os ids em variáveis. Rode as requisições na ordem: `01` cria a transferência (`201`), `02` repete a mesma chave (`200`, mesma transferência) e `03` consulta pelo id, `04` consulta o limite diário da origem (300 usados de 500000), `05` pede uma transferência de 500000 e recebe `422 transfer-failed` com o motivo `daily-limit-exceeded` e `06` confere que a recusa não consumiu o limite. Os dois serviços precisam estar no ar.
+A coleção `api/bruno/transfers/` roda sozinha, sem depender da coleção do `accounts`: o script da requisição `01` abre a origem do cliente e o destino do outro cliente pelo `accounts`, credita 1000 na origem pelo admin e guarda a `Idempotency-Key` e os ids em variáveis. Rode as requisições na ordem: `01` cria a transferência (`201`), `02` repete a mesma chave (`200`, mesma transferência) e `03` consulta pelo id, `04` consulta o limite diário da origem (300 usados de 500000), `05` pede uma transferência de 500000 e recebe `422 transfer-failed` com o motivo `daily-limit-exceeded`, `06` confere que a recusa não consumiu o limite e `07` mostra o `404 account-not-found` de quem transfere de uma origem de outro cliente.
 - **App do Bruno:** "Open Collection" → `api/bruno/transfers`, ambiente `local`.
 - **Terminal:**
   ```bash
   (cd api/bruno/transfers && bru run --env local)
   ```
-  Esperado: `Requests 6 (6 Passed)`.
+  Esperado: `Requests 7 (7 Passed)`.
+
+### Coleção do `customer`
+A coleção `api/bruno/customer/` usa um cliente novo, ainda sem cadastro: `01` cadastra (`201`, `ACTIVE`, o id é o `sub` do token), `02` repete o cadastro (`200`, o mesmo), `03` lê `GET /customers/me`, `04` o admin consulta `GET /admin/customers/{id}`, `05` o admin bloqueia (`BLOCKED`), `06` o cliente chama a rota de admin (`403 forbidden`), `07` o admin desbloqueia (`ACTIVE`) e `08` mostra o `401` sem token.
+- **Terminal:**
+  ```bash
+  (cd api/bruno/customer && bru run --env local)
+  ```
+  Esperado: `Requests 8 (8 Passed)`.
 
 ## Identidade local (mock-oauth2-server)
 O compose sobe o `mock-oauth2-server` (`ghcr.io/navikt/mock-oauth2-server`) na porta 8090 (`MOCK_OAUTH2_PORT`), no lugar do Cognito. O emissor é `http://localhost:8090/default`; os serviços o recebem em `*_JWT_ISSUER_URI` (`ACCOUNTS_`, `TRANSFERS_`, `NOTIFICATION_`, `STATEMENT_` e `CUSTOMER_`, veja o `.env.example`). Os serviços que chamam outros serviços usam um cliente de máquina (client credentials, escopo `digitalbanking/internal`): `ACCOUNTS_OAUTH_CLIENT_ID`/`_SECRET` e `TRANSFERS_OAUTH_CLIENT_ID`/`_SECRET`. O mock aceita qualquer segredo, então `local-secret` serve; são valores só de desenvolvimento local.
@@ -271,7 +308,7 @@ curl -H "Authorization: Bearer $(infra/local/auth/token.sh user <uuid>)" http://
 O usuário de teste do dono tem `sub` `00000000-0000-7000-8000-000000000001`, nome `Owner Test`, e-mail `owner@example.test` e o grupo `admin`; o nome e o e-mail entram no cadastro do `customer` pelo seed local. Os tokens duram 1 hora.
 
 ## 8. Derrubar tudo
-Pare os quatro `bootRun` com Ctrl+C nos terminais deles. Depois derrube os contêineres; o `-v` apaga os dados:
+Pare os cinco `bootRun` com Ctrl+C nos terminais deles. Depois derrube os contêineres; o `-v` apaga os dados:
 ```bash
 docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml down -v
 ```

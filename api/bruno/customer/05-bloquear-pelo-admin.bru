@@ -1,0 +1,28 @@
+meta {
+  name: Bloquear pelo admin
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/admin/customers/{{customerId}}/status
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminToken}}
+}
+
+body:json {
+  {
+    "status": "BLOCKED"
+  }
+}
+
+tests {
+  test("200 com o cliente BLOCKED", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.status).to.equal("BLOCKED");
+  });
+}
