@@ -155,7 +155,7 @@
 **Files:**
 - os dois serviços usam as libs e apagam os filtros próprios;
 - `statement`: extrato só do dono (o `customerId` da conta já está na tabela) ou do admin;
-- `notification`: `GET /notifications` e `POST /notifications/read` pelo `Caller`, sem o parâmetro `customerId`;
+- `notification`: `GET /notifications` e `POST /notifications/read` pelo `Caller`; o parâmetro `customerId` fica só para o admin;
 - actuator e OpenAPI.
 
 - [ ] **Testes:** `401`, `404` do extrato alheio, admin passa, notificações só do próprio cliente; testes atuais migrados. Build dos dois verde. Commit `feat(statement,notification): JWT e dono`.

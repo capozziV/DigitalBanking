@@ -30,7 +30,7 @@ Toda requisição de cliente chega com um JWT, e cada serviço só deixa o clien
 
 ## 1. Identidade e o id do cliente
 - **O id do cliente é o `sub` do usuário** (UUID). Um usuário tem no máximo um cliente. Com isso, todo serviço sabe quem é o cliente só pelo token, sem consulta extra. O Cognito emite `sub` UUID; o mock é configurado para emitir UUID.
-- O `customerId` some dos corpos e parâmetros em que hoje vem do chamador (`POST /accounts`, `GET /notifications?customerId=`).
+- O `customerId` some dos corpos e parâmetros em que hoje vem do chamador (`POST /accounts`, `GET /notifications?customerId=`). Exceção: o `GET /notifications?customerId=` fica só para o admin consultar as notificações de outro cliente; o cliente que passa o id de outro recebe `404 notification-not-found`, e o próprio id (ou nenhum) lê as dele.
 - **Negar por padrão:** rota sem regra explícita responde `403`; cada serviço lista todas as suas rotas.
 - **Três tipos de chamador** (`Caller`), resolvidos de um JWT validado (Spring Security resource server, emissor e JWKS configuráveis):
   - **cliente:** token de usuário sem o grupo `admin`; `customerId = sub`;
