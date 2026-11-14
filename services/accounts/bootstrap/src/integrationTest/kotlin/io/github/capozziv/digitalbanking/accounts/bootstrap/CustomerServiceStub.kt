@@ -37,6 +37,11 @@ class CustomerServiceStub private constructor(
         data class Slow(
             val delay: Duration,
         ) : Behavior
+
+        /** Sends the headers of an ACTIVE answer at once, and its body only after [delay]. */
+        data class SlowBody(
+            val delay: Duration,
+        ) : Behavior
     }
 
     private val behaviors = ConcurrentHashMap<UUID, Behavior>()
@@ -97,6 +102,10 @@ class CustomerServiceStub private constructor(
                 Thread.sleep(behavior.delay.toMillis())
                 exchange.respond(200, customer(customerId, "ACTIVE"))
             }
+
+            is Behavior.SlowBody -> {
+                exchange.respond(200, customer(customerId, "ACTIVE"), bodyDelay = behavior.delay)
+            }
         }
     }
 
@@ -118,11 +127,16 @@ class CustomerServiceStub private constructor(
     private fun HttpExchange.respond(
         status: Int,
         body: String,
+        bodyDelay: Duration = Duration.ZERO,
     ) {
         try {
             val bytes = body.toByteArray()
             responseHeaders.add("Content-Type", "application/json")
             sendResponseHeaders(status, bytes.size.toLong())
+            if (!bodyDelay.isZero) {
+                responseBody.flush()
+                Thread.sleep(bodyDelay.toMillis())
+            }
             responseBody.use { it.write(bytes) }
         } catch (_: java.io.IOException) {
             // The client gave up (timeout): nothing to answer.

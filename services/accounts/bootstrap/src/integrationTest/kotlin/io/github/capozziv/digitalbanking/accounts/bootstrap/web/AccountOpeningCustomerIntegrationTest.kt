@@ -1,10 +1,12 @@
 package io.github.capozziv.digitalbanking.accounts.bootstrap.web
 
+import io.github.capozziv.digitalbanking.accounts.adapters.customer.CustomerClientProperties
 import io.github.capozziv.digitalbanking.accounts.bootstrap.AccountsIntegrationTest
 import io.github.capozziv.digitalbanking.accounts.bootstrap.CustomerServiceStub.Behavior
 import io.github.capozziv.digitalbanking.testing.security.JwtTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.web.server.LocalServerPort
 import java.time.Duration
 import java.util.UUID
@@ -16,6 +18,9 @@ import java.util.UUID
 class AccountOpeningCustomerIntegrationTest : AccountsIntegrationTest() {
     @LocalServerPort
     private var port: Int = 0
+
+    @Autowired
+    private lateinit var customerClientProperties: CustomerClientProperties
 
     private val api by lazy { ApiClient(port) }
     private val customerId = UUID.randomUUID()
@@ -66,8 +71,26 @@ class AccountOpeningCustomerIntegrationTest : AccountsIntegrationTest() {
     }
 
     @Test
+    fun `the timeout of the customer service is 500 ms by default`() {
+        assertThat(customerClientProperties.timeout).isEqualTo(Duration.ofMillis(500))
+    }
+
+    @Test
     fun `a customer service slower than the timeout is 503 customers-unavailable within the timeout, and nothing is written`() {
         customerService.answer(customerId, Behavior.Slow(Duration.ofSeconds(3)))
+
+        assertUnavailableWithinTheTimeout()
+    }
+
+    @Test
+    fun `a customer service that sends the headers but delays the body is 503 customers-unavailable within the timeout`() {
+        customerService.answer(customerId, Behavior.SlowBody(Duration.ofSeconds(3)))
+
+        assertUnavailableWithinTheTimeout()
+    }
+
+    /** The opening of [customerId] waits the 500 ms timeout, not much more, then answers 503 and writes nothing. */
+    private fun assertUnavailableWithinTheTimeout() {
         api.openAccount(UUID.randomUUID()) // warms the cached service token, so the timing below is the customer call only
 
         val started = System.nanoTime()
@@ -75,7 +98,7 @@ class AccountOpeningCustomerIntegrationTest : AccountsIntegrationTest() {
         val elapsed = Duration.ofNanos(System.nanoTime() - started)
 
         assertProblem(response, 503, "customers-unavailable")
-        assertThat(elapsed).isLessThan(Duration.ofSeconds(2))
+        assertThat(elapsed).isBetween(Duration.ofMillis(500), Duration.ofSeconds(1))
         assertNothingWrittenFor(customerId)
     }
 
@@ -86,22 +109,5 @@ class AccountOpeningCustomerIntegrationTest : AccountsIntegrationTest() {
         customerService.answer(customerId, Behavior.Blocked)
 
         assertProblem(api.openAccount(customerId, openingKey), 422, "customer-blocked")
-    }
-
-    private fun assertNothingWrittenFor(customerId: UUID) {
-        val accounts =
-            ownerJdbc
-                .sql("select count(*) from account where customer_id = :id")
-                .param("id", customerId)
-                .query(Long::class.java)
-                .single()
-        val events =
-            ownerJdbc
-                .sql("select count(*) from outbox where event_type = 'AccountOpened' and payload::text like :id")
-                .param("id", "%$customerId%")
-                .query(Long::class.java)
-                .single()
-        assertThat(accounts).isZero()
-        assertThat(events).isZero()
     }
 }

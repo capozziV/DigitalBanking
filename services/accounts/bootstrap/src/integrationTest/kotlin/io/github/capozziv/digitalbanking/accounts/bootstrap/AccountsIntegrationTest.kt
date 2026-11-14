@@ -1,6 +1,7 @@
 package io.github.capozziv.digitalbanking.accounts.bootstrap
 
 import io.github.capozziv.digitalbanking.testing.security.JwtTestSupport
+import org.assertj.core.api.Assertions.assertThat
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.simple.JdbcClient
@@ -9,6 +10,7 @@ import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.TestPropertySource
 import org.testcontainers.postgresql.PostgreSQLContainer
+import java.util.UUID
 
 /**
  * Base of every integration test of the accounts service. One PostgreSQL container is shared by all
@@ -37,6 +39,24 @@ abstract class AccountsIntegrationTest {
         ownerJdbc.sql("update outbox set published_at = now() where published_at is null").update()
     }
 
+    /** No account and no `AccountOpened` event exist for [customerId]. */
+    protected fun assertNothingWrittenFor(customerId: UUID) {
+        val accounts =
+            ownerJdbc
+                .sql("select count(*) from account where customer_id = :id")
+                .param("id", customerId)
+                .query(Long::class.java)
+                .single()
+        val events =
+            ownerJdbc
+                .sql("select count(*) from outbox where event_type = 'AccountOpened' and payload::text like :id")
+                .param("id", "%$customerId%")
+                .query(Long::class.java)
+                .single()
+        assertThat(accounts).isZero()
+        assertThat(events).isZero()
+    }
+
     companion object {
         const val APP_USER = "accounts_app"
         const val APP_PASSWORD = "app"
@@ -58,11 +78,23 @@ abstract class AccountsIntegrationTest {
             registry.add("spring.flyway.placeholders.appUser") { APP_USER }
         }
 
+        /** Set by a subclass (with its own @DynamicPropertySource) to point the `customer` service elsewhere. */
+        const val CUSTOMER_BASE_URL_OVERRIDE = "accounts-test.customer-base-url"
+
+        /** Set by a subclass (with its own @DynamicPropertySource) to point the token endpoint elsewhere. */
+        const val TOKEN_URI_OVERRIDE = "accounts-test.token-uri"
+
+        // The superclass's dynamic properties win over a subclass's for the same key, so the stub URLs are
+        // placeholders whose default is the stub: a subclass overrides them through the *_OVERRIDE keys.
         @JvmStatic
         @DynamicPropertySource
         fun customerServiceProperties(registry: DynamicPropertyRegistry) {
-            registry.add("accounts.customer.base-url") { CustomerServiceStub.instance.baseUrl }
-            registry.add("digitalbanking.security.service-token.token-uri") { "${CustomerServiceStub.instance.baseUrl}/token" }
+            registry.add("accounts.customer.base-url") {
+                "\${$CUSTOMER_BASE_URL_OVERRIDE:${CustomerServiceStub.instance.baseUrl}}"
+            }
+            registry.add("digitalbanking.security.service-token.token-uri") {
+                "\${$TOKEN_URI_OVERRIDE:${CustomerServiceStub.instance.baseUrl}/token}"
+            }
         }
     }
 }
