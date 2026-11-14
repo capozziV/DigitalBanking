@@ -58,6 +58,8 @@ class DynamoDbStatementRepository(
 
     override fun accountExists(accountId: UUID): Boolean = getItem(accountId, ACCOUNT_SEQUENCE) != null
 
+    override fun findCustomerId(accountId: UUID): UUID? = getItem(accountId, ACCOUNT_SEQUENCE)?.get(CUSTOMER_ID)?.s()?.let(UUID::fromString)
+
     /**
      * The first page (no cursor) is read with strong consistency: it is the page the cache keeps, and the record use
      * case evicts it right after an insert. An eventually consistent read after that evict could miss the new entry and

@@ -1,5 +1,6 @@
 package io.github.capozziv.digitalbanking.notification.adapters.web
 
+import io.github.capozziv.digitalbanking.notification.application.ForeignCustomerException
 import io.github.capozziv.digitalbanking.notification.application.NotificationNotFoundException
 import org.slf4j.LoggerFactory
 import org.springframework.beans.TypeMismatchException
@@ -34,10 +35,20 @@ class ProblemDetailsExceptionHandler : ResponseEntityExceptionHandler() {
             "The notification was not found for this customer",
         )
 
+    /** The notifications of another customer: answered like a notification that does not exist. */
+    @ExceptionHandler
+    fun handle(e: ForeignCustomerException) =
+        problem(
+            HttpStatus.NOT_FOUND,
+            "notification-not-found",
+            "Notification not found",
+            "The notification was not found for this customer",
+        )
+
     @ExceptionHandler
     fun handle(e: InvalidRequestException) = validationError(e.errors)
 
-    /** A required query parameter that is absent, such as `customerId`. */
+    /** A required parameter that is absent. */
     override fun handleMissingServletRequestParameter(
         ex: MissingServletRequestParameterException,
         headers: HttpHeaders,

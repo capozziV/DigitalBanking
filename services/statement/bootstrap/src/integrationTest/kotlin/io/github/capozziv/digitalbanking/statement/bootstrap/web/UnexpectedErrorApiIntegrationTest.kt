@@ -1,6 +1,7 @@
 package io.github.capozziv.digitalbanking.statement.bootstrap.web
 
 import io.github.capozziv.digitalbanking.statement.application.port.StatementRepository
+import io.github.capozziv.digitalbanking.testing.security.JwtTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
@@ -30,7 +31,14 @@ class UnexpectedErrorApiIntegrationTest : StatementWebIntegrationTest() {
             .accountExists(any(UUID::class.java) ?: UUID.randomUUID())
         val correlationId = UUID.randomUUID().toString()
 
-        val response = ApiClient(port).get("/accounts/${UUID.randomUUID()}/statement", mapOf("X-Correlation-Id" to correlationId))
+        val response =
+            ApiClient(
+                port,
+            ).get(
+                "/accounts/${UUID.randomUUID()}/statement",
+                mapOf("X-Correlation-Id" to correlationId),
+                JwtTestSupport.adminToken(UUID.randomUUID()),
+            )
 
         assertProblem(response, 500, "internal-error")
         assertThat(response.rawBody).doesNotContain("secret internal detail")

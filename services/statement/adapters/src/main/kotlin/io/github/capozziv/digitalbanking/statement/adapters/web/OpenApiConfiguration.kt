@@ -1,11 +1,14 @@
 package io.github.capozziv.digitalbanking.statement.adapters.web
 
+import io.swagger.v3.oas.models.Components
 import io.swagger.v3.oas.models.OpenAPI
 import io.swagger.v3.oas.models.info.Info
 import io.swagger.v3.oas.models.media.Content
 import io.swagger.v3.oas.models.media.MediaType
 import io.swagger.v3.oas.models.media.Schema
 import io.swagger.v3.oas.models.responses.ApiResponse
+import io.swagger.v3.oas.models.security.SecurityRequirement
+import io.swagger.v3.oas.models.security.SecurityScheme
 import org.springdoc.core.customizers.OpenApiCustomizer
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -18,12 +21,18 @@ import org.springframework.context.annotation.Configuration
 class OpenApiConfiguration {
     @Bean
     fun statementOpenApi(): OpenAPI =
-        OpenAPI().info(
-            Info()
-                .title("statement")
-                .version("v1")
-                .description(DESCRIPTION),
-        )
+        OpenAPI()
+            .info(
+                Info()
+                    .title("statement")
+                    .version("v1")
+                    .description(DESCRIPTION),
+            ).components(
+                Components().addSecuritySchemes(
+                    BEARER_AUTH,
+                    SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT"),
+                ),
+            ).addSecurityItem(SecurityRequirement().addList(BEARER_AUTH))
 
     /** Every operation can fail with an unexpected error, answered by the generic handler as 500 internal-error. */
     @Bean
@@ -45,10 +54,16 @@ class OpenApiConfiguration {
         }
 
     private companion object {
+        const val BEARER_AUTH = "bearerAuth"
+
         val DESCRIPTION =
             """
             Statement of the simulated digital bank: the ledger entries of an account, projected from the events of accounts.
 
+            - Every request carries `Authorization: Bearer <JWT>` (scheme `bearerAuth`). No token, or an invalid or
+              expired one, is `401 /problems/unauthorized`.
+            - A customer reads only the statements of their own accounts; an admin reads any. The account of another
+              customer answers `404 /problems/account-not-found`, the same as an account that does not exist.
             - The list is newest first (highest ledger sequence first); `limit` is 1 to 100 (default 20).
             - `nextCursor` is opaque and null on the last page. Entries arrive asynchronously, so a just-made
               operation may take a moment to show up.

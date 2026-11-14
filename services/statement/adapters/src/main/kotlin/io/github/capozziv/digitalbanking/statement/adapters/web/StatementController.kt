@@ -1,5 +1,6 @@
 package io.github.capozziv.digitalbanking.statement.adapters.web
 
+import io.github.capozziv.digitalbanking.security.currentCaller
 import io.github.capozziv.digitalbanking.statement.adapters.web.dto.StatementDTO
 import io.github.capozziv.digitalbanking.statement.application.usecase.GetStatementUseCase
 import io.swagger.v3.oas.annotations.Operation
@@ -21,7 +22,10 @@ import java.util.UUID
 class StatementController(
     private val getStatement: GetStatementUseCase,
 ) {
-    @Operation(summary = "List the entries of an account, newest first, with cursor pagination")
+    @Operation(
+        summary = "List the entries of an account, newest first, with cursor pagination",
+        description = "Only the customer that owns the account, or an admin, can read it.",
+    )
     @ApiResponses(
         ApiResponse(
             responseCode = "200",
@@ -36,8 +40,15 @@ class StatementController(
             content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
+            responseCode = "401",
+            description = "/problems/unauthorized: no token, or an invalid or expired one",
+            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
+        ),
+        ApiResponse(
             responseCode = "404",
-            description = "/problems/account-not-found: the statement knows no account with this id",
+            description =
+                "/problems/account-not-found: the statement knows no account with this id, or the account belongs " +
+                    "to another customer (same answer, so it does not reveal that the account exists)",
             content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
     )
@@ -56,6 +67,6 @@ class StatementController(
             )
         }
         val decoded = cursor?.let(StatementCursorCodec::decode)
-        return StatementDTO.from(accountId, getStatement.execute(accountId, decoded, limit))
+        return StatementDTO.from(accountId, getStatement.execute(accountId, decoded, limit, currentCaller()))
     }
 }

@@ -8,6 +8,7 @@ import io.github.capozziv.digitalbanking.statement.bootstrap.web.assertProblem
 import io.github.capozziv.digitalbanking.statement.domain.EntryKind
 import io.github.capozziv.digitalbanking.statement.domain.StatementEntry
 import io.github.capozziv.digitalbanking.testing.redis.RedisTestSupport
+import io.github.capozziv.digitalbanking.testing.security.JwtTestSupport
 import io.micrometer.core.instrument.MeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.awaitility.Awaitility.await
@@ -44,14 +45,14 @@ class StatementCacheIntegrationTest : StatementIntegrationTest() {
 
     @Test
     fun `the second read of the first page is served from the cache`() {
-        val account = UUID.randomUUID()
+        val account = newAccount()
         repository.insertEntry(entry(account, 1))
         val hits = counter("statement.cache.requests", "hit")
 
-        val first = api.get("/accounts/$account/statement")
+        val first = api.get("/accounts/$account/statement", bearer = tokenOf(account))
         // Straight into DynamoDB, with no queue and no eviction: only the cache can hide it.
         repository.insertEntry(entry(account, 2))
-        val second = api.get("/accounts/$account/statement")
+        val second = api.get("/accounts/$account/statement", bearer = tokenOf(account))
 
         assertThat(sequences(first.body!!)).containsExactly(1L)
         assertThat(second.status).describedAs(second.rawBody).isEqualTo(200)
@@ -61,32 +62,32 @@ class StatementCacheIntegrationTest : StatementIntegrationTest() {
 
     @Test
     fun `an entry consumed from the queue evicts the page and the next read shows it`() {
-        val account = UUID.randomUUID()
+        val account = newAccount()
         repository.insertEntry(entry(account, 1))
-        assertThat(sequences(api.get("/accounts/$account/statement").body!!)).containsExactly(1L)
+        assertThat(sequences(api.get("/accounts/$account/statement", bearer = tokenOf(account)).body!!)).containsExactly(1L)
         assertThat(redisTemplate.hasKey(key(account))).isTrue()
 
         send(account, ledgerEntryRecorded(account, sequence = 2))
 
         await().atMost(Duration.ofSeconds(10)).pollInterval(Duration.ofMillis(100)).untilAsserted {
-            assertThat(sequences(api.get("/accounts/$account/statement").body!!)).containsExactly(2L, 1L)
+            assertThat(sequences(api.get("/accounts/$account/statement", bearer = tokenOf(account)).body!!)).containsExactly(2L, 1L)
         }
     }
 
     @Test
     fun `with redis paused the statement answers 200 from dynamodb in under 1 second`() {
-        val account = UUID.randomUUID()
+        val account = newAccount()
         repository.insertEntry(entry(account, 1))
         repository.insertEntry(entry(account, 2))
         // Warm the Redis connection and the HTTP stack, so the paused read measures the command timeout.
-        api.get("/accounts/${UUID.randomUUID()}/statement")
+        api.get("/accounts/${UUID.randomUUID()}/statement", bearer = admin)
         val errors = counter("statement.cache.requests", "error")
 
         var response: ApiResponse? = null
         RedisTestSupport.pause(redis)
         val elapsed =
             try {
-                measureTimeMillis { response = api.get("/accounts/$account/statement") }
+                measureTimeMillis { response = api.get("/accounts/$account/statement", bearer = tokenOf(account)) }
             } finally {
                 RedisTestSupport.unpause(redis)
             }
@@ -98,14 +99,46 @@ class StatementCacheIntegrationTest : StatementIntegrationTest() {
     }
 
     @Test
+    fun `a page in the cache is not served to a customer who is not the owner`() {
+        val account = newAccount()
+        repository.insertEntry(entry(account, 1))
+        assertThat(api.get("/accounts/$account/statement", bearer = tokenOf(account)).status).isEqualTo(200)
+        assertThat(redisTemplate.hasKey(key(account))).isTrue()
+
+        val stranger = api.get("/accounts/$account/statement", bearer = JwtTestSupport.customerToken(UUID.randomUUID()))
+        val unknown = api.get("/accounts/${UUID.randomUUID()}/statement", bearer = JwtTestSupport.customerToken(UUID.randomUUID()))
+        val asAdmin = api.get("/accounts/$account/statement", bearer = admin)
+
+        assertProblem(stranger, 404, "account-not-found")
+        // The same body shape as an account that does not exist, apart from the id.
+        assertProblem(unknown, 404, "account-not-found")
+        assertThat(stranger.rawBody).doesNotContain("entryId")
+        assertThat(asAdmin.status).describedAs(asAdmin.rawBody).isEqualTo(200)
+        assertThat(sequences(asAdmin.body!!)).containsExactly(1L)
+    }
+
+    @Test
     fun `an unknown account answers 404 twice and stores nothing`() {
         val account = UUID.randomUUID()
 
-        assertProblem(api.get("/accounts/$account/statement"), 404, "account-not-found")
-        assertProblem(api.get("/accounts/$account/statement"), 404, "account-not-found")
+        assertProblem(api.get("/accounts/$account/statement", bearer = admin), 404, "account-not-found")
+        assertProblem(api.get("/accounts/$account/statement", bearer = admin), 404, "account-not-found")
 
         assertThat(redisTemplate.hasKey(key(account))).isFalse()
     }
+
+    private val owners = mutableMapOf<UUID, UUID>()
+    private val admin = JwtTestSupport.adminToken(UUID.randomUUID())
+
+    /** An account registered as `AccountOpened` would, owned by a new customer. */
+    private fun newAccount(): UUID {
+        val account = UUID.randomUUID()
+        owners[account] = UUID.randomUUID()
+        repository.insertAccount(account, owners.getValue(account))
+        return account
+    }
+
+    private fun tokenOf(account: UUID) = JwtTestSupport.customerToken(owners.getValue(account))
 
     private fun key(account: UUID) = "statement:first-page:v1:$account"
 
