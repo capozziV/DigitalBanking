@@ -2,7 +2,11 @@ package io.github.capozziv.digitalbanking.accounts.adapters.web
 
 import io.github.capozziv.digitalbanking.accounts.application.AccountBusyException
 import io.github.capozziv.digitalbanking.accounts.application.AccountNotFoundException
+import io.github.capozziv.digitalbanking.accounts.application.CallerNotCustomerException
 import io.github.capozziv.digitalbanking.accounts.application.CustomerAlreadyHasAccountException
+import io.github.capozziv.digitalbanking.accounts.application.CustomerBlockedException
+import io.github.capozziv.digitalbanking.accounts.application.CustomerNotFoundException
+import io.github.capozziv.digitalbanking.accounts.application.CustomersUnavailableException
 import io.github.capozziv.digitalbanking.accounts.application.IdempotencyKeyReusedException
 import io.github.capozziv.digitalbanking.accounts.domain.BalanceOverflowException
 import org.slf4j.LoggerFactory
@@ -44,6 +48,28 @@ class ProblemDetailsExceptionHandler : ResponseEntityExceptionHandler() {
     @ExceptionHandler
     fun handle(e: CustomerAlreadyHasAccountException) =
         problem(HttpStatus.CONFLICT, "customer-already-has-account", "Customer already has an account", e.message)
+
+    @ExceptionHandler
+    fun handle(e: CustomerNotFoundException) =
+        problem(HttpStatus.UNPROCESSABLE_CONTENT, "customer-not-found", "Customer not found", "The customer of the token is not registered")
+
+    @ExceptionHandler
+    fun handle(e: CustomerBlockedException) =
+        problem(HttpStatus.UNPROCESSABLE_CONTENT, "customer-blocked", "Customer blocked", "The customer is blocked")
+
+    @ExceptionHandler
+    fun handle(e: CustomersUnavailableException) =
+        problem(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "customers-unavailable",
+            "Customer service unavailable",
+            "The customer service could not be reached; nothing was written, retry later",
+        )
+
+    /** Same type and title as the 403 of the security library: the caller may not do this. */
+    @ExceptionHandler
+    fun handle(e: CallerNotCustomerException) =
+        problem(HttpStatus.FORBIDDEN, "forbidden", "Forbidden", "Only a customer can open its own account")
 
     @ExceptionHandler
     fun handle(e: IdempotencyKeyReusedException) =

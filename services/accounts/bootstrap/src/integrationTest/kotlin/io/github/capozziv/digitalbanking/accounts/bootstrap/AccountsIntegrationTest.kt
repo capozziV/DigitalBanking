@@ -1,6 +1,8 @@
 package io.github.capozziv.digitalbanking.accounts.bootstrap
 
+import io.github.capozziv.digitalbanking.testing.security.JwtTestSupport
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.jdbc.datasource.DriverManagerDataSource
 import org.springframework.test.context.DynamicPropertyRegistry
@@ -15,14 +17,20 @@ import org.testcontainers.postgresql.PostgreSQLContainer
  * container's owner user, mirroring accounts_owner / accounts_app of the local environment.
  * The outbox relay is off, so outbox rows stay as the operations wrote them; the relay tests turn it on
  * (a subclass @TestPropertySource overrides this one).
+ *
+ * Security: tokens are signed by [JwtTestSupport] (its decoder replaces the one built from the issuer URI), and the
+ * token endpoint and the `customer` service are the [CustomerServiceStub], where every customer is ACTIVE by default.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = ["accounts.outbox.relay-enabled=false"])
+@Import(JwtTestSupport.DecoderConfiguration::class)
 abstract class AccountsIntegrationTest {
     /** JdbcClient connected as the owner user, for setup and inspection outside the application's grants. */
     protected val ownerJdbc: JdbcClient by lazy {
         JdbcClient.create(DriverManagerDataSource(postgres.jdbcUrl, postgres.username, postgres.password))
     }
+
+    protected val customerService: CustomerServiceStub get() = CustomerServiceStub.instance
 
     /** Marks as published every pending outbox event, such as those left by other tests on the shared database. */
     protected fun markPendingOutboxEventsPublished() {
@@ -48,6 +56,13 @@ abstract class AccountsIntegrationTest {
             registry.add("spring.flyway.user") { postgres.username }
             registry.add("spring.flyway.password") { postgres.password }
             registry.add("spring.flyway.placeholders.appUser") { APP_USER }
+        }
+
+        @JvmStatic
+        @DynamicPropertySource
+        fun customerServiceProperties(registry: DynamicPropertyRegistry) {
+            registry.add("accounts.customer.base-url") { CustomerServiceStub.instance.baseUrl }
+            registry.add("digitalbanking.security.service-token.token-uri") { "${CustomerServiceStub.instance.baseUrl}/token" }
         }
     }
 }

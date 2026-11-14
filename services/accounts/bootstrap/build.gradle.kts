@@ -13,6 +13,7 @@ dependencies {
 
     integrationTestImplementation(testFixtures(project(":libs:outbox")))
     integrationTestImplementation(project(":libs:testing-localstack"))
+    integrationTestImplementation(project(":libs:testing-security"))
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-webmvc")
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-jdbc")
     integrationTestImplementation("org.awaitility:awaitility") // version managed by the Spring Boot BOM

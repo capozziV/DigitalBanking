@@ -48,7 +48,7 @@ class UnexpectedErrorApiIntegrationTest : AccountsIntegrationTest() {
         val api = ApiClient(port)
         val accountId =
             api
-                .post("/accounts", """{"customerId": "${UUID.randomUUID()}"}""", mapOf("Idempotency-Key" to "open-${UUID.randomUUID()}"))
+                .openAccount()
                 .body!!
                 .get("id")
                 .asString()

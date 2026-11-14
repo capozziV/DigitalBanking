@@ -1,11 +1,14 @@
 package io.github.capozziv.digitalbanking.accounts.adapters.web
 
+import io.swagger.v3.oas.models.Components
 import io.swagger.v3.oas.models.OpenAPI
 import io.swagger.v3.oas.models.info.Info
 import io.swagger.v3.oas.models.media.Content
 import io.swagger.v3.oas.models.media.MediaType
 import io.swagger.v3.oas.models.media.Schema
 import io.swagger.v3.oas.models.responses.ApiResponse
+import io.swagger.v3.oas.models.security.SecurityRequirement
+import io.swagger.v3.oas.models.security.SecurityScheme
 import org.springdoc.core.customizers.OpenApiCustomizer
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -18,42 +21,79 @@ import org.springframework.context.annotation.Configuration
 class OpenApiConfiguration {
     @Bean
     fun accountsOpenApi(): OpenAPI =
-        OpenAPI().info(
-            Info()
-                .title("accounts")
-                .version("v1")
-                .description(DESCRIPTION),
-        )
+        OpenAPI()
+            .info(
+                Info()
+                    .title("accounts")
+                    .version("v1")
+                    .description(DESCRIPTION),
+            ).components(
+                Components().addSecuritySchemes(
+                    BEARER_AUTH,
+                    SecurityScheme()
+                        .type(SecurityScheme.Type.HTTP)
+                        .scheme("bearer")
+                        .bearerFormat("JWT")
+                        .description("JWT of a customer, an admin (group `admin`) or a service (scope `digitalbanking/internal`)"),
+                ),
+            ).addSecurityItem(SecurityRequirement().addList(BEARER_AUTH))
 
-    /** Every operation can fail with an unexpected error, answered by the generic handler as 500 internal-error. */
+    /**
+     * What every operation can answer besides its own responses: 401 and 403 from the security filter, and an
+     * unexpected error answered by the generic handler as 500 internal-error.
+     */
     @Bean
-    fun internalErrorResponseCustomizer(): OpenApiCustomizer =
+    fun commonResponsesCustomizer(): OpenApiCustomizer =
         OpenApiCustomizer { openApi ->
             openApi.paths.orEmpty().values.flatMap { it.readOperations() }.forEach { operation ->
                 operation.responses.addApiResponse(
+                    "401",
+                    problemResponse("${ApiDocs.PROBLEMS}unauthorized: no bearer token, or an invalid or expired one"),
+                )
+                operation.responses.addApiResponse(
+                    "403",
+                    problemResponse("${ApiDocs.PROBLEMS}forbidden: the caller's role may not call this operation"),
+                )
+                operation.responses.addApiResponse(
                     "500",
-                    ApiResponse()
-                        .description("${ApiDocs.PROBLEMS}internal-error: unexpected error; the detail does not expose the cause")
-                        .content(
-                            Content().addMediaType(
-                                ApiDocs.PROBLEM_JSON,
-                                MediaType().schema(Schema<Any>().`$ref`("#/components/schemas/ProblemDetail")),
-                            ),
-                        ),
+                    problemResponse("${ApiDocs.PROBLEMS}internal-error: unexpected error; the detail does not expose the cause"),
                 )
             }
         }
 
+    private fun problemResponse(description: String) =
+        ApiResponse()
+            .description(description)
+            .content(
+                Content().addMediaType(
+                    ApiDocs.PROBLEM_JSON,
+                    MediaType().schema(Schema<Any>().`$ref`("#/components/schemas/ProblemDetail")),
+                ),
+            )
+
     private companion object {
+        const val BEARER_AUTH = "bearerAuth"
+
         val DESCRIPTION =
             """
             Accounts, immutable ledger and balance of the simulated digital bank.
 
+            - Every operation needs `Authorization: Bearer <JWT>` (scheme `bearerAuth`); without a valid token the
+              answer is 401 /problems/unauthorized. Who may call what:
+              - customer (user token without the `admin` group): opens its own account and reads its own account
+                and entries; the account of another customer is 404 /problems/account-not-found;
+              - admin (group `admin`): everything, including credits, debits, the account type and `/admin/**`;
+                an admin who is also a customer opens its own account;
+              - service (machine token, scope `digitalbanking/internal`): reads any account, credits, debits and
+                the entry lookup.
+            - A role that may not call an operation, and any route without a rule, are denied with
+              403 /problems/forbidden.
             - Amounts are whole cents (integers); `amount` > 0.
             - Errors are Problem Details (RFC 9457, `application/problem+json`). Errors of this API have a relative
               `type` `/problems/<slug>`; `400 /problems/validation-error` lists the invalid fields in `errors`.
-            - Errors raised by the framework itself (404 unknown route, 405 method not allowed, 415 unsupported
-              media type, ...) are Problem Details without a `type` member, which RFC 9457 defines as `about:blank`.
+            - Errors raised by the framework itself (405 method not allowed, 415 unsupported media type, 404 of
+              a static resource, ...) are Problem Details without a `type` member, which RFC 9457 defines as
+              `about:blank`.
             - `X-Correlation-Id` is accepted on every request (generated when absent or invalid) and returned on
               every response.
             """.trimIndent()
