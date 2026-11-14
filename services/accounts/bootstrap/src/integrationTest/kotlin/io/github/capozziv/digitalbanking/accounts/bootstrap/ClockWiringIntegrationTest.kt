@@ -23,11 +23,7 @@ class ClockWiringIntegrationTest : AccountsIntegrationTest() {
     fun `the entry createdAt and the outbox occurredAt come from the same Clock bean`() {
         val api = ApiClient(port)
         val opened =
-            api.post(
-                "/accounts",
-                """{"customerId":"${UUID.randomUUID()}"}""",
-                mapOf("Idempotency-Key" to UUID.randomUUID().toString()),
-            )
+            api.openAccount()
         val accountId = opened.body!!.get("id").asString()
 
         val credit =

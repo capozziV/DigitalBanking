@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.system.CapturedOutput
 import org.springframework.boot.test.system.OutputCaptureExtension
 import org.springframework.boot.test.web.server.LocalServerPort
+import org.springframework.http.HttpMethod
 import java.sql.DriverManager
 import java.util.UUID
 
@@ -28,7 +29,7 @@ class AccountApiIntegrationTest : AccountsIntegrationTest() {
     fun `opening an account returns 201 with a FREE account, zero balance and its location`() {
         val customerId = UUID.randomUUID()
 
-        val response = api.post("/accounts", """{"customerId":"$customerId"}""", key(UUID.randomUUID().toString()))
+        val response = api.openAccount(customerId)
 
         assertThat(response.status).isEqualTo(201)
         val body = response.body!!
@@ -46,9 +47,9 @@ class AccountApiIntegrationTest : AccountsIntegrationTest() {
     fun `opening again with the same key returns 200 with the same account`() {
         val customerId = UUID.randomUUID()
         val idempotencyKey = UUID.randomUUID().toString()
-        val first = api.post("/accounts", """{"customerId":"$customerId"}""", key(idempotencyKey))
+        val first = api.openAccount(customerId, idempotencyKey)
 
-        val retry = api.post("/accounts", """{"customerId":"$customerId"}""", key(idempotencyKey))
+        val retry = api.openAccount(customerId, idempotencyKey)
 
         assertThat(retry.status).isEqualTo(200)
         assertThat(retry.body).isEqualTo(first.body)
@@ -57,9 +58,9 @@ class AccountApiIntegrationTest : AccountsIntegrationTest() {
     @Test
     fun `opening a second account for the same customer with another key is 409 customer-already-has-account`() {
         val customerId = UUID.randomUUID()
-        api.post("/accounts", """{"customerId":"$customerId"}""", key(UUID.randomUUID().toString()))
+        api.openAccount(customerId)
 
-        val response = api.post("/accounts", """{"customerId":"$customerId"}""", key(UUID.randomUUID().toString()))
+        val response = api.openAccount(customerId)
 
         assertProblem(response, 409, "customer-already-has-account")
     }
@@ -67,23 +68,23 @@ class AccountApiIntegrationTest : AccountsIntegrationTest() {
     @Test
     fun `opening with a key already used by another customer is 422 idempotency-key-reused`() {
         val idempotencyKey = UUID.randomUUID().toString()
-        api.post("/accounts", """{"customerId":"${UUID.randomUUID()}"}""", key(idempotencyKey))
+        api.openAccount(idempotencyKey = idempotencyKey)
 
-        val response = api.post("/accounts", """{"customerId":"${UUID.randomUUID()}"}""", key(idempotencyKey))
+        val response = api.openAccount(idempotencyKey = idempotencyKey)
 
         assertProblem(response, 422, "idempotency-key-reused")
     }
 
     @Test
     fun `opening without Idempotency-Key is 400 missing-idempotency-key`() {
-        val response = api.post("/accounts", """{"customerId":"${UUID.randomUUID()}"}""")
+        val response = api.send(HttpMethod.POST, "/accounts", headers = asCustomer(UUID.randomUUID()))
 
         assertProblem(response, 400, "missing-idempotency-key")
     }
 
     @Test
     fun `a blank Idempotency-Key is 400 validation-error`() {
-        val response = api.post("/accounts", """{"customerId":"${UUID.randomUUID()}"}""", key("   "))
+        val response = api.openAccount(idempotencyKey = "   ")
 
         assertProblem(response, 400, "validation-error")
         assertThat(response.errorFields()).containsExactly("Idempotency-Key")
@@ -91,8 +92,8 @@ class AccountApiIntegrationTest : AccountsIntegrationTest() {
 
     @Test
     fun `an Idempotency-Key of 255 characters is accepted and one of 256 is 400 validation-error`() {
-        val accepted = api.post("/accounts", """{"customerId":"${UUID.randomUUID()}"}""", key(uniqueKeyOfLength(255)))
-        val tooLong = api.post("/accounts", """{"customerId":"${UUID.randomUUID()}"}""", key(uniqueKeyOfLength(256)))
+        val accepted = api.openAccount(idempotencyKey = uniqueKeyOfLength(255))
+        val tooLong = api.openAccount(idempotencyKey = uniqueKeyOfLength(256))
 
         assertThat(accepted.status).isEqualTo(201)
         assertProblem(tooLong, 400, "validation-error")
@@ -100,19 +101,18 @@ class AccountApiIntegrationTest : AccountsIntegrationTest() {
     }
 
     @Test
-    fun `opening without customerId or with a customerId that is not a UUID is 400 validation-error`() {
-        val missing = api.post("/accounts", """{}""", key(UUID.randomUUID().toString()))
-        val notUuid = api.post("/accounts", """{"customerId":"abc"}""", key(UUID.randomUUID().toString()))
+    fun `opening reads no body, the customer comes from the token, so any body is ignored`() {
+        val customerId = UUID.randomUUID()
 
-        assertProblem(missing, 400, "validation-error")
-        assertThat(missing.errorFields()).containsExactly("customerId")
-        assertProblem(notUuid, 400, "validation-error")
-        assertThat(notUuid.errorFields()).containsExactly("customerId")
+        val response = api.post("/accounts", """{"customerId":"abc""", key(UUID.randomUUID().toString()) + asCustomer(customerId))
+
+        assertThat(response.status).describedAs(response.rawBody).isEqualTo(201)
+        assertThat(response.body!!.get("customerId").asString()).isEqualTo(customerId.toString())
     }
 
     @Test
     fun `a malformed JSON body is 400 validation-error`() {
-        val response = api.post("/accounts", """{"customerId":""", key(UUID.randomUUID().toString()))
+        val response = api.post("/accounts/${openAccount()}/credits", """{"amount":""", key(UUID.randomUUID().toString()))
 
         assertProblem(response, 400, "validation-error")
     }
@@ -548,7 +548,7 @@ class AccountApiIntegrationTest : AccountsIntegrationTest() {
     fun `without a correlation id one is generated, returned and recorded in the outbox`() {
         val customerId = UUID.randomUUID()
 
-        val response = api.post("/accounts", """{"customerId":"$customerId"}""", key(UUID.randomUUID().toString()))
+        val response = api.openAccount(customerId)
 
         val generated = response.header("X-Correlation-Id")
         assertThat(generated).isNotBlank()
@@ -627,7 +627,7 @@ class AccountApiIntegrationTest : AccountsIntegrationTest() {
     }
 
     private fun openAccount(): String {
-        val response = api.post("/accounts", """{"customerId":"${UUID.randomUUID()}"}""", key(UUID.randomUUID().toString()))
+        val response = api.openAccount()
         assertThat(response.status).isEqualTo(201)
         return response.body!!.get("id").asString()
     }

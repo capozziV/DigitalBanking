@@ -15,6 +15,7 @@ import io.github.capozziv.digitalbanking.accounts.domain.EntryKind
 import io.github.capozziv.digitalbanking.accounts.domain.LedgerEntry
 import io.github.capozziv.digitalbanking.accounts.domain.Money
 import io.github.capozziv.digitalbanking.accounts.domain.OverdraftLimit
+import io.github.capozziv.digitalbanking.security.Caller
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -36,6 +37,7 @@ class GetAccountUseCaseTest {
         )
     private val tx = DirectTransactionRunner()
     private val useCase = GetAccountUseCase(accounts, entries, types, tx)
+    private val owner = Caller.Customer(customerId)
 
     private fun entry(
         sequence: Long,
@@ -58,7 +60,7 @@ class GetAccountUseCaseTest {
     fun `standard account without entries has zero balance and the overdraft limit as available balance`() {
         accounts.insert(account, "open-key-1")
 
-        val view = useCase.execute(accountId)
+        val view = useCase.execute(accountId, owner)
 
         assertThat(view).isEqualTo(
             AccountView(account, Balance(0), OverdraftLimit(50000), AvailableBalance(50000)),
@@ -71,7 +73,7 @@ class GetAccountUseCaseTest {
         entries.insert(entry(1, EntryKind.CREDIT, 10000, 10000))
         entries.insert(entry(2, EntryKind.DEBIT, 30000, -20000))
 
-        val view = useCase.execute(accountId)
+        val view = useCase.execute(accountId, owner)
 
         assertThat(view).isEqualTo(
             AccountView(account, Balance(-20000), OverdraftLimit(50000), AvailableBalance(30000)),
@@ -84,7 +86,7 @@ class GetAccountUseCaseTest {
         val log = CallLog()
         val tracked = GetAccountUseCase(log.accounts(accounts), log.entries(entries), log.types(types), log.transactions(tx))
 
-        tracked.execute(accountId)
+        tracked.execute(accountId, owner)
 
         assertThat(log.calls).containsExactly(
             "begin read-only",
@@ -97,8 +99,42 @@ class GetAccountUseCaseTest {
     }
 
     @Test
+    fun `the account of another customer fails with account not found, so its existence is not revealed`() {
+        accounts.insert(account, "open-key-1")
+        val stranger = Caller.Customer(UUID.fromString("0199a0b0-0000-7000-8000-0000000000c2"))
+
+        assertThatThrownBy { useCase.execute(accountId, stranger) }
+            .isInstanceOfSatisfying(AccountNotFoundException::class.java) {
+                assertThat(it.accountId).isEqualTo(accountId)
+            }
+    }
+
+    @Test
+    fun `an admin reads the account of any customer`() {
+        accounts.insert(account, "open-key-1")
+
+        val view = useCase.execute(accountId, Caller.Admin(UUID.fromString("0199a0b0-0000-7000-8000-0000000000ad")))
+
+        assertThat(view.account).isEqualTo(account)
+    }
+
+    @Test
+    fun `an admin who is the customer reads its own account`() {
+        accounts.insert(account, "open-key-1")
+
+        assertThat(useCase.execute(accountId, Caller.Admin(customerId)).account).isEqualTo(account)
+    }
+
+    @Test
+    fun `a service reads any account, with its customer id`() {
+        accounts.insert(account, "open-key-1")
+
+        assertThat(useCase.execute(accountId, Caller.Service).account.customerId).isEqualTo(customerId)
+    }
+
+    @Test
     fun `unknown account fails with account not found`() {
-        assertThatThrownBy { useCase.execute(accountId) }
+        assertThatThrownBy { useCase.execute(accountId, owner) }
             .isInstanceOfSatisfying(AccountNotFoundException::class.java) {
                 assertThat(it.accountId).isEqualTo(accountId)
             }

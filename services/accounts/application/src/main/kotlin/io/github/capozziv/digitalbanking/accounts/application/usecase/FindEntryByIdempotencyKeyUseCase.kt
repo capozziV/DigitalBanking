@@ -4,6 +4,7 @@ import io.github.capozziv.digitalbanking.accounts.application.AccountNotFoundExc
 import io.github.capozziv.digitalbanking.accounts.application.port.AccountRepository
 import io.github.capozziv.digitalbanking.accounts.application.port.LedgerEntryRepository
 import io.github.capozziv.digitalbanking.accounts.domain.LedgerEntry
+import io.github.capozziv.digitalbanking.security.Caller
 import java.util.UUID
 
 /**
@@ -14,12 +15,17 @@ class FindEntryByIdempotencyKeyUseCase(
     private val accounts: AccountRepository,
     private val entries: LedgerEntryRepository,
 ) {
-    /** The entry, or null when the key was never recorded on this account. */
+    /**
+     * The entry, or null when the key was never recorded on this account. Fails with [AccountNotFoundException]
+     * also when [caller] may not read the account (see [requireCanRead]).
+     */
     fun execute(
         accountId: UUID,
         key: String,
+        caller: Caller,
     ): LedgerEntry? {
-        accounts.findById(accountId) ?: throw AccountNotFoundException(accountId)
+        val account = accounts.findById(accountId) ?: throw AccountNotFoundException(accountId)
+        caller.requireCanRead(account)
         return entries.findByIdempotencyKey(accountId, key)
     }
 }
