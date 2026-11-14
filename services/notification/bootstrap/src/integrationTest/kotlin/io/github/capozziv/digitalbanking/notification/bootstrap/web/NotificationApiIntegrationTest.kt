@@ -3,6 +3,7 @@ package io.github.capozziv.digitalbanking.notification.bootstrap.web
 import io.github.capozziv.digitalbanking.notification.application.port.NotificationRepository
 import io.github.capozziv.digitalbanking.notification.bootstrap.persistence.aNotification
 import io.github.capozziv.digitalbanking.notification.domain.Notification
+import io.github.capozziv.digitalbanking.testing.security.JwtTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -25,6 +26,20 @@ class NotificationApiIntegrationTest : NotificationWebIntegrationTest() {
 
     private val customer = UUID.randomUUID()
 
+    /** As [customer] by default; the access rules are in [NotificationAccessIntegrationTest]. */
+    private fun get(
+        path: String,
+        headers: Map<String, String> = emptyMap(),
+        bearer: String = JwtTestSupport.customerToken(customer),
+    ) = api.get(path, headers, bearer)
+
+    private fun post(
+        path: String,
+        body: String,
+        headers: Map<String, String> = emptyMap(),
+        bearer: String = JwtTestSupport.customerToken(customer),
+    ) = api.post(path, body, headers, bearer)
+
     @BeforeEach
     fun cleanTables() {
         ownerJdbc.sql("delete from notifications").update()
@@ -32,7 +47,7 @@ class NotificationApiIntegrationTest : NotificationWebIntegrationTest() {
 
     @Test
     fun `a customer without notifications gets an empty page`() {
-        val response = api.get("/notifications?customerId=$customer")
+        val response = get("/notifications")
 
         assertThat(response.status).describedAs(response.rawBody).isEqualTo(200)
         assertThat(response.body!!.get("items").size()).isZero()
@@ -44,7 +59,7 @@ class NotificationApiIntegrationTest : NotificationWebIntegrationTest() {
     fun `the page has 20 notifications, newest first, and the cursor leads to the rest`() {
         val saved = seed(customer, 25)
 
-        val first = api.get("/notifications?customerId=$customer")
+        val first = get("/notifications")
 
         assertThat(first.status).describedAs(first.rawBody).isEqualTo(200)
         assertThat(ids(first)).isEqualTo(saved.take(20).map { it.id.toString() })
@@ -52,7 +67,7 @@ class NotificationApiIntegrationTest : NotificationWebIntegrationTest() {
         val cursor = first.body.get("nextCursor").asString()
         assertThat(cursor).isNotBlank()
 
-        val second = api.get("/notifications?customerId=$customer&cursor=$cursor")
+        val second = get("/notifications?cursor=$cursor")
 
         assertThat(second.status).describedAs(second.rawBody).isEqualTo(200)
         assertThat(ids(second)).isEqualTo(saved.drop(20).map { it.id.toString() })
@@ -64,8 +79,7 @@ class NotificationApiIntegrationTest : NotificationWebIntegrationTest() {
         val notification = seed(customer, 1).single()
 
         val item =
-            api
-                .get("/notifications?customerId=$customer")
+            get("/notifications")
                 .body!!
                 .get("items")
                 .get(0)
@@ -84,8 +98,7 @@ class NotificationApiIntegrationTest : NotificationWebIntegrationTest() {
         repository.saveAll(listOf(aNotification(customerId = customer, data = mapOf("amountCents" to 250_000L))))
 
         val data =
-            api
-                .get("/notifications?customerId=$customer")
+            get("/notifications")
                 .body!!
                 .get("items")
                 .get(0)
@@ -101,19 +114,18 @@ class NotificationApiIntegrationTest : NotificationWebIntegrationTest() {
         val anchor = saved[2]
         val other = seed(UUID.randomUUID(), 1).single()
 
-        val first = api.post("/notifications/read", read(customer, anchor.id))
+        val first = post("/notifications/read", read(anchor.id))
 
         assertThat(first.status).describedAs(first.rawBody).isEqualTo(200)
         assertThat(first.body!!.get("marked").asInt()).isEqualTo(3)
         assertThat(
-            api
-                .get("/notifications?customerId=$customer")
+            get("/notifications")
                 .body!!
                 .get("unreadCount")
                 .asLong(),
         ).isEqualTo(2)
 
-        val repeated = api.post("/notifications/read", read(customer, anchor.id))
+        val repeated = post("/notifications/read", read(anchor.id))
 
         assertThat(repeated.status).isEqualTo(200)
         assertThat(repeated.body!!.get("marked").asInt()).isZero()
@@ -125,7 +137,7 @@ class NotificationApiIntegrationTest : NotificationWebIntegrationTest() {
         val mine = seed(customer, 2)
         val foreign = seed(UUID.randomUUID(), 1).single()
 
-        val response = api.post("/notifications/read", read(customer, foreign.id))
+        val response = post("/notifications/read", read(foreign.id))
 
         assertProblem(response, 404, "notification-not-found")
         assertThat(repository.find(foreign.id)!!.readAt).isNull()
@@ -134,20 +146,15 @@ class NotificationApiIntegrationTest : NotificationWebIntegrationTest() {
 
     @Test
     fun `an upTo that does not exist is 404 notification-not-found`() {
-        assertProblem(api.post("/notifications/read", read(customer, UUID.randomUUID())), 404, "notification-not-found")
+        assertProblem(post("/notifications/read", read(UUID.randomUUID())), 404, "notification-not-found")
     }
 
     @Test
     fun `a customerId that is not a UUID is 400 validation-error`() {
-        val response = api.get("/notifications?customerId=abc")
+        val response = get("/notifications?customerId=abc", bearer = JwtTestSupport.adminToken(UUID.randomUUID()))
 
         assertProblem(response, 400, "validation-error")
         assertThat(response.errorFields()).containsExactly("customerId")
-    }
-
-    @Test
-    fun `a missing customerId is 400 validation-error`() {
-        assertProblem(api.get("/notifications"), 400, "validation-error")
     }
 
     @Test
@@ -160,7 +167,7 @@ class NotificationApiIntegrationTest : NotificationWebIntegrationTest() {
         val threeParts = encoded("2026-10-28T12:00:00Z|${UUID.randomUUID()}|extra")
 
         for (cursor in listOf(notDecodable, notAnInstant, notAUuid, threeParts)) {
-            val response = api.get("/notifications?customerId=$customer&cursor=$cursor")
+            val response = get("/notifications?cursor=$cursor")
 
             assertProblem(response, 400, "validation-error")
             assertThat(response.errorFields()).describedAs(cursor).containsExactly("cursor")
@@ -168,17 +175,17 @@ class NotificationApiIntegrationTest : NotificationWebIntegrationTest() {
     }
 
     @Test
-    fun `the read body must carry a customerId and an upTo that are UUIDs`() {
-        assertProblem(api.post("/notifications/read", """{"customerId":"abc","upTo":"${UUID.randomUUID()}"}"""), 400, "validation-error")
-        assertProblem(api.post("/notifications/read", """{"customerId":"$customer"}"""), 400, "validation-error")
-        assertProblem(api.post("/notifications/read", "{"), 400, "validation-error")
+    fun `the read body must carry an upTo that is a UUID`() {
+        assertProblem(post("/notifications/read", """{"upTo":"abc"}"""), 400, "validation-error")
+        assertProblem(post("/notifications/read", """{}"""), 400, "validation-error")
+        assertProblem(post("/notifications/read", "{"), 400, "validation-error")
     }
 
     @Test
     fun `X-Correlation-Id is returned as received when safe, and generated otherwise`() {
-        val received = api.get("/notifications?customerId=$customer", mapOf("X-Correlation-Id" to "abc-123"))
-        val generated = api.get("/notifications?customerId=$customer")
-        val unsafe = api.get("/notifications?customerId=$customer", mapOf("X-Correlation-Id" to "bad id!"))
+        val received = get("/notifications", mapOf("X-Correlation-Id" to "abc-123"))
+        val generated = get("/notifications")
+        val unsafe = get("/notifications", mapOf("X-Correlation-Id" to "bad id!"))
 
         assertThat(received.header("X-Correlation-Id")).isEqualTo("abc-123")
         assertThat(UUID.fromString(generated.header("X-Correlation-Id"))).isNotNull()
@@ -187,7 +194,7 @@ class NotificationApiIntegrationTest : NotificationWebIntegrationTest() {
 
     @Test
     fun `an error response also carries the correlation id`() {
-        val response = api.post("/notifications/read", read(customer, UUID.randomUUID()), mapOf("X-Correlation-Id" to "trace-1"))
+        val response = post("/notifications/read", read(UUID.randomUUID()), mapOf("X-Correlation-Id" to "trace-1"))
 
         assertThat(response.header("X-Correlation-Id")).isEqualTo("trace-1")
     }
@@ -206,8 +213,5 @@ class NotificationApiIntegrationTest : NotificationWebIntegrationTest() {
     private fun ids(response: ApiResponse): List<String> =
         response.body!!.get("items").let { items -> (0 until items.size()).map { items.get(it).get("id").asString() } }
 
-    private fun read(
-        customerId: UUID,
-        upTo: UUID,
-    ) = """{"customerId":"$customerId","upTo":"$upTo"}"""
+    private fun read(upTo: UUID) = """{"upTo":"$upTo"}"""
 }

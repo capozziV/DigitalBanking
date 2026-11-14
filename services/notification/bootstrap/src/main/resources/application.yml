@@ -16,6 +16,11 @@ spring:
     password: ${NOTIFICATION_DB_OWNER_PASSWORD:notification_owner}
     placeholders:
       appUser: ${NOTIFICATION_DB_USER:notification_app}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${NOTIFICATION_JWT_ISSUER_URI:http://localhost:8090/default}
   cloud:
     aws:
       # Like the outbox relays: a blank endpoint is the real AWS endpoint of the region with the AWS default
@@ -25,6 +30,11 @@ spring:
         static: ${NOTIFICATION_AWS_REGION:us-east-1}
       sqs:
         endpoint: ${NOTIFICATION_AWS_ENDPOINT:}
+
+digitalbanking:
+  security:
+    # Claim of the token that lists the user's groups ("admin" makes an admin); cognito:groups on AWS.
+    groups-claim: ${NOTIFICATION_JWT_GROUPS_CLAIM:groups}
 
 notification:
   queues:
@@ -37,10 +47,15 @@ notification:
     refresh-interval: ${NOTIFICATION_DLQ_METRICS_REFRESH_INTERVAL:30s}
 
 management:
+  endpoint:
+    health:
+      # Only an admin sees the details; /actuator/health itself stays open (liveness for compose and the load balancer).
+      show-details: when-authorized
+      roles: ADMIN
   endpoints:
     web:
       exposure:
-        # notification.dlq.messages is read from /actuator/metrics.
+        # notification.dlq.messages is read from /actuator/metrics (admin only).
         include: health,metrics
 
 logging:

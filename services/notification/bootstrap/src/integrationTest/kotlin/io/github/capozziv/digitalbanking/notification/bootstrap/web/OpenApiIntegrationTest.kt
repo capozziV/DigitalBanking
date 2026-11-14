@@ -26,7 +26,7 @@ class OpenApiIntegrationTest : NotificationWebIntegrationTest() {
         val list = operation("GET /notifications")
 
         val parameters = list.get("parameters").associateBy { it.get("name").asString() }
-        assertThat(parameters.getValue("customerId").get("required").asBoolean()).isTrue()
+        assertThat(parameters.getValue("customerId").get("required").asBoolean()).isFalse()
         assertThat(parameters.getValue("cursor").get("required").asBoolean()).isFalse()
         assertThat(
             list
@@ -62,7 +62,7 @@ class OpenApiIntegrationTest : NotificationWebIntegrationTest() {
         assertThat(schemas.get("NotificationPageDTO").get("properties").propertyNames()).contains("items", "unreadCount", "nextCursor")
         assertThat(schemas.get("NotificationDTO").get("properties").propertyNames())
             .contains("id", "kind", "title", "body", "data", "createdAt", "readAt")
-        assertThat(schemas.get("MarkNotificationsReadDTO").get("properties").propertyNames()).contains("customerId", "upTo")
+        assertThat(schemas.get("MarkNotificationsReadDTO").get("properties").propertyNames()).containsExactly("upTo")
     }
 
     private fun operations(): List<Pair<String, JsonNode>> {

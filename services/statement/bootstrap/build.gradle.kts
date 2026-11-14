@@ -24,6 +24,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 
     integrationTestImplementation(project(":libs:testing-localstack"))
+    integrationTestImplementation(project(":libs:testing-security"))
     integrationTestImplementation(project(":libs:testing-redis"))
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-webmvc")
     integrationTestImplementation(libs.testcontainers.junit.jupiter)

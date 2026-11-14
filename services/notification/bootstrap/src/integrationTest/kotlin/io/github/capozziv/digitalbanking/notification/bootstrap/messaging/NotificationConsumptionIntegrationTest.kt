@@ -5,6 +5,7 @@ import io.github.capozziv.digitalbanking.notification.bootstrap.NotificationInte
 import io.github.capozziv.digitalbanking.notification.bootstrap.NotificationTestPropertiesSupport
 import io.github.capozziv.digitalbanking.notification.bootstrap.web.ApiClient
 import io.github.capozziv.digitalbanking.testing.localstack.LocalStackTestSupport
+import io.github.capozziv.digitalbanking.testing.security.JwtTestSupport
 import io.micrometer.core.instrument.MeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.awaitility.Awaitility
@@ -16,6 +17,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.system.CapturedOutput
 import org.springframework.boot.test.system.OutputCaptureExtension
 import org.springframework.boot.test.web.server.LocalServerPort
+import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.jdbc.datasource.DriverManagerDataSource
 import org.springframework.test.annotation.DirtiesContext
@@ -40,6 +42,7 @@ import java.util.UUID
 @SpringBootTest(classes = [NotificationApplication::class], webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @ExtendWith(OutputCaptureExtension::class)
+@Import(JwtTestSupport.DecoderConfiguration::class)
 class NotificationConsumptionIntegrationTest {
     @Autowired
     private lateinit var meterRegistry: MeterRegistry
@@ -135,7 +138,10 @@ class NotificationConsumptionIntegrationTest {
 
     @Test
     fun `the DLQ gauge is exposed by the metrics endpoint with the queue tag`() {
-        val response = ApiClient(port).get("/actuator/metrics/notification.dlq.messages")
+        val response =
+            ApiClient(
+                port,
+            ).get("/actuator/metrics/notification.dlq.messages", bearer = JwtTestSupport.adminToken(UUID.randomUUID()))
 
         assertThat(response.status).describedAs(response.rawBody).isEqualTo(200)
         val tags = response.body!!.get("availableTags")
