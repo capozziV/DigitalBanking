@@ -43,10 +43,10 @@ class JdbcTransferRepository(
                 """
                 insert into transfer (id, source_account_id, destination_account_id, amount, description, idempotency_key,
                                       status, step, failure_reason, deadline_at, next_attempt_at, attempts, correlation_id,
-                                      created_at, updated_at, limit_day, limit_reserved)
+                                      created_at, updated_at, limit_day, limit_reserved, source_customer_id)
                 values (:id, :source, :destination, :amount, :description, :key,
                         :status, :step, :failureReason, :deadline, :nextAttemptAt, :attempts, :correlationId,
-                        :createdAt, :updatedAt, :limitDay, :limitReserved)
+                        :createdAt, :updatedAt, :limitDay, :limitReserved, :sourceCustomer)
                 on conflict (idempotency_key) do nothing
                 """.trimIndent(),
             ).param("id", transfer.id)
@@ -66,6 +66,7 @@ class JdbcTransferRepository(
             .param("updatedAt", transfer.updatedAt.utc())
             .param("limitDay", transfer.limitDay)
             .param("limitReserved", transfer.limitReserved)
+            .param("sourceCustomer", transfer.sourceCustomerId)
             .update() == 1
 
     override fun tryAcquireLease(
@@ -159,7 +160,7 @@ class JdbcTransferRepository(
     private companion object {
         const val COLUMNS =
             "id, source_account_id, destination_account_id, amount, description, idempotency_key, step, failure_reason, " +
-                "deadline_at, attempts, correlation_id, created_at, updated_at, limit_day, limit_reserved"
+                "deadline_at, attempts, correlation_id, created_at, updated_at, limit_day, limit_reserved, source_customer_id"
 
         val ROW_MAPPER =
             RowMapper { rs, _ ->
@@ -179,6 +180,7 @@ class JdbcTransferRepository(
                     updatedAt = rs.getObject("updated_at", OffsetDateTime::class.java).toInstant(),
                     limitDay = rs.getObject("limit_day", LocalDate::class.java),
                     limitReserved = rs.getBoolean("limit_reserved"),
+                    sourceCustomerId = rs.getObject("source_customer_id", UUID::class.java),
                 )
             }
     }

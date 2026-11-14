@@ -9,18 +9,23 @@ import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
 import com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo
 import com.github.tomakehurst.wiremock.stubbing.Scenario
 import com.github.tomakehurst.wiremock.verification.LoggedRequest
+import io.github.capozziv.digitalbanking.transfers.bootstrap.TransfersIntegrationTest
 import java.util.UUID
 
 /** WireMock answers of `accounts` shared by the saga integration tests. */
 class AccountsStubs(
     private val server: WireMockServer,
 ) {
-    fun accountExists(id: UUID) {
+    /** The account [id] exists and belongs to [customerId] (by default the customer of the API client's token). */
+    fun accountExists(
+        id: UUID,
+        customerId: UUID = TransfersIntegrationTest.CUSTOMER_ID,
+    ) {
         server.stubFor(
             get(urlEqualTo("/accounts/$id")).willReturn(
                 json(
                     200,
-                    """{"id":"$id","customerId":"${UUID.randomUUID()}","type":"FREE","balance":0,"overdraftLimit":0,"availableBalance":0}""",
+                    """{"id":"$id","customerId":"$customerId","type":"FREE","balance":0,"overdraftLimit":0,"availableBalance":0}""",
                 ),
             ),
         )

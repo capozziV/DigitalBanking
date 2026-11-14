@@ -3,6 +3,7 @@ package io.github.capozziv.digitalbanking.transfers.bootstrap
 import io.github.capozziv.digitalbanking.transfers.application.RetryBackoff
 import io.github.capozziv.digitalbanking.transfers.application.port.AccountsGateway
 import io.github.capozziv.digitalbanking.transfers.application.port.CorrelationContext
+import io.github.capozziv.digitalbanking.transfers.application.port.CustomerGateway
 import io.github.capozziv.digitalbanking.transfers.application.port.DailyLimitGateway
 import io.github.capozziv.digitalbanking.transfers.application.port.EventOutbox
 import io.github.capozziv.digitalbanking.transfers.application.port.IdGenerator
@@ -55,11 +56,12 @@ class UseCaseConfiguration {
     fun requestTransferUseCase(
         transfers: TransferRepository,
         accounts: AccountsGateway,
+        customers: CustomerGateway,
         runSaga: RunTransferSagaUseCase,
         ids: IdGenerator,
         settings: SagaSettings,
         clock: Clock,
-    ) = RequestTransferUseCase(transfers, accounts, runSaga, ids, settings, clock)
+    ) = RequestTransferUseCase(transfers, accounts, customers, runSaga, ids, settings, clock)
 
     @Bean
     fun getTransferUseCase(transfers: TransferRepository) = GetTransferUseCase(transfers)
@@ -67,8 +69,9 @@ class UseCaseConfiguration {
     @Bean
     fun getDailyLimitUseCase(
         dailyLimits: DailyLimitGateway,
+        accounts: AccountsGateway,
         clock: Clock,
-    ) = GetDailyLimitUseCase(dailyLimits, clock)
+    ) = GetDailyLimitUseCase(dailyLimits, accounts, clock)
 
     /** Every saga run of the scheduler takes the lease under a new owner (see [SchedulerLeaseOwners]). */
     @Bean

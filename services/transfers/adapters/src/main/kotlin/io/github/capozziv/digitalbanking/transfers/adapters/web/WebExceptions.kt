@@ -23,7 +23,21 @@ class TransferAccountNotFoundException(
     val accountId: UUID,
 ) : RuntimeException("account $accountId not found")
 
+/**
+ * The account does not exist, or it is not the caller's: answered with 404, the same in both cases, so the account of
+ * another customer does not reveal it exists. Used for the source of a transfer and for the daily limit.
+ */
+class OwnAccountNotFoundException(
+    val accountId: UUID,
+) : RuntimeException("account $accountId not found")
+
 class AccountsUnavailableException : RuntimeException("accounts is unavailable")
+
+class CustomerNotFoundException : RuntimeException("the customer that owns the source account is not registered")
+
+class CustomerBlockedException : RuntimeException("the customer that owns the source account is blocked")
+
+class CustomersUnavailableException : RuntimeException("customer is unavailable")
 
 /** The transfer ended in `FAILED`: the request is answered with 422, on the first call and on every repetition. */
 class TransferFailedException(

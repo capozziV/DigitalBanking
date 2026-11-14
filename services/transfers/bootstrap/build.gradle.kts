@@ -6,6 +6,8 @@ dependencies {
     implementation(project(":services:transfers:application"))
     implementation(project(":libs:outbox"))
     implementation(project(":libs:outbox-relay"))
+    // SagaTimeoutsValidator adds the worst case of the machine token to the call budget.
+    implementation(project(":libs:security"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
@@ -16,6 +18,7 @@ dependencies {
     integrationTestImplementation(testFixtures(project(":libs:outbox")))
     integrationTestImplementation(project(":libs:testing-localstack"))
     integrationTestImplementation(project(":libs:testing-redis"))
+    integrationTestImplementation(project(":libs:testing-security"))
     integrationTestImplementation("org.awaitility:awaitility") // version managed by the Spring Boot BOM
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-webmvc")
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-jdbc")

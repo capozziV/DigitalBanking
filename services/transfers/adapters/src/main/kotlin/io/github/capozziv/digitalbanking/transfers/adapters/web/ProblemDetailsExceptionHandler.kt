@@ -45,6 +45,40 @@ class ProblemDetailsExceptionHandler : ResponseEntityExceptionHandler() {
             .also { it.setProperty("accountId", e.accountId) }
 
     @ExceptionHandler
+    fun handle(e: OwnAccountNotFoundException) =
+        problem(HttpStatus.NOT_FOUND, "account-not-found", "Account not found", e.message)
+            .also { it.setProperty("accountId", e.accountId) }
+
+    @ExceptionHandler
+    fun handle(e: CustomerNotFoundException) =
+        problem(
+            HttpStatus.UNPROCESSABLE_CONTENT,
+            "customer-not-found",
+            "Customer not found",
+            "The customer that owns the source account is not registered",
+        )
+
+    @ExceptionHandler
+    fun handle(e: CustomerBlockedException) =
+        problem(
+            HttpStatus.UNPROCESSABLE_CONTENT,
+            "customer-blocked",
+            "Customer blocked",
+            "The customer that owns the source account is blocked and cannot transfer",
+        )
+
+    @ExceptionHandler
+    fun handle(e: CustomersUnavailableException): ResponseEntity<ProblemDetail> =
+        retryLater(
+            problem(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "customers-unavailable",
+                "Customers unavailable",
+                "The customer service did not answer; retry shortly",
+            ),
+        )
+
+    @ExceptionHandler
     fun handle(e: IdempotencyKeyReusedException) =
         problem(
             HttpStatus.UNPROCESSABLE_CONTENT,
@@ -77,16 +111,18 @@ class ProblemDetailsExceptionHandler : ResponseEntityExceptionHandler() {
     }
 
     @ExceptionHandler
-    fun handle(e: AccountsUnavailableException): ResponseEntity<ProblemDetail> {
-        val body =
+    fun handle(e: AccountsUnavailableException): ResponseEntity<ProblemDetail> =
+        retryLater(
             problem(
                 HttpStatus.SERVICE_UNAVAILABLE,
                 "accounts-unavailable",
                 "Accounts unavailable",
                 "The accounts service did not answer; retry shortly",
-            )
-        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).header(HttpHeaders.RETRY_AFTER, "1").body(body)
-    }
+            ),
+        )
+
+    private fun retryLater(body: ProblemDetail): ResponseEntity<ProblemDetail> =
+        ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).header(HttpHeaders.RETRY_AFTER, "1").body(body)
 
     /** A missing Idempotency-Key gets its own type; other binding errors keep Spring's Problem Details. */
     override fun handleServletRequestBindingException(
