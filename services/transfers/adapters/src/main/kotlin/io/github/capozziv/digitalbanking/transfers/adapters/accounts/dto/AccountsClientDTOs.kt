@@ -15,10 +15,11 @@ data class AccountsEntryResponseDTO(
     val id: UUID,
 )
 
-/** The part of an account the client checks on a lookup. */
+/** The part of an account the client reads on a lookup: who owns it. */
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class AccountsAccountResponseDTO(
     val id: UUID,
+    val customerId: UUID,
 )
 
 /** Problem Details (RFC 9457) as sent by `accounts`; only `type` matters here. */

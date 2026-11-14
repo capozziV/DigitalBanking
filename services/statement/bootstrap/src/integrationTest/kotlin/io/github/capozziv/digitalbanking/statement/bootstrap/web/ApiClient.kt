@@ -41,13 +41,16 @@ class ApiClient(
     fun get(
         path: String,
         headers: Map<String, String> = emptyMap(),
+        bearer: String? = null,
     ): ApiResponse {
         val entity =
             client
                 .method(HttpMethod.GET)
                 .uri(path)
-                .headers { h -> headers.forEach { (k, v) -> h.add(k, v) } }
-                .retrieve()
+                .headers { h ->
+                    headers.forEach { (k, v) -> h.add(k, v) }
+                    bearer?.let { h.setBearerAuth(it) }
+                }.retrieve()
                 .toEntity(String::class.java)
         val raw = entity.body
         return ApiResponse(

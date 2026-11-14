@@ -2,7 +2,9 @@ package io.github.capozziv.digitalbanking.statement.bootstrap
 
 import io.github.capozziv.digitalbanking.testing.localstack.LocalStackTestSupport
 import io.github.capozziv.digitalbanking.testing.redis.RedisTestSupport
+import io.github.capozziv.digitalbanking.testing.security.JwtTestSupport
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.context.annotation.Import
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.TestPropertySource
@@ -28,6 +30,8 @@ import software.amazon.awssdk.services.sqs.model.QueueAttributeName
  * random account ids.
  */
 @SpringBootTest
+// The decoder of the tests replaces the one built from the issuer URI, so no identity server has to be up.
+@Import(JwtTestSupport.DecoderConfiguration::class)
 @TestPropertySource(
     properties = [
         // The DLQ gauge refreshes once at startup; no further reads during the tests.

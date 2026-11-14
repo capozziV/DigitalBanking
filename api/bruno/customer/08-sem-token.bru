@@ -1,0 +1,18 @@
+meta {
+  name: Sem token
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/customers/me
+  body: none
+  auth: none
+}
+
+tests {
+  test("401 unauthorized", function () {
+    expect(res.status).to.equal(401);
+    expect(res.body.type).to.contain("unauthorized");
+  });
+}

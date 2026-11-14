@@ -14,9 +14,12 @@
 - **Localmente**, nginx faz o roteamento por caminho.
 - **Autenticação local** (decidido em 2026-11-12): `mock-oauth2-server` no docker-compose emite JWT com JWKS, e os serviços validam o token do mesmo jeito que validam o do Cognito na AWS (só muda o emissor configurado).
 
+- **Terraform da borda** (etapa 7): módulos `identity` (Cognito) e `edge` (API Gateway, autorizador JWT, VPC Link) escritos e validados no CI (`fmt -check`, `validate`), **sem `apply`**; o deploy fica na etapa 8, depois do #146.
+- Identidade e autorização dos serviços: [ADR 0020](0020-identidade-e-autorizacao.md).
+
 ## Consequências
 - Positivas: um serviço a menos para manter; autenticação na borda sem código próprio; defesa em profundidade com validação JWT nos serviços.
-- Negativas: comportamento local (nginx) difere da AWS; Cognito no LocalStack é recurso pago, então o ambiente local usa o `mock-oauth2-server` e não reproduz o Cognito em si, só a validação do JWT.
+- Negativas: comportamento local (nginx) difere da AWS; Cognito no LocalStack é recurso pago, então o ambiente local usa o `mock-oauth2-server` e não reproduz o Cognito em si, só a validação do JWT. O Terraform da borda só é exercitado na AWS na etapa 8.
 
 ## Alternativas consideradas
 - **Gateway em Spring:** descartado em favor do API Gateway HTTP API, que já entrega roteamento e autorizador JWT gerenciados.

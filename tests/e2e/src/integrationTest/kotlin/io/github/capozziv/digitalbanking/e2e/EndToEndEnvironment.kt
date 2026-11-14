@@ -2,6 +2,7 @@ package io.github.capozziv.digitalbanking.e2e
 
 import io.github.capozziv.digitalbanking.testing.localstack.LocalStackTestSupport
 import org.testcontainers.containers.GenericContainer
+import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.localstack.LocalStackContainer
 import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.MountableFile
@@ -17,10 +18,13 @@ import java.time.Duration
 import java.time.Instant
 
 /**
- * Everything the end-to-end tests run against, as in the local environment: one Redis (the `statement` first-page cache), one PostgreSQL with the `accounts`,
- * `transfers` and `notification` databases and their owner/app users (created by the compose init script itself),
- * LocalStack with the topics, inspection queues, notification queues and statement queue and table of the compose init scripts, the four services
- * as `java -jar` processes, and [AccountsProxy] between `transfers` and `accounts`.
+ * Everything the end-to-end tests run against, as in the local environment: one Redis (the `statement` first-page cache
+ * and the `transfers` daily limit), one PostgreSQL with the `accounts`, `transfers`, `notification` and `customer`
+ * databases and their owner/app users (created by the compose init script itself), LocalStack with the topics,
+ * inspection queues, notification queues and statement queue and table of the compose init scripts, the
+ * `mock-oauth2-server` with the issuer config of the compose (every service validates its tokens, and `accounts` and
+ * `transfers` get their machine tokens from it), the five services as `java -jar` processes, and [AccountsProxy]
+ * between `transfers` and `accounts`. The API clients get their tokens from [tokens].
  *
  * The saga runs with short times (see [SAGA_ARGUMENTS]) so the deadline and lease scenarios take seconds, not minutes.
  */
@@ -34,6 +38,13 @@ class EndToEndEnvironment : AutoCloseable {
                 }
             }
     private val redis: GenericContainer<*> = GenericContainer<Nothing>(REDIS_IMAGE).withExposedPorts(REDIS_PORT)
+    private val oauth: GenericContainer<*> =
+        GenericContainer<Nothing>(MOCK_OAUTH2_IMAGE).apply {
+            withExposedPorts(MOCK_OAUTH2_PORT)
+            withEnv("JSON_CONFIG_PATH", MOCK_OAUTH2_CONFIG)
+            withCopyFileToContainer(MountableFile.forHostPath(systemPath("e2e.oauth-config")), MOCK_OAUTH2_CONFIG)
+            waitingFor(Wait.forHttp("/default/.well-known/openid-configuration").forStatusCode(200))
+        }
     private lateinit var localStack: LocalStackContainer
     private lateinit var sqs: SqsClient
 
@@ -44,6 +55,12 @@ class EndToEndEnvironment : AutoCloseable {
     lateinit var notification: ServiceProcess
         private set
     lateinit var statement: ServiceProcess
+        private set
+    lateinit var customer: ServiceProcess
+        private set
+    lateinit var tokens: TokenIssuer
+        private set
+    lateinit var customerApi: CustomerApiClient
         private set
     lateinit var proxy: AccountsProxy
         private set
@@ -66,7 +83,8 @@ class EndToEndEnvironment : AutoCloseable {
         listOfNotNull(if (::accounts.isInitialized) accounts else null) +
             listOfNotNull(if (::transfers.isInitialized) transfers else null) +
             listOfNotNull(if (::notification.isInitialized) notification else null) +
-            listOfNotNull(if (::statement.isInitialized) statement else null)
+            listOfNotNull(if (::statement.isInitialized) statement else null) +
+            listOfNotNull(if (::customer.isInitialized) customer else null)
 
     /** Starts LocalStack first: without the token the whole class is skipped locally (and fails on CI) right away. */
     fun start() {
@@ -81,6 +99,8 @@ class EndToEndEnvironment : AutoCloseable {
         awaitLocalStackInit()
         postgres.start()
         redis.start()
+        oauth.start()
+        tokens = TokenIssuer(issuer())
 
         sqs = LocalStackTestSupport.sqsClient(localStack)
         transferEvents = TransferEventsQueue(sqs, sqs.getQueueUrl { it.queueName(TRANSFERS_INSPECTION_QUEUE) }.queueUrl())
@@ -89,6 +109,8 @@ class EndToEndEnvironment : AutoCloseable {
             TransfersDatabase(jdbcUrl("transfers"), "transfers_owner", DATABASE_PASSWORDS.getValue("TRANSFERS_DB_OWNER_PASSWORD"))
 
         val logDir = systemPath("e2e.log-dir")
+        customer =
+            ServiceProcess("customer", systemPath("e2e.customer-jar"), customerEnvironment(), emptyList(), logDir)
         accounts =
             ServiceProcess("accounts", systemPath("e2e.accounts-jar"), accountsEnvironment(), emptyList(), logDir)
         proxy = AccountsProxy(accounts.baseUrl)
@@ -104,14 +126,16 @@ class EndToEndEnvironment : AutoCloseable {
             )
         statement =
             ServiceProcess("statement", systemPath("e2e.statement-jar"), statementEnvironment(), emptyList(), logDir)
+        customer.start()
         accounts.start()
         transfers.start()
         notification.start()
         statement.start()
-        accountsApi = AccountsApiClient(accounts.baseUrl)
-        transfersApi = TransfersApiClient(transfers.baseUrl)
-        notificationApi = NotificationApiClient(notification.baseUrl)
-        statementApi = StatementApiClient(statement.baseUrl)
+        customerApi = CustomerApiClient(customer.baseUrl, tokens)
+        accountsApi = AccountsApiClient(accounts.baseUrl, customerApi, tokens)
+        transfersApi = TransfersApiClient(transfers.baseUrl, tokens, accountsApi::ownerOf)
+        notificationApi = NotificationApiClient(notification.baseUrl, tokens)
+        statementApi = StatementApiClient(statement.baseUrl, tokens)
     }
 
     override fun close() {
@@ -121,7 +145,24 @@ class EndToEndEnvironment : AutoCloseable {
         if (::localStack.isInitialized) localStack.stop()
         postgres.stop()
         redis.stop()
+        oauth.stop()
     }
+
+    /** The issuer of every token: the services validate `iss` against it and the clients ask it for tokens. */
+    private fun issuer() = "http://${oauth.host}:${oauth.getMappedPort(MOCK_OAUTH2_PORT)}/default"
+
+    private fun customerEnvironment() =
+        mapOf(
+            "CUSTOMER_DB_URL" to jdbcUrl("customer"),
+            "CUSTOMER_DB_USER" to "customer_app",
+            "CUSTOMER_DB_PASSWORD" to DATABASE_PASSWORDS.getValue("CUSTOMER_DB_PASSWORD"),
+            "CUSTOMER_DB_OWNER_USER" to "customer_owner",
+            "CUSTOMER_DB_OWNER_PASSWORD" to DATABASE_PASSWORDS.getValue("CUSTOMER_DB_OWNER_PASSWORD"),
+            "CUSTOMER_AWS_ENDPOINT" to localStack.endpoint.toString(),
+            "CUSTOMER_AWS_REGION" to localStack.region,
+            "CUSTOMER_TOPIC_ARN" to topicArn("customer-events.fifo"),
+            "CUSTOMER_JWT_ISSUER_URI" to issuer(),
+        )
 
     private fun accountsEnvironment() =
         mapOf(
@@ -133,6 +174,9 @@ class EndToEndEnvironment : AutoCloseable {
             "ACCOUNTS_AWS_ENDPOINT" to localStack.endpoint.toString(),
             "ACCOUNTS_AWS_REGION" to localStack.region,
             "ACCOUNTS_TOPIC_ARN" to topicArn("accounts-events.fifo"),
+            "ACCOUNTS_JWT_ISSUER_URI" to issuer(),
+            "ACCOUNTS_OAUTH_TOKEN_URI" to "${issuer()}/token",
+            "ACCOUNTS_CUSTOMER_BASE_URL" to customer.baseUrl,
         )
 
     private fun transfersEnvironment() =
@@ -148,6 +192,9 @@ class EndToEndEnvironment : AutoCloseable {
             "TRANSFERS_TOPIC_ARN" to topicArn("transfers-events.fifo"),
             "TRANSFERS_REDIS_HOST" to redis.host,
             "TRANSFERS_REDIS_PORT" to redis.getMappedPort(REDIS_PORT).toString(),
+            "TRANSFERS_JWT_ISSUER_URI" to issuer(),
+            "TRANSFERS_OAUTH_TOKEN_URI" to "${issuer()}/token",
+            "TRANSFERS_CUSTOMER_BASE_URL" to customer.baseUrl,
         )
 
     private fun notificationEnvironment() =
@@ -159,6 +206,7 @@ class EndToEndEnvironment : AutoCloseable {
             "NOTIFICATION_DB_OWNER_PASSWORD" to DATABASE_PASSWORDS.getValue("NOTIFICATION_DB_OWNER_PASSWORD"),
             "NOTIFICATION_AWS_ENDPOINT" to localStack.endpoint.toString(),
             "NOTIFICATION_AWS_REGION" to localStack.region,
+            "NOTIFICATION_JWT_ISSUER_URI" to issuer(),
         )
 
     private fun statementEnvironment() =
@@ -170,6 +218,7 @@ class EndToEndEnvironment : AutoCloseable {
             // A long TTL (default 60s) makes the cache tests fail by invalidation, never by expiry. Spring relaxed binding
             // maps the variable to statement.cache.ttl.
             "STATEMENT_CACHE_TTL" to "600s",
+            "STATEMENT_JWT_ISSUER_URI" to issuer(),
         )
 
     private fun jdbcUrl(database: String) = "jdbc:postgresql://${postgres.host}:${postgres.getMappedPort(POSTGRES_PORT)}/$database"
@@ -204,7 +253,8 @@ class EndToEndEnvironment : AutoCloseable {
          *   stops and starts again inside it. The one test that waits the deadline out (the lookup path, after it) takes
          *   about a minute, still inside SAGA_FINISH_TIMEOUT of 90 s;
          * - read timeout 10 s, so a call held at the proxy is still in flight when the test acts on it;
-         * - call budget 11 s (connect 1 s + read 10 s), which must stay below the lease (validated at startup);
+         * - call budget 13 s (connect 1 s + read 10 s + 2 s of the worst case of the machine token), the minimum
+         *   SagaTimeoutsValidator accepts at startup; still well below the lease;
          * - lease 40 s: the lease test restarts `transfers` after a kill and needs it healthy before the lease ends. A
          *   restart takes 6 to 10 s unloaded; the margin (lease minus restart) was ~9.8 s with a 16 s lease and failed once on a
          *   loaded machine. At 40 s the margin is ~30 s, and the test only waits the remaining lease (well under
@@ -215,7 +265,7 @@ class EndToEndEnvironment : AutoCloseable {
             listOf(
                 "--transfers.saga.deadline=60s",
                 "--transfers.saga.lease=40s",
-                "--transfers.saga.call-budget=11s",
+                "--transfers.saga.call-budget=13s",
                 "--transfers.accounts.read-timeout=10s",
                 "--transfers.saga.retry-initial=200ms",
                 "--transfers.saga.retry-max=1s",
@@ -236,6 +286,11 @@ class EndToEndEnvironment : AutoCloseable {
         private const val POSTGRES_PORT = 5432
         private const val REDIS_IMAGE = "redis:7-alpine"
         private const val REDIS_PORT = 6379
+
+        /** Same image as the compose (`mock-oauth2-server`); change both together. */
+        private const val MOCK_OAUTH2_IMAGE = "ghcr.io/navikt/mock-oauth2-server:6.1.5"
+        private const val MOCK_OAUTH2_PORT = 8080
+        private const val MOCK_OAUTH2_CONFIG = "/config/mock-oauth2-config.json"
         private const val TRANSFERS_INSPECTION_QUEUE = "transfers-events-inspection.fifo"
         private const val EXECUTABLE = 0b111_101_101
         private val LOCALSTACK_INIT_TIMEOUT: Duration = Duration.ofSeconds(60)
@@ -251,6 +306,8 @@ class EndToEndEnvironment : AutoCloseable {
                 "TRANSFERS_DB_PASSWORD" to "transfers_app",
                 "NOTIFICATION_DB_OWNER_PASSWORD" to "notification_owner",
                 "NOTIFICATION_DB_PASSWORD" to "notification_app",
+                "CUSTOMER_DB_OWNER_PASSWORD" to "customer_owner",
+                "CUSTOMER_DB_PASSWORD" to "customer_app",
             )
 
         private fun systemPath(property: String): Path =

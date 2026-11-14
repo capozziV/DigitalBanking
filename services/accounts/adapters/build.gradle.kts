@@ -4,6 +4,8 @@ dependencies {
     implementation(project(":services:accounts:application"))
     implementation(project(":services:accounts:domain"))
     implementation(project(":libs:outbox"))
+    implementation(project(":libs:security"))
+    implementation(project(":libs:observabilidade"))
 
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-jdbc")

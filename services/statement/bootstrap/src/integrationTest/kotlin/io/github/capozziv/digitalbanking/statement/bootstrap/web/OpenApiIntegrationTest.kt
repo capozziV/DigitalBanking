@@ -11,7 +11,7 @@ class OpenApiIntegrationTest : StatementWebIntegrationTest() {
     private var port: Int = 0
 
     private val docs: JsonNode by lazy {
-        val response = ApiClient(port).get("/v3/api-docs")
+        val response = ApiClient(port).get("/v3/api-docs") // open: no token
         assertThat(response.status).describedAs(response.rawBody).isEqualTo(200)
         response.body!!
     }
@@ -48,6 +48,23 @@ class OpenApiIntegrationTest : StatementWebIntegrationTest() {
                     .get("schema")
             assertThat(schema.get("\$ref").asString()).describedAs(status).endsWith("/ProblemDetail")
         }
+    }
+
+    @Test
+    fun `the contract declares bearerAuth for every request and documents 401`() {
+        val scheme = docs.get("components").get("securitySchemes").get("bearerAuth")
+
+        assertThat(scheme.get("type").asString()).isEqualTo("http")
+        assertThat(scheme.get("scheme").asString()).isEqualTo("bearer")
+        assertThat(scheme.get("bearerFormat").asString()).isEqualTo("JWT")
+        assertThat(docs.get("security").get(0).has("bearerAuth")).isTrue()
+        assertThat(
+            statement
+                .get("responses")
+                .get("401")
+                .get("description")
+                .asString(),
+        ).contains("/problems/unauthorized")
     }
 
     @Test

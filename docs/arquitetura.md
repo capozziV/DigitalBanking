@@ -13,7 +13,7 @@
 ## Serviços
 | Serviço | Responsabilidade | Dados |
 |---|---|---|
-| customer | Cadastro e status do cliente | PostgreSQL |
+| customer | Cadastro e status do cliente (porta 8085, eventos `customer-events.fifo`) | PostgreSQL próprio |
 | accounts | Contas, ledger imutável e saldo (fonte da verdade) | PostgreSQL |
 | transfers | Saga orquestrada de transferência, idempotência, limite diário | PostgreSQL + Redis |
 | statement | Extrato para leitura (CQRS) | DynamoDB (Redis para a primeira página chega na etapa 5) |
@@ -83,7 +83,12 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 - Os serviços **também** validam o JWT (Spring Security resource server); não confiam só na borda.
 - Localmente, nginx faz o roteamento por caminho. Cognito no LocalStack é recurso pago: localmente, o `mock-oauth2-server` no docker-compose emite JWT com JWKS e os serviços o validam como validam o do Cognito.
 - Na AWS os serviços rodam no EKS e se chamam pelo DNS de Service do Kubernetes ([ADR 0019](adr/0019-runtime-na-aws-com-eks.md)). Nenhum deploy na AWS antes da derrubada automática com tempo máximo ligado e do alarme de orçamento (#146).
-- (ver [ADR 0004](adr/0004-api-gateway-http-api-na-borda.md))
+- **Identidade:** o id do cliente é o `sub` do usuário. Três chamadores: cliente, admin (grupo `admin`, claim configurável) e serviço (token de máquina por client credentials, escopo `digitalbanking/internal`). Recurso de outro cliente devolve `404`; sem token, `401`; rota de admin sem o grupo, `403`.
+- `accounts` (abrir conta) e `transfers` (criar transferência) consultam o `customer` na hora, sem cache; inexistente ou bloqueado dá `422`, `customer` fora dá `503`.
+- `401` e `403` em Problem Details; desconexão do cliente não vira `500`. `/actuator/health` aberto sem detalhes; o resto do actuator só para admin.
+- **Terraform da borda** (`infra/terraform/modules/identity` e `edge`, `envs/aws`): escrito e validado no CI, sem `apply` até a etapa 8.
+- **Bibliotecas compartilhadas** (só infraestrutura): `libs/security` (resource server, `Caller`, token de máquina), `libs/observabilidade` (filtro de correlation ID e propagação nas chamadas HTTP de saída) e `libs/testing-security` (emissor de JWT de teste).
+- (ver [ADR 0004](adr/0004-api-gateway-http-api-na-borda.md) e [ADR 0020](adr/0020-identidade-e-autorizacao.md))
 
 ### Contratos
 - Cada serviço expõe contrato OpenAPI.
@@ -95,6 +100,7 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 - Apenas correlation ID, sem tracing distribuído (sem OpenTelemetry, Jaeger ou X-Ray).
 - O ID vem do header `X-Correlation-Id` ou é gerado na entrada, vai para o MDC (logs JSON) e é propagado nas chamadas HTTP, numa coluna do outbox, no envelope do evento e nos atributos SNS/SQS (raw message delivery).
 - Até existir o BFF, o serviço que recebe a chamada gera o ID; depois, o BFF gera e os serviços reaproveitam.
+- O filtro e a propagação ficam em `libs/observabilidade`, usada por todos os serviços.
 - (ver [ADR 0006](adr/0006-observabilidade-com-correlation-id.md))
 
 ### Frontend (etapa 9, detalhar depois)

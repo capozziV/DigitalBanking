@@ -1,6 +1,8 @@
 package io.github.capozziv.digitalbanking.accounts.bootstrap
 
 import io.github.capozziv.digitalbanking.accounts.bootstrap.web.ApiClient
+import io.github.capozziv.digitalbanking.accounts.bootstrap.web.assertProblem
+import io.github.capozziv.digitalbanking.testing.security.JwtTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.web.server.LocalServerPort
@@ -128,13 +130,52 @@ class OpenApiIntegrationTest : AccountsIntegrationTest() {
     }
 
     @Test
+    fun `the contract is open, declares the bearerAuth scheme and requires it on every operation`() {
+        val anonymous = ApiClient(port, defaultToken = null).get("/v3/api-docs")
+        val scheme = docs.get("components").get("securitySchemes").get("bearerAuth")
+
+        assertThat(anonymous.status).isEqualTo(200)
+        assertThat(scheme.get("type").asString()).isEqualTo("http")
+        assertThat(scheme.get("scheme").asString()).isEqualTo("bearer")
+        assertThat(scheme.get("bearerFormat").asString()).isEqualTo("JWT")
+        assertThat(docs.get("security").single().propertyNames()).containsExactly("bearerAuth")
+    }
+
+    @Test
+    fun `every operation documents 401 unauthorized and 403 forbidden`() {
+        for ((name, operation) in operations()) {
+            val responses = operation.get("responses")
+            assertThat(responses.get("401").get("description").asString()).describedAs(name).contains("/problems/unauthorized")
+            assertThat(responses.get("403").get("description").asString()).describedAs(name).contains("/problems/forbidden")
+        }
+    }
+
+    @Test
+    fun `opening an account takes no body and documents the customer service errors`() {
+        val open = operation("POST /accounts")
+        val responses = open.get("responses")
+
+        assertThat(open.has("requestBody")).isFalse()
+        assertThat(responses.get("422").get("description").asString())
+            .contains("/problems/customer-not-found")
+            .contains("/problems/customer-blocked")
+        assertThat(responses.get("503").get("description").asString()).contains("/problems/customers-unavailable")
+        assertThat(docs.get("components").get("schemas").has("OpenAccountDTO")).isFalse()
+    }
+
+    @Test
+    fun `a route without a rule is denied, 403 forbidden even for an admin, as the contract says`() {
+        assertProblem(ApiClient(port).get("/nowhere"), 403, "forbidden")
+        assertThat(docs.get("info").get("description").asString()).contains("403 /problems/forbidden").contains("denied")
+    }
+
+    @Test
     fun `framework errors really are Problem Details without type, that is about-blank`() {
         val api = ApiClient(port)
-        val unknownRoute = api.get("/nowhere").let { it.status to it.rawBody }
         val methodNotAllowed = api.send(HttpMethod.DELETE, "/admin/account-types").let { it.status to it.rawBody }
         val unsupportedMediaType = putPlainText("/admin/account-types/FREE")
 
-        for ((expected, actual) in listOf(404 to unknownRoute, 405 to methodNotAllowed, 415 to unsupportedMediaType)) {
+        for ((expected, actual) in listOf(405 to methodNotAllowed, 415 to unsupportedMediaType)) {
             val (status, body) = actual
             assertThat(status).describedAs(body).isEqualTo(expected)
             val problem = mapper.readTree(body)
@@ -152,6 +193,7 @@ class OpenApiIntegrationTest : AccountsIntegrationTest() {
             HttpRequest
                 .newBuilder(URI.create("http://localhost:$port$path"))
                 .header("Content-Type", "text/plain")
+                .header("Authorization", "Bearer ${JwtTestSupport.adminToken(ApiClient.ADMIN_ID)}")
                 .PUT(HttpRequest.BodyPublishers.ofString("x"))
                 .build()
         val response = HttpClient.newHttpClient().use { it.send(request, HttpResponse.BodyHandlers.ofString()) }

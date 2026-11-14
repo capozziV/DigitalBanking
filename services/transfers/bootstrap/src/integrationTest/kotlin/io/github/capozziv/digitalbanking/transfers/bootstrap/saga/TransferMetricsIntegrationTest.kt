@@ -1,5 +1,6 @@
 package io.github.capozziv.digitalbanking.transfers.bootstrap.saga
 
+import io.github.capozziv.digitalbanking.testing.security.JwtTestSupport
 import io.github.capozziv.digitalbanking.transfers.application.port.TransferRepository
 import io.github.capozziv.digitalbanking.transfers.bootstrap.TransfersIntegrationTest
 import io.github.capozziv.digitalbanking.transfers.bootstrap.web.ApiClient
@@ -29,7 +30,8 @@ class TransferMetricsIntegrationTest : TransfersIntegrationTest() {
     @Autowired
     private lateinit var repository: TransferRepository
 
-    private val api by lazy { ApiClient(port) }
+    /** The metrics are for admins only. */
+    private val api by lazy { ApiClient(port, JwtTestSupport.adminToken(UUID.randomUUID())) }
 
     @BeforeEach
     fun reset() {

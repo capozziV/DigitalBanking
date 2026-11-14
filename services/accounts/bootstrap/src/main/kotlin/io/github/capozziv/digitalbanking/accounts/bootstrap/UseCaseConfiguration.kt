@@ -2,6 +2,7 @@ package io.github.capozziv.digitalbanking.accounts.bootstrap
 
 import io.github.capozziv.digitalbanking.accounts.application.port.AccountRepository
 import io.github.capozziv.digitalbanking.accounts.application.port.AccountTypeRepository
+import io.github.capozziv.digitalbanking.accounts.application.port.CustomerGateway
 import io.github.capozziv.digitalbanking.accounts.application.port.EventOutbox
 import io.github.capozziv.digitalbanking.accounts.application.port.IdGenerator
 import io.github.capozziv.digitalbanking.accounts.application.port.LedgerEntryRepository
@@ -37,7 +38,8 @@ class UseCaseConfiguration {
         outbox: EventOutbox,
         tx: TransactionRunner,
         ids: IdGenerator,
-    ) = OpenAccountUseCase(accounts, entries, types, outbox, tx, ids)
+        customers: CustomerGateway,
+    ) = OpenAccountUseCase(accounts, entries, types, outbox, tx, ids, customers)
 
     @Bean
     fun getAccountUseCase(

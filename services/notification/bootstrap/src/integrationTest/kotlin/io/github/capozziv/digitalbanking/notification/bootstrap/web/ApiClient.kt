@@ -44,8 +44,13 @@ class ApiClient(
         path: String,
         body: String? = null,
         headers: Map<String, String> = emptyMap(),
+        bearer: String? = null,
     ): ApiResponse {
-        val spec = client.method(method).uri(path).headers { h -> headers.forEach { (k, v) -> h.add(k, v) } }
+        val spec =
+            client.method(method).uri(path).headers { h ->
+                headers.forEach { (k, v) -> h.add(k, v) }
+                bearer?.let { h.setBearerAuth(it) }
+            }
         if (body != null) spec.contentType(MediaType.APPLICATION_JSON).body(body)
         val entity = spec.retrieve().toEntity(String::class.java)
         val raw = entity.body
@@ -60,13 +65,15 @@ class ApiClient(
     fun get(
         path: String,
         headers: Map<String, String> = emptyMap(),
-    ) = send(HttpMethod.GET, path, headers = headers)
+        bearer: String? = null,
+    ) = send(HttpMethod.GET, path, headers = headers, bearer = bearer)
 
     fun post(
         path: String,
         body: String,
         headers: Map<String, String> = emptyMap(),
-    ) = send(HttpMethod.POST, path, body, headers)
+        bearer: String? = null,
+    ) = send(HttpMethod.POST, path, body, headers, bearer)
 }
 
 /** Asserts a Problem Details response (RFC 9457) with the given status and type `/problems/<slug>`. */

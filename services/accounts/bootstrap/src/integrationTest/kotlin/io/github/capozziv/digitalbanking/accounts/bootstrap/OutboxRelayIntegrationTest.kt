@@ -1,6 +1,7 @@
 package io.github.capozziv.digitalbanking.accounts.bootstrap
 
 import io.github.capozziv.digitalbanking.accounts.bootstrap.web.ApiClient
+import io.github.capozziv.digitalbanking.accounts.bootstrap.web.asCustomer
 import io.github.capozziv.digitalbanking.outbox.PendingEvent
 import io.github.capozziv.digitalbanking.outbox.relay.EventPublisher
 import io.github.capozziv.digitalbanking.outbox.relay.OutboxMetrics
@@ -203,8 +204,8 @@ class OutboxRelayIntegrationTest : AccountsIntegrationTest() {
         val response =
             api.post(
                 "/accounts",
-                """{"customerId":"${UUID.randomUUID()}"}""",
-                headers(correlationId),
+                "",
+                headers(correlationId) + asCustomer(UUID.randomUUID()),
             )
         assertThat(response.status).isEqualTo(201)
         return response.body!!.get("id").asString()

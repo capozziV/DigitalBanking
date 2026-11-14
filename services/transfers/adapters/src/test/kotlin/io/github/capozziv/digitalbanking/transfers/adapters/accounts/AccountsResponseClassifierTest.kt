@@ -63,6 +63,14 @@ class AccountsResponseClassifierTest {
     }
 
     @ParameterizedTest
+    @ValueSource(ints = [401, 403])
+    fun `a rejected service token (401 or 403) is transient, never a refusal`(status: Int) {
+        assertThat(classifier.classify(status, null)).isEqualTo(StepOutcome.TransientFailure)
+        assertThat(classifier.classify(status, "unauthorized")).isEqualTo(StepOutcome.TransientFailure)
+        assertThat(classifier.classify(status, "forbidden")).isEqualTo(StepOutcome.TransientFailure)
+    }
+
+    @ParameterizedTest
     @ValueSource(ints = [500, 502, 503, 504])
     fun `5xx is transient, whatever the problem type`(status: Int) {
         assertThat(classifier.classify(status, null)).isEqualTo(StepOutcome.TransientFailure)

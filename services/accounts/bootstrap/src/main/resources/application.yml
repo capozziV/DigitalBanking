@@ -20,9 +20,27 @@ spring:
     password: ${ACCOUNTS_DB_OWNER_PASSWORD:accounts_owner}
     placeholders:
       appUser: ${ACCOUNTS_DB_USER:accounts_app}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${ACCOUNTS_JWT_ISSUER_URI:http://localhost:8090/default}
+
+digitalbanking:
+  security:
+    groups-claim: ${ACCOUNTS_JWT_GROUPS_CLAIM:groups}
+    # Machine token (client credentials) for the calls to the customer service.
+    service-token:
+      token-uri: ${ACCOUNTS_OAUTH_TOKEN_URI:http://localhost:8090/default/token}
+      client-id: ${ACCOUNTS_OAUTH_CLIENT_ID:accounts}
+      client-secret: ${ACCOUNTS_OAUTH_CLIENT_SECRET:local-secret}
 
 accounts:
   lock-timeout: 2s
+  customer:
+    # Asked on every account opening (GET /internal/customers/{id}); slower than the timeout is 503.
+    base-url: ${ACCOUNTS_CUSTOMER_BASE_URL:http://localhost:8085}
+    timeout: ${ACCOUNTS_CUSTOMER_TIMEOUT:500ms}
   outbox:
     relay-enabled: true
     poll-interval: 500ms
@@ -53,5 +71,7 @@ management:
         include: health,metrics
   endpoint:
     health:
-      show-details: always
-      show-components: always
+      # Health is open; its details and components are shown to admins only (the rest of /actuator is admin only).
+      show-details: when-authorized
+      show-components: when-authorized
+      roles: ADMIN

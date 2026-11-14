@@ -5,6 +5,7 @@ import io.github.capozziv.digitalbanking.notification.adapters.web.dto.MarkedNot
 import io.github.capozziv.digitalbanking.notification.adapters.web.dto.NotificationPageDTO
 import io.github.capozziv.digitalbanking.notification.application.usecase.ListNotificationsUseCase
 import io.github.capozziv.digitalbanking.notification.application.usecase.MarkNotificationsReadUseCase
+import io.github.capozziv.digitalbanking.security.currentCaller
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.media.Content
@@ -27,7 +28,12 @@ class NotificationController(
     private val listNotifications: ListNotificationsUseCase,
     private val markNotificationsRead: MarkNotificationsReadUseCase,
 ) {
-    @Operation(summary = "List the notifications of a customer, newest first, 20 per page")
+    @Operation(
+        summary = "List the notifications of the caller, newest first, 20 per page",
+        description =
+            "The caller comes from the JWT. An admin may pass `customerId` to read the notifications of a customer; " +
+                "without it, an admin reads their own. A customer may omit it or pass their own id.",
+    )
     @ApiResponses(
         ApiResponse(
             responseCode = "200",
@@ -36,14 +42,27 @@ class NotificationController(
         ),
         ApiResponse(
             responseCode = "400",
-            description = "/problems/validation-error: customerId missing or not a UUID, or a cursor that was not issued by this API",
+            description = "/problems/validation-error: customerId not a UUID, or a cursor that was not issued by this API",
+            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
+        ),
+        ApiResponse(
+            responseCode = "401",
+            description = "/problems/unauthorized: no token, or an invalid or expired one",
+            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
+        ),
+        ApiResponse(
+            responseCode = "404",
+            description = "/problems/notification-not-found: a customer asked for the notifications of another customer",
             content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
     )
     @GetMapping
     fun list(
-        @Parameter(description = "Customer whose notifications are listed (UUID)", required = true)
-        @RequestParam customerId: UUID,
+        @Parameter(
+            description = "Customer whose notifications are listed (UUID); only an admin may name another customer",
+            required = false,
+        )
+        @RequestParam(required = false) customerId: UUID?,
         @Parameter(description = "`nextCursor` of the previous page; absent for the first page", required = false)
         @RequestParam(required = false) cursor: String?,
     ): NotificationPageDTO {
@@ -51,10 +70,13 @@ class NotificationController(
             cursor?.let {
                 NotificationCursorCodec.decode(it) ?: throw InvalidRequestException(listOf(InvalidField("cursor", "is invalid")))
             }
-        return NotificationPageDTO.from(listNotifications.execute(customerId, decoded))
+        return NotificationPageDTO.from(listNotifications.execute(currentCaller(), customerId, decoded))
     }
 
-    @Operation(summary = "Mark as read the notifications of a customer up to one of them, inclusive; idempotent")
+    @Operation(
+        summary = "Mark as read the notifications of the caller up to one of them, inclusive; idempotent",
+        description = "Always the caller's own notifications, from the JWT (an admin too).",
+    )
     @ApiResponses(
         ApiResponse(
             responseCode = "200",
@@ -63,7 +85,12 @@ class NotificationController(
         ),
         ApiResponse(
             responseCode = "400",
-            description = "/problems/validation-error: customerId or upTo missing or not a UUID, or malformed JSON",
+            description = "/problems/validation-error: upTo missing or not a UUID, or malformed JSON",
+            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
+        ),
+        ApiResponse(
+            responseCode = "401",
+            description = "/problems/unauthorized: no token, or an invalid or expired one",
             content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
@@ -75,6 +102,5 @@ class NotificationController(
     @PostMapping("/read")
     fun markRead(
         @Valid @RequestBody request: MarkNotificationsReadDTO,
-    ): MarkedNotificationsDTO =
-        MarkedNotificationsDTO(markNotificationsRead.execute(checkNotNull(request.customerId), checkNotNull(request.upTo)))
+    ): MarkedNotificationsDTO = MarkedNotificationsDTO(markNotificationsRead.execute(currentCaller(), checkNotNull(request.upTo)))
 }

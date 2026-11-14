@@ -10,6 +10,7 @@ import io.github.capozziv.digitalbanking.accounts.domain.AvailableBalance
 import io.github.capozziv.digitalbanking.accounts.domain.Balance
 import io.github.capozziv.digitalbanking.accounts.domain.OverdraftLimit
 import io.github.capozziv.digitalbanking.accounts.domain.currentBalance
+import io.github.capozziv.digitalbanking.security.Caller
 import java.util.UUID
 
 data class AccountView(
@@ -34,9 +35,14 @@ class GetAccountUseCase(
     private val types: AccountTypeRepository,
     private val tx: TransactionRunner,
 ) {
-    fun execute(accountId: UUID): AccountView =
+    /** Fails with [AccountNotFoundException] also when [caller] may not read the account (see [requireCanRead]). */
+    fun execute(
+        accountId: UUID,
+        caller: Caller,
+    ): AccountView =
         tx.inReadOnlyTransaction {
             val account = accounts.findById(accountId) ?: throw AccountNotFoundException(accountId)
+            caller.requireCanRead(account)
             AccountView.of(account, entries.findLast(accountId).currentBalance(), types.findLimit(account.type))
         }
 }
