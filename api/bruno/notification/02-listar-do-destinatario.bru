@@ -5,9 +5,13 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/notifications?customerId={{destinationCustomerId}}
+  url: {{baseUrl}}/notifications
   body: none
-  auth: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{otherCustomerToken}}
 }
 
 script:pre-request {
@@ -15,7 +19,8 @@ script:pre-request {
   const axios = require("axios");
   const base = bru.getEnvVar("baseUrl");
   for (let i = 0; i < 45; i++) {
-    const r = await axios.get(`${base}/notifications`, { params: { customerId: bru.getVar("destinationCustomerId") } });
+    const r = await axios.get(`${base}/notifications`,
+      { headers: { Authorization: `Bearer ${bru.getVar("otherCustomerToken")}` } });
     if (r.data.items.some((n) => n.kind === "TRANSFER_RECEIVED")) break;
     await new Promise((resolve) => setTimeout(resolve, 1000));
     if (i === 44) throw new Error("FALHA: TRANSFER_RECEIVED nao chegou em 45 s");

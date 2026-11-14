@@ -1,8 +1,9 @@
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 import java.time.Duration
 
-// End-to-end tests of the transfer saga, the notifications and the statement: accounts, transfers, notification and statement run as real processes (java -jar of the boot jars),
-// with PostgreSQL and LocalStack in Testcontainers. Everything lives in the integrationTest source set.
+// End-to-end tests of the transfer saga, the notifications, the statement and identity: accounts, transfers, notification,
+// statement and customer run as real processes (java -jar of the boot jars), with PostgreSQL, Redis, LocalStack and the
+// mock-oauth2-server (the local token issuer) in Testcontainers. Everything lives in the integrationTest source set.
 plugins {
     id("digitalbanking.integration-test")
 }
@@ -36,6 +37,14 @@ abstract class EndToEndInputs : CommandLineArgumentProvider {
     @get:PathSensitive(PathSensitivity.NONE)
     abstract val statementJar: RegularFileProperty
 
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val customerJar: RegularFileProperty
+
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val oauthConfig: RegularFileProperty
+
     @get:InputDirectory
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val postgresInitDir: DirectoryProperty
@@ -53,6 +62,8 @@ abstract class EndToEndInputs : CommandLineArgumentProvider {
             "-De2e.transfers-jar=${transfersJar.get().asFile.absolutePath}",
             "-De2e.notification-jar=${notificationJar.get().asFile.absolutePath}",
             "-De2e.statement-jar=${statementJar.get().asFile.absolutePath}",
+            "-De2e.customer-jar=${customerJar.get().asFile.absolutePath}",
+            "-De2e.oauth-config=${oauthConfig.get().asFile.absolutePath}",
             "-De2e.postgres-init-dir=${postgresInitDir.get().asFile.absolutePath}",
             "-De2e.localstack-init-dir=${localStackInitDir.get().asFile.absolutePath}",
             "-De2e.log-dir=${logDir.get().asFile.absolutePath}",
@@ -64,14 +75,16 @@ evaluationDependsOn(":services:accounts:bootstrap")
 evaluationDependsOn(":services:transfers:bootstrap")
 evaluationDependsOn(":services:notification:bootstrap")
 evaluationDependsOn(":services:statement:bootstrap")
+evaluationDependsOn(":services:customer:bootstrap")
 
 val accountsBootJar = project(":services:accounts:bootstrap").tasks.named<BootJar>("bootJar")
 val transfersBootJar = project(":services:transfers:bootstrap").tasks.named<BootJar>("bootJar")
 val notificationBootJar = project(":services:notification:bootstrap").tasks.named<BootJar>("bootJar")
 val statementBootJar = project(":services:statement:bootstrap").tasks.named<BootJar>("bootJar")
+val customerBootJar = project(":services:customer:bootstrap").tasks.named<BootJar>("bootJar")
 
 tasks.named<Test>("integrationTest") {
-    // Four service processes and their restarts: room for the suite, but a stuck process never hangs the build.
+    // Five service processes and their restarts: room for the suite, but a stuck process never hangs the build.
     timeout = Duration.ofMinutes(15)
     jvmArgumentProviders.add(
         objects.newInstance<EndToEndInputs>().apply {
@@ -80,6 +93,8 @@ tasks.named<Test>("integrationTest") {
             transfersJar.set(transfersBootJar.flatMap { it.archiveFile })
             notificationJar.set(notificationBootJar.flatMap { it.archiveFile })
             statementJar.set(statementBootJar.flatMap { it.archiveFile })
+            customerJar.set(customerBootJar.flatMap { it.archiveFile })
+            oauthConfig.set(root.file("infra/local/auth/mock-oauth2-config.json"))
             postgresInitDir.set(root.dir("infra/local/postgres/init"))
             localStackInitDir.set(root.dir("infra/local/localstack/init/ready.d"))
             logDir.set(layout.buildDirectory.dir("e2e-logs"))
