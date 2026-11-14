@@ -62,11 +62,17 @@ Toda requisição de cliente chega com um JWT, e cada serviço só deixa o clien
   - `transfers` grava `source_customer_id` no pedido, conferido na consulta da conta de origem ao `accounts`, que devolve o `customerId`;
   - o limite diário confere a conta pelo `accounts`.
 - Recurso de outro cliente → **`404`** (não `403`), para não revelar que existe. Sem token ou token inválido → `401`. Rota de admin sem o grupo → `403`.
+- **`transfers`:** origem alheia ou inexistente → `404 account-not-found`; destino inexistente segue `422 account-not-found`. Transferências anteriores à migração V7 (`source_customer_id` nulo, sem backfill) só o admin vê.
 - **Chamadas entre serviços** (`transfers` → `accounts`, `transfers` → `customer`, `accounts` → `customer`) levam um token de máquina obtido por client credentials (cacheado até perto de expirar). Localmente, o `mock-oauth2-server` emite esse token; na AWS, um app client do Cognito com o escopo `digitalbanking/internal`.
+- A busca do token pode levar até 2 s no pior caso e conta no `call-budget` da saga, que passou de 4 s para 6 s; o `SagaTimeoutsValidator` confere a soma na partida.
+- `401`/`403` de outro serviço são erro de configuração, não resposta de negócio: do `accounts`, viram falha passageira na saga (nunca recusa) e `503 accounts-unavailable` na consulta da conta; do `customer`, viram `503 customers-unavailable`.
 
 ## 4. Consulta ao `customer` no pedido
 - `accounts` (`POST /accounts`) e `transfers` (`POST /transfers`) chamam `GET /internal/customers/{id}` com timeout curto (configurável, padrão 500 ms) e sem cache, por decisão do usuário: sempre a fonte da verdade.
 - `404` → `422 customer-not-found`; `BLOCKED` → `422 customer-blocked`; erro, timeout ou `5xx` → `503 customers-unavailable`. Nada é criado nesses casos.
+- A busca do token de máquina fica fora dos 500 ms: com o token frio, o pior caso da consulta chega a ~2,5 s.
+- No `transfers`, o cliente consultado é o dono da conta de origem, também quando quem transfere é o admin (cliente bloqueado barra o admin).
+- No `accounts`, a consulta roda fora da transação e também no retry da mesma chave de abertura: cliente bloqueado depois não recebe a conta, e com o `customer` fora o retry dá `503`.
 - Uma transferência que já passou da consulta segue até o fim, mesmo que o cliente seja bloqueado durante a saga, que dura milissegundos.
 
 ## 5. `libs/observabilidade`

@@ -117,7 +117,7 @@
 - `POST /accounts` sem `customerId` no corpo, com o cliente vindo do `Caller`;
 - `HttpCustomerGateway` (`adapters/customer/`) com o token de máquina;
 - `GET /accounts/{id}` e `/entries` com a regra de dono;
-- débitos, créditos e busca de lançamento só para `Service` e `Admin`;
+- débitos e créditos só para `Service` e `Admin` (a busca de lançamento em `/entries` vale também para o cliente dono, como na tabela da spec);
 - actuator restrito;
 - OpenAPI `bearerAuth`.
 
