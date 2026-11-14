@@ -1,5 +1,7 @@
 package io.github.capozziv.digitalbanking.transfers.adapters.accounts
 
+import io.github.capozziv.digitalbanking.observability.CorrelationIdRestClientInterceptor
+import io.github.capozziv.digitalbanking.security.ServiceTokenClient
 import io.github.capozziv.digitalbanking.transfers.application.port.AccountsGateway
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -12,8 +14,15 @@ import java.net.http.HttpClient
 @Configuration
 @EnableConfigurationProperties(AccountsClientProperties::class)
 class AccountsClientConfiguration {
+    /**
+     * Every call carries the correlation id of the thread and the machine token of transfers. Getting the token may
+     * take up to [ServiceTokenClient.maxFetchDuration] before the request leaves; `SagaTimeoutsValidator` counts it.
+     */
     @Bean
-    fun accountsRestClient(properties: AccountsClientProperties): RestClient {
+    fun accountsRestClient(
+        properties: AccountsClientProperties,
+        serviceTokenClient: ServiceTokenClient,
+    ): RestClient {
         // HTTP/1.1 only: the JDK client would otherwise try a cleartext HTTP/2 upgrade on every connection.
         val httpClient =
             HttpClient
@@ -27,6 +36,8 @@ class AccountsClientConfiguration {
             .builder()
             .baseUrl(properties.url)
             .requestFactory(requestFactory)
+            .requestInterceptor(CorrelationIdRestClientInterceptor())
+            .requestInterceptor(serviceTokenClient.interceptor())
             .build()
     }
 

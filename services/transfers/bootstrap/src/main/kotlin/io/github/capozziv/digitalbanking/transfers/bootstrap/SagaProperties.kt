@@ -13,7 +13,7 @@ import java.time.Duration
  * Settings of the transfer saga (`transfers.saga.*`); the defaults are those of the spec. Validated at startup:
  * counts and durations must be positive, [callBudget] shorter than [lease] and [retryInitial] at most [retryMax].
  * [pollInterval] is read by [TransferSagaScheduler]; [schedulerEnabled] turns the scheduler off (integration tests
- * that do not exercise it). The rule that spans `transfers.accounts.*` is checked by [SagaTimeoutsValidator].
+ * that do not exercise it). The rule that spans `transfers.accounts.*` and the machine token is checked by [SagaTimeoutsValidator].
  */
 @ConfigurationProperties("transfers.saga")
 @Validated
@@ -24,8 +24,9 @@ data class SagaProperties(
     val lease: Duration = Duration.ofSeconds(30),
     @field:Positive
     val busyAttempts: Int = 3,
+    /** Connect 1 s + read 3 s of the `accounts` client + 2 s of the machine token (see [SagaTimeoutsValidator]). */
     @field:DurationMin(nanos = 1)
-    val callBudget: Duration = Duration.ofSeconds(4),
+    val callBudget: Duration = Duration.ofSeconds(6),
     @field:Positive
     val dueBatchSize: Int = 50,
     @field:DurationMin(nanos = 1)

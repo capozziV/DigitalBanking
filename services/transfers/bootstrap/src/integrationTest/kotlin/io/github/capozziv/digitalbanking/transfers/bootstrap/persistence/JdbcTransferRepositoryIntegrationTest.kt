@@ -77,8 +77,9 @@ class JdbcTransferRepositoryIntegrationTest : TransfersIntegrationTest() {
     }
 
     @Test
-    fun `round trips a transfer with null description, failure reason and correlation id`() {
-        val transfer = aTransfer().copy(description = null, correlationId = null)
+    fun `round trips a transfer with null description, failure reason, correlation id and source customer`() {
+        // A null source customer is a transfer requested before stage 7.
+        val transfer = aTransfer(sourceCustomerId = null).copy(description = null, correlationId = null)
         repository.insert(transfer)
 
         assertThat(repository.findById(transfer.id)).isEqualTo(transfer)

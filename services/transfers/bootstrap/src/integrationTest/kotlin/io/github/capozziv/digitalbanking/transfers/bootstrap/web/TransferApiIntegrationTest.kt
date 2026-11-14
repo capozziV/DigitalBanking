@@ -205,6 +205,19 @@ class TransferApiIntegrationTest : TransfersIntegrationTest() {
     }
 
     @Test
+    fun `an unknown source account is 404 account-not-found, as a source of another customer is`() {
+        val missing = UUID.randomUUID()
+        accountsServer.stubFor(get(urlEqualTo("/accounts/$missing")).willReturn(problem(404, "account-not-found")))
+        val before = transferCount()
+
+        val response = api.post("/transfers", transferJson(sourceId = missing.toString(), amount = "10"), key())
+
+        assertProblem(response, 404, "account-not-found")
+        assertThat(response.body!!.get("accountId").asString()).isEqualTo(missing.toString())
+        assertThat(transferCount()).isEqualTo(before)
+    }
+
+    @Test
     fun `accounts being unavailable is 503 accounts-unavailable with Retry-After, and nothing is stored`() {
         accountsServer.stubFor(get(urlEqualTo("/accounts/$destination")).willReturn(aResponse().withStatus(503)))
         val before = transferCount()
@@ -386,7 +399,7 @@ class TransferApiIntegrationTest : TransfersIntegrationTest() {
                     .withStatus(200)
                     .withHeader("Content-Type", "application/json")
                     .withBody(
-                        """{"id":"$id","customerId":"${UUID.randomUUID()}","type":"FREE","balance":0,""" +
+                        """{"id":"$id","customerId":"$CUSTOMER_ID","type":"FREE","balance":0,""" +
                             """"overdraftLimit":0,"availableBalance":0}""",
                     ),
             ),
