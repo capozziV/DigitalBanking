@@ -39,6 +39,7 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 ## Decisões tomadas
 ### Dados e consistência
 - Conta e ledger no mesmo serviço (`accounts`), na mesma transação ACID.
+- Uma conta não encerrada por cliente (antes, uma conta por cliente): depois de encerrar, o cliente pode abrir outra ([spec do bloqueio e encerramento](superpowers/specs/2026-11-16-bloqueio-e-encerramento-de-conta-design.md)).
 - O saldo fica no lançamento (`sequence` por conta e `balance_after`); não há coluna de saldo na conta. Concorrência com trava pessimista `FOR UPDATE` na conta e `UNIQUE (account_id, sequence)` como rede de segurança; `lock_timeout` configurável (padrão 2s), estouro vira `503` com `Retry-After`. Nenhuma transação do `accounts` trava duas contas.
 - O saldo pode ficar negativo até o limite de cheque especial, definido pelo tipo de conta (`FREE`, `STANDARD`, `GOLD`, `BLACK`, `DIAMOND`). Os limites ficam numa tabela do `accounts`, alterável pelo endpoint `/admin/account-types/{type}` (protegido na etapa 7). Débito acima do saldo disponível: `422` com tipo `insufficient-available-balance`.
 - Persistência com Spring JDBC (`JdbcClient`), SQL explícito e mapeamento manual.

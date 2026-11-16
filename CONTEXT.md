@@ -42,6 +42,25 @@ Categoria da conta que define o limite de cheque especial; valores Free, Standar
 _Código_: `AccountType`
 _Evite_: plano, categoria, nível
 
+**Status da conta**:
+Indica o que a conta pode fazer; valores Ativa, Bloqueada e Encerrada. O ledger fica guardado em qualquer status.
+_Código_: `AccountStatus` (valores `ACTIVE`, `BLOCKED`, `CLOSED`)
+_Evite_: estado, situação
+
+**Ativa**:
+A conta envia e recebe valores; valor de Status da conta.
+_Código_: `AccountStatus.ACTIVE`
+
+**Bloqueada**:
+A conta não envia valores, mas recebe; valor de Status da conta.
+_Código_: `AccountStatus.BLOCKED`
+_Evite_: congelada, suspensa
+
+**Encerrada**:
+A conta não envia nem recebe valores, sem volta; valor de Status da conta.
+_Código_: `AccountStatus.CLOSED`
+_Evite_: cancelada, fechada, excluída
+
 ## Ledger
 
 **Lançamento**:
@@ -155,5 +174,5 @@ _Código_: `Notification`
 _Evite_: alerta, mensagem
 
 **Tipo de notificação**:
-Categoria da notificação, que define o texto mostrado ao cliente; valores Boas-vindas, Tipo de conta alterado, Transferência enviada, Transferência recebida, Transferência recusada e Transferência devolvida.
-_Código_: `NotificationKind` (valores `WELCOME`, `ACCOUNT_TYPE_CHANGED`, `TRANSFER_SENT`, `TRANSFER_RECEIVED`, `TRANSFER_FAILED`, `TRANSFER_COMPENSATED`)
+Categoria da notificação, que define o texto mostrado ao cliente; valores Boas-vindas, Tipo de conta alterado, Transferência enviada, Transferência recebida, Transferência recusada, Transferência devolvida, Conta bloqueada, Conta desbloqueada e Conta encerrada.
+_Código_: `NotificationKind` (valores `WELCOME`, `ACCOUNT_TYPE_CHANGED`, `TRANSFER_SENT`, `TRANSFER_RECEIVED`, `TRANSFER_FAILED`, `TRANSFER_COMPENSATED`, `ACCOUNT_BLOCKED`, `ACCOUNT_UNBLOCKED`, `ACCOUNT_CLOSED`)
