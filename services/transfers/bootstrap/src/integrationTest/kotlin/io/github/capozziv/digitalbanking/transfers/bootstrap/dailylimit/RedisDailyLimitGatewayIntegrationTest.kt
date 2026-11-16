@@ -17,9 +17,11 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.data.redis.core.RedisCallback
 import org.springframework.data.redis.core.StringRedisTemplate
 import java.sql.DriverManager
 import java.time.LocalDate
+import java.util.Properties
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -308,6 +310,75 @@ class RedisDailyLimitGatewayIntegrationTest : TransfersIntegrationTest() {
     }
 
     @Test
+    fun `usage reads postgres without waiting for the lock of the account and day`() {
+        reserve(transferOf(120_000), 120_000)
+        val pool = Executors.newSingleThreadExecutor()
+        DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password).use { connection ->
+            connection.autoCommit = false
+            connection
+                .prepareStatement("select pg_advisory_xact_lock(hashtextextended(? || ':' || ?, 0))")
+                .use { lock ->
+                    lock.setString(1, account.toString())
+                    lock.setString(2, day.toString())
+                    lock.executeQuery().close()
+                }
+            try {
+                val usage = pool.submit<DailyLimitUsage> { gateway.usage(account, day) }
+
+                assertThat(usage.get(5, TimeUnit.SECONDS).used).isEqualTo(120_000)
+            } finally {
+                connection.rollback()
+                pool.shutdownNow()
+            }
+        }
+    }
+
+    @Test
+    fun `usage leaves the redis counter alone`() {
+        assertThat(gateway.usage(account, day).used).isZero()
+
+        assertThat(redisTemplate.hasKey(key())).isFalse()
+    }
+
+    @Test
+    fun `the counter records the redis instance that seeded it`() {
+        // Two reservations: should the first one fall back to PostgreSQL, the second one seeds the counter in Redis.
+        reserve(transferOf(1_000), 1_000)
+        reserve(transferOf(1_000), 1_000)
+
+        assertThat(redisTemplate.opsForHash<String, String>().get(key(), "instance")).isEqualTo(runId())
+    }
+
+    @Test
+    fun `a counter left by another redis instance is rebuilt even with the same epoch`() {
+        val first = transferOf(400_000)
+        reserve(first, 400_000)
+        // What a failover to a replica that missed the last writes leaves: same epoch, the reservation gone. Every field
+        // is written, so the counter differs from a fresh one only by the instance, whichever path the first one took.
+        val hash = redisTemplate.opsForHash<String, String>()
+        hash.delete(key(), first.toString())
+        hash.putAll(key(), mapOf("epoch" to epochInPostgres().toString(), "instance" to "run-id-of-the-old-primary", "total" to "0"))
+        val rebuilds = rebuilds()
+
+        assertThat(reserve(transferOf(200_000), 200_000)).isEqualTo(EXCEEDED)
+
+        assertThat(rebuilds()).isEqualTo(rebuilds + 1)
+        assertThat(hash.get(key(), "total")).isEqualTo("400000")
+        assertThat(hash.get(key(), "instance")).isEqualTo(runId())
+    }
+
+    @Test
+    fun `a reservation undone by postgres after the lua script does not stay in the counter`() {
+        reserve(transferOf(100_000), 100_000)
+
+        // The transfer does not exist, so marking it fails after the script reserved and the transaction rolls back.
+        assertThat(reserve(UUID.randomUUID(), 400_000)).isEqualTo(UNAVAILABLE)
+
+        assertThat(reserve(transferOf(400_000), 400_000)).isEqualTo(RESERVED)
+        assertThat(reservedSumInPostgres()).isEqualTo(500_000)
+    }
+
+    @Test
     fun `a reservation for an unknown transfer is unavailable and counted as an error`() {
         val errors = counter("error")
 
@@ -382,6 +453,9 @@ class RedisDailyLimitGatewayIntegrationTest : TransfersIntegrationTest() {
             .single()
 
     private fun key() = "daily-limit:v1:$account:$day"
+
+    private fun runId(): String =
+        checkNotNull(redisTemplate.execute(RedisCallback<Properties> { it.serverCommands().info("server") })).getProperty("run_id")
 
     private fun counter(result: String): Double =
         meterRegistry

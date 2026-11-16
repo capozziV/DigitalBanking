@@ -32,7 +32,14 @@ import java.util.UUID
  * tests that exercise them turn them on (a subclass @TestPropertySource overrides this one).
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@TestPropertySource(properties = ["transfers.saga.scheduler-enabled=false", "transfers.outbox.relay-enabled=false"])
+@TestPropertySource(
+    properties = [
+        "transfers.saga.scheduler-enabled=false",
+        "transfers.outbox.relay-enabled=false",
+        // The daily limit circuit lets a probe through 1 ms after it opens, so a test that paused Redis leaves it closable.
+        "transfers.daily-limit.circuit-breaker.open-duration=1ms",
+    ],
+)
 @Import(JwtTestSupport.DecoderConfiguration::class)
 abstract class TransfersIntegrationTest {
     /** JdbcClient connected as the owner user, for setup and inspection outside the application's grants. */

@@ -20,7 +20,7 @@ Transferências têm limite diário. A verificação precisa ser atômica sob co
 ## Consequências
 - Positivas: verificação e reserva atômicas; sem brecha entre as duas vias; falha de `release` ou reserva desfeita deixa o contador acima do real (lado seguro), e o epoch faz a próxima reserva reconstruí-lo; retentativas não consomem limite duas vezes; perda ou queda do Redis não quebra o limite.
 - Negativas: dois lugares com o mesmo dado (Redis e PostgreSQL); uma transação curta por reserva; contenção só entre transferências da mesma conta e dia; liberação no Redis é melhor esforço; exige rotina de reconstrução e o epoch.
-- **Risco aceito no MVP:** perda parcial de escritas no Redis (failover com réplica assíncrona, ou restauração de snapshot antigo) pode deixar o contador abaixo do real com o mesmo epoch, e o limite pode ser passado. Aceito porque o banco é simulado e o ElastiCache do ambiente efêmero não tem failover. Mitigação futura no cartão de débito técnico #160.
+- **Risco aceito:** perda parcial de escritas no Redis (failover com réplica assíncrona, ou restauração de snapshot antigo) podia deixar o contador abaixo do real com o mesmo epoch. Mitigado (#160): o contador guarda o `run_id` da instância do Redis que o semeou e é reconstruído quando outra instância responde (reinício, failover ou snapshot restaurado). Resta o caso raro de a mesma instância perder escritas sem reiniciar, aceito porque o banco é simulado.
 
 ## Alternativas consideradas
 - **Só Redis, sem trava no PostgreSQL:** deixa brecha entre o Redis e o fallback, que poderia passar do limite. Descartada.
