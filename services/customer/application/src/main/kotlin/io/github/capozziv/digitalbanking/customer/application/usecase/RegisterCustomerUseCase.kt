@@ -7,7 +7,6 @@ import io.github.capozziv.digitalbanking.customer.application.port.TransactionRu
 import io.github.capozziv.digitalbanking.customer.domain.Customer
 import io.github.capozziv.digitalbanking.security.Caller
 import java.time.Clock
-import java.util.UUID
 
 data class RegisterCustomerCommand(
     val name: String,
@@ -18,14 +17,6 @@ data class RegisterCustomerResult(
     val customer: Customer,
     val created: Boolean,
 )
-
-/** The customer id of a caller that can own one: the `sub` of a customer or of an admin user. */
-internal fun Caller.ownCustomerId(): UUID =
-    when (this) {
-        is Caller.Customer -> customerId
-        is Caller.Admin -> userId
-        Caller.Service -> throw CallerHasNoCustomerException()
-    }
 
 /**
  * Registers the customer of the caller, idempotent by the caller's `sub`: the first call creates it and writes
@@ -41,7 +32,7 @@ class RegisterCustomerUseCase(
         command: RegisterCustomerCommand,
         caller: Caller,
     ): RegisterCustomerResult {
-        val id = caller.ownCustomerId()
+        val id = caller.ownCustomerId() ?: throw CallerHasNoCustomerException()
         return tx.inTransaction {
             val (customer, event) = Customer.register(id, command.name, command.email, clock.instant())
             if (customers.insertIfAbsent(customer)) {
