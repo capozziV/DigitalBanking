@@ -90,7 +90,8 @@ class JdbcTransferRepository(
 
     /**
      * The lease must be valid at [now]; `updated_at` is only data, it takes no part in the decision. `limit_reserved`
-     * was already set by the daily limit gateway under its lock when the reservation was made; this write only repeats it.
+     * was already set by the daily limit gateway under its lock when the reservation was made; this write only repeats it
+     * and never clears it, so a copy read before the reservation cannot undo the gateway's mark.
      */
     override fun saveIfOwner(
         transfer: Transfer,
@@ -104,7 +105,7 @@ class JdbcTransferRepository(
                 """
                 update transfer set status = :status, step = :step, failure_reason = :failureReason, attempts = :attempts,
                                     next_attempt_at = :nextAttemptAt, locked_until = :leaseUntil, updated_at = :updatedAt,
-                                    limit_reserved = :limitReserved
+                                    limit_reserved = limit_reserved or :limitReserved
                 where id = :id and lock_owner = :owner and locked_until >= :now
                 """.trimIndent(),
             ).param("status", transfer.status.name)
