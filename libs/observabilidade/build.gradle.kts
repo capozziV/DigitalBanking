@@ -7,8 +7,11 @@ plugins {
 dependencies {
     api("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.slf4j:slf4j-api")
+    // Only to document X-Correlation-Id in the services that publish an OpenAPI contract.
+    compileOnly(libs.springdoc.openapi.starter.webmvc.ui)
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation(libs.springdoc.openapi.starter.webmvc.ui)
     // Only to check that the MDC key is the one the outbox writer reads.
     testImplementation(project(":libs:outbox"))
 }

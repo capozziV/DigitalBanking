@@ -12,12 +12,13 @@ class DigitalBankingSecurityAutoConfigurationTest {
     private val runner = ApplicationContextRunner().withConfiguration(AutoConfigurations.of(ServiceTokenAutoConfiguration::class.java))
 
     @Test
-    fun `both auto-configurations are listed for Spring Boot`() {
+    fun `the auto-configurations are listed for Spring Boot`() {
         val candidates = ImportCandidates.load(AutoConfiguration::class.java, javaClass.classLoader).candidates
 
         assertThat(candidates).contains(
             DigitalBankingSecurityAutoConfiguration::class.java.name,
             ServiceTokenAutoConfiguration::class.java.name,
+            ApiDocsAutoConfiguration::class.java.name,
         )
     }
 
