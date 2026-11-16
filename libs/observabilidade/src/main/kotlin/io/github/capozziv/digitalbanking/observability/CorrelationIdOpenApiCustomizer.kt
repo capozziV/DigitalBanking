@@ -5,13 +5,20 @@ import io.swagger.v3.oas.models.headers.Header
 import io.swagger.v3.oas.models.media.StringSchema
 import io.swagger.v3.oas.models.parameters.HeaderParameter
 import org.springdoc.core.customizers.OpenApiCustomizer
+import org.springframework.core.Ordered
 
 /**
  * Documents what [CorrelationIdFilter] does on every operation of a service's OpenAPI contract: the optional
  * `X-Correlation-Id` request header and the same header on every response. Registered by
  * [ObservabilityAutoConfiguration] when springdoc is on the classpath; a header the controller declares itself wins.
+ * Runs last (springdoc applies the customizers in order), so the responses other customizers add, such as the 401,
+ * 403 and 500 of `:libs:security`, also get the header.
  */
-class CorrelationIdOpenApiCustomizer : OpenApiCustomizer {
+class CorrelationIdOpenApiCustomizer :
+    OpenApiCustomizer,
+    Ordered {
+    override fun getOrder(): Int = Ordered.LOWEST_PRECEDENCE
+
     override fun customise(openApi: OpenAPI) {
         openApi.paths.orEmpty().values.flatMap { it.readOperations() }.forEach { operation ->
             val declared =

@@ -13,9 +13,15 @@ import org.springdoc.core.customizers.OpenApiCustomizer
 import org.springframework.boot.autoconfigure.AutoConfigurations
 import org.springframework.boot.test.context.FilteredClassLoader
 import org.springframework.boot.test.context.runner.WebApplicationContextRunner
+import org.springframework.core.Ordered
 
 class CorrelationIdOpenApiCustomizerTest {
     private val customizer = CorrelationIdOpenApiCustomizer()
+
+    @Test
+    fun `runs after every other customizer, so the responses they add also get the header`() {
+        assertThat(customizer.order).isEqualTo(Ordered.LOWEST_PRECEDENCE)
+    }
 
     @Test
     fun `every operation accepts the optional X-Correlation-Id header and returns it on every response`() {

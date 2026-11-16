@@ -14,9 +14,15 @@ import org.springdoc.core.customizers.OpenApiCustomizer
 import org.springframework.boot.autoconfigure.AutoConfigurations
 import org.springframework.boot.test.context.FilteredClassLoader
 import org.springframework.boot.test.context.runner.WebApplicationContextRunner
+import org.springframework.core.Ordered
 
 class ProblemResponsesOpenApiCustomizerTest {
     private val customizer = ProblemResponsesOpenApiCustomizer()
+
+    @Test
+    fun `runs before the customizers left at the lowest precedence, such as the X-Correlation-Id one`() {
+        assertThat(customizer.order).isLessThan(Ordered.LOWEST_PRECEDENCE)
+    }
 
     @Test
     fun `every operation gets 401, 403 and 500 as Problem Details`() {
@@ -51,18 +57,29 @@ class ProblemResponsesOpenApiCustomizerTest {
     }
 
     @Test
-    fun `success responses and error responses with their own content are left alone`() {
-        val ownContent = Content().addMediaType("text/plain", MediaType())
+    fun `success responses are left alone and an error response with the return type springdoc inferred becomes Problem Details`() {
+        val successContent = Content().addMediaType("application/json", MediaType())
         val operation =
             operation(
-                "200" to ApiResponse().description("ok"),
-                "409" to ApiResponse().description("conflict").content(ownContent),
+                "200" to ApiResponse().description("ok").content(successContent),
+                "409" to ApiResponse().description("conflict").content(Content().addMediaType("*/*", MediaType())),
             )
 
         customizer.customise(openApi("/a" to PathItem().get(operation)))
 
-        assertThat(operation.responses["200"]!!.content).isNull()
-        assertThat(operation.responses["409"]!!.content).isSameAs(ownContent)
+        assertThat(operation.responses["200"]!!.content).isSameAs(successContent)
+        assertThat(operation.responses["409"]!!.content.keys).containsExactly("application/problem+json")
+        assertThat(problemSchemaRef(operation.responses["409"]!!)).isEqualTo(PROBLEM_REF)
+    }
+
+    @Test
+    fun `an error response already declared as Problem Details is kept`() {
+        val own = Content().addMediaType("application/problem+json", MediaType())
+        val operation = operation("422" to ApiResponse().description("unprocessable").content(own))
+
+        customizer.customise(openApi("/a" to PathItem().get(operation)))
+
+        assertThat(operation.responses["422"]!!.content).isSameAs(own)
     }
 
     @Test
