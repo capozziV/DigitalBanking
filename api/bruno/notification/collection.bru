@@ -1,0 +1,43 @@
+auth {
+  mode: bearer
+}
+
+auth:bearer {
+  token: {{customerToken}}
+}
+
+script:pre-request {
+  // Tokens do mock-oauth2-server (como infra/local/auth/token.sh), uma vez por execucao da colecao:
+  // - customerToken: cliente novo, ja cadastrado no customer (o token padrao das requisicoes, por heranca);
+  // - otherCustomerToken: outro cliente cadastrado, para ver o 404 do recurso alheio;
+  // - adminToken: usuario de teste do dono, no grupo admin (creditos, debitos e rotas /admin).
+  if (!bru.getVar("customerToken")) {
+    const axios = require("axios");
+    const base = bru.getEnvVar("baseUrl");
+    const tokenUrl = bru.getEnvVar("tokenUrl");
+    async function userToken(sub, admin) {
+      // Formulario montado a mao: o sandbox de scripts do Bruno nao tem URLSearchParams.
+      const form = `grant_type=password&username=${encodeURIComponent(sub)}&password=unused` +
+        (admin ? "&user_groups=admin" : "");
+      const r = await axios.post(tokenUrl, form, {
+        auth: { username: "web", password: "local-secret" },
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      });
+      return r.data.access_token;
+    }
+    async function registeredCustomer(name) {
+      const sub = bru.interpolate("{{$guid}}");
+      const token = await userToken(sub, false);
+      await axios.post(`${base}/customers`, { name, email: `bruno-${sub}@example.test` },
+        { headers: { Authorization: `Bearer ${token}` } });
+      return { sub, token };
+    }
+    const customer = await registeredCustomer("Bruno Customer");
+    const other = await registeredCustomer("Bruno Other Customer");
+    bru.setVar("adminToken", await userToken(bru.getEnvVar("adminSub"), true));
+    bru.setVar("customerId", customer.sub);
+    bru.setVar("otherCustomerId", other.sub);
+    bru.setVar("otherCustomerToken", other.token);
+    bru.setVar("customerToken", customer.token);
+  }
+}

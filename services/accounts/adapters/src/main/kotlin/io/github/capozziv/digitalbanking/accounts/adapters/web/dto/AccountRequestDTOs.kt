@@ -7,13 +7,9 @@ import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Positive
 import jakarta.validation.constraints.PositiveOrZero
 import jakarta.validation.constraints.Size
-import java.util.UUID
 
 // Fields are nullable so that a missing value reaches bean validation and becomes a field error.
-
-data class OpenAccountDTO(
-    @field:NotNull val customerId: UUID?,
-)
+// POST /accounts has no body: the customer is the caller of the token.
 
 data class RecordEntryDTO(
     @field:NotNull @field:Positive val amount: Long?,

@@ -7,6 +7,11 @@ spring:
   threads:
     virtual:
       enabled: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${STATEMENT_JWT_ISSUER_URI:http://localhost:8090/default}
   cloud:
     aws:
       # Like the outbox relays and notification: a blank endpoint is the real AWS endpoint of the region with the AWS
@@ -24,6 +29,11 @@ spring:
       # With Redis down a command fails fast and the statement is read from DynamoDB (RedisStatementFirstPageCache).
       timeout: ${STATEMENT_CACHE_TIMEOUT:100ms}
       connect-timeout: ${STATEMENT_CACHE_TIMEOUT:100ms}
+
+digitalbanking:
+  security:
+    # Claim of the token that lists the user's groups ("admin" makes an admin); cognito:groups on AWS.
+    groups-claim: ${STATEMENT_JWT_GROUPS_CLAIM:groups}
 
 statement:
   cache:
@@ -43,6 +53,11 @@ statement:
     refresh-interval: ${STATEMENT_DLQ_METRICS_REFRESH:30s}
 
 management:
+  endpoint:
+    health:
+      # Only an admin sees the details; /actuator/health itself stays open (liveness for compose and the load balancer).
+      show-details: when-authorized
+      roles: ADMIN
   health:
     redis:
       # The cache is optional: a Redis outage must not turn the service DOWN.
@@ -50,7 +65,7 @@ management:
   endpoints:
     web:
       exposure:
-        # The DLQ depth gauge is read from /actuator/metrics.
+        # The DLQ depth gauge is read from /actuator/metrics (admin only).
         include: health,metrics
 
 logging:

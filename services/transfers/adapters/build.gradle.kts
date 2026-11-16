@@ -4,6 +4,9 @@ dependencies {
     implementation(project(":services:transfers:domain"))
     implementation(project(":services:transfers:application"))
     implementation(project(":libs:outbox"))
+    // JWT resource server, Caller, route rules and the machine token; correlation id filter and propagation.
+    implementation(project(":libs:security"))
+    implementation(project(":libs:observabilidade"))
 
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-jdbc")

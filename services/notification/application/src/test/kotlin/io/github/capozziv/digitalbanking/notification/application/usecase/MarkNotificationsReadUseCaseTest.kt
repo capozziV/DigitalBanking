@@ -1,11 +1,13 @@
 package io.github.capozziv.digitalbanking.notification.application.usecase
 
+import io.github.capozziv.digitalbanking.notification.application.ForeignCustomerException
 import io.github.capozziv.digitalbanking.notification.application.NotificationNotFoundException
 import io.github.capozziv.digitalbanking.notification.application.fake.ImmediateTransactionRunner
 import io.github.capozziv.digitalbanking.notification.application.fake.InMemoryNotificationRepository
 import io.github.capozziv.digitalbanking.notification.application.fake.MutableClock
 import io.github.capozziv.digitalbanking.notification.domain.Notification
 import io.github.capozziv.digitalbanking.notification.domain.NotificationKind
+import io.github.capozziv.digitalbanking.security.Caller
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -26,7 +28,7 @@ class MarkNotificationsReadUseCaseTest {
         val stored = store(customer, 5, firstIndex = 0)
         val transactionsBefore = transactions.transactions
 
-        val marked = useCase.execute(customer, stored[2].id)
+        val marked = useCase.execute(Caller.Customer(customer), stored[2].id)
 
         assertThat(marked).isEqualTo(3)
         val byId = repository.all.associateBy { it.id }
@@ -40,7 +42,7 @@ class MarkNotificationsReadUseCaseTest {
         val mine = store(customer, 2, firstIndex = 0)
         val theirs = store(other, 2, firstIndex = 10)
 
-        useCase.execute(customer, mine.last().id)
+        useCase.execute(Caller.Customer(customer), mine.last().id)
 
         val byId = repository.all.associateBy { it.id }
         assertThat(theirs.map { byId.getValue(it.id).readAt }).containsOnlyNulls()
@@ -49,9 +51,9 @@ class MarkNotificationsReadUseCaseTest {
     @Test
     fun `already read notifications are not counted again`() {
         val stored = store(customer, 3, firstIndex = 0)
-        useCase.execute(customer, stored[1].id)
+        useCase.execute(Caller.Customer(customer), stored[1].id)
 
-        assertThat(useCase.execute(customer, stored[2].id)).isEqualTo(1)
+        assertThat(useCase.execute(Caller.Customer(customer), stored[2].id)).isEqualTo(1)
     }
 
     @Test
@@ -59,7 +61,7 @@ class MarkNotificationsReadUseCaseTest {
         store(customer, 2, firstIndex = 0)
         val theirs = store(other, 1, firstIndex = 10).single()
 
-        assertThatThrownBy { useCase.execute(customer, theirs.id) }
+        assertThatThrownBy { useCase.execute(Caller.Customer(customer), theirs.id) }
             .isInstanceOf(NotificationNotFoundException::class.java)
             .satisfies({ assertThat((it as NotificationNotFoundException).notificationId).isEqualTo(theirs.id) })
 
@@ -68,7 +70,7 @@ class MarkNotificationsReadUseCaseTest {
 
     @Test
     fun `up to an unknown notification is not found`() {
-        assertThatThrownBy { useCase.execute(customer, UUID.randomUUID()) }
+        assertThatThrownBy { useCase.execute(Caller.Customer(customer), UUID.randomUUID()) }
             .isInstanceOf(NotificationNotFoundException::class.java)
     }
 
@@ -80,7 +82,7 @@ class MarkNotificationsReadUseCaseTest {
         val tieUseCase = MarkNotificationsReadUseCase(tiedStore, transactions, MutableClock(readAt))
         val (smaller, larger) = tied.sortedBy { it.id.toString() }
 
-        val marked = tieUseCase.execute(customer, smaller.id)
+        val marked = tieUseCase.execute(Caller.Customer(customer), smaller.id)
 
         assertThat(marked).isEqualTo(1)
         assertThat(tiedStore.find(smaller.id)!!.readAt).isEqualTo(readAt)
@@ -108,5 +110,26 @@ class MarkNotificationsReadUseCaseTest {
             }
         transactions.inTransaction { repository.saveAll(created) }
         return created
+    }
+
+    @Test
+    fun `an admin marks the notifications of their own user id, never those of a customer`() {
+        val admin = UUID.randomUUID()
+        val own = store(admin, 2, firstIndex = 0)
+        val theirs = store(customer, 1, firstIndex = 10)
+
+        val marked = useCase.execute(Caller.Admin(admin), own.last().id)
+
+        assertThat(marked).isEqualTo(2)
+        assertThatThrownBy { useCase.execute(Caller.Admin(admin), theirs.single().id) }
+            .isInstanceOf(NotificationNotFoundException::class.java)
+        assertThat(repository.all.first { it.id == theirs.single().id }.readAt).isNull()
+    }
+
+    @Test
+    fun `a service caller cannot mark notifications`() {
+        val stored = store(customer, 1, firstIndex = 0)
+
+        assertThatThrownBy { useCase.execute(Caller.Service, stored.single().id) }.isInstanceOf(ForeignCustomerException::class.java)
     }
 }

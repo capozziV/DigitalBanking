@@ -20,6 +20,7 @@ internal fun aTransfer(
     attempts: Int = 0,
     limitDay: LocalDate = DailyLimitDay.of(createdAt),
     limitReserved: Boolean = false,
+    sourceCustomerId: UUID? = UUID.randomUUID(),
 ): Transfer =
     Transfer(
         id = UUID.randomUUID(),
@@ -37,4 +38,5 @@ internal fun aTransfer(
         updatedAt = createdAt,
         limitDay = limitDay,
         limitReserved = limitReserved,
+        sourceCustomerId = sourceCustomerId,
     )

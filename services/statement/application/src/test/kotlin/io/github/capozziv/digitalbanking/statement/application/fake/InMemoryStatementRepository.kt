@@ -27,6 +27,8 @@ class InMemoryStatementRepository : StatementRepository {
 
     override fun accountExists(accountId: UUID): Boolean = accountId in accounts
 
+    override fun findCustomerId(accountId: UUID): UUID? = accounts[accountId]
+
     override fun findPage(
         accountId: UUID,
         cursor: StatementCursor?,

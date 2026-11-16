@@ -1,0 +1,18 @@
+meta {
+  name: Rota de admin sem o grupo
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/admin/customers/{{customerId}}
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("403 forbidden para o cliente, mesmo no proprio cadastro", function () {
+    expect(res.status).to.equal(403);
+    expect(res.body.type).to.contain("forbidden");
+  });
+}

@@ -98,11 +98,7 @@ class AccountTypeAdminApiIntegrationTest : AccountsIntegrationTest() {
 
     private fun openGoldAccount(): String {
         val opened =
-            api.post(
-                "/accounts",
-                """{"customerId":"${UUID.randomUUID()}"}""",
-                mapOf("Idempotency-Key" to UUID.randomUUID().toString()),
-            )
+            api.openAccount()
         val accountId = opened.body!!.get("id").asString()
         assertThat(api.put("/accounts/$accountId/type", """{"type":"GOLD"}""").status).isEqualTo(200)
         return accountId

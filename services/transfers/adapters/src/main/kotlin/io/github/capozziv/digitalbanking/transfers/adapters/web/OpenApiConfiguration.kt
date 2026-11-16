@@ -1,11 +1,13 @@
 package io.github.capozziv.digitalbanking.transfers.adapters.web
 
+import io.swagger.v3.oas.models.Components
 import io.swagger.v3.oas.models.OpenAPI
 import io.swagger.v3.oas.models.info.Info
 import io.swagger.v3.oas.models.media.Content
 import io.swagger.v3.oas.models.media.MediaType
 import io.swagger.v3.oas.models.media.Schema
 import io.swagger.v3.oas.models.responses.ApiResponse
+import io.swagger.v3.oas.models.security.SecurityScheme
 import org.springdoc.core.customizers.OpenApiCustomizer
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -18,34 +20,58 @@ import org.springframework.context.annotation.Configuration
 class OpenApiConfiguration {
     @Bean
     fun transfersOpenApi(): OpenAPI =
-        OpenAPI().info(
-            Info()
-                .title("transfers")
-                .version("v1")
-                .description(DESCRIPTION),
-        )
+        OpenAPI()
+            .info(
+                Info()
+                    .title("transfers")
+                    .version("v1")
+                    .description(DESCRIPTION),
+            ).components(
+                Components().addSecuritySchemes(
+                    BEARER_AUTH,
+                    SecurityScheme()
+                        .type(SecurityScheme.Type.HTTP)
+                        .scheme("bearer")
+                        .bearerFormat("JWT")
+                        .description("Access token of a customer or of an admin (group `admin`)."),
+                ),
+            )
 
-    /** Every operation can fail with an unexpected error, answered by the generic handler as 500 internal-error. */
+    /**
+     * What every operation can answer besides its own responses: 401 and 403 from the security library, and an
+     * unexpected error, answered by the generic handler as 500 internal-error.
+     */
     @Bean
-    fun internalErrorResponseCustomizer(): OpenApiCustomizer =
+    fun commonResponsesCustomizer(): OpenApiCustomizer =
         OpenApiCustomizer { openApi ->
             openApi.paths.orEmpty().values.flatMap { it.readOperations() }.forEach { operation ->
+                operation.responses.addApiResponse("401", problemResponse("${ApiDocs.PROBLEMS}unauthorized: no token, or an invalid one"))
+                operation.responses.addApiResponse(
+                    "403",
+                    problemResponse("${ApiDocs.PROBLEMS}forbidden: the token is valid, but not of a customer or an admin"),
+                )
                 operation.responses.addApiResponse(
                     "500",
-                    ApiResponse()
-                        .description("${ApiDocs.PROBLEMS}internal-error: unexpected error; the detail does not expose the cause")
-                        .content(
-                            Content().addMediaType(
-                                ApiDocs.PROBLEM_JSON,
-                                MediaType().schema(Schema<Any>().`$ref`("#/components/schemas/ProblemDetail")),
-                            ),
-                        ),
+                    problemResponse("${ApiDocs.PROBLEMS}internal-error: unexpected error; the detail does not expose the cause"),
                 )
             }
         }
 
-    private companion object {
-        val DESCRIPTION =
+    private fun problemResponse(description: String) =
+        ApiResponse()
+            .description(description)
+            .content(
+                Content().addMediaType(
+                    ApiDocs.PROBLEM_JSON,
+                    MediaType().schema(Schema<Any>().`$ref`("#/components/schemas/ProblemDetail")),
+                ),
+            )
+
+    companion object {
+        /** Name of the security scheme every operation requires. */
+        const val BEARER_AUTH = "bearerAuth"
+
+        private val DESCRIPTION =
             """
             Transfers between accounts of the simulated digital bank, run as a saga over the accounts API.
 
@@ -56,8 +82,13 @@ class OpenApiConfiguration {
               `type` `/problems/<slug>`; `400 /problems/validation-error` lists the invalid fields in `errors`.
             - Errors raised by the framework itself (404 unknown route, 405 method not allowed, 415 unsupported
               media type, ...) are Problem Details without a `type` member, which RFC 9457 defines as `about:blank`.
+            - Every operation needs `Authorization: Bearer <JWT>` of a customer or of an admin (`bearerAuth`). A
+              customer only transfers from, and only sees, its own accounts and transfers; someone else's is answered
+              with 404, as if it did not exist. An admin may do everything.
+            - Before a transfer is created, the customer that owns the source account is checked with the customer
+              service, every time: not registered or blocked is 422, customer unavailable is 503.
             - `X-Correlation-Id` is accepted on every request (generated when absent or invalid), forwarded to accounts
-              and returned on every response.
+              and customer, and returned on every response.
             """.trimIndent()
     }
 }

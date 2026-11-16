@@ -1,0 +1,31 @@
+auth {
+  mode: bearer
+}
+
+auth:bearer {
+  token: {{customerToken}}
+}
+
+script:pre-request {
+  // Tokens do mock-oauth2-server (como infra/local/auth/token.sh), uma vez por execucao da colecao: um cliente novo,
+  // ainda sem cadastro (customerToken, o token padrao das requisicoes, por heranca), e o usuario de teste do dono no
+  // grupo admin (adminToken).
+  if (!bru.getVar("customerToken")) {
+    const axios = require("axios");
+    const tokenUrl = bru.getEnvVar("tokenUrl");
+    async function userToken(sub, admin) {
+      // Formulario montado a mao: o sandbox de scripts do Bruno nao tem URLSearchParams.
+      const form = `grant_type=password&username=${encodeURIComponent(sub)}&password=unused` +
+        (admin ? "&user_groups=admin" : "");
+      const r = await axios.post(tokenUrl, form, {
+        auth: { username: "web", password: "local-secret" },
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      });
+      return r.data.access_token;
+    }
+    const sub = bru.interpolate("{{$guid}}");
+    bru.setVar("customerId", sub);
+    bru.setVar("adminToken", await userToken(bru.getEnvVar("adminSub"), true));
+    bru.setVar("customerToken", await userToken(sub, false));
+  }
+}

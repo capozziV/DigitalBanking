@@ -51,11 +51,7 @@ class OutboxRelayUnreachableBrokerIntegrationTest : AccountsIntegrationTest() {
     fun `failed publications increase attempts and health stays UP`() {
         markPendingOutboxEventsPublished()
         val opened =
-            api.post(
-                "/accounts",
-                """{"customerId":"${UUID.randomUUID()}"}""",
-                mapOf("Idempotency-Key" to UUID.randomUUID().toString()),
-            )
+            api.openAccount()
         assertThat(opened.status).isEqualTo(201)
         val account = opened.body!!.get("id").asString()
 

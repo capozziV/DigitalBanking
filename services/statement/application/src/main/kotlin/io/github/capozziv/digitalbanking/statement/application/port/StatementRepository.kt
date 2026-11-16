@@ -26,6 +26,9 @@ interface StatementRepository {
 
     fun accountExists(accountId: UUID): Boolean
 
+    /** The customer that owns the account, or null when the statement has not received its `AccountOpened` yet. */
+    fun findCustomerId(accountId: UUID): UUID?
+
     /**
      * Entries of the account with a sequence lower than [cursor] (all of them without a cursor), newest first,
      * at most [limit]. The next cursor is the last returned sequence when the page is full and that sequence

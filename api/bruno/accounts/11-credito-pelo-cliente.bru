@@ -1,0 +1,30 @@
+meta {
+  name: Credito pelo cliente
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/accounts/{{accountId}}/credits
+  body: json
+  auth: inherit
+}
+
+headers {
+  Idempotency-Key: {{$guid}}
+}
+
+body:json {
+  {
+    "amount": 1000,
+    "description": "credito sem ser admin"
+  }
+}
+
+tests {
+  // Creditos e debitos sao do admin e da saga (token de maquina), nunca do cliente.
+  test("403 forbidden", function () {
+    expect(res.status).to.equal(403);
+    expect(res.body.type).to.contain("forbidden");
+  });
+}

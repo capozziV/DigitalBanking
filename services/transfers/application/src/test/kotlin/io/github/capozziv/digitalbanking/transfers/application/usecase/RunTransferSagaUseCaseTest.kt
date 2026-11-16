@@ -58,6 +58,7 @@ class RunTransferSagaUseCaseTest {
                 .request(
                     id = id,
                     sourceAccountId = source,
+                    sourceCustomerId = FakeAccountsGateway.OWNER,
                     destinationAccountId = destination,
                     amount = Money(500),
                     description = "rent",

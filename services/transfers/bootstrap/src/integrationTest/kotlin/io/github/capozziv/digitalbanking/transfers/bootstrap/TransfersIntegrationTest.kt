@@ -1,9 +1,15 @@
 package io.github.capozziv.digitalbanking.transfers.bootstrap
 
 import com.github.tomakehurst.wiremock.WireMockServer
-import com.github.tomakehurst.wiremock.core.WireMockConfiguration.options
+import com.github.tomakehurst.wiremock.client.WireMock.aResponse
+import com.github.tomakehurst.wiremock.client.WireMock.get
+import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
+import com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching
 import io.github.capozziv.digitalbanking.testing.redis.RedisTestSupport
+import io.github.capozziv.digitalbanking.testing.security.JwtTestSupport
+import org.junit.jupiter.api.BeforeEach
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.jdbc.datasource.DriverManagerDataSource
 import org.springframework.test.context.DynamicPropertyRegistry
@@ -11,27 +17,62 @@ import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.TestPropertySource
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.postgresql.PostgreSQLContainer
+import java.util.UUID
 
 /**
  * Base of every integration test of the transfers service. One PostgreSQL container is shared by all subclasses
  * (singleton container, so the cached Spring context keeps a valid connection). The application connects as
  * [APP_USER]; Flyway runs as the container's owner user, mirroring transfers_owner / transfers_app of the
- * local environment. A shared WireMock server stands in for `accounts`; tests that use it reset it first. One Redis
- * container holds the daily limit counters; tests use random account ids, so they never share a counter.
+ * local environment. Shared WireMock servers stand in for `accounts` and `customer`; both answer 401 to a request
+ * without the service token, which [tokenServer] issues (see [ServiceTokenServers]). Tests that stub `accounts` reset
+ * it first; `customer` is reset before every test to answer every customer as active. One Redis container holds the
+ * daily limit counters; tests use random account ids, so they never share a counter.
+ * JWTs are signed by [JwtTestSupport]; [CUSTOMER_ID] is the customer of the default token of the API client.
  * The saga scheduler and the outbox relay are off, so transfers and outbox rows stay as the requests left them; the
  * tests that exercise them turn them on (a subclass @TestPropertySource overrides this one).
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = ["transfers.saga.scheduler-enabled=false", "transfers.outbox.relay-enabled=false"])
+@Import(JwtTestSupport.DecoderConfiguration::class)
 abstract class TransfersIntegrationTest {
     /** JdbcClient connected as the owner user, for setup and inspection outside the application's grants. */
     protected val ownerJdbc: JdbcClient by lazy {
         JdbcClient.create(DriverManagerDataSource(postgres.jdbcUrl, postgres.username, postgres.password))
     }
 
+    @BeforeEach
+    fun everyCustomerIsActive() {
+        customerServer.resetAll()
+        customerServer.stubFor(
+            get(urlPathMatching("/internal/customers/.*"))
+                .atPriority(10)
+                .willReturn(customerJson(CUSTOMER_ID, "ACTIVE")),
+        )
+    }
+
+    /** `customer` answers [customerId] with [status] (`ACTIVE` or `BLOCKED`). */
+    protected fun stubCustomer(
+        customerId: UUID,
+        status: String,
+    ) {
+        customerServer.stubFor(get(urlEqualTo("/internal/customers/$customerId")).willReturn(customerJson(customerId, status)))
+    }
+
+    private fun customerJson(
+        customerId: UUID,
+        status: String,
+    ) = aResponse()
+        .withStatus(200)
+        .withHeader("Content-Type", "application/json")
+        .withBody("""{"id":"$customerId","status":"$status"}""")
+
     companion object {
         const val APP_USER = "transfers_app"
         const val APP_PASSWORD = "app"
+
+        /** The customer that owns the accounts stubbed by default, and of the API client's default token. */
+        @JvmStatic
+        val CUSTOMER_ID: UUID = UUID.fromString("0198a1b2-0000-7000-8000-0000000000c1")
 
         @JvmStatic
         val postgres: PostgreSQLContainer =
@@ -43,9 +84,17 @@ abstract class TransfersIntegrationTest {
         @JvmStatic
         val redis: GenericContainer<*> = RedisTestSupport.container().apply { start() }
 
+        /** Issues the machine token of transfers (client credentials). */
+        @JvmStatic
+        val tokenServer: WireMockServer = ServiceTokenServers.tokenServer()
+
         /** Stands in for the accounts service; `transfers.accounts.url` points to it. */
         @JvmStatic
-        val accountsServer: WireMockServer = WireMockServer(options().dynamicPort()).apply { start() }
+        val accountsServer: WireMockServer = ServiceTokenServers.peerRequiringServiceToken()
+
+        /** Stands in for the customer service; `transfers.customer.url` points to it. */
+        @JvmStatic
+        val customerServer: WireMockServer = ServiceTokenServers.peerRequiringServiceToken()
 
         @JvmStatic
         @DynamicPropertySource
@@ -57,6 +106,12 @@ abstract class TransfersIntegrationTest {
             registry.add("spring.flyway.password") { postgres.password }
             registry.add("spring.flyway.placeholders.appUser") { APP_USER }
             registry.add("transfers.accounts.url") { "http://localhost:${accountsServer.port()}" }
+            registry.add("transfers.customer.url") { "http://localhost:${customerServer.port()}" }
+            registry.add("digitalbanking.security.service-token.token-uri") {
+                "http://localhost:${tokenServer.port()}${ServiceTokenServers.TOKEN_PATH}"
+            }
+            registry.add("digitalbanking.security.service-token.client-id") { ServiceTokenServers.CLIENT_ID }
+            registry.add("digitalbanking.security.service-token.client-secret") { ServiceTokenServers.CLIENT_SECRET }
             registry.add("spring.data.redis.host") { redis.host }
             registry.add("spring.data.redis.port") { redis.getMappedPort(RedisTestSupport.PORT) }
         }

@@ -6,18 +6,12 @@ meta {
 
 post {
   url: {{baseUrl}}/accounts
-  body: json
-  auth: none
+  body: none
+  auth: inherit
 }
 
 headers {
   Idempotency-Key: {{$guid}}
-}
-
-body:json {
-  {
-    "customerId": "{{$guid}}"
-  }
 }
 
 script:post-response {
@@ -25,8 +19,10 @@ script:post-response {
 }
 
 tests {
-  test("201 com a conta nova", function () {
+  // O cliente vem do token (customerToken, cadastrado no customer pelo script da colecao), nao do corpo.
+  test("201 com a conta nova do cliente do token", function () {
     expect(res.status).to.equal(201);
     expect(res.body.balance).to.equal(0);
+    expect(res.body.customerId).to.equal(bru.getVar("customerId"));
   });
 }

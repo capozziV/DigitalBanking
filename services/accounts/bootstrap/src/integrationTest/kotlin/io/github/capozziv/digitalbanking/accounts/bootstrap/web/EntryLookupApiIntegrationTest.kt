@@ -100,7 +100,7 @@ class EntryLookupApiIntegrationTest : AccountsIntegrationTest() {
     private fun key(value: String) = mapOf("Idempotency-Key" to value)
 
     private fun openAccount(): String {
-        val response = api.post("/accounts", """{"customerId":"${UUID.randomUUID()}"}""", key(UUID.randomUUID().toString()))
+        val response = api.openAccount()
         assertThat(response.status).isEqualTo(201)
         return response.body!!.get("id").asString()
     }

@@ -18,6 +18,7 @@ class InMemoryTransferRepositoryTest {
             Transfer.request(
                 id = id,
                 sourceAccountId = UUID.fromString("00000000-0000-7000-8000-0000000000a1"),
+                sourceCustomerId = UUID.fromString("00000000-0000-7000-8000-0000000000c3"),
                 destinationAccountId = UUID.fromString("00000000-0000-7000-8000-0000000000b2"),
                 amount = Money(500),
                 description = "rent",

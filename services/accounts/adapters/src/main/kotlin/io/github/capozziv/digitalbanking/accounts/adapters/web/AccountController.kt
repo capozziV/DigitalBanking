@@ -3,7 +3,6 @@ package io.github.capozziv.digitalbanking.accounts.adapters.web
 import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.AccountDTO
 import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.ChangeAccountTypeDTO
 import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.LedgerEntryDTO
-import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.OpenAccountDTO
 import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.RecordEntryDTO
 import io.github.capozziv.digitalbanking.accounts.application.usecase.ChangeAccountTypeUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.DebitOutcome
@@ -16,6 +15,7 @@ import io.github.capozziv.digitalbanking.accounts.application.usecase.RecordDebi
 import io.github.capozziv.digitalbanking.accounts.application.usecase.RecordEntryCommand
 import io.github.capozziv.digitalbanking.accounts.application.usecase.RecordEntryResult
 import io.github.capozziv.digitalbanking.accounts.domain.Money
+import io.github.capozziv.digitalbanking.security.currentCaller
 import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.MeterRegistry
 import io.swagger.v3.oas.annotations.Operation
@@ -62,8 +62,16 @@ class AccountController(
     // The Idempotency-Key header is declared before the body: a missing key is reported (400
     // missing-idempotency-key) before the body is read and validated.
 
-    /** 201 with the new account; 200 with the existing one when the opening key is repeated. */
-    @Operation(summary = "Open an account (type FREE, zero balance)")
+    /**
+     * 201 with the new account; 200 with the existing one when the opening key is repeated. The account is the
+     * caller's own (a customer, or an admin who is also a customer); the `customer` service must report it ACTIVE.
+     */
+    @Operation(
+        summary = "Open the caller's own account (type FREE, zero balance)",
+        description =
+            "No body: the customer is the `sub` of the token. The `customer` service is asked on every call, " +
+                "retries included, and nothing is written unless it reports the customer ACTIVE.",
+    )
     @ApiResponses(
         ApiResponse(
             responseCode = "201",
@@ -88,7 +96,17 @@ class AccountController(
         ),
         ApiResponse(
             responseCode = "422",
-            description = "/problems/idempotency-key-reused: the key was used to open the account of another customer",
+            description =
+                "/problems/idempotency-key-reused: the key was used to open the account of another customer. " +
+                    "/problems/customer-not-found: the customer service has no customer for the token. " +
+                    "/problems/customer-blocked: the customer is blocked",
+            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
+        ),
+        ApiResponse(
+            responseCode = "503",
+            description =
+                "/problems/customers-unavailable: the customer service is down, slower than the timeout or " +
+                    "answered an error; nothing was written, retry later",
             content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
     )
@@ -96,10 +114,9 @@ class AccountController(
     fun open(
         @Parameter(description = ApiDocs.IDEMPOTENCY_KEY)
         @RequestHeader(IdempotencyKeyHeader.NAME) idempotencyKey: String,
-        @Valid @RequestBody request: OpenAccountDTO,
     ): ResponseEntity<AccountDTO> {
         val key = IdempotencyKeyHeader.require(idempotencyKey)
-        val result = openAccount.execute(OpenAccountCommand(checkNotNull(request.customerId), key))
+        val result = openAccount.execute(OpenAccountCommand(currentCaller(), key))
         val body = AccountDTO.from(result.view)
         return if (result.created) {
             ResponseEntity.created(URI.create("/accounts/${body.id}")).body(body)
@@ -122,14 +139,14 @@ class AccountController(
         ),
         ApiResponse(
             responseCode = "404",
-            description = "/problems/account-not-found",
+            description = "/problems/account-not-found: no such account, or an account of another customer",
             content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
     )
     @GetMapping("/{id}")
     fun get(
         @PathVariable id: UUID,
-    ): AccountDTO = AccountDTO.from(getAccount.execute(id))
+    ): AccountDTO = AccountDTO.from(getAccount.execute(id, currentCaller()))
 
     @Operation(summary = "Record a credit")
     @ApiResponses(
@@ -244,7 +261,7 @@ class AccountController(
         ApiResponse(
             responseCode = "404",
             description =
-                "/problems/account-not-found. " +
+                "/problems/account-not-found: no such account, or an account of another customer. " +
                     "/problems/entry-not-found: no entry was recorded on this account with the key",
             content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
@@ -256,7 +273,7 @@ class AccountController(
         @RequestParam(required = false) idempotencyKey: String?,
     ): LedgerEntryDTO {
         val key = IdempotencyKeyHeader.require("idempotencyKey", idempotencyKey)
-        val entry = findEntryByIdempotencyKey.execute(id, key) ?: throw EntryNotFoundException(id)
+        val entry = findEntryByIdempotencyKey.execute(id, key, currentCaller()) ?: throw EntryNotFoundException(id)
         return LedgerEntryDTO.from(entry)
     }
 

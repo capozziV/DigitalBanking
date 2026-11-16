@@ -1,6 +1,10 @@
 package io.github.capozziv.digitalbanking.accounts.application.usecase
 
+import io.github.capozziv.digitalbanking.accounts.application.CallerNotCustomerException
 import io.github.capozziv.digitalbanking.accounts.application.CustomerAlreadyHasAccountException
+import io.github.capozziv.digitalbanking.accounts.application.CustomerBlockedException
+import io.github.capozziv.digitalbanking.accounts.application.CustomerNotFoundException
+import io.github.capozziv.digitalbanking.accounts.application.CustomersUnavailableException
 import io.github.capozziv.digitalbanking.accounts.application.IdempotencyKeyReusedException
 import io.github.capozziv.digitalbanking.accounts.application.fake.CallLog
 import io.github.capozziv.digitalbanking.accounts.application.fake.DirectTransactionRunner
@@ -9,6 +13,8 @@ import io.github.capozziv.digitalbanking.accounts.application.fake.InMemoryAccou
 import io.github.capozziv.digitalbanking.accounts.application.fake.InMemoryLedgerEntryRepository
 import io.github.capozziv.digitalbanking.accounts.application.fake.RecordingEventOutbox
 import io.github.capozziv.digitalbanking.accounts.application.fake.SequentialIdGenerator
+import io.github.capozziv.digitalbanking.accounts.application.fake.StubCustomerGateway
+import io.github.capozziv.digitalbanking.accounts.application.port.CustomerStatus
 import io.github.capozziv.digitalbanking.accounts.domain.Account
 import io.github.capozziv.digitalbanking.accounts.domain.AccountOpened
 import io.github.capozziv.digitalbanking.accounts.domain.AccountType
@@ -19,6 +25,7 @@ import io.github.capozziv.digitalbanking.accounts.domain.EntryKind
 import io.github.capozziv.digitalbanking.accounts.domain.LedgerEntry
 import io.github.capozziv.digitalbanking.accounts.domain.Money
 import io.github.capozziv.digitalbanking.accounts.domain.OverdraftLimit
+import io.github.capozziv.digitalbanking.security.Caller
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -35,7 +42,8 @@ class OpenAccountUseCaseTest {
             listOf(AccountTypeLimit(AccountType.FREE, OverdraftLimit(1_000), Instant.parse("2026-10-01T00:00:00Z"))),
         )
     private val tx = DirectTransactionRunner()
-    private val useCase = OpenAccountUseCase(accounts, entries, types, outbox, tx, SequentialIdGenerator())
+    private val customers = StubCustomerGateway()
+    private val useCase = OpenAccountUseCase(accounts, entries, types, outbox, tx, SequentialIdGenerator(), customers)
 
     private val expectedAccount = Account(SequentialIdGenerator.idAt(1), customerId, AccountType.FREE)
     private val expectedView = AccountView(expectedAccount, Balance.ZERO, OverdraftLimit(1_000), AvailableBalance(1_000))
@@ -48,11 +56,12 @@ class OpenAccountUseCaseTest {
             log.outbox(outbox),
             log.transactions(tx),
             SequentialIdGenerator(),
+            customers,
         )
 
     @Test
     fun `opening a new account creates a free account and appends account opened to the outbox`() {
-        val result = useCase.execute(OpenAccountCommand(customerId, OPENING_KEY))
+        val result = useCase.execute(OpenAccountCommand(Caller.Customer(customerId), OPENING_KEY))
 
         assertThat(result).isEqualTo(OpenAccountResult(expectedView, created = true))
         assertThat(accounts.all()).containsExactly(expectedAccount)
@@ -62,9 +71,9 @@ class OpenAccountUseCaseTest {
 
     @Test
     fun `retrying with the same opening key returns the same account without a new event`() {
-        useCase.execute(OpenAccountCommand(customerId, OPENING_KEY))
+        useCase.execute(OpenAccountCommand(Caller.Customer(customerId), OPENING_KEY))
 
-        val retry = useCase.execute(OpenAccountCommand(customerId, OPENING_KEY))
+        val retry = useCase.execute(OpenAccountCommand(Caller.Customer(customerId), OPENING_KEY))
 
         assertThat(retry).isEqualTo(OpenAccountResult(expectedView, created = false))
         assertThat(accounts.all()).containsExactly(expectedAccount)
@@ -76,14 +85,14 @@ class OpenAccountUseCaseTest {
         val log = CallLog()
         val tracked = tracked(log)
 
-        tracked.execute(OpenAccountCommand(customerId, OPENING_KEY))
+        tracked.execute(OpenAccountCommand(Caller.Customer(customerId), OPENING_KEY))
 
         assertThat(log.calls).containsExactly("begin", "outbox.append", "types.findLimit", "end")
     }
 
     @Test
     fun `a retry returns the current balance of the existing account read in the same transaction`() {
-        useCase.execute(OpenAccountCommand(customerId, OPENING_KEY))
+        useCase.execute(OpenAccountCommand(Caller.Customer(customerId), OPENING_KEY))
         entries.insert(
             LedgerEntry(
                 id = UUID.fromString("0199a0b0-0000-7000-8000-000000000101"),
@@ -100,7 +109,7 @@ class OpenAccountUseCaseTest {
         val log = CallLog()
         val tracked = tracked(log)
 
-        val retry = tracked.execute(OpenAccountCommand(customerId, OPENING_KEY))
+        val retry = tracked.execute(OpenAccountCommand(Caller.Customer(customerId), OPENING_KEY))
 
         assertThat(retry).isEqualTo(
             OpenAccountResult(
@@ -114,9 +123,9 @@ class OpenAccountUseCaseTest {
     @Test
     fun `reusing an opening key of another customer fails without returning that account`() {
         val otherCustomerId = UUID.fromString("0199a0b0-0000-7000-8000-0000000000c2")
-        useCase.execute(OpenAccountCommand(customerId, OPENING_KEY))
+        useCase.execute(OpenAccountCommand(Caller.Customer(customerId), OPENING_KEY))
 
-        assertThatThrownBy { useCase.execute(OpenAccountCommand(otherCustomerId, OPENING_KEY)) }
+        assertThatThrownBy { useCase.execute(OpenAccountCommand(Caller.Customer(otherCustomerId), OPENING_KEY)) }
             .isInstanceOfSatisfying(IdempotencyKeyReusedException::class.java) {
                 assertThat(it.key).isEqualTo(OPENING_KEY)
             }
@@ -126,14 +135,74 @@ class OpenAccountUseCaseTest {
 
     @Test
     fun `opening a second account for the same customer with another key fails`() {
-        useCase.execute(OpenAccountCommand(customerId, OPENING_KEY))
+        useCase.execute(OpenAccountCommand(Caller.Customer(customerId), OPENING_KEY))
 
-        assertThatThrownBy { useCase.execute(OpenAccountCommand(customerId, "open-key-2")) }
+        assertThatThrownBy { useCase.execute(OpenAccountCommand(Caller.Customer(customerId), "open-key-2")) }
             .isInstanceOfSatisfying(CustomerAlreadyHasAccountException::class.java) {
                 assertThat(it.customerId).isEqualTo(customerId)
             }
         assertThat(accounts.all()).containsExactly(expectedAccount)
         assertThat(outbox.events).containsExactly(AccountOpened(expectedAccount.id, customerId, AccountType.FREE))
+    }
+
+    @Test
+    fun `the customer service is asked about the customer of the caller before anything is written`() {
+        val log = CallLog()
+        customers.log = log
+
+        tracked(log).execute(OpenAccountCommand(Caller.Customer(customerId), OPENING_KEY))
+
+        assertThat(customers.lookups).containsExactly(customerId)
+        assertThat(log.calls).containsExactly("customers.findStatus", "begin", "outbox.append", "types.findLimit", "end")
+    }
+
+    @Test
+    fun `an admin opens the account for itself, the customer whose id is its user id`() {
+        val result = useCase.execute(OpenAccountCommand(Caller.Admin(customerId), OPENING_KEY))
+
+        assertThat(result).isEqualTo(OpenAccountResult(expectedView, created = true))
+        assertThat(customers.lookups).containsExactly(customerId)
+    }
+
+    @Test
+    fun `a service cannot open an account, it is no customer`() {
+        assertThatThrownBy { useCase.execute(OpenAccountCommand(Caller.Service, OPENING_KEY)) }
+            .isInstanceOf(CallerNotCustomerException::class.java)
+        assertThat(customers.lookups).isEmpty()
+        assertThat(accounts.all()).isEmpty()
+    }
+
+    @Test
+    fun `an unknown customer fails with customer not found and nothing is written`() {
+        customers.set(customerId, null)
+
+        assertThatThrownBy { useCase.execute(OpenAccountCommand(Caller.Customer(customerId), OPENING_KEY)) }
+            .isInstanceOfSatisfying(CustomerNotFoundException::class.java) { assertThat(it.customerId).isEqualTo(customerId) }
+        assertNothingWritten()
+    }
+
+    @Test
+    fun `a blocked customer fails with customer blocked and nothing is written`() {
+        customers.set(customerId, CustomerStatus.BLOCKED)
+
+        assertThatThrownBy { useCase.execute(OpenAccountCommand(Caller.Customer(customerId), OPENING_KEY)) }
+            .isInstanceOfSatisfying(CustomerBlockedException::class.java) { assertThat(it.customerId).isEqualTo(customerId) }
+        assertNothingWritten()
+    }
+
+    @Test
+    fun `a customer service failure propagates and nothing is written`() {
+        customers.failFor(customerId)
+
+        assertThatThrownBy { useCase.execute(OpenAccountCommand(Caller.Customer(customerId), OPENING_KEY)) }
+            .isInstanceOf(CustomersUnavailableException::class.java)
+        assertNothingWritten()
+    }
+
+    private fun assertNothingWritten() {
+        assertThat(accounts.all()).isEmpty()
+        assertThat(outbox.events).isEmpty()
+        assertThat(tx.transactions).isZero()
     }
 
     private companion object {

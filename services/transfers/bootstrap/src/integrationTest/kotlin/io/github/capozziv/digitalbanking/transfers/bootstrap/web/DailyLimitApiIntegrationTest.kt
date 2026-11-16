@@ -35,7 +35,10 @@ class DailyLimitApiIntegrationTest : TransfersIntegrationTest() {
 
     @Test
     fun `an account that never transferred has the whole limit available`() {
-        val response = api.get("/accounts/${UUID.randomUUID()}/daily-limit")
+        val untouched = UUID.randomUUID()
+        stubs.accountExists(untouched)
+
+        val response = api.get("/accounts/$untouched/daily-limit")
 
         assertThat(response.status).describedAs(response.rawBody).isEqualTo(200)
         assertThat(response.body!!.get("limitCents").asLong()).isEqualTo(500_000)

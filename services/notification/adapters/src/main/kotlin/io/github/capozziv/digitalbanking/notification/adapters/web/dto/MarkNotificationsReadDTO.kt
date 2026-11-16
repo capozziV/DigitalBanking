@@ -5,9 +5,8 @@ import java.util.UUID
 
 // Fields are nullable so that a missing value reaches bean validation and becomes a field error.
 
-/** Marks as read the notifications of `customerId` up to `upTo`, inclusive. */
+/** Marks as read the notifications of the caller up to `upTo`, inclusive. */
 data class MarkNotificationsReadDTO(
-    @field:NotNull val customerId: UUID?,
     @field:NotNull val upTo: UUID?,
 )
 

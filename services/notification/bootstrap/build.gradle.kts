@@ -15,6 +15,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 
     integrationTestImplementation(project(":libs:testing-localstack"))
+    integrationTestImplementation(project(":libs:testing-security"))
     integrationTestImplementation("org.awaitility:awaitility") // version managed by the Spring Boot BOM
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-webmvc")
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-jdbc")

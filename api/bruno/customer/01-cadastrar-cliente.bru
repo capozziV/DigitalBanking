@@ -1,0 +1,27 @@
+meta {
+  name: Cadastrar cliente
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/customers
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Bruno Customer",
+    "email": "bruno-{{customerId}}@example.test"
+  }
+}
+
+tests {
+  // O id do cliente e o sub do token.
+  test("201 com o cadastro ACTIVE do cliente do token", function () {
+    expect(res.status).to.equal(201);
+    expect(res.body.id).to.equal(bru.getVar("customerId"));
+    expect(res.body.status).to.equal("ACTIVE");
+  });
+}

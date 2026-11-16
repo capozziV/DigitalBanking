@@ -21,6 +21,7 @@ class DailyLimitDayTest {
             Transfer.request(
                 id = TransferFixtures.id,
                 sourceAccountId = TransferFixtures.source,
+                sourceCustomerId = TransferFixtures.sourceCustomer,
                 destinationAccountId = TransferFixtures.destination,
                 amount = Money(1),
                 description = null,

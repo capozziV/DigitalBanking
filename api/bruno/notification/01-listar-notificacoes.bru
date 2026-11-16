@@ -5,35 +5,34 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/notifications?customerId={{sourceCustomerId}}
+  url: {{baseUrl}}/notifications
   body: none
-  auth: none
+  auth: inherit
 }
 
 script:pre-request {
-  // Gera os eventos: abre duas contas, credita a origem e transfere; depois espera a notificacao chegar (ate 45 s).
+  // Gera os eventos: o cliente (remetente) e o outro cliente (destinatario) abrem uma conta cada, o admin credita a
+  // origem e o remetente transfere; depois espera a notificacao chegar (ate 45 s). O token diz de quem sao as
+  // notificacoes listadas.
   const axios = require("axios");
   const base = bru.getEnvVar("baseUrl");
   const guid = () => bru.interpolate("{{$guid}}");
-  const sourceCustomer = guid();
-  const destinationCustomer = guid();
-  async function openAccount(customerId) {
-    const r = await axios.post(`${base}/accounts`, { customerId },
-      { headers: { "Idempotency-Key": guid() } });
+  const bearer = (name) => ({ Authorization: `Bearer ${bru.getVar(name)}` });
+  async function openAccount(tokenVar) {
+    const r = await axios.post(`${base}/accounts`, null,
+      { headers: { ...bearer(tokenVar), "Idempotency-Key": guid() } });
     return r.data.id;
   }
-  const source = await openAccount(sourceCustomer);
-  const destination = await openAccount(destinationCustomer);
+  const source = await openAccount("customerToken");
+  const destination = await openAccount("otherCustomerToken");
   await axios.post(`${base}/accounts/${source}/credits`, { amount: 1000, description: "bruno credito" },
-    { headers: { "Idempotency-Key": guid() } });
+    { headers: { ...bearer("adminToken"), "Idempotency-Key": guid() } });
   await axios.post(`${base}/transfers`,
     { sourceAccountId: source, destinationAccountId: destination, amount: 300, description: "bruno transferencia" },
-    { headers: { "Idempotency-Key": guid() } });
-  bru.setVar("sourceCustomerId", sourceCustomer);
-  bru.setVar("destinationCustomerId", destinationCustomer);
+    { headers: { ...bearer("customerToken"), "Idempotency-Key": guid() } });
 
   for (let i = 0; i < 45; i++) {
-    const r = await axios.get(`${base}/notifications`, { params: { customerId: sourceCustomer } });
+    const r = await axios.get(`${base}/notifications`, { headers: bearer("customerToken") });
     if (r.data.items.some((n) => n.kind === "TRANSFER_SENT")) break;
     await new Promise((resolve) => setTimeout(resolve, 1000));
     if (i === 44) throw new Error("FALHA: TRANSFER_SENT nao chegou em 45 s");

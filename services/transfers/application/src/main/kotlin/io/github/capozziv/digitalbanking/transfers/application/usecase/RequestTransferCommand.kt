@@ -1,5 +1,6 @@
 package io.github.capozziv.digitalbanking.transfers.application.usecase
 
+import io.github.capozziv.digitalbanking.security.Caller
 import io.github.capozziv.digitalbanking.transfers.domain.Money
 import java.util.UUID
 
@@ -10,4 +11,6 @@ data class RequestTransferCommand(
     val description: String?,
     val idempotencyKey: String,
     val correlationId: String?,
+    /** Who asks: a customer may only transfer from its own account; an admin from any account. */
+    val caller: Caller,
 )

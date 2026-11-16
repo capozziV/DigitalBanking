@@ -9,10 +9,28 @@ Pessoa cadastrada no banco, com um status que indica se pode operar.
 _Código_: `Customer`
 _Evite_: usuário (identidade de login), correntista, titular
 
+**Status do cliente**:
+Indica se o cliente pode operar; valores Ativo e Bloqueado.
+_Código_: `CustomerStatus` (valores `ACTIVE`, `BLOCKED`)
+_Evite_: estado
+
+**Ativo**:
+O cliente pode operar; valor de Status do cliente.
+_Código_: `CustomerStatus.ACTIVE`
+
+**Bloqueado**:
+O cliente não pode abrir conta nem transferir; valor de Status do cliente.
+_Código_: `CustomerStatus.BLOCKED`
+
 **Usuário**:
-Identidade de login usada para autenticar um cliente.
+Identidade de login usada para autenticar um cliente; o cliente tem o mesmo id do seu usuário.
 _Código_: `User`
 _Evite_: cliente, conta
+
+**Administrador**:
+Usuário do grupo `admin`, que opera qualquer conta.
+_Código_: `Admin`
+_Evite_: gerente, superusuário
 
 **Conta**:
 Conta de um cliente que guarda valores e possui um saldo.

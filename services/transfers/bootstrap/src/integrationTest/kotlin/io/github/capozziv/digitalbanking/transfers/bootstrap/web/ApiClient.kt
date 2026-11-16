@@ -1,12 +1,16 @@
 package io.github.capozziv.digitalbanking.transfers.bootstrap.web
 
+import io.github.capozziv.digitalbanking.testing.security.JwtTestSupport
+import io.github.capozziv.digitalbanking.transfers.bootstrap.TransfersIntegrationTest
 import org.assertj.core.api.Assertions.assertThat
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
+import org.springframework.http.client.JdkClientHttpRequestFactory
 import org.springframework.web.client.RestClient
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
+import java.net.http.HttpClient
 
 data class ApiResponse(
     val status: Int,
@@ -32,9 +36,14 @@ data class ApiResponse(
     }
 }
 
-/** Plain HTTP client for the integration tests: never throws on 4xx/5xx, returns status, headers and JSON. */
+/**
+ * Plain HTTP client for the integration tests: never throws on 4xx/5xx, returns status, headers and JSON.
+ * Every request carries `Authorization: Bearer` [token] (by default a customer token of
+ * [TransfersIntegrationTest.CUSTOMER_ID]) unless [token] is null or the request sets its own `Authorization`.
+ */
 class ApiClient(
-    port: Int,
+    private val port: Int,
+    private val token: String? = JwtTestSupport.customerToken(TransfersIntegrationTest.CUSTOMER_ID),
 ) {
     private val mapper = JsonMapper.builder().build()
 
@@ -42,8 +51,14 @@ class ApiClient(
         RestClient
             .builder()
             .baseUrl("http://localhost:$port")
+            // The JDK client, never retrying: Apache HttpClient 5 (on the test classpath) repeats a 503 after
+            // 1 s, which would send a second request and hide the timing of a single one.
+            .requestFactory(JdkClientHttpRequestFactory(HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build()))
             .defaultStatusHandler({ true }) { _, _ -> }
             .build()
+
+    /** The same client with another bearer token (null: no token). */
+    fun withToken(token: String?) = ApiClient(port, token)
 
     fun send(
         method: HttpMethod,
@@ -51,15 +66,24 @@ class ApiClient(
         body: String? = null,
         headers: Map<String, String> = emptyMap(),
     ): ApiResponse {
-        val spec = client.method(method).uri(path).headers { h -> headers.forEach { (k, v) -> h.add(k, v) } }
+        val spec =
+            client.method(method).uri(path).headers { h ->
+                if (token != null && headers.keys.none { it.equals(HttpHeaders.AUTHORIZATION, ignoreCase = true) }) {
+                    h.setBearerAuth(token)
+                }
+                headers.forEach { (k, v) -> h.add(k, v) }
+            }
         if (body != null) spec.contentType(MediaType.APPLICATION_JSON).body(body)
         val entity = spec.retrieve().toEntity(String::class.java)
         val raw = entity.body
+        // JSON bodies only (application/json, application/problem+json); YAML or text stays in rawBody.
+        val contentType = entity.headers.contentType
+        val json = contentType != null && contentType.subtype.endsWith("json")
         return ApiResponse(
             status = entity.statusCode.value(),
             headers = entity.headers,
             rawBody = raw,
-            body = raw?.takeIf { it.isNotBlank() }?.let { mapper.readTree(it) },
+            body = raw?.takeIf { json && it.isNotBlank() }?.let { mapper.readTree(it) },
         )
     }
 

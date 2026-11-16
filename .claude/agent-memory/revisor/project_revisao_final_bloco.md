@@ -32,3 +32,8 @@ Na revisão final do bloco 1 da etapa 2 (2026-10-27), as tasks estavam limpas um
 - Menores adiados que são "plano reservava outro arquivo"/"fora da lista do brief" e já seguem a spec: triagem "sem ação", não issue.
 
 Relacionado: [[gate-revisao-task]]
+- Etapa 7 (revisão final, 2026-11-14): aprovada, sem bloqueantes. Build `--rerun-tasks` deu 1200 testes em 15 min. Os 5 mutantes rodaram num script com `git archive`, um por cópia e só nas classes-alvo: cerca de 3 min, todos vermelhos.
+  - Drift de docs de novo. Uma task manteve um parâmetro que a spec mandava tirar (`GET /notifications?customerId=` ficou só para o admin). O código tem teste, mas a spec §1 e o plano não foram corrigidos. Para cada "X some"/"sem Y" da spec, faça `git grep` no código.
+  - O `docs/status.md` estava parado no meio da etapa.
+  - Integração de libs comuns: compare as regras de rota de cada serviço (`SecurityRules`) com os `@*Mapping`. Exceção aberta num só serviço (`/v3/api-docs.yaml`) é sinal de regra que devia estar na lib.
+  - Os `TEST-*.xml` não servem com `-newer build.log`, porque o log é gravado até o fim. Com `--rerun-tasks`, conte todos e confira o intervalo dos mtimes.

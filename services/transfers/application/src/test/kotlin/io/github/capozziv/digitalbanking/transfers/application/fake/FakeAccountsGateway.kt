@@ -13,7 +13,7 @@ class FakeAccountsGateway(
 ) : AccountsGateway {
     private val script = ArrayDeque<CallResult>()
     val calls = mutableListOf<StepCall.Accounts>()
-    var lookup = AccountLookup.EXISTS
+    var lookup: AccountLookup = AccountLookup.Found(OWNER)
 
     /** Per-account override of [lookup]. */
     val lookupResults = mutableMapOf<UUID, AccountLookup>()
@@ -39,6 +39,9 @@ class FakeAccountsGateway(
     }
 
     companion object {
+        /** Customer that owns every account unless [lookupResults] says otherwise. */
+        val OWNER: UUID = UUID.fromString("00000000-0000-7000-8000-0000000000c3")
+
         val created = CallResult(StepOutcome.Success, 201, null)
         val busy = CallResult(StepOutcome.TransientFailure, 503, "account-busy")
         val timeout = CallResult(StepOutcome.TransientFailure, null, "read timed out")

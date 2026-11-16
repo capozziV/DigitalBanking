@@ -1,5 +1,7 @@
 package io.github.capozziv.digitalbanking.accounts.bootstrap
 
+import io.github.capozziv.digitalbanking.accounts.bootstrap.web.ApiClient
+import io.github.capozziv.digitalbanking.testing.security.JwtTestSupport
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -47,6 +49,8 @@ class AccountsApplicationIntegrationTest : AccountsIntegrationTest() {
             .create("http://localhost:$port")
             .get()
             .uri("/actuator/health")
+            // Health details (the components) are shown to admins only.
+            .header("Authorization", "Bearer ${JwtTestSupport.adminToken(ApiClient.ADMIN_ID)}")
             .retrieve()
             .body(object : ParameterizedTypeReference<Map<String, Any>>() {})
 

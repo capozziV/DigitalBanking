@@ -53,6 +53,7 @@ class ResumeDueTransfersUseCaseTest {
                 UUID.fromString("00000000-0000-7000-8000-00000000010$n"),
                 UUID.randomUUID(),
                 UUID.randomUUID(),
+                UUID.randomUUID(),
                 Money(100),
                 null,
                 "key-$n",

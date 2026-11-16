@@ -1,10 +1,13 @@
 package io.github.capozziv.digitalbanking.notification.application.usecase
 
+import io.github.capozziv.digitalbanking.notification.application.ForeignCustomerException
 import io.github.capozziv.digitalbanking.notification.application.fake.InMemoryNotificationRepository
 import io.github.capozziv.digitalbanking.notification.application.port.NotificationCursor
 import io.github.capozziv.digitalbanking.notification.domain.Notification
 import io.github.capozziv.digitalbanking.notification.domain.NotificationKind
+import io.github.capozziv.digitalbanking.security.Caller
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.util.UUID
@@ -19,7 +22,7 @@ class ListNotificationsUseCaseTest {
     fun `the first page has the 20 newest notifications and a cursor to the next`() {
         val stored = store(25)
 
-        val page = useCase.execute(customer, null)
+        val page = useCase.execute(Caller.Customer(customer), null, null)
 
         assertThat(page.items).hasSize(20)
         assertThat(page.items.map { it.id }).isEqualTo(stored.reversed().take(20).map { it.id })
@@ -30,9 +33,9 @@ class ListNotificationsUseCaseTest {
     @Test
     fun `the second page has the rest and no next cursor`() {
         val stored = store(25)
-        val first = useCase.execute(customer, null)
+        val first = useCase.execute(Caller.Customer(customer), null, null)
 
-        val second = useCase.execute(customer, first.nextCursor)
+        val second = useCase.execute(Caller.Customer(customer), null, first.nextCursor)
 
         assertThat(second.items.map { it.id }).isEqualTo(stored.take(5).reversed().map { it.id })
         assertThat(second.nextCursor).isNull()
@@ -42,7 +45,7 @@ class ListNotificationsUseCaseTest {
     fun `exactly one full page has no next cursor`() {
         store(20)
 
-        assertThat(useCase.execute(customer, null).nextCursor).isNull()
+        assertThat(useCase.execute(Caller.Customer(customer), null, null).nextCursor).isNull()
     }
 
     @Test
@@ -51,12 +54,12 @@ class ListNotificationsUseCaseTest {
         repository.markReadUpTo(customer, stored[2], start)
         repository.saveAll(listOf(notification(UUID.randomUUID(), 99)))
 
-        assertThat(useCase.execute(customer, null).unreadCount).isEqualTo(22)
+        assertThat(useCase.execute(Caller.Customer(customer), null, null).unreadCount).isEqualTo(22)
     }
 
     @Test
     fun `a customer without notifications gets an empty page`() {
-        val page = useCase.execute(customer, null)
+        val page = useCase.execute(Caller.Customer(customer), null, null)
 
         assertThat(page.items).isEmpty()
         assertThat(page.unreadCount).isZero()
@@ -68,7 +71,7 @@ class ListNotificationsUseCaseTest {
         val tied = (1..3).map { tied(it) }
         repository.saveAll(tied)
 
-        val page = useCase.execute(customer, null)
+        val page = useCase.execute(Caller.Customer(customer), null, null)
 
         assertThat(page.items.map { it.id }).isEqualTo(tied.sortedByDescending { it.id.toString() }.map { it.id })
     }
@@ -80,14 +83,58 @@ class ListNotificationsUseCaseTest {
         repository.saveAll(tied)
         val expected = (newer + tied).sortedWith(compareByDescending<Notification> { it.createdAt }.thenByDescending { it.id.toString() })
 
-        val first = useCase.execute(customer, null)
-        val second = useCase.execute(customer, first.nextCursor)
+        val first = useCase.execute(Caller.Customer(customer), null, null)
+        val second = useCase.execute(Caller.Customer(customer), null, first.nextCursor)
 
         assertThat(first.items).hasSize(20)
         assertThat(second.items).hasSize(2)
         assertThat(first.items.last().createdAt).isEqualTo(second.items.first().createdAt)
         assertThat(first.items.map { it.id } + second.items.map { it.id }).isEqualTo(expected.map { it.id })
         assertThat(second.nextCursor).isNull()
+    }
+
+    @Test
+    fun `a customer who names their own id gets their notifications`() {
+        store(2)
+
+        val page = useCase.execute(Caller.Customer(customer), customer, null)
+
+        assertThat(page.items).hasSize(2)
+    }
+
+    @Test
+    fun `a customer who names another customer is refused and sees nothing`() {
+        val other = UUID.randomUUID()
+        repository.saveAll(listOf(notification(other, 1)))
+
+        assertThatThrownBy { useCase.execute(Caller.Customer(customer), other, null) }
+            .isInstanceOf(ForeignCustomerException::class.java)
+    }
+
+    @Test
+    fun `an admin without a customerId gets the notifications of their own user id`() {
+        val admin = UUID.randomUUID()
+        repository.saveAll(listOf(notification(admin, 1), notification(customer, 2)))
+
+        val page = useCase.execute(Caller.Admin(admin), null, null)
+
+        assertThat(page.items.map { it.customerId }).containsOnly(admin)
+        assertThat(page.items).hasSize(1)
+    }
+
+    @Test
+    fun `an admin who names a customer gets the notifications of that customer`() {
+        store(3)
+
+        val page = useCase.execute(Caller.Admin(UUID.randomUUID()), customer, null)
+
+        assertThat(page.items).hasSize(3)
+        assertThat(page.unreadCount).isEqualTo(3)
+    }
+
+    @Test
+    fun `a service caller has no notifications`() {
+        assertThatThrownBy { useCase.execute(Caller.Service, null, null) }.isInstanceOf(ForeignCustomerException::class.java)
     }
 
     private fun tied(index: Int) = notification(customer, 100 + index).copy(createdAt = start.plusSeconds(1000))

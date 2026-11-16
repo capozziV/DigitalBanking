@@ -18,6 +18,7 @@ import io.github.capozziv.digitalbanking.transfers.adapters.accounts.AccountsRes
 import io.github.capozziv.digitalbanking.transfers.adapters.accounts.HttpAccountsGateway
 import io.github.capozziv.digitalbanking.transfers.application.port.AccountLookup
 import io.github.capozziv.digitalbanking.transfers.application.port.AccountsGateway
+import io.github.capozziv.digitalbanking.transfers.bootstrap.ServiceTokenServers
 import io.github.capozziv.digitalbanking.transfers.domain.Money
 import io.github.capozziv.digitalbanking.transfers.domain.StepCall
 import io.github.capozziv.digitalbanking.transfers.domain.StepOutcome
@@ -32,8 +33,10 @@ import java.time.Duration
 import java.util.UUID
 import kotlin.concurrent.thread
 
+/** The accounts client against a WireMock that answers 401 to any request without the service token. */
 class HttpAccountsGatewayIntegrationTest {
-    private val server = WireMockServer(options().dynamicPort())
+    private val server = WireMockServer(ServiceTokenServers.peerOptions())
+    private val tokenServer = WireMockServer(options().dynamicPort())
     private lateinit var gateway: AccountsGateway
 
     private val accountId = UUID.fromString("0198a1b2-0000-7000-8000-000000000001")
@@ -42,6 +45,8 @@ class HttpAccountsGatewayIntegrationTest {
     @BeforeEach
     fun startServer() {
         server.start()
+        tokenServer.start()
+        ServiceTokenServers.stubTokenEndpoint(tokenServer)
         gateway = gatewayFor("http://localhost:${server.port()}")
     }
 
@@ -49,11 +54,38 @@ class HttpAccountsGatewayIntegrationTest {
     fun stopServer() {
         MDC.clear()
         server.stop()
+        tokenServer.stop()
     }
 
     private fun gatewayFor(url: String): AccountsGateway {
         val properties = AccountsClientProperties(url = url)
-        return HttpAccountsGateway(AccountsClientConfiguration().accountsRestClient(properties), AccountsResponseClassifier())
+        val restClient = AccountsClientConfiguration().accountsRestClient(properties, ServiceTokenServers.clientOf(tokenServer))
+        return HttpAccountsGateway(restClient, AccountsResponseClassifier())
+    }
+
+    @Test
+    fun `every call carries the service token`() {
+        server.stubFor(
+            post(urlEqualTo("/accounts/$accountId/debits"))
+                .willReturn(aResponse().withStatus(201).withHeader("Content-Type", "application/json").withBody(entryJson())),
+        )
+
+        assertThat(gateway.perform(debit()).outcome).isEqualTo(StepOutcome.Success)
+        server.verify(
+            postRequestedFor(urlEqualTo("/accounts/$accountId/debits"))
+                .withHeader("Authorization", equalTo("Bearer ${ServiceTokenServers.SERVICE_TOKEN}")),
+        )
+    }
+
+    @Test
+    fun `no service token is a transient failure, never a refusal`() {
+        tokenServer.stop()
+
+        val result = gateway.perform(debit())
+
+        assertThat(result.outcome).isEqualTo(StepOutcome.TransientFailure)
+        assertThat(result.httpStatus).isNull()
+        assertThat(server.allServeEvents).isEmpty()
     }
 
     private fun debit(key: String = "transfer-1-debit") = StepCall.Debit(accountId, Money(1_000), key, "Transfer to someone")
@@ -387,7 +419,7 @@ class HttpAccountsGatewayIntegrationTest {
     }
 
     @Test
-    fun `lookup account returns EXISTS for 200`() {
+    fun `lookup account returns the owner for 200`() {
         server.stubFor(
             get(urlEqualTo("/accounts/$accountId")).willReturn(
                 aResponse().withStatus(200).withHeader("Content-Type", "application/json").withBody(
@@ -397,30 +429,58 @@ class HttpAccountsGatewayIntegrationTest {
         )
         MDC.put("correlationId", "corr-7")
 
-        assertThat(gateway.lookupAccount(accountId)).isEqualTo(AccountLookup.EXISTS)
+        assertThat(gateway.lookupAccount(accountId)).isEqualTo(AccountLookup.Found(UUID.fromString(entryId)))
         server.verify(getRequestedFor(urlEqualTo("/accounts/$accountId")).withHeader("X-Correlation-Id", equalTo("corr-7")))
     }
 
     @Test
-    fun `lookup account returns NOT_FOUND for 404 account-not-found`() {
+    fun `lookup account returns NotFound for 404 account-not-found`() {
         server.stubFor(get(urlEqualTo("/accounts/$accountId")).willReturn(problem(404, "account-not-found")))
 
-        assertThat(gateway.lookupAccount(accountId)).isEqualTo(AccountLookup.NOT_FOUND)
+        assertThat(gateway.lookupAccount(accountId)).isEqualTo(AccountLookup.NotFound)
     }
 
     @Test
-    fun `lookup account returns UNAVAILABLE for 5xx, bad 200 body, cut connection and timeout`() {
+    fun `lookup account returns Unavailable for 5xx, bad 200 body, cut connection and timeout`() {
         server.stubFor(get(urlEqualTo("/accounts/$accountId")).willReturn(aResponse().withStatus(503)))
-        assertThat(gateway.lookupAccount(accountId)).isEqualTo(AccountLookup.UNAVAILABLE)
+        assertThat(gateway.lookupAccount(accountId)).isEqualTo(AccountLookup.Unavailable)
 
         server.stubFor(get(urlEqualTo("/accounts/$accountId")).willReturn(aResponse().withStatus(200).withBody("<html></html>")))
-        assertThat(gateway.lookupAccount(accountId)).isEqualTo(AccountLookup.UNAVAILABLE)
+        assertThat(gateway.lookupAccount(accountId)).isEqualTo(AccountLookup.Unavailable)
+
+        // An account without its owner cannot be checked: not taken for an account of nobody.
+        server.stubFor(
+            get(urlEqualTo("/accounts/$accountId"))
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json").withBody("""{"id":"$accountId"}""")),
+        )
+        assertThat(gateway.lookupAccount(accountId)).isEqualTo(AccountLookup.Unavailable)
 
         server.stubFor(get(urlEqualTo("/accounts/$accountId")).willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER)))
-        assertThat(gateway.lookupAccount(accountId)).isEqualTo(AccountLookup.UNAVAILABLE)
+        assertThat(gateway.lookupAccount(accountId)).isEqualTo(AccountLookup.Unavailable)
 
         server.stubFor(get(urlEqualTo("/accounts/$accountId")).willReturn(aResponse().withStatus(200).withFixedDelay(4_000)))
-        assertThat(gateway.lookupAccount(accountId)).isEqualTo(AccountLookup.UNAVAILABLE)
+        assertThat(gateway.lookupAccount(accountId)).isEqualTo(AccountLookup.Unavailable)
+    }
+
+    @Test
+    fun `a debit with the service token rejected (401 or 403) is transient`() {
+        for ((status, slug) in listOf(401 to "unauthorized", 403 to "forbidden")) {
+            server.stubFor(post(urlEqualTo("/accounts/$accountId/debits")).willReturn(problem(status, slug)))
+
+            val result = gateway.perform(debit())
+
+            assertThat(result.outcome).describedAs("status $status").isEqualTo(StepOutcome.TransientFailure)
+            assertThat(result.httpStatus).isEqualTo(status)
+        }
+    }
+
+    @Test
+    fun `lookup account returns Unavailable when accounts rejects the service token (401 or 403)`() {
+        server.stubFor(get(urlEqualTo("/accounts/$accountId")).willReturn(problem(401, "unauthorized")))
+        assertThat(gateway.lookupAccount(accountId)).isEqualTo(AccountLookup.Unavailable)
+
+        server.stubFor(get(urlEqualTo("/accounts/$accountId")).willReturn(problem(403, "forbidden")))
+        assertThat(gateway.lookupAccount(accountId)).isEqualTo(AccountLookup.Unavailable)
     }
 
     @Test

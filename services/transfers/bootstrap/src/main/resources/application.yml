@@ -22,13 +22,32 @@ spring:
       # With Redis down a command fails fast and the daily limit is decided in PostgreSQL (RedisDailyLimitGateway).
       timeout: ${TRANSFERS_REDIS_TIMEOUT:100ms}
       connect-timeout: ${TRANSFERS_REDIS_TIMEOUT:100ms}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${TRANSFERS_JWT_ISSUER_URI:http://localhost:8090/default}
   flyway:
     user: ${TRANSFERS_DB_OWNER_USER:transfers_owner}
     password: ${TRANSFERS_DB_OWNER_PASSWORD:transfers_owner}
     placeholders:
       appUser: ${TRANSFERS_DB_USER:transfers_app}
 
+digitalbanking:
+  security:
+    groups-claim: ${TRANSFERS_JWT_GROUPS_CLAIM:groups}
+    # Machine token of transfers for its calls to accounts and customer (client credentials). Worst case of one token
+    # request: connect 500 ms + read 1.5 s = 2 s, counted in transfers.saga.call-budget.
+    service-token:
+      token-uri: ${TRANSFERS_OAUTH_TOKEN_URI:http://localhost:8090/default/token}
+      client-id: ${TRANSFERS_OAUTH_CLIENT_ID:transfers}
+      client-secret: ${TRANSFERS_OAUTH_CLIENT_SECRET:local-secret}
+
 transfers:
+  customer:
+    # Asked on every transfer request, never cached; slower than the timeout is 503 customers-unavailable.
+    url: ${TRANSFERS_CUSTOMER_BASE_URL:http://localhost:8085}
+    timeout: ${TRANSFERS_CUSTOMER_TIMEOUT:500ms}
   daily-limit:
     # Cents a source account may transfer per São Paulo day.
     amount: ${TRANSFERS_DAILY_LIMIT:500000}
@@ -41,7 +60,8 @@ transfers:
     deadline: 2m
     lease: 30s
     busy-attempts: 3
-    call-budget: 4s
+    # Connect 1 s + read 3 s of transfers.accounts + 2 s of the machine token (checked by SagaTimeoutsValidator).
+    call-budget: 6s
     retry-initial: 1s
     retry-max: 15s
   outbox:
@@ -61,8 +81,8 @@ transfers:
 
 logging:
   pattern:
-    # Correlation id (MDC key of OutboxEventEnvelope.CORRELATION_ID_MDC_KEY) on every log line, from the request
-    # filter or, for the saga scheduler, from the transfer being resumed.
+    # Correlation id (MDC key of libs/observabilidade, the same as OutboxEventEnvelope.CORRELATION_ID_MDC_KEY) on every
+    # log line, from the request filter or, for the saga scheduler, from the transfer being resumed.
     correlation: "[%X{correlationId:-}] "
 
 server:
@@ -75,8 +95,11 @@ management:
         include: health,metrics
   endpoint:
     health:
-      show-details: always
-      show-components: always
+      # /actuator/health is open with the status only; details and components for admins. The rest of the actuator
+      # is for admins only (libs/security).
+      show-details: when-authorized
+      show-components: when-authorized
+      roles: ADMIN
   health:
     redis:
       # Redis is not required: with it down the daily limit falls back to PostgreSQL, so the service stays UP.

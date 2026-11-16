@@ -1,6 +1,8 @@
 package io.github.capozziv.digitalbanking.notification.bootstrap
 
+import io.github.capozziv.digitalbanking.testing.security.JwtTestSupport
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.jdbc.datasource.DriverManagerDataSource
 import org.springframework.test.context.DynamicPropertyRegistry
@@ -17,6 +19,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer
  * `@SpringBootTest` (e.g. a web environment) does not drop them.
  */
 @SpringBootTest
+// The decoder of the tests replaces the one built from the issuer URI, so no identity server has to be up.
+@Import(JwtTestSupport.DecoderConfiguration::class)
 @TestPropertySource(
     properties = [
         "spring.cloud.aws.region.static=us-east-1",

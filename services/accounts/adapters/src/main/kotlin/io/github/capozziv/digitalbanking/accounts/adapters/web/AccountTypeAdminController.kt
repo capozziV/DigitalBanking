@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
-/** Overdraft limits per account type. Open until stage 7, which restricts it to administrators. */
+/** Overdraft limits per account type. Administrators only: every route under `/admin/` is a rule of libs/security. */
 @RestController
 @RequestMapping("/admin/account-types")
 class AccountTypeAdminController(

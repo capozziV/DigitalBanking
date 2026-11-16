@@ -3,7 +3,9 @@ package io.github.capozziv.digitalbanking.statement.bootstrap.web
 import io.github.capozziv.digitalbanking.statement.application.port.StatementRepository
 import io.github.capozziv.digitalbanking.statement.domain.EntryKind
 import io.github.capozziv.digitalbanking.statement.domain.StatementEntry
+import io.github.capozziv.digitalbanking.testing.security.JwtTestSupport
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
@@ -24,6 +26,19 @@ class StatementApiIntegrationTest : StatementWebIntegrationTest() {
     private val api by lazy { ApiClient(port) }
 
     private val account = UUID.randomUUID()
+    private val owner = UUID.randomUUID()
+
+    /** The owner of [account] by default; the owner check itself is in [StatementOwnershipIntegrationTest]. */
+    private fun get(
+        path: String,
+        headers: Map<String, String> = emptyMap(),
+        bearer: String = JwtTestSupport.customerToken(owner),
+    ) = api.get(path, headers, bearer)
+
+    @BeforeEach
+    fun registerAccount() {
+        repository.insertAccount(account, owner)
+    }
 
     @Test
     fun `three entries come newest first with the fields of the spec`() {
@@ -32,7 +47,7 @@ class StatementApiIntegrationTest : StatementWebIntegrationTest() {
         val first = entry(1, EntryKind.CREDIT, amount = 1_000, balanceAfter = 1_000, description = "deposit")
         listOf(first, credit, debit).forEach(repository::insertEntry)
 
-        val response = api.get("/accounts/$account/statement")
+        val response = get("/accounts/$account/statement")
 
         assertThat(response.status).describedAs(response.rawBody).isEqualTo(200)
         val body = response.body!!
@@ -59,7 +74,7 @@ class StatementApiIntegrationTest : StatementWebIntegrationTest() {
         var path = "/accounts/$account/statement?limit=2"
         var pages = 0
         while (true) {
-            val response = api.get(path)
+            val response = get(path)
             assertThat(response.status).describedAs(response.rawBody).isEqualTo(200)
             seen += sequences(response.body!!)
             pages++
@@ -76,7 +91,7 @@ class StatementApiIntegrationTest : StatementWebIntegrationTest() {
     fun `the default page has 20 entries`() {
         (1L..25L).forEach { repository.insertEntry(entry(it)) }
 
-        val response = api.get("/accounts/$account/statement")
+        val response = get("/accounts/$account/statement")
 
         assertThat(response.body!!.get("entries").size()).isEqualTo(20)
         assertThat(response.body.get("nextCursor").isNull).isFalse()
@@ -84,9 +99,7 @@ class StatementApiIntegrationTest : StatementWebIntegrationTest() {
 
     @Test
     fun `a known account without entries gets an empty page`() {
-        repository.insertAccount(account, UUID.randomUUID())
-
-        val response = api.get("/accounts/$account/statement")
+        val response = get("/accounts/$account/statement")
 
         assertThat(response.status).describedAs(response.rawBody).isEqualTo(200)
         assertThat(response.body!!.get("accountId").asString()).isEqualTo(account.toString())
@@ -96,15 +109,13 @@ class StatementApiIntegrationTest : StatementWebIntegrationTest() {
 
     @Test
     fun `an unknown account is 404 account-not-found`() {
-        assertProblem(api.get("/accounts/${UUID.randomUUID()}/statement"), 404, "account-not-found")
+        assertProblem(get("/accounts/${UUID.randomUUID()}/statement"), 404, "account-not-found")
     }
 
     @ParameterizedTest
     @ValueSource(strings = ["0", "101", "-1", "abc"])
     fun `a limit outside 1 to 100 or not a number is 400 validation-error`(limit: String) {
-        repository.insertAccount(account, UUID.randomUUID())
-
-        val response = api.get("/accounts/$account/statement?limit=$limit")
+        val response = get("/accounts/$account/statement?limit=$limit")
 
         assertProblem(response, 400, "validation-error")
         assertThat(response.errorFields()).containsExactly("limit")
@@ -114,14 +125,14 @@ class StatementApiIntegrationTest : StatementWebIntegrationTest() {
     fun `the limits 1 and 100 are accepted`() {
         repository.insertEntry(entry(1))
 
-        assertThat(api.get("/accounts/$account/statement?limit=1").status).isEqualTo(200)
-        assertThat(api.get("/accounts/$account/statement?limit=100").status).isEqualTo(200)
+        assertThat(get("/accounts/$account/statement?limit=1").status).isEqualTo(200)
+        assertThat(get("/accounts/$account/statement?limit=100").status).isEqualTo(200)
     }
 
     @ParameterizedTest
     @ValueSource(strings = ["%25%25%25", "abc", "djE6MA", "djE6eA"])
     fun `a cursor that was not issued by the API is 400 validation-error`(cursor: String) {
-        val response = api.get("/accounts/$account/statement?cursor=$cursor")
+        val response = get("/accounts/$account/statement?cursor=$cursor")
 
         assertProblem(response, 400, "validation-error")
         assertThat(response.errorFields()).containsExactly("cursor")
@@ -131,7 +142,7 @@ class StatementApiIntegrationTest : StatementWebIntegrationTest() {
     fun `the cursor past the oldest entry gets an empty page without a next cursor`() {
         repository.insertEntry(entry(1))
 
-        val response = api.get("/accounts/$account/statement?cursor=djE6MQ")
+        val response = get("/accounts/$account/statement?cursor=djE6MQ")
 
         assertThat(response.status).describedAs(response.rawBody).isEqualTo(200)
         assertThat(response.body!!.get("entries").size()).isZero()
@@ -139,18 +150,20 @@ class StatementApiIntegrationTest : StatementWebIntegrationTest() {
     }
 
     @Test
-    fun `a valid cursor on an unknown account gets an empty page, not 404`() {
-        val response = api.get("/accounts/$account/statement?cursor=djE6NQ")
+    fun `a valid cursor on an unknown account gets an empty page for an admin, not 404`() {
+        val unknown = UUID.randomUUID()
+
+        val response = get("/accounts/$unknown/statement?cursor=djE6NQ", bearer = JwtTestSupport.adminToken(UUID.randomUUID()))
 
         assertThat(response.status).describedAs(response.rawBody).isEqualTo(200)
-        assertThat(response.body!!.get("accountId").asString()).isEqualTo(account.toString())
+        assertThat(response.body!!.get("accountId").asString()).isEqualTo(unknown.toString())
         assertThat(response.body.get("entries").size()).isZero()
         assertThat(response.body.get("nextCursor").isNull).isTrue()
     }
 
     @Test
     fun `an accountId that is not a UUID is 400 validation-error`() {
-        val response = api.get("/accounts/nope/statement")
+        val response = get("/accounts/nope/statement")
 
         assertProblem(response, 400, "validation-error")
         assertThat(response.errorFields()).containsExactly("accountId")
@@ -158,8 +171,8 @@ class StatementApiIntegrationTest : StatementWebIntegrationTest() {
 
     @Test
     fun `the correlation id is returned, reused when sent and generated when not`() {
-        val sent = api.get("/accounts/${UUID.randomUUID()}/statement", mapOf("X-Correlation-Id" to "corr-123"))
-        val generated = api.get("/accounts/${UUID.randomUUID()}/statement")
+        val sent = get("/accounts/${UUID.randomUUID()}/statement", mapOf("X-Correlation-Id" to "corr-123"))
+        val generated = get("/accounts/${UUID.randomUUID()}/statement")
 
         assertThat(sent.header("X-Correlation-Id")).isEqualTo("corr-123")
         assertThat(generated.header("X-Correlation-Id")).isNotBlank()

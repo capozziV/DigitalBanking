@@ -9,3 +9,10 @@ infra/local/.env
 .DS_Store
 graphify-out/cache/
 .claude/worktrees/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log

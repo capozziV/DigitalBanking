@@ -1,5 +1,6 @@
 package io.github.capozziv.digitalbanking.transfers.bootstrap.web
 
+import io.github.capozziv.digitalbanking.security.Caller
 import io.github.capozziv.digitalbanking.transfers.application.usecase.GetTransferUseCase
 import io.github.capozziv.digitalbanking.transfers.bootstrap.TransfersIntegrationTest
 import org.assertj.core.api.Assertions.assertThat
@@ -31,7 +32,7 @@ class UnexpectedErrorApiIntegrationTest : TransfersIntegrationTest() {
         output: CapturedOutput,
     ) {
         val id = UUID.randomUUID()
-        `when`(getTransfer.execute(id)).thenThrow(IllegalStateException("secret internal detail"))
+        `when`(getTransfer.execute(id, Caller.Customer(CUSTOMER_ID))).thenThrow(IllegalStateException("secret internal detail"))
         val correlationId = UUID.randomUUID().toString()
 
         val response = ApiClient(port).get("/transfers/$id", mapOf("X-Correlation-Id" to correlationId))

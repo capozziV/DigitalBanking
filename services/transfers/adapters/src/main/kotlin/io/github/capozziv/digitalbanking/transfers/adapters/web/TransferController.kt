@@ -1,6 +1,7 @@
 package io.github.capozziv.digitalbanking.transfers.adapters.web
 
-import io.github.capozziv.digitalbanking.outbox.OutboxEventEnvelope
+import io.github.capozziv.digitalbanking.observability.CorrelationId
+import io.github.capozziv.digitalbanking.security.currentCaller
 import io.github.capozziv.digitalbanking.transfers.adapters.web.dto.RequestTransferDTO
 import io.github.capozziv.digitalbanking.transfers.adapters.web.dto.TransferDTO
 import io.github.capozziv.digitalbanking.transfers.application.usecase.GetTransferUseCase
@@ -17,6 +18,7 @@ import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
+import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import jakarta.validation.Valid
 import org.slf4j.MDC
 import org.springframework.http.ProblemDetail
@@ -33,6 +35,7 @@ import java.util.UUID
 
 @RestController
 @RequestMapping("/transfers")
+@SecurityRequirement(name = OpenApiConfiguration.BEARER_AUTH)
 class TransferController(
     private val requestTransfer: RequestTransferUseCase,
     private val getTransfer: GetTransferUseCase,
@@ -78,15 +81,26 @@ class TransferController(
                     "`daily-limit-exceeded` (the source account would pass its daily limit), " +
                     "`daily-limit-unavailable` (the daily limit could not be checked in time) or any other reason of accounts. " +
                     "/problems/same-account-transfer: source and destination are the same account. " +
-                    "/problems/account-not-found: an account does not exist (`accountId`); nothing is stored. " +
-                    "/problems/idempotency-key-reused: the key was used for another source, destination or amount.",
+                    "/problems/account-not-found: the destination account does not exist (`accountId`); nothing is stored. " +
+                    "/problems/idempotency-key-reused: the key was used for another source, destination or amount. " +
+                    "/problems/customer-not-found: the customer that owns the source account is not registered; " +
+                    "nothing is stored. " +
+                    "/problems/customer-blocked: the customer that owns the source account is blocked; nothing is stored.",
+            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
+        ),
+        ApiResponse(
+            responseCode = "404",
+            description =
+                "/problems/account-not-found: the source account does not exist or is not the caller's (`accountId`); " +
+                    "the same answer in both cases. An admin may transfer from any account. Nothing is stored.",
             content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "503",
             description =
-                "/problems/accounts-unavailable: accounts did not answer the account check; nothing is stored, " +
-                    "retry after `Retry-After` seconds",
+                "/problems/accounts-unavailable: accounts did not answer the account check. " +
+                    "/problems/customers-unavailable: customer did not answer the status check in time. " +
+                    "Nothing is stored; retry after `Retry-After` seconds",
             headers = [Header(name = "Retry-After", description = "Seconds to wait before retrying (1)")],
             content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
@@ -104,14 +118,19 @@ class TransferController(
                 amount = Money(checkNotNull(request.amount)),
                 description = request.normalizedDescription(),
                 idempotencyKey = IdempotencyKeyHeader.require(idempotencyKey),
-                correlationId = MDC.get(OutboxEventEnvelope.CORRELATION_ID_MDC_KEY),
+                correlationId = MDC.get(CorrelationId.MDC_KEY),
+                caller = currentCaller(),
             )
         return when (val outcome = requestTransfer.execute(command)) {
             is RequestTransferOutcome.Created -> created(outcome.transfer)
             is RequestTransferOutcome.Existing -> existing(outcome.transfer)
             RequestTransferOutcome.SameAccount -> throw SameAccountTransferException()
+            is RequestTransferOutcome.SourceAccountNotFound -> throw OwnAccountNotFoundException(outcome.accountId)
             is RequestTransferOutcome.AccountNotFound -> throw TransferAccountNotFoundException(outcome.accountId)
             RequestTransferOutcome.AccountsUnavailable -> throw AccountsUnavailableException()
+            RequestTransferOutcome.CustomerNotFound -> throw CustomerNotFoundException()
+            RequestTransferOutcome.CustomerBlocked -> throw CustomerBlockedException()
+            RequestTransferOutcome.CustomersUnavailable -> throw CustomersUnavailableException()
         }
     }
 
@@ -129,14 +148,16 @@ class TransferController(
         ),
         ApiResponse(
             responseCode = "404",
-            description = "/problems/transfer-not-found",
+            description =
+                "/problems/transfer-not-found: no such transfer, or the source account is not the caller's " +
+                    "(an admin sees every transfer)",
             content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
     )
     @GetMapping("/{id}")
     fun get(
         @PathVariable id: UUID,
-    ): TransferDTO = TransferDTO.from(getTransfer.execute(id) ?: throw TransferNotFoundException(id))
+    ): TransferDTO = TransferDTO.from(getTransfer.execute(id, currentCaller()) ?: throw TransferNotFoundException(id))
 
     /** First answer: 201 completed, 202 pending, 200 compensated, 422 failed. */
     private fun created(transfer: Transfer): ResponseEntity<TransferDTO> {

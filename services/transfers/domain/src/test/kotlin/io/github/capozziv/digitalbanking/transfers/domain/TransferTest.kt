@@ -17,6 +17,7 @@ class TransferTest {
             Transfer.request(
                 id = TransferFixtures.id,
                 sourceAccountId = TransferFixtures.source,
+                sourceCustomerId = TransferFixtures.sourceCustomer,
                 destinationAccountId = TransferFixtures.destination,
                 amount = Money(500),
                 description = "rent",
@@ -43,11 +44,17 @@ class TransferTest {
     }
 
     @Test
+    fun `request keeps the customer that owns the source account`() {
+        assertThat(transfer().sourceCustomerId).isEqualTo(TransferFixtures.sourceCustomer)
+    }
+
+    @Test
     fun `request rejects the same source and destination`() {
         assertThatThrownBy {
             Transfer.request(
                 id = TransferFixtures.id,
                 sourceAccountId = TransferFixtures.source,
+                sourceCustomerId = TransferFixtures.sourceCustomer,
                 destinationAccountId = TransferFixtures.source,
                 amount = Money(1),
                 description = null,
@@ -131,6 +138,7 @@ class TransferTest {
                 Transfer.request(
                     id = TransferFixtures.id,
                     sourceAccountId = TransferFixtures.source,
+                    sourceCustomerId = TransferFixtures.sourceCustomer,
                     destinationAccountId = TransferFixtures.destination,
                     amount = Money(1),
                     description = null,

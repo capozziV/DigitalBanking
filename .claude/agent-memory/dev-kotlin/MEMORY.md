@@ -1,2 +1,5 @@
 - [Worktree Bash guard](project_worktree_bash_guard.md) — compound Bash refused in worktree agents and runs nothing; use Edit/Write, verify with git status
+- [KDoc globs and lib dirs](project_kdoc_glob_nested_comment.md) — `/internal/**` in KDoc = unclosed comment; libs must be top-level `libs/<name>` for CI loop
+- [DynamicPropertySource override](project_dynamic_property_source_override.md) — base IT class key beats subclass; override via placeholder indirection keys
 - [SQS listener tests](project_sqs_listener_tests.md) — notification @SqsListener starts in every SpringBootTest; auto-startup=false in base, explicit SQS endpoint in every test
+- [Local scripts pitfalls](project_local_scripts_pitfalls.md) — bash 3.2 errexit in $(), bru sandbox lacks URLSearchParams, one account per customer

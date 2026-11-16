@@ -23,6 +23,11 @@ data class Transfer(
     val limitDay: LocalDate,
     /** True once the daily limit was reserved for this transfer; a failed or compensated transfer releases it. */
     val limitReserved: Boolean,
+    /**
+     * Customer that owned the source account when the transfer was requested, as `accounts` answered; only that
+     * customer (or an admin) sees the transfer. Null for transfers requested before stage 7: those only an admin sees.
+     */
+    val sourceCustomerId: UUID? = null,
 ) {
     val status: TransferStatus get() = step.status
 
@@ -93,6 +98,7 @@ data class Transfer(
         fun request(
             id: UUID,
             sourceAccountId: UUID,
+            sourceCustomerId: UUID,
             destinationAccountId: UUID,
             amount: Money,
             description: String?,
@@ -119,6 +125,7 @@ data class Transfer(
                 updatedAt = now,
                 limitDay = DailyLimitDay.of(now),
                 limitReserved = false,
+                sourceCustomerId = sourceCustomerId,
             )
         }
     }

@@ -1,0 +1,28 @@
+meta {
+  name: Desbloquear pelo admin
+  type: http
+  seq: 7
+}
+
+put {
+  url: {{baseUrl}}/admin/customers/{{customerId}}/status
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminToken}}
+}
+
+body:json {
+  {
+    "status": "ACTIVE"
+  }
+}
+
+tests {
+  test("200 com o cliente ACTIVE de novo", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.status).to.equal("ACTIVE");
+  });
+}

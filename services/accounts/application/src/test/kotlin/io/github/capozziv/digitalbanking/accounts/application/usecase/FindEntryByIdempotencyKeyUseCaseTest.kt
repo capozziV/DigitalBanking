@@ -9,6 +9,7 @@ import io.github.capozziv.digitalbanking.accounts.domain.Balance
 import io.github.capozziv.digitalbanking.accounts.domain.EntryKind
 import io.github.capozziv.digitalbanking.accounts.domain.LedgerEntry
 import io.github.capozziv.digitalbanking.accounts.domain.Money
+import io.github.capozziv.digitalbanking.security.Caller
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -43,14 +44,14 @@ class FindEntryByIdempotencyKeyUseCaseTest {
         val recorded = entry(accountId, "transfer-1-debit")
         entries.insert(recorded)
 
-        assertThat(useCase.execute(accountId, "transfer-1-debit")).isEqualTo(recorded)
+        assertThat(useCase.execute(accountId, "transfer-1-debit", Caller.Service)).isEqualTo(recorded)
     }
 
     @Test
     fun `returns null when the key was never used on the account`() {
         accounts.insert(Account(accountId, UUID.randomUUID(), AccountType.FREE), "open-1")
 
-        assertThat(useCase.execute(accountId, "unknown")).isNull()
+        assertThat(useCase.execute(accountId, "unknown", Caller.Service)).isNull()
     }
 
     @Test
@@ -59,12 +60,32 @@ class FindEntryByIdempotencyKeyUseCaseTest {
         accounts.insert(Account(otherAccountId, UUID.randomUUID(), AccountType.FREE), "open-2")
         entries.insert(entry(otherAccountId, "shared-key"))
 
-        assertThat(useCase.execute(accountId, "shared-key")).isNull()
+        assertThat(useCase.execute(accountId, "shared-key", Caller.Service)).isNull()
+    }
+
+    @Test
+    fun `the owner finds an entry of its account`() {
+        val owner = UUID.randomUUID()
+        accounts.insert(Account(accountId, owner, AccountType.FREE), "open-1")
+        val recorded = entry(accountId, "credit-1")
+        entries.insert(recorded)
+
+        assertThat(useCase.execute(accountId, "credit-1", Caller.Customer(owner))).isEqualTo(recorded)
+        assertThat(useCase.execute(accountId, "credit-1", Caller.Admin(UUID.randomUUID()))).isEqualTo(recorded)
+    }
+
+    @Test
+    fun `another customer gets AccountNotFoundException even when the entry exists`() {
+        accounts.insert(Account(accountId, UUID.randomUUID(), AccountType.FREE), "open-1")
+        entries.insert(entry(accountId, "credit-1"))
+
+        assertThatThrownBy { useCase.execute(accountId, "credit-1", Caller.Customer(UUID.randomUUID())) }
+            .isInstanceOf(AccountNotFoundException::class.java)
     }
 
     @Test
     fun `fails with AccountNotFoundException when the account does not exist`() {
-        assertThatThrownBy { useCase.execute(accountId, "any") }
+        assertThatThrownBy { useCase.execute(accountId, "any", Caller.Service) }
             .isInstanceOf(AccountNotFoundException::class.java)
     }
 }
