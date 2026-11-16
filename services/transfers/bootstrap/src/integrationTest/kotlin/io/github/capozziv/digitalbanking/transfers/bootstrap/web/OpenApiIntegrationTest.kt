@@ -18,9 +18,35 @@ class OpenApiIntegrationTest : TransfersIntegrationTest() {
     }
 
     @Test
-    fun `the contract has exactly the three operations of the API`() {
+    fun `the contract has exactly the operations of the API, the admin ones included`() {
         assertThat(operations().map { it.first })
-            .containsExactlyInAnyOrder("POST /transfers", "GET /transfers/{id}", "GET /accounts/{accountId}/daily-limit")
+            .containsExactlyInAnyOrder(
+                "POST /transfers",
+                "GET /transfers/{id}",
+                "GET /accounts/{accountId}/daily-limit",
+                "GET /admin/transfers/stuck",
+                "POST /admin/transfers/{id}/retry",
+                "POST /admin/transfers/{id}/manual-compensation",
+            )
+    }
+
+    @Test
+    fun `the manual compensation documents the reason, the admin-only access and the conflicts`() {
+        val responses = operation("POST /admin/transfers/{id}/manual-compensation").get("responses")
+
+        assertThat(responses.get("400").get("description").asString()).contains("reason")
+        assertThat(responses.get("403").get("description").asString()).contains("/problems/forbidden")
+        assertThat(responses.get("409").get("description").asString())
+            .contains("/problems/transfer-not-compensating")
+            .contains("/problems/transfer-busy")
+        assertThat(
+            docs
+                .get("components")
+                .get("schemas")
+                .get("ManualCompensationDTO")
+                .get("properties")
+                .propertyNames(),
+        ).containsExactlyInAnyOrder("transfer", "resolvedBy", "reason", "resolvedAt")
     }
 
     @Test
