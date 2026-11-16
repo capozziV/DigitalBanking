@@ -7,6 +7,8 @@ auth:bearer {
 }
 
 script:pre-request {
+  // Variante do script das colecoes accounts, notification, statement e transfers (copias identicas entre si):
+  // o pedido de token (userToken) e o mesmo, mude-o junto com elas.
   // Tokens do mock-oauth2-server (como infra/local/auth/token.sh), uma vez por execucao da colecao: um cliente novo,
   // ainda sem cadastro (customerToken, o token padrao das requisicoes, por heranca), e o usuario de teste do dono no
   // grupo admin (adminToken).

@@ -17,5 +17,7 @@ auth:bearer {
 tests {
   test("404 para o extrato de outro cliente, sem revelar que a conta existe", function () {
     expect(res.status).to.equal(404);
+    // Mesmo problem de uma conta desconhecida (04): a resposta nao distingue conta alheia de inexistente.
+    expect(res.body.type).to.contain("account-not-found");
   });
 }

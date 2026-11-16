@@ -29,7 +29,7 @@ variable "security_group_ids" {
 }
 
 variable "route_prefixes" {
-  description = "Prefixos de caminho roteados ao ALB; o statement e o limite diario ficam sob /accounts e /transfers."
+  description = "Prefixos de caminho roteados ao ALB; o statement e o limite diario (GET /accounts/{id}/statement e /daily-limit) ficam sob /accounts."
   type        = list(string)
   default     = ["/accounts", "/transfers", "/notifications", "/customers", "/admin"]
 }
