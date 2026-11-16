@@ -3,6 +3,7 @@ package io.github.capozziv.digitalbanking.outbox.relay
 import io.github.capozziv.digitalbanking.outbox.PendingEvent
 import java.time.Duration
 import java.time.Instant
+import java.util.UUID
 
 /** Outbox storage as the relay sees it. */
 interface OutboxStore {
@@ -41,6 +42,47 @@ interface OutboxStore {
         now: Instant,
         stuckAfterAttempts: Int,
     ): OutboxBacklog
+
+    /**
+     * Up to [limit] events that hold their aggregate back, oldest first: unpublished, not discarded, with at least
+     * one failed attempt. Each is the head of its aggregate, since later events of it are not attempted.
+     */
+    fun stuckEvents(limit: Int): List<StuckEvent>
+
+    /**
+     * Sets the failed event [eventId] aside for good, so the later events of its aggregate get published: the relay
+     * no longer fetches it and the backlog no longer counts it. The row is kept, with [discardedBy], [reason] and the
+     * last error in `last_error`. Waits for the relay lock [lockKey], so it never interleaves with a relay cycle.
+     * Discarding an event that is already discarded changes nothing.
+     */
+    fun discard(
+        eventId: UUID,
+        discardedBy: String,
+        reason: String,
+        lockKey: Long,
+    ): DiscardOutcome
+}
+
+/** An unpublished event with failed attempts, which keeps the later events of its aggregate waiting. */
+data class StuckEvent(
+    val position: Long,
+    val eventId: UUID,
+    val aggregateId: String,
+    val eventType: String,
+    val occurredAt: Instant,
+    val attempts: Int,
+    val lastError: String?,
+)
+
+/** Result of [OutboxStore.discard]. */
+enum class DiscardOutcome {
+    DISCARDED,
+    ALREADY_DISCARDED,
+    NOT_FOUND,
+    ALREADY_PUBLISHED,
+
+    /** The event was never attempted or never failed: it does not hold its aggregate back. */
+    NOT_FAILED,
 }
 
 /**

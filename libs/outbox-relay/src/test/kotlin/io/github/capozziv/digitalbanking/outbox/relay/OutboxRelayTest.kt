@@ -379,6 +379,15 @@ class OutboxRelayTest {
             return backlog
         }
 
+        override fun stuckEvents(limit: Int): List<StuckEvent> = error("not used by the relay")
+
+        override fun discard(
+            eventId: UUID,
+            discardedBy: String,
+            reason: String,
+            lockKey: Long,
+        ): DiscardOutcome = error("not used by the relay")
+
         private fun requireLeadership(call: String) {
             if (!insideLeadership) callsOutsideLeadership += call
         }

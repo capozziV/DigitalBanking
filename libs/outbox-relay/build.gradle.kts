@@ -12,6 +12,11 @@ dependencies {
     api(libs.aws.sdk.sns)
     implementation("org.slf4j:slf4j-api")
     implementation("org.springframework.boot:spring-boot-starter")
+    // The admin endpoint of the relay (OutboxAdminController): services already run Spring MVC and springdoc.
+    implementation("org.springframework:spring-web")
+    compileOnly(libs.springdoc.openapi.starter.webmvc.ui)
+    // Binds the Kotlin request DTO through its constructor, as in the services.
+    runtimeOnly("tools.jackson.module:jackson-module-kotlin")
 
     testImplementation("tools.jackson.core:jackson-databind")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
@@ -21,4 +26,10 @@ dependencies {
     integrationTestRuntimeOnly(libs.postgresql)
 
     integrationTestImplementation(project(":libs:testing-localstack"))
+
+    // The admin endpoint behind the security of the services.
+    integrationTestImplementation(project(":libs:security"))
+    integrationTestImplementation(project(":libs:testing-security"))
+    integrationTestImplementation("org.springframework.boot:spring-boot-starter-webmvc")
+    integrationTestImplementation(libs.springdoc.openapi.starter.webmvc.ui)
 }

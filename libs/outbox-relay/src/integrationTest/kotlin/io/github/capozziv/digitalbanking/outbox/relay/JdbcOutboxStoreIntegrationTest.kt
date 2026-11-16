@@ -19,6 +19,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -281,6 +282,145 @@ class JdbcOutboxStoreIntegrationTest {
         assertThat(backlog.pending).isEqualTo(5)
         assertThat(backlog.stuckAggregates).isEqualTo(2)
     }
+
+    @Test
+    fun `stuckEvents lists the failed head event of each stuck aggregate, oldest first`() {
+        repeat(2) { write("acc-A") }
+        write("acc-healthy")
+        write("acc-B")
+        write("acc-recovered")
+        val (a1, _, _, b1, recovered) = positions()
+        store.asLeader(LOCK_KEY) {
+            store.markFailed(b1, "b error")
+            repeat(2) { store.markFailed(a1, "a error") }
+            store.markFailed(recovered, "blip")
+            store.markPublished(recovered, now)
+        }
+
+        val stuck = store.stuckEvents(10)
+
+        assertThat(stuck.map { it.position }).containsExactly(a1, b1)
+        val head = stuck.first()
+        assertThat(head.eventId).isEqualTo(eventId(a1))
+        assertThat(head.aggregateId).isEqualTo("acc-A")
+        assertThat(head.eventType).isEqualTo("LedgerEntryRecorded")
+        assertThat(head.attempts).isEqualTo(2)
+        assertThat(head.lastError).isEqualTo("a error")
+        assertThat(head.occurredAt).isEqualTo(now)
+        assertThat(store.stuckEvents(1).map { it.position }).containsExactly(a1)
+    }
+
+    @Test
+    fun `discard sets the stuck event aside and lets the later events of its aggregate through`() {
+        repeat(3) { write("acc-A") }
+        write("acc-B")
+        val (a1, a2, a3, b1) = positions()
+        store.asLeader(LOCK_KEY) { store.markFailed(a1, "payload too large") }
+
+        val outcome = store.discard(eventId(a1), discardedBy = "admin-1", reason = "poison event", lockKey = LOCK_KEY)
+
+        assertThat(outcome).isEqualTo(DiscardOutcome.DISCARDED)
+        assertThat(store.asLeader(LOCK_KEY) { store.fetchPending(10) }!!.map { it.position }).containsExactly(a2, a3, b1)
+        assertThat(store.stuckEvents(10)).isEmpty()
+        val row = row(a1)
+        assertThat(row["published_at"]).isNull()
+        assertThat(row["last_error"] as String)
+            .contains("admin-1")
+            .contains("poison event")
+            .contains("payload too large")
+    }
+
+    @Test
+    fun `a discarded event leaves the backlog and the stuck aggregates`() {
+        write("acc-A")
+        write("acc-B")
+        val (a1, _) = positions()
+        store.asLeader(LOCK_KEY) { repeat(STUCK_AFTER) { store.markFailed(a1, "sns rejects it") } }
+        assertThat(store.backlog(now, STUCK_AFTER).stuckAggregates).isEqualTo(1)
+
+        store.discard(eventId(a1), discardedBy = "admin-1", reason = "poison event", lockKey = LOCK_KEY)
+
+        val backlog = store.backlog(now, STUCK_AFTER)
+        assertThat(backlog.pending).isEqualTo(1)
+        assertThat(backlog.stuckAggregates).isZero()
+    }
+
+    @Test
+    fun `discarding an event twice changes nothing the second time`() {
+        write("acc-A")
+        val a1 = positions().single()
+        store.asLeader(LOCK_KEY) { store.markFailed(a1, "sns rejects it") }
+        store.discard(eventId(a1), discardedBy = "admin-1", reason = "first", lockKey = LOCK_KEY)
+        val afterFirst = row(a1)
+
+        val outcome = store.discard(eventId(a1), discardedBy = "admin-2", reason = "second", lockKey = LOCK_KEY)
+
+        assertThat(outcome).isEqualTo(DiscardOutcome.ALREADY_DISCARDED)
+        assertThat(row(a1)).isEqualTo(afterFirst)
+    }
+
+    @Test
+    fun `discard refuses an unknown event, a published one and one that never failed`() {
+        write("acc-A")
+        write("acc-B")
+        val (published, neverFailed) = positions()
+        store.asLeader(LOCK_KEY) { store.markPublished(published, now) }
+
+        assertThat(store.discard(UUID.randomUUID(), "admin-1", "x", LOCK_KEY)).isEqualTo(DiscardOutcome.NOT_FOUND)
+        assertThat(store.discard(eventId(published), "admin-1", "x", LOCK_KEY)).isEqualTo(DiscardOutcome.ALREADY_PUBLISHED)
+        assertThat(store.discard(eventId(neverFailed), "admin-1", "x", LOCK_KEY)).isEqualTo(DiscardOutcome.NOT_FAILED)
+        assertThat(store.asLeader(LOCK_KEY) { store.fetchPending(10) }!!.map { it.position }).containsExactly(neverFailed)
+    }
+
+    @Test
+    fun `discard waits for the relay cycle in progress, so a failure recorded by the cycle cannot undo it`() {
+        write("acc-A")
+        write("acc-A")
+        val (a1, a2) = positions()
+        store.asLeader(LOCK_KEY) { store.markFailed(a1, "sns rejects it") }
+        val cycleInside = CountDownLatch(1)
+        val endCycle = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(2)
+        try {
+            val cycle =
+                executor.submit<Unit> {
+                    store.asLeader(LOCK_KEY) {
+                        cycleInside.countDown()
+                        endCycle.await(10, TimeUnit.SECONDS)
+                        store.markFailed(a1, "sns rejects it again")
+                    }
+                }
+            assertThat(cycleInside.await(10, TimeUnit.SECONDS)).isTrue()
+
+            val discard = executor.submit<DiscardOutcome> { store.discard(eventId(a1), "admin-1", "poison event", LOCK_KEY) }
+            Thread.sleep(300)
+            assertThat(discard.isDone).describedAs("discard must wait for the relay lock").isFalse()
+
+            endCycle.countDown()
+            cycle.get(10, TimeUnit.SECONDS)
+            assertThat(discard.get(10, TimeUnit.SECONDS)).isEqualTo(DiscardOutcome.DISCARDED)
+        } finally {
+            endCycle.countDown()
+            executor.shutdownNow()
+        }
+
+        assertThat(store.asLeader(LOCK_KEY) { store.fetchPending(10) }!!.map { it.position }).containsExactly(a2)
+        assertThat(row(a1)["last_error"] as String).contains("sns rejects it again")
+    }
+
+    private fun eventId(position: Long): UUID =
+        jdbcClient
+            .sql("select event_id from outbox where position = :p")
+            .param("p", position)
+            .query(UUID::class.java)
+            .single()
+
+    private fun row(position: Long): Map<String, Any?> =
+        jdbcClient
+            .sql("select * from outbox where position = :p")
+            .param("p", position)
+            .query()
+            .singleRow()
 
     private fun JdbcOutboxStore.asLeaderOnOtherConnection(lockKey: Long): String? {
         val executor = Executors.newSingleThreadExecutor()
