@@ -64,6 +64,16 @@ data class Transfer(
         )
     }
 
+    /**
+     * Ends a transfer stuck in [TransferStep.Compensate] as [TransferStep.Compensated] without the compensation credit:
+     * an admin attests that the source account was made whole outside the saga (the credit kept being refused, a bug).
+     * Only `Compensate` qualifies; any other step is an [IllegalStateException].
+     */
+    fun compensateManually(now: Instant): Transfer {
+        check(step == TransferStep.Compensate) { "transfer $id is in step ${step.name}, not ${TransferStep.Compensate.name}" }
+        return copy(step = TransferStep.Compensated, attempts = 0, updatedAt = now)
+    }
+
     /** `entry-not-found` is internal to the resolve step; the API and the event say the debit was not confirmed. */
     private fun publicReason(reason: String): String =
         if (step == TransferStep.ResolveDebit && reason == StepOutcome.ENTRY_NOT_FOUND) StepOutcome.DEBIT_NOT_CONFIRMED else reason
