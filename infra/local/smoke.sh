@@ -12,7 +12,8 @@
 # 3. notification: espera ate 45 s (45 tentativas de 1 s) e confere TRANSFER_SENT para o remetente e TRANSFER_RECEIVED para o
 #    destinatario em GET /notifications, cada um com o proprio token.
 # 4. statement: espera ate 30 s e confere, em GET /accounts/{id}/statement, os lancamentos da conta do passo 1:
-#    sequence 2 (debito de 300, saldo 700) e sequence 1 (credito de 1000, saldo 1000), do mais novo para o mais antigo.
+#    sequence 2 (debito de 300, saldo 700) e sequence 1 (credito de 1000, saldo 1000), do mais novo para o mais antigo;
+#    o mesmo extrato pedido por outro cliente responde 404 account-not-found.
 # Uso: infra/local/smoke.sh [url-base]   (padrao http://127.0.0.1; exige o compose de pe)
 set -euo pipefail
 
@@ -29,7 +30,7 @@ out=$(mktemp)
 trap 'rm -f "$out"' EXIT
 
 # UUID aleatorio em minusculas: /proc no Linux, uuidgen no macOS (que imprime em maiusculas).
-uuid() { { cat /proc/sys/kernel/random/uuid 2>/dev/null || uuidgen; } | tr 'A-Z' 'a-z'; }
+uuid() { { cat /proc/sys/kernel/random/uuid 2>/dev/null || uuidgen; } | tr '[:upper:]' '[:lower:]'; }
 
 # Faz a requisicao com o token, confere o status e imprime o corpo. O status esperado pode ser uma lista
 # separada por barra vertical (ex.: 201|202). Token "-" manda a requisicao sem Authorization. Todo POST leva
@@ -223,3 +224,13 @@ if [ "$statement" != "2:DEBIT:300:700 1:CREDIT:1000:1000" ]; then
   exit 1
 fi
 echo "OK: extrato da conta $id: $statement"
+
+# O extrato de outro cliente responde 404 account-not-found, como uma conta desconhecida (sem revelar que existe).
+stranger_type=$(call 404 "$intruder_token" GET "/accounts/$id/statement?limit=10" | jq -r .type)
+case "$stranger_type" in
+  *account-not-found*) echo "OK: extrato da conta $id para outro cliente: 404 $stranger_type" ;;
+  *)
+    echo "FALHA: extrato da conta $id para outro cliente com type '$stranger_type' (esperado account-not-found)" >&2
+    exit 1
+    ;;
+esac

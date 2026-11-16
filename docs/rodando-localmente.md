@@ -247,7 +247,7 @@ docker compose -f infra/local/docker-compose.yml exec -T \
 ```
 
 ## 7. Coleção Bruno
-São cinco coleções em `api/bruno/` (`accounts`, `transfers`, `notification`, `statement` e `customer`), cada uma com o ambiente `local` (`baseUrl`, `tokenUrl` do `mock-oauth2-server` e `adminSub`, o usuário de teste do dono). O script da coleção (`collection.bru`) pega os tokens no mock uma vez por execução: `customerToken` (um cliente novo, já cadastrado no `customer`; nas quatro primeiras coleções é o token padrão das requisições, por herança), `otherCustomerToken` (outro cliente cadastrado, para o `404` do recurso alheio) e `adminToken`. As requisições de admin (créditos, débitos, troca de tipo, `/admin/**`) usam o `adminToken`. Precisa do compose e dos cinco serviços no ar.
+São cinco coleções em `api/bruno/` (`accounts`, `transfers`, `notification`, `statement` e `customer`), cada uma com o ambiente `local` (`baseUrl`, `tokenUrl` do `mock-oauth2-server` e `adminSub`, o usuário de teste do dono). O script da coleção (`collection.bru`) pega os tokens no mock uma vez por execução: `customerToken` (um cliente novo, já cadastrado no `customer`; nas quatro primeiras coleções é o token padrão das requisições, por herança), `otherCustomerToken` (outro cliente cadastrado, para o `404` do recurso alheio) e `adminToken`. As requisições de admin (créditos, débitos, troca de tipo, `/admin/**`) usam o `adminToken`. Precisa do compose e dos cinco serviços no ar. O script de `accounts`, `notification`, `statement` e `transfers` é uma cópia idêntica (o Bruno não compartilha scripts entre coleções): mude as quatro juntas, porque o job `lint` do CI compara as cópias e falha se divergirem; o do `customer` é uma variante (cliente ainda sem cadastro) com o mesmo pedido de token.
 
 ### Coleção do `accounts`
 A coleção fica em `api/bruno/accounts/`, com uma requisição por endpoint e `Idempotency-Key` nova a cada envio (`{{$guid}}`, ou uma chave gerada no script da requisição). A consulta de lançamento por chave (`08`) usa a chave do crédito (`03`): rode o `03` antes do `08`. Depois vêm `09` (conta de outro cliente, `404`), `10` (sem token, `401`) e `11` (crédito com o token do cliente, `403`).
@@ -305,6 +305,8 @@ infra/local/auth/token.sh user 00000000-0000-7000-8000-000000000001 admin  # usu
 infra/local/auth/token.sh service                                          # serviço (client_id accounts); outro: service transfers
 curl -H "Authorization: Bearer $(infra/local/auth/token.sh user <uuid>)" http://localhost/...
 ```
+**Peça o token sempre em `localhost:8090`.** O mock monta o `iss` do token a partir do Host da requisição, e os serviços só aceitam `iss` igual a `http://localhost:8090/default`. Um token pedido em `http://127.0.0.1:8090/default/token` sai com `iss` `http://127.0.0.1:8090/default` e leva `401` em todos os serviços, mesmo válido. Por isso o `token.sh`, o `tokenUrl` das coleções Bruno e o seed usam `localhost`, e não `127.0.0.1` (a regra do `127.0.0.1` vale para healthchecks e curls dentro dos contêineres, não para o emissor). Se trocar `MOCK_OAUTH2_URL`, troque também os `*_JWT_ISSUER_URI` para o mesmo host.
+
 O usuário de teste do dono tem `sub` `00000000-0000-7000-8000-000000000001`, nome `Owner Test`, e-mail `owner@example.test` e o grupo `admin`; o nome e o e-mail entram no cadastro do `customer` pelo seed local. Os tokens duram 1 hora.
 
 ## 8. Derrubar tudo
