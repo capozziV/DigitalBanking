@@ -4,7 +4,7 @@
 
 **Última atualização:** 2026-11-13
 **Board:** [Digital Banking no GitHub Projects](https://github.com/users/capozziV/projects/2)
-**Fase atual:** etapa 7 (borda e identidade) concluída na branch `etapa-7-identidade`, com revisão final aprovada; PR para a `main`. Débitos técnicos #170 e #171; decisão pendente do seed (uma ou duas contas do dono, #169).
+**Fase atual:** etapa 7 (borda e identidade) concluída na branch `etapa-7-identidade`, com revisão final aprovada; PR para a `main`. Débitos técnicos #170 e #171.
 **Próximo passo:** merge da etapa 7 com o `ci-ok` verde; débitos técnicos #159/#160 (etapa 6) e #170/#171 (etapa 7); depois, etapa 8 (acabamento).
 
 ## Como usar o board

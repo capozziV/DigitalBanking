@@ -167,7 +167,7 @@
   - `mock-oauth2-server` em Testcontainers e `customer` como processo;
   - os clientes de API pegam token;
   - teste novo `a blocked customer cannot transfer and another customer cannot read the statement`;
-- `infra/local/seed.sh`: usuário do dono, duas contas e crédito inicial pelo admin;
+- `infra/local/seed.sh`: usuário do dono, uma conta (uma por cliente) e crédito inicial pelo admin;
 - `smoke.sh` e as cinco coleções Bruno com tokens (coleção nova `customer`);
 - `docs/rodando-localmente.md`.
 
