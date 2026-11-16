@@ -5,22 +5,17 @@ import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
 import io.github.capozziv.digitalbanking.transfers.bootstrap.TransfersIntegrationTest
 import io.github.capozziv.digitalbanking.transfers.bootstrap.saga.AccountsStubs
 import io.github.capozziv.digitalbanking.transfers.bootstrap.saga.AccountsStubs.Companion.entryCreated
-import io.github.capozziv.digitalbanking.transfers.domain.DailyLimitDay
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.web.server.LocalServerPort
-import java.time.Clock
+import java.time.LocalDate
 import java.util.UUID
 
 /** `GET /accounts/{accountId}/daily-limit` against the real Redis and PostgreSQL, with the default limit of 500000. */
 class DailyLimitApiIntegrationTest : TransfersIntegrationTest() {
     @LocalServerPort
     private var port: Int = 0
-
-    @Autowired
-    private lateinit var clock: Clock
 
     private val api by lazy { ApiClient(port) }
     private val stubs by lazy { AccountsStubs(accountsServer) }
@@ -62,7 +57,8 @@ class DailyLimitApiIntegrationTest : TransfersIntegrationTest() {
         val response = api.get("/accounts/$source/daily-limit")
 
         assertThat(response.status).describedAs(response.rawBody).isEqualTo(200)
-        assertThat(response.body!!.get("day").asString()).isEqualTo(DailyLimitDay.of(clock.instant()).toString())
+        // The day the transfer counted in, so the check never races the midnight of São Paulo.
+        assertThat(response.body!!.get("day").asString()).isEqualTo(limitDay(transfer).toString())
         assertThat(response.body.get("limitCents").asLong()).isEqualTo(500_000)
         assertThat(response.body.get("usedCents").asLong()).isEqualTo(120_000)
         assertThat(response.body.get("availableCents").asLong()).isEqualTo(380_000)
@@ -72,4 +68,11 @@ class DailyLimitApiIntegrationTest : TransfersIntegrationTest() {
     fun `an id that is not a UUID is a validation error`() {
         assertProblem(api.get("/accounts/not-a-uuid/daily-limit"), 400, "validation-error")
     }
+
+    private fun limitDay(transfer: ApiResponse): LocalDate =
+        ownerJdbc
+            .sql("select limit_day from transfer where id = :id")
+            .param("id", UUID.fromString(transfer.body!!.get("id").asString()))
+            .query(LocalDate::class.java)
+            .single()
 }
