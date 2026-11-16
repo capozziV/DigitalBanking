@@ -41,15 +41,22 @@ class RedisCircuitBreaker(
     @Synchronized
     fun tryAcquire(): Boolean =
         when (state) {
-            State.CLOSED -> true
-            State.HALF_OPEN -> false
-            State.OPEN ->
+            State.CLOSED -> {
+                true
+            }
+
+            State.HALF_OPEN -> {
+                false
+            }
+
+            State.OPEN -> {
                 if (nanoTime() - openedAt >= openNanos) {
                     state = State.HALF_OPEN
                     true
                 } else {
                     false
                 }
+            }
         }
 
     @Synchronized

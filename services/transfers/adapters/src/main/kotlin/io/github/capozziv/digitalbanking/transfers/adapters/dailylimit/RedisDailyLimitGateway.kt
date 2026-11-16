@@ -175,7 +175,10 @@ class RedisDailyLimitGateway(
                     onCountedInRedis()
                     return true
                 }
-                LUA_EXCEEDED -> return false
+
+                LUA_EXCEEDED -> {
+                    return false
+                }
             }
         }
         throw RedisUnavailableException("the counter $key went missing right after it was rebuilt")
