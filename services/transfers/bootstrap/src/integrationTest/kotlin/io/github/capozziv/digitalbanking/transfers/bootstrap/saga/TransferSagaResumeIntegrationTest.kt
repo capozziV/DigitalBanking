@@ -4,6 +4,9 @@ import com.github.tomakehurst.wiremock.client.WireMock.aResponse
 import com.github.tomakehurst.wiremock.client.WireMock.get
 import com.github.tomakehurst.wiremock.client.WireMock.post
 import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
+import io.github.capozziv.digitalbanking.security.ServiceTokenClient
+import io.github.capozziv.digitalbanking.transfers.adapters.accounts.AccountsResponseClassifier
+import io.github.capozziv.digitalbanking.transfers.bootstrap.ServiceTokenServers
 import io.github.capozziv.digitalbanking.transfers.bootstrap.TransfersIntegrationTest
 import io.github.capozziv.digitalbanking.transfers.bootstrap.saga.AccountsStubs.Companion.entriesPath
 import io.github.capozziv.digitalbanking.transfers.bootstrap.saga.AccountsStubs.Companion.entryCreated
@@ -11,7 +14,9 @@ import io.github.capozziv.digitalbanking.transfers.bootstrap.saga.AccountsStubs.
 import io.github.capozziv.digitalbanking.transfers.bootstrap.web.ApiClient
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
+import io.micrometer.core.instrument.MeterRegistry
 import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.TestPropertySource
@@ -39,6 +44,12 @@ import java.util.UUID
 class TransferSagaResumeIntegrationTest : TransfersIntegrationTest() {
     @LocalServerPort
     private var port: Int = 0
+
+    @Autowired
+    private lateinit var serviceTokenClient: ServiceTokenClient
+
+    @Autowired
+    private lateinit var meterRegistry: MeterRegistry
 
     private val api by lazy { ApiClient(port) }
     private val stubs = AccountsStubs(accountsServer)
@@ -150,6 +161,68 @@ class TransferSagaResumeIntegrationTest : TransfersIntegrationTest() {
         assertThat(stubs.requestsFor(destination)).isEmpty()
     }
 
+    @Test
+    fun `a debit rejected with 401 and 403 for a while is completed once accounts accepts the service token again`() {
+        val id = UUID.randomUUID()
+        val now = Instant.now()
+        insertPending(id, step = "DEBIT", lockedUntil = now.minusSeconds(1), now = now)
+        stubs.sequence(
+            { post(urlEqualTo("/accounts/$source/debits")) },
+            problem(401, "unauthorized"),
+            problem(403, "forbidden"),
+            entryCreated(),
+        )
+        accountsServer.stubFor(post(urlEqualTo("/accounts/$destination/credits")).willReturn(entryCreated()))
+        val rejectedBefore = rejectedTokens()
+
+        ownerJdbc.awaitStatus(id, "COMPLETED")
+
+        assertThat(ownerJdbc.recordedSteps(id)).containsExactly("DEBIT", "DEBIT", "DEBIT", "CREDIT")
+        assertThat(rejectedTokens() - rejectedBefore).isEqualTo(2.0)
+    }
+
+    /**
+     * The token in cache was rotated out (a new signing key, a revoked client): `accounts` answers 401 to it. The 401
+     * drops it, so the next attempt asks for a new token and the saga goes on, instead of retrying with the stale token
+     * until it expires (an hour here).
+     */
+    @Test
+    fun `a debit rejected because the cached token was rotated out goes on with a new token`() {
+        try {
+            AccountsStubs(tokenServer).sequence(
+                { post(urlEqualTo(ServiceTokenServers.TOKEN_PATH)) },
+                tokenResponse("rotated-out-token"),
+                tokenResponse(ServiceTokenServers.SERVICE_TOKEN),
+            )
+            serviceTokenClient.onRejected(ServiceTokenServers.SERVICE_TOKEN)
+            val id = UUID.randomUUID()
+            val now = Instant.now()
+            insertPending(id, step = "DEBIT", lockedUntil = now.minusSeconds(1), now = now)
+            accountsServer.stubFor(post(urlEqualTo("/accounts/$source/debits")).willReturn(entryCreated()))
+            accountsServer.stubFor(post(urlEqualTo("/accounts/$destination/credits")).willReturn(entryCreated()))
+
+            ownerJdbc.awaitStatus(id, "COMPLETED")
+
+            val debits = stubs.requestsFor(source).map { it.getHeader("Authorization") }
+            assertThat(debits).containsExactly("Bearer rotated-out-token", "Bearer ${ServiceTokenServers.SERVICE_TOKEN}")
+        } finally {
+            tokenServer.resetAll()
+            ServiceTokenServers.stubTokenEndpoint(tokenServer)
+        }
+    }
+
+    private fun tokenResponse(token: String) =
+        aResponse()
+            .withStatus(200)
+            .withHeader("Content-Type", "application/json")
+            .withBody("""{"access_token":"$token","token_type":"Bearer","expires_in":3600}""")
+
+    private fun rejectedTokens(): Double =
+        meterRegistry
+            .find(AccountsResponseClassifier.SERVICE_TOKEN_REJECTED)
+            .counters()
+            .sumOf { it.count() }
+
     private fun requestTransfer(correlationId: String) =
         api.post(
             "/transfers",
@@ -162,6 +235,14 @@ class TransferSagaResumeIntegrationTest : TransfersIntegrationTest() {
         lockedUntil: Instant,
         now: Instant,
         destinationId: UUID = destination,
+    ) = insertPending(id, "CREDIT", lockedUntil, now, destinationId)
+
+    private fun insertPending(
+        id: UUID,
+        step: String,
+        lockedUntil: Instant,
+        now: Instant,
+        destinationId: UUID = destination,
     ) {
         ownerJdbc
             .sql(
@@ -169,11 +250,12 @@ class TransferSagaResumeIntegrationTest : TransfersIntegrationTest() {
                 insert into transfer (id, source_account_id, destination_account_id, amount, description, idempotency_key,
                                       status, step, deadline_at, next_attempt_at, attempts, locked_until, lock_owner,
                                       correlation_id, created_at, updated_at, limit_day)
-                values (:id, :source, :destination, 2500, 'rent', :key, 'PENDING', 'CREDIT', :deadline, :past, 1,
+                values (:id, :source, :destination, 2500, 'rent', :key, 'PENDING', :step, :deadline, :past, 1,
                         :lockedUntil, 'request-of-a-dead-process', 'corr-dead-process', :past, :past,
                         (:past at time zone 'America/Sao_Paulo')::date)
                 """.trimIndent(),
             ).param("id", id)
+            .param("step", step)
             .param("source", source)
             .param("destination", destinationId)
             .param("key", "key-$id")

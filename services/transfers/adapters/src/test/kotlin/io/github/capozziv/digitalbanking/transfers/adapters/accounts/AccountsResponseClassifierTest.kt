@@ -1,13 +1,36 @@
 package io.github.capozziv.digitalbanking.transfers.adapters.accounts
 
 import io.github.capozziv.digitalbanking.transfers.domain.StepOutcome
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 
 class AccountsResponseClassifierTest {
-    private val classifier = AccountsResponseClassifier()
+    private val registry = SimpleMeterRegistry()
+    private val classifier = AccountsResponseClassifier(registry)
+
+    @Test
+    fun `every rejected service token is counted by status, and nothing else is`() {
+        classifier.classify(401, "unauthorized")
+        classifier.classify(401, null)
+        classifier.classify(403, "forbidden")
+        classifier.classify(404, "entry-not-found")
+        classifier.classify(503, null)
+        classifier.classify(null, null)
+
+        assertThat(rejected("401")).isEqualTo(2.0)
+        assertThat(rejected("403")).isEqualTo(1.0)
+        assertThat(registry.find(AccountsResponseClassifier.SERVICE_TOKEN_REJECTED).counters().sumOf { it.count() }).isEqualTo(3.0)
+    }
+
+    private fun rejected(status: String) =
+        registry
+            .find(AccountsResponseClassifier.SERVICE_TOKEN_REJECTED)
+            .tag("status", status)
+            .counter()
+            ?.count()
 
     @ParameterizedTest
     @ValueSource(ints = [200, 201, 204])

@@ -21,7 +21,9 @@ import java.util.UUID
 
 /**
  * `transfers.pending` and `transfers.oldest.pending.age` show pending transfers on the actuator, so a compensation
- * refused in a loop (a bug) shows up as an old pending transfer. The scheduler is off here: the transfer stays pending.
+ * refused in a loop (a bug) shows up as an old pending transfer; `transfers.pending.aged` counts those older than a
+ * threshold (a machine token never accepted, `accounts` down for good). The scheduler is off here: the transfer stays
+ * pending.
  */
 class TransferMetricsIntegrationTest : TransfersIntegrationTest() {
     @LocalServerPort
@@ -55,6 +57,17 @@ class TransferMetricsIntegrationTest : TransfersIntegrationTest() {
         assertThat(metric("transfers.pending")).isEqualTo(2.0)
         assertThat(metric("transfers.oldest.pending.age")).isCloseTo(90.0, within(5.0))
         assertThat(baseUnit("transfers.oldest.pending.age")).isEqualTo("seconds")
+    }
+
+    @Test
+    fun `transfers pending for longer than the aged threshold (10 min by default) are counted apart`() {
+        repository.insert(transfer(Instant.now().minus(Duration.ofMinutes(11)), TransferStep.Compensate))
+        repository.insert(transfer(Instant.now().minus(Duration.ofMinutes(30)), TransferStep.Debit))
+        repository.insert(transfer(Instant.now().minus(Duration.ofMinutes(9)), TransferStep.Credit))
+        repository.insert(transfer(Instant.now().minus(Duration.ofMinutes(60)), TransferStep.Completed))
+
+        assertThat(metric("transfers.pending.aged")).isEqualTo(2.0)
+        assertThat(metric("transfers.pending")).isEqualTo(3.0)
     }
 
     private fun metric(name: String): Double {
