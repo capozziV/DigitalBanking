@@ -1,0 +1,47 @@
+# Valores do transfers para o chart deploy/helm/service.
+# Valores vazios ("") dependem do ambiente e entram na instalacao (--set ou -f), a partir dos outputs do Terraform:
+# image.repository/tag, targetGroupArn e os enderecos de banco, Redis, issuer e topico. Segredos nunca ficam aqui:
+# secretEnv so referencia Secrets do Kubernetes criados fora do chart (nome do Secret -> chaves).
+name: transfers
+port: 8082
+
+image:
+  repository: ""
+  tag: ""
+
+targetGroupArn: ""
+
+serviceAccount:
+  roleArn: ""
+
+# Obrigatorios: o chart recusa o render se algum estiver vazio ou ausente (sem eles o pod cairia no padrao local do application.yml).
+requiredEnv:
+  - TRANSFERS_DB_URL
+  - TRANSFERS_REDIS_HOST
+  - TRANSFERS_JWT_ISSUER_URI
+  - TRANSFERS_OAUTH_TOKEN_URI
+  - TRANSFERS_OAUTH_CLIENT_ID
+  - TRANSFERS_TOPIC_ARN
+
+env:
+  TRANSFERS_DB_URL: ""
+  TRANSFERS_DB_USER: transfers_app
+  TRANSFERS_DB_OWNER_USER: transfers_owner
+  TRANSFERS_REDIS_HOST: ""
+  TRANSFERS_REDIS_PORT: "6379"
+  TRANSFERS_JWT_ISSUER_URI: ""
+  TRANSFERS_JWT_GROUPS_CLAIM: "cognito:groups"
+  TRANSFERS_OAUTH_TOKEN_URI: ""
+  TRANSFERS_OAUTH_CLIENT_ID: ""
+  TRANSFERS_ACCOUNTS_URL: http://accounts:8081
+  TRANSFERS_CUSTOMER_BASE_URL: http://customer:8085
+  TRANSFERS_AWS_ENDPOINT: ""
+  TRANSFERS_AWS_REGION: us-east-1
+  TRANSFERS_TOPIC_ARN: ""
+
+secretEnv:
+  transfers-db:
+    - TRANSFERS_DB_PASSWORD
+    - TRANSFERS_DB_OWNER_PASSWORD
+  transfers-oauth:
+    - TRANSFERS_OAUTH_CLIENT_SECRET

@@ -1,0 +1,37 @@
+# Valores do statement para o chart deploy/helm/service.
+# Valores vazios ("") dependem do ambiente e entram na instalacao (--set ou -f), a partir dos outputs do Terraform:
+# image.repository/tag, targetGroupArn e os enderecos de banco, Redis, issuer e topico. Segredos nunca ficam aqui:
+# secretEnv so referencia Secrets do Kubernetes criados fora do chart (nome do Secret -> chaves).
+name: statement
+port: 8084
+
+image:
+  repository: ""
+  tag: ""
+
+targetGroupArn: ""
+
+serviceAccount:
+  roleArn: ""
+
+# Obrigatorios: o chart recusa o render se algum estiver vazio ou ausente (sem eles o pod cairia no padrao local do application.yml).
+requiredEnv:
+  - STATEMENT_JWT_ISSUER_URI
+  - STATEMENT_REDIS_HOST
+
+env:
+  STATEMENT_JWT_ISSUER_URI: ""
+  STATEMENT_JWT_GROUPS_CLAIM: "cognito:groups"
+  STATEMENT_AWS_ENDPOINT: ""
+  STATEMENT_AWS_REGION: us-east-1
+  STATEMENT_REDIS_HOST: ""
+  STATEMENT_REDIS_PORT: "6379"
+  STATEMENT_CACHE_TIMEOUT: 100ms
+  STATEMENT_CACHE_ENABLED: "true"
+  STATEMENT_TABLE: statement
+  STATEMENT_ACCOUNTS_QUEUE: statement-accounts.fifo
+  STATEMENT_ACCOUNTS_DLQ: statement-accounts-dlq.fifo
+  STATEMENT_DLQ_METRICS_REFRESH: 30s
+
+# Sem segredos: DynamoDB, SQS e Redis sem senha, acesso pelo papel do Pod Identity.
+secretEnv: {}
