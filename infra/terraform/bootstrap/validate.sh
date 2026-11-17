@@ -20,7 +20,7 @@ if grep -nE 'StringLike|repo:[^"]*\*' main.tf; then
   exit 1
 fi
 # Deny do papel: tem de existir e cobrir budgets, o proprio papel/OIDC e o bucket do estado.
-for needle in '"budgets:\*"' '"iam:\*"' 's3:DeleteBucket\*' 's3:PutBucketPolicy' 'aws_iam_role_policy_attachment" "github_guardrails"'; do
+for needle in '"budgets:\*"' '"iam:\*"' 's3:DeleteBucket\*' 's3:PutBucketPolicy' 'aws_iam_role_policy_attachment" "github_guardrails"' 'local.guardrails_policy_arn,'; do
   if ! grep -q "$needle" main.tf; then
     echo "deny do papel do GitHub incompleto: falta $needle" >&2
     exit 1

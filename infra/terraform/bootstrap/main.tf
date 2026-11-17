@@ -1,5 +1,11 @@
 data "aws_caller_identity" "current" {}
 
+locals {
+  guardrails_policy_name = "digital-banking-github-guardrails"
+  # ARN montado por padrao: referenciar aws_iam_policy.github_guardrails dentro dela criaria ciclo.
+  guardrails_policy_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/${local.guardrails_policy_name}"
+}
+
 # --- Estado remoto dos demais stacks (lock nativo do S3: use_lockfile) ---
 
 resource "aws_s3_bucket" "state" {
@@ -94,6 +100,7 @@ data "aws_iam_policy_document" "github_guardrails" {
     resources = [
       aws_iam_role.github.arn,
       aws_iam_openid_connect_provider.github.arn,
+      local.guardrails_policy_arn,
     ]
   }
 
@@ -111,7 +118,7 @@ data "aws_iam_policy_document" "github_guardrails" {
 }
 
 resource "aws_iam_policy" "github_guardrails" {
-  name   = "digital-banking-github-guardrails"
+  name   = local.guardrails_policy_name
   policy = data.aws_iam_policy_document.github_guardrails.json
 }
 
