@@ -95,6 +95,26 @@ class RedisDailyLimitGatewayResilienceIntegrationTest : TransfersIntegrationTest
     }
 
     @Test
+    fun `a probe that fails while redis is still down opens the circuit again and the reservation falls back to postgres`() {
+        reserve(transferOf(1_000))
+        whilePaused { repeat(2) { reserve(transferOf(1_000)) } }
+        assertThat(circuitState()).isEqualTo(1.0)
+        now += OPEN_DURATION.toNanos()
+
+        whilePaused { assertThat(reserve(transferOf(1_000))).isEqualTo(RESERVED) }
+
+        assertThat(circuitState()).isEqualTo(1.0)
+        // Redis is back, but the failed probe opened the circuit for another open duration.
+        assertThat(reserve(transferOf(1_000))).isEqualTo(RESERVED)
+        assertThat(counter("reserved")).isEqualTo(1.0)
+        assertThat(counter("fallback")).isEqualTo(4.0)
+        now += OPEN_DURATION.toNanos()
+        assertThat(reserve(transferOf(1_000))).isEqualTo(RESERVED)
+        assertThat(circuitState()).isEqualTo(0.0)
+        assertThat(counter("reserved")).isEqualTo(2.0)
+    }
+
+    @Test
     fun `a reservation that waits longer than the lock timeout is unavailable`() {
         val waiting = transferOf(1_000)
         val pool = Executors.newSingleThreadExecutor()
@@ -108,9 +128,12 @@ class RedisDailyLimitGatewayResilienceIntegrationTest : TransfersIntegrationTest
                     lock.executeQuery().close()
                 }
             try {
+                val started = System.nanoTime()
                 val result = pool.submit<ReservationResult> { reserve(waiting) }
 
                 assertThat(result.get(5, TimeUnit.SECONDS)).isEqualTo(UNAVAILABLE)
+                // The 200 ms of the properties, not the 2 s of the default: inside the saga's call budget.
+                assertThat(Duration.ofNanos(System.nanoTime() - started)).isBetween(Duration.ofMillis(190), Duration.ofMillis(1_500))
                 assertThat(counter("error")).isEqualTo(1.0)
             } finally {
                 connection.rollback()

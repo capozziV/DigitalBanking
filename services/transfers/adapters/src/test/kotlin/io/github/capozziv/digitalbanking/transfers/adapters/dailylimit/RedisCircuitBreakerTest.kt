@@ -78,6 +78,43 @@ class RedisCircuitBreakerTest {
         assertThat(breaker.tryAcquire()).isTrue()
     }
 
+    @Test
+    fun `a call that ends in success after the circuit opened does not close it`() {
+        repeat(2) { fail() }
+        val late = breaker.tryAcquire()
+        fail()
+        assertThat(breaker.state).isEqualTo(State.OPEN)
+
+        assertThat(late).isTrue()
+        breaker.onSuccess()
+
+        assertThat(breaker.state).isEqualTo(State.OPEN)
+        assertThat(breaker.tryAcquire()).isFalse()
+    }
+
+    @Test
+    fun `a call that ends in failure after the circuit opened does not extend the open duration`() {
+        repeat(3) { fail() }
+        now += Duration.ofSeconds(9).toNanos()
+
+        breaker.onFailure()
+
+        now += Duration.ofSeconds(1).toNanos()
+        assertThat(breaker.tryAcquire()).isTrue()
+    }
+
+    @Test
+    fun `failures before a success do not count towards the next opening`() {
+        repeat(3) { fail() }
+        now += Duration.ofSeconds(10).toNanos()
+        breaker.tryAcquire()
+        breaker.onSuccess()
+
+        repeat(2) { fail() }
+
+        assertThat(breaker.state).isEqualTo(State.CLOSED)
+    }
+
     private fun fail() {
         breaker.tryAcquire()
         breaker.onFailure()

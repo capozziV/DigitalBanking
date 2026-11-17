@@ -52,7 +52,15 @@ transfers:
     # Cents a source account may transfer per São Paulo day.
     amount: ${TRANSFERS_DAILY_LIMIT:500000}
     # Life of the Redis counter without a reservation; then it is rebuilt from PostgreSQL.
-    counter-ttl: 10m
+    counter-ttl: ${TRANSFERS_DAILY_LIMIT_COUNTER_TTL:10m}
+    # Longest wait for the lock of the account and day; past it the reservation is unavailable and the saga retries.
+    # Keep it well inside transfers.saga.call-budget.
+    lock-timeout: ${TRANSFERS_DAILY_LIMIT_LOCK_TIMEOUT:2s}
+    # With Redis failing, reservations go straight to PostgreSQL: failure-threshold consecutive failures open the circuit
+    # for open-duration, then one probe decides. State in the gauge transfers.daily_limit.circuit.state (0, 1, 2).
+    circuit-breaker:
+      failure-threshold: ${TRANSFERS_DAILY_LIMIT_CIRCUIT_BREAKER_FAILURE_THRESHOLD:5}
+      open-duration: ${TRANSFERS_DAILY_LIMIT_CIRCUIT_BREAKER_OPEN_DURATION:10s}
   saga:
     scheduler-enabled: true
     poll-interval: 1s

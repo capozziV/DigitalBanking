@@ -350,6 +350,19 @@ class RedisDailyLimitGatewayIntegrationTest : TransfersIntegrationTest() {
     }
 
     @Test
+    fun `a reservation on a valid counter takes a single redis script call and no other command from the client`() {
+        reserve(transferOf(1_000), 1_000)
+        reserve(transferOf(1_000), 1_000)
+        redisTemplate.execute(RedisCallback<Any?> { it.serverCommands().resetConfigStats() })
+
+        reserve(transferOf(1_000), 1_000)
+
+        val stats = commandStats()
+        assertThat(stats).containsKey("evalsha").doesNotContainKeys("hmget", "get", "hgetall")
+        assertThat(stats["evalsha"]).isEqualTo(1L)
+    }
+
+    @Test
     fun `a counter left by another redis instance is rebuilt even with the same epoch`() {
         val first = transferOf(400_000)
         reserve(first, 400_000)
@@ -490,5 +503,12 @@ class RedisDailyLimitGatewayIntegrationTest : TransfersIntegrationTest() {
 
     private companion object {
         const val ROUNDS = 5
+    }
+
+    private fun commandStats(): Map<String, Long> {
+        val info = checkNotNull(redisTemplate.execute(RedisCallback<Properties> { it.serverCommands().info("commandstats") }))
+        return info.stringPropertyNames().filter { it.startsWith("cmdstat_") }.associate {
+            it.removePrefix("cmdstat_") to Regex("calls=(\\d+)").find(info.getProperty(it))!!.groupValues[1].toLong()
+        }
     }
 }

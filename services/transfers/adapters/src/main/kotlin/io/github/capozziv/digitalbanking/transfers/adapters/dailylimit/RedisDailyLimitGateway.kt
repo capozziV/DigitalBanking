@@ -7,12 +7,10 @@ import io.github.capozziv.digitalbanking.transfers.domain.Money
 import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
-import org.springframework.data.redis.core.RedisCallback
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.transaction.support.TransactionTemplate
 import java.time.LocalDate
-import java.util.Properties
 import java.util.UUID
 
 /**
@@ -158,7 +156,6 @@ class RedisDailyLimitGateway(
     ): Boolean {
         val key = key(accountId, day)
         repeat(RESERVE_TRIES) {
-            rebuildIfStale(key, accountId, day, epoch)
             val answer =
                 redisCall {
                     redis.execute(
@@ -168,6 +165,7 @@ class RedisDailyLimitGateway(
                         amount.cents.toString(),
                         limit.cents.toString(),
                         ttlSeconds,
+                        epoch.toString(),
                     )
                 }
             when (answer) {
@@ -180,6 +178,7 @@ class RedisDailyLimitGateway(
                     return false
                 }
             }
+            rebuild(key, accountId, day, epoch)
         }
         throw RedisUnavailableException("the counter $key went missing right after it was rebuilt")
     }
@@ -199,29 +198,21 @@ class RedisDailyLimitGateway(
     }
 
     /**
-     * A counter missing, or seeded with another epoch than PostgreSQL's or by another Redis instance than the one that
-     * answers now, is replaced by the reservations in PostgreSQL.
+     * Replaces the counter, missing or seeded with another epoch than PostgreSQL's or by another Redis instance than the
+     * one that answers now (`reserve.lua` tells), by the reservations in PostgreSQL. The script records the `run_id` of
+     * the instance, new on every start and different on a replica promoted by a failover.
      */
-    private fun rebuildIfStale(
+    private fun rebuild(
         key: String,
         accountId: UUID,
         day: LocalDate,
         epoch: Long,
     ) {
-        val instance = redisInstance()
-        val stored = redisCall { redis.opsForHash<String, String>().multiGet(key, listOf(EPOCH, INSTANCE)) }
-        if (stored == listOf(epoch.toString(), instance)) return
         redisCall { redis.delete(key) }
         val pairs = store.reservations(accountId, day).flatMap { (id, cents) -> listOf(id.toString(), cents.toString()) }
-        redisCall { redis.execute(scripts.seed, listOf(key), epoch.toString(), instance, ttlSeconds, *pairs.toTypedArray()) }
+        redisCall { redis.execute(scripts.seed, listOf(key), epoch.toString(), ttlSeconds, *pairs.toTypedArray()) }
         meterRegistry.counter(REBUILDS).increment()
     }
-
-    /** The `run_id` of the Redis instance, new on every start and different on a replica promoted by a failover. */
-    private fun redisInstance(): String =
-        redisCall { redis.execute(RedisCallback<Properties> { it.serverCommands().info("server") }) }
-            ?.getProperty(RUN_ID)
-            ?: throw RedisUnavailableException("redis did not report its run_id")
 
     /**
      * Runs a Redis command through the [circuit], turning any failure into [RedisUnavailableException], so a
@@ -266,10 +257,6 @@ class RedisDailyLimitGateway(
         const val CIRCUIT_STATE = "transfers.daily_limit.circuit.state"
         const val RESULT = "result"
         const val ERROR = "error"
-        const val TOTAL = "total"
-        const val EPOCH = "epoch"
-        const val INSTANCE = "instance"
-        const val RUN_ID = "run_id"
         const val LUA_RESERVED = 1L
         const val LUA_EXCEEDED = 0L
         const val RESERVE_TRIES = 2

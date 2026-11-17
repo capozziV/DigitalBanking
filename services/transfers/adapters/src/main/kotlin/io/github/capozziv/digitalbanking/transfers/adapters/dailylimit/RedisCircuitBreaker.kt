@@ -1,5 +1,6 @@
 package io.github.capozziv.digitalbanking.transfers.adapters.dailylimit
 
+import org.slf4j.LoggerFactory
 import java.time.Duration
 
 /**
@@ -51,7 +52,7 @@ class RedisCircuitBreaker(
 
             State.OPEN -> {
                 if (nanoTime() - openedAt >= openNanos) {
-                    state = State.HALF_OPEN
+                    transitionTo(State.HALF_OPEN)
                     true
                 } else {
                     false
@@ -59,18 +60,62 @@ class RedisCircuitBreaker(
             }
         }
 
+    /** Only a success while CLOSED (resets the count) or the probe's, in HALF_OPEN, counts; a late one in OPEN is ignored. */
     @Synchronized
     fun onSuccess() {
-        consecutiveFailures = 0
-        state = State.CLOSED
+        when (state) {
+            State.CLOSED -> {
+                consecutiveFailures = 0
+            }
+
+            State.HALF_OPEN -> {
+                consecutiveFailures = 0
+                transitionTo(State.CLOSED)
+            }
+
+            State.OPEN -> {
+                Unit
+            }
+        }
     }
 
+    /** A failure of a call that ends after the circuit opened is ignored: it must not extend the open duration. */
     @Synchronized
     fun onFailure() {
-        consecutiveFailures++
-        if (state == State.HALF_OPEN || consecutiveFailures >= failureThreshold) {
-            state = State.OPEN
-            openedAt = nanoTime()
+        when (state) {
+            State.CLOSED -> {
+                consecutiveFailures++
+                if (consecutiveFailures >= failureThreshold) open()
+            }
+
+            State.HALF_OPEN -> {
+                open()
+            }
+
+            State.OPEN -> {
+                Unit
+            }
         }
+    }
+
+    /** Opens the circuit and starts the count over, so the next closing needs the threshold of failures again. */
+    private fun open() {
+        consecutiveFailures = 0
+        openedAt = nanoTime()
+        transitionTo(State.OPEN)
+    }
+
+    private fun transitionTo(next: State) {
+        val previous = state
+        state = next
+        if (next == State.OPEN) {
+            log.warn("daily limit redis circuit breaker {} -> {}: reservations go to postgres", previous, next)
+        } else {
+            log.info("daily limit redis circuit breaker {} -> {}", previous, next)
+        }
+    }
+
+    private companion object {
+        private val log = LoggerFactory.getLogger(RedisCircuitBreaker::class.java)
     }
 }
