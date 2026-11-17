@@ -65,12 +65,40 @@ data class Transfer(
     }
 
     /**
-     * Ends a transfer stuck in [TransferStep.Compensate] as [TransferStep.Compensated] without the compensation credit:
-     * an admin attests that the source account was made whole outside the saga (the credit kept being refused, a bug).
-     * Only `Compensate` qualifies; any other step is an [IllegalStateException].
+     * Why [entry] cannot stand for the compensation credit, or null when it can: a credit of exactly [amount] on the
+     * source account, which puts back what the debit took.
      */
-    fun compensateManually(now: Instant): Transfer {
+    fun manualCreditMismatch(entry: RecordedEntry): String? =
+        when {
+            entry.accountId != sourceAccountId -> {
+                "the entry is on account ${entry.accountId}, not the source account $sourceAccountId"
+            }
+
+            entry.kind != EntryKind.CREDIT -> {
+                "the entry is a ${entry.kind.name}, not a ${EntryKind.CREDIT.name}"
+            }
+
+            entry.amount != amount -> {
+                "the entry is of ${entry.amount.cents} cents, the transfer of ${amount.cents} cents"
+            }
+
+            else -> {
+                null
+            }
+        }
+
+    /**
+     * Ends a transfer stuck in [TransferStep.Compensate] as [TransferStep.Compensated] with a credit the admin recorded
+     * outside the saga (the saga's credit kept being refused, a bug). The value went back to the source only if [credit]
+     * is the compensation credit ([manualCreditMismatch]); otherwise an [IllegalArgumentException]. Only `Compensate`
+     * qualifies; any other step is an [IllegalStateException].
+     */
+    fun compensateManually(
+        credit: RecordedEntry,
+        now: Instant,
+    ): Transfer {
         check(step == TransferStep.Compensate) { "transfer $id is in step ${step.name}, not ${TransferStep.Compensate.name}" }
+        manualCreditMismatch(credit)?.let { throw IllegalArgumentException("transfer $id: $it") }
         return copy(step = TransferStep.Compensated, attempts = 0, updatedAt = now)
     }
 
