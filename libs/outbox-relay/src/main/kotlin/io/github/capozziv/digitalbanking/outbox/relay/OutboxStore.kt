@@ -60,6 +60,7 @@ interface OutboxStore {
         discardedBy: String,
         reason: String,
         lockKey: Long,
+        lockTimeout: Duration,
     ): DiscardOutcome
 }
 
@@ -83,6 +84,9 @@ enum class DiscardOutcome {
 
     /** The event was never attempted or never failed: it does not hold its aggregate back. */
     NOT_FAILED,
+
+    /** The relay cycle held its lock past the wait: nothing changed, the caller may try again. */
+    RELAY_BUSY,
 }
 
 /**

@@ -71,6 +71,7 @@ abstract class OutboxRelayConfigurationSupport(
             maxCycleDuration = properties.maxCycleDuration,
             retryBackoff = properties.retryBackoff,
             maxRetryBackoff = properties.maxRetryBackoff,
+            discardLockTimeout = properties.discardLockTimeout,
         )
 
     /**
@@ -136,7 +137,7 @@ abstract class OutboxRelayConfigurationSupport(
     fun outboxAdminController(
         store: OutboxStore,
         settings: OutboxRelaySettings,
-    ) = OutboxAdminController(store, settings.lockKey)
+    ) = OutboxAdminController(store, settings.lockKey, settings.discardLockTimeout)
 
     /**
      * Waits on shutdown for the longest a cycle can take: its maximum duration plus one publish call.
@@ -168,6 +169,7 @@ data class OutboxRelayProperties(
     val pollInterval: Duration = Duration.ofMillis(500),
     val retryBackoff: Duration = OutboxRelaySettings.DEFAULT_RETRY_BACKOFF,
     val maxRetryBackoff: Duration = OutboxRelaySettings.DEFAULT_MAX_RETRY_BACKOFF,
+    val discardLockTimeout: Duration = OutboxRelaySettings.DEFAULT_DISCARD_LOCK_TIMEOUT,
 )
 
 /** `<prefix>.aws.*`: where the events go. A blank [endpoint] means the real AWS endpoint of [region]. */

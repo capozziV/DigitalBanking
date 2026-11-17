@@ -1,9 +1,11 @@
 package io.github.capozziv.digitalbanking.outbox.relay
 
 import io.github.capozziv.digitalbanking.outbox.PendingEvent
+import org.springframework.dao.DataAccessException
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.transaction.support.TransactionOperations
 import java.sql.ResultSet
+import java.sql.SQLException
 import java.time.Duration
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -45,7 +47,7 @@ class JdbcOutboxStore(
         at: Instant,
     ) {
         jdbcClient
-            .sql("update outbox set published_at = :at where position = :position")
+            .sql("update outbox set published_at = :at where position = :position and attempts >= 0")
             .param("at", OffsetDateTime.ofInstant(at, ZoneOffset.UTC))
             .param("position", position)
             .update()
@@ -56,7 +58,7 @@ class JdbcOutboxStore(
         error: String,
     ) {
         jdbcClient
-            .sql("update outbox set attempts = attempts + 1, last_error = :error where position = :position")
+            .sql("update outbox set attempts = attempts + 1, last_error = :error where position = :position and attempts >= 0")
             .param("error", error)
             .param("position", position)
             .update()
@@ -95,59 +97,80 @@ class JdbcOutboxStore(
             }.list()
 
     /**
-     * Takes the relay lock with `pg_advisory_xact_lock`, which waits (up to [DISCARD_LOCK_TIMEOUT]) for the cycle in
-     * progress instead of giving up: the cycle may have fetched the event and would otherwise record a failure on it
-     * after the discard, turning it back into a pending event.
+     * Takes the relay lock with `pg_advisory_xact_lock`, which waits (up to [lockTimeout], through PostgreSQL's
+     * `lock_timeout`) for the cycle in progress instead of giving up: the cycle may have fetched the event and would
+     * otherwise record a failure on it after the discard, turning it back into a pending event. A wait that runs out
+     * rolls back and answers [DiscardOutcome.RELAY_BUSY].
      */
     override fun discard(
         eventId: UUID,
         discardedBy: String,
         reason: String,
         lockKey: Long,
+        lockTimeout: Duration,
     ): DiscardOutcome =
-        transactions.execute {
-            jdbcClient.sql("set local lock_timeout = '$DISCARD_LOCK_TIMEOUT'").update()
+        try {
+            transactions.execute { discardHoldingRelayLock(eventId, discardedBy, reason, lockKey, lockTimeout) }
+        } catch (e: DataAccessException) {
+            if (e.isLockTimeout()) DiscardOutcome.RELAY_BUSY else throw e
+        }
+
+    private fun discardHoldingRelayLock(
+        eventId: UUID,
+        discardedBy: String,
+        reason: String,
+        lockKey: Long,
+        lockTimeout: Duration,
+    ): DiscardOutcome {
+        jdbcClient
+            .sql("select set_config('lock_timeout', :timeout, true)")
+            .param("timeout", "${lockTimeout.toMillis()}ms")
+            .query()
+            .singleRow()
+        jdbcClient
+            .sql("select pg_advisory_xact_lock(:lockKey)")
+            .param("lockKey", lockKey)
+            .query()
+            .singleRow()
+        val row =
             jdbcClient
-                .sql("select pg_advisory_xact_lock(:lockKey)")
-                .param("lockKey", lockKey)
+                .sql("select position, published_at, attempts, last_error from outbox where event_id = :eventId for update")
+                .param("eventId", eventId)
                 .query()
-                .singleRow()
-            val row =
+                .listOfRows()
+                .singleOrNull()
+        return when {
+            row == null -> {
+                DiscardOutcome.NOT_FOUND
+            }
+
+            row["published_at"] != null -> {
+                DiscardOutcome.ALREADY_PUBLISHED
+            }
+
+            row["attempts"] == DISCARDED_ATTEMPTS -> {
+                DiscardOutcome.ALREADY_DISCARDED
+            }
+
+            (row["attempts"] as Int) <= 0 -> {
+                DiscardOutcome.NOT_FAILED
+            }
+
+            else -> {
+                val note = "Discarded manually by $discardedBy: $reason. Last error: ${row["last_error"]}"
                 jdbcClient
-                    .sql("select position, published_at, attempts, last_error from outbox where event_id = :eventId for update")
-                    .param("eventId", eventId)
-                    .query()
-                    .listOfRows()
-                    .singleOrNull()
-            when {
-                row == null -> {
-                    DiscardOutcome.NOT_FOUND
-                }
-
-                row["published_at"] != null -> {
-                    DiscardOutcome.ALREADY_PUBLISHED
-                }
-
-                row["attempts"] == DISCARDED_ATTEMPTS -> {
-                    DiscardOutcome.ALREADY_DISCARDED
-                }
-
-                (row["attempts"] as Int) <= 0 -> {
-                    DiscardOutcome.NOT_FAILED
-                }
-
-                else -> {
-                    val note = "Discarded manually by $discardedBy: $reason. Last error: ${row["last_error"]}"
-                    jdbcClient
-                        .sql("update outbox set attempts = :discarded, last_error = :note where position = :position")
-                        .param("discarded", DISCARDED_ATTEMPTS)
-                        .param("note", note.take(MAX_LAST_ERROR_LENGTH))
-                        .param("position", row["position"])
-                        .update()
-                    DiscardOutcome.DISCARDED
-                }
+                    .sql("update outbox set attempts = :discarded, last_error = :note where position = :position")
+                    .param("discarded", DISCARDED_ATTEMPTS)
+                    .param("note", note.take(MAX_LAST_ERROR_LENGTH))
+                    .param("position", row["position"])
+                    .update()
+                DiscardOutcome.DISCARDED
             }
         }
+    }
+
+    private fun Throwable.isLockTimeout(): Boolean =
+        generateSequence(this) { it.cause }.any { it is SQLException && it.sqlState == LOCK_NOT_AVAILABLE }
 
     private fun ResultSet.toPendingEvent() =
         PendingEvent(
@@ -179,8 +202,8 @@ class JdbcOutboxStore(
          */
         const val DISCARDED_ATTEMPTS = -1
 
-        /** Longest a discard waits for the relay cycle in progress (a cycle lasts at most its maximum duration plus one publish). */
-        const val DISCARD_LOCK_TIMEOUT = "30s"
+        /** SQLState of PostgreSQL's `lock_not_available`, raised when `lock_timeout` runs out. */
+        private const val LOCK_NOT_AVAILABLE = "55P03"
 
         private const val MAX_LAST_ERROR_LENGTH = 2000
 

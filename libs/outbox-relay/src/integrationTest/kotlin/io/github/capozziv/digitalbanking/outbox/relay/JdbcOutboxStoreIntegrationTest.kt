@@ -317,7 +317,14 @@ class JdbcOutboxStoreIntegrationTest {
         val (a1, a2, a3, b1) = positions()
         store.asLeader(LOCK_KEY) { store.markFailed(a1, "payload too large") }
 
-        val outcome = store.discard(eventId(a1), discardedBy = "admin-1", reason = "poison event", lockKey = LOCK_KEY)
+        val outcome =
+            store.discard(
+                eventId(a1),
+                discardedBy = "admin-1",
+                reason = "poison event",
+                lockKey = LOCK_KEY,
+                lockTimeout = LOCK_TIMEOUT,
+            )
 
         assertThat(outcome).isEqualTo(DiscardOutcome.DISCARDED)
         assertThat(store.asLeader(LOCK_KEY) { store.fetchPending(10) }!!.map { it.position }).containsExactly(a2, a3, b1)
@@ -338,7 +345,7 @@ class JdbcOutboxStoreIntegrationTest {
         store.asLeader(LOCK_KEY) { repeat(STUCK_AFTER) { store.markFailed(a1, "sns rejects it") } }
         assertThat(store.backlog(now, STUCK_AFTER).stuckAggregates).isEqualTo(1)
 
-        store.discard(eventId(a1), discardedBy = "admin-1", reason = "poison event", lockKey = LOCK_KEY)
+        store.discard(eventId(a1), discardedBy = "admin-1", reason = "poison event", lockKey = LOCK_KEY, lockTimeout = LOCK_TIMEOUT)
 
         val backlog = store.backlog(now, STUCK_AFTER)
         assertThat(backlog.pending).isEqualTo(1)
@@ -350,10 +357,10 @@ class JdbcOutboxStoreIntegrationTest {
         write("acc-A")
         val a1 = positions().single()
         store.asLeader(LOCK_KEY) { store.markFailed(a1, "sns rejects it") }
-        store.discard(eventId(a1), discardedBy = "admin-1", reason = "first", lockKey = LOCK_KEY)
+        store.discard(eventId(a1), discardedBy = "admin-1", reason = "first", lockKey = LOCK_KEY, lockTimeout = LOCK_TIMEOUT)
         val afterFirst = row(a1)
 
-        val outcome = store.discard(eventId(a1), discardedBy = "admin-2", reason = "second", lockKey = LOCK_KEY)
+        val outcome = store.discard(eventId(a1), discardedBy = "admin-2", reason = "second", lockKey = LOCK_KEY, lockTimeout = LOCK_TIMEOUT)
 
         assertThat(outcome).isEqualTo(DiscardOutcome.ALREADY_DISCARDED)
         assertThat(row(a1)).isEqualTo(afterFirst)
@@ -366,9 +373,9 @@ class JdbcOutboxStoreIntegrationTest {
         val (published, neverFailed) = positions()
         store.asLeader(LOCK_KEY) { store.markPublished(published, now) }
 
-        assertThat(store.discard(UUID.randomUUID(), "admin-1", "x", LOCK_KEY)).isEqualTo(DiscardOutcome.NOT_FOUND)
-        assertThat(store.discard(eventId(published), "admin-1", "x", LOCK_KEY)).isEqualTo(DiscardOutcome.ALREADY_PUBLISHED)
-        assertThat(store.discard(eventId(neverFailed), "admin-1", "x", LOCK_KEY)).isEqualTo(DiscardOutcome.NOT_FAILED)
+        assertThat(store.discard(UUID.randomUUID(), "admin-1", "x", LOCK_KEY, LOCK_TIMEOUT)).isEqualTo(DiscardOutcome.NOT_FOUND)
+        assertThat(store.discard(eventId(published), "admin-1", "x", LOCK_KEY, LOCK_TIMEOUT)).isEqualTo(DiscardOutcome.ALREADY_PUBLISHED)
+        assertThat(store.discard(eventId(neverFailed), "admin-1", "x", LOCK_KEY, LOCK_TIMEOUT)).isEqualTo(DiscardOutcome.NOT_FAILED)
         assertThat(store.asLeader(LOCK_KEY) { store.fetchPending(10) }!!.map { it.position }).containsExactly(neverFailed)
     }
 
@@ -392,7 +399,7 @@ class JdbcOutboxStoreIntegrationTest {
                 }
             assertThat(cycleInside.await(10, TimeUnit.SECONDS)).isTrue()
 
-            val discard = executor.submit<DiscardOutcome> { store.discard(eventId(a1), "admin-1", "poison event", LOCK_KEY) }
+            val discard = executor.submit<DiscardOutcome> { store.discard(eventId(a1), "admin-1", "poison event", LOCK_KEY, LOCK_TIMEOUT) }
             Thread.sleep(300)
             assertThat(discard.isDone).describedAs("discard must wait for the relay lock").isFalse()
 
@@ -406,6 +413,53 @@ class JdbcOutboxStoreIntegrationTest {
 
         assertThat(store.asLeader(LOCK_KEY) { store.fetchPending(10) }!!.map { it.position }).containsExactly(a2)
         assertThat(row(a1)["last_error"] as String).contains("sns rejects it again")
+    }
+
+    @Test
+    fun `discard gives up as relay busy when the cycle holds the lock past the timeout, and changes nothing`() {
+        write("acc-A")
+        val a1 = positions().single()
+        store.asLeader(LOCK_KEY) { store.markFailed(a1, "sns rejects it") }
+        val before = row(a1)
+        val cycleInside = CountDownLatch(1)
+        val endCycle = CountDownLatch(1)
+        val executor = Executors.newSingleThreadExecutor()
+        try {
+            val cycle =
+                executor.submit<Boolean> {
+                    store.asLeader(LOCK_KEY) {
+                        cycleInside.countDown()
+                        endCycle.await(10, TimeUnit.SECONDS)
+                    }
+                }
+            assertThat(cycleInside.await(10, TimeUnit.SECONDS)).isTrue()
+
+            val outcome = store.discard(eventId(a1), "admin-1", "poison event", LOCK_KEY, Duration.ofMillis(200))
+
+            assertThat(outcome).isEqualTo(DiscardOutcome.RELAY_BUSY)
+            endCycle.countDown()
+            cycle.get(10, TimeUnit.SECONDS)
+        } finally {
+            endCycle.countDown()
+            executor.shutdownNow()
+        }
+        assertThat(row(a1)).isEqualTo(before)
+    }
+
+    @Test
+    fun `markFailed and markPublished leave a discarded event discarded`() {
+        write("acc-A")
+        val a1 = positions().single()
+        store.asLeader(LOCK_KEY) { store.markFailed(a1, "sns rejects it") }
+        store.discard(eventId(a1), "admin-1", "poison event", LOCK_KEY, LOCK_TIMEOUT)
+        val discarded = row(a1)
+
+        store.asLeader(LOCK_KEY) {
+            store.markFailed(a1, "late failure")
+            store.markPublished(a1, now)
+        }
+
+        assertThat(row(a1)).isEqualTo(discarded)
     }
 
     private fun eventId(position: Long): UUID =
@@ -448,6 +502,7 @@ class JdbcOutboxStoreIntegrationTest {
     companion object {
         private const val LOCK_KEY = 4_242L
         private const val STUCK_AFTER = 3
+        private val LOCK_TIMEOUT: Duration = Duration.ofSeconds(10)
 
         @Container
         @JvmStatic

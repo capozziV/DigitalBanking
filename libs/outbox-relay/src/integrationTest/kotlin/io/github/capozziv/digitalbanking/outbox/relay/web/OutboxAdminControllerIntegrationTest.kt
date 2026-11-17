@@ -30,6 +30,9 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Clock
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /**
  * The admin endpoint that every service with a relay gets from [OutboxRelayConfigurationSupport]: behind the security
@@ -44,6 +47,10 @@ import java.util.UUID
         "demo.aws.topic-arn=arn:aws:sns:us-east-1:000000000000:demo.fifo",
         "demo.aws.endpoint=http://127.0.0.1:1",
         "demo.outbox.poll-interval=1h",
+        // A discard waits 400 ms for the relay lock before answering 503.
+        "demo.outbox.discard-lock-timeout=400ms",
+        "demo.outbox.max-cycle-duration=100ms",
+        "demo.outbox.publish-timeout=100ms",
         "spring.sql.init.mode=always",
         "spring.sql.init.schema-locations=classpath:outbox/outbox-table.sql",
     ],
@@ -109,9 +116,52 @@ class OutboxAdminControllerIntegrationTest {
         val published = insert("acc-B", attempts = 3, publishedAt = true)
 
         assertProblem(discard(UUID.randomUUID().toString()), 404, "outbox-event-not-found")
-        assertProblem(discard("not-a-uuid"), 404, "outbox-event-not-found")
         assertProblem(discard(neverFailed.toString()), 409, "outbox-event-not-stuck")
         assertProblem(discard(published.toString()), 409, "outbox-event-not-stuck")
+    }
+
+    @Test
+    fun `discard answers 400 for an event id that is not a UUID`() {
+        val problem = discard("not-a-uuid")
+
+        assertProblem(problem, 400, "validation-error")
+        assertThat(json(problem).get("title").asString()).isEqualTo("Validation error")
+        assertThat(
+            json(problem)
+                .get("errors")
+                .get(0)
+                .get("field")
+                .asString(),
+        ).isEqualTo("eventId")
+    }
+
+    @Test
+    fun `discard answers 503 while the relay cycle holds the lock past the wait, and changes nothing`() {
+        val stuck = insert("acc-A", attempts = 12, lastError = "boom")
+        val cycleInside = CountDownLatch(1)
+        val endCycle = CountDownLatch(1)
+        val executor = Executors.newSingleThreadExecutor()
+        try {
+            val cycle =
+                executor.submit<Boolean> {
+                    store.asLeader(4_242L) {
+                        cycleInside.countDown()
+                        endCycle.await(10, TimeUnit.SECONDS)
+                    }
+                }
+            assertThat(cycleInside.await(10, TimeUnit.SECONDS)).isTrue()
+
+            val busy = discard(stuck.toString())
+
+            assertProblem(busy, 503, "outbox-relay-busy")
+            assertThat(busy.headers().firstValue("Retry-After")).isPresent()
+            endCycle.countDown()
+            cycle.get(10, TimeUnit.SECONDS)
+        } finally {
+            endCycle.countDown()
+            executor.shutdownNow()
+        }
+        assertThat(store.stuckEvents(10).map { it.eventId }).containsExactly(stuck)
     }
 
     @Test
@@ -163,6 +213,14 @@ class OutboxAdminControllerIntegrationTest {
                 .get("description")
                 .asString(),
         ).contains("/problems/validation-error")
+        assertThat(
+            discard
+                .get("responses")
+                .get("503")
+                .get("description")
+                .asString(),
+        ).contains("/problems/outbox-relay-busy")
+        assertThat(discard.get("description").asString()).contains("AccountOpened")
         assertThat(discard.get("responses").has("204")).isTrue()
     }
 

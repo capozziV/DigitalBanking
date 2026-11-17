@@ -38,4 +38,26 @@ class OutboxRelaySettingsTest {
         assertThatThrownBy { OutboxRelaySettings(lockKey = 1, maxCycleDuration = Duration.ofSeconds(-1)) }
             .isInstanceOf(IllegalArgumentException::class.java)
     }
+
+    @Test
+    fun `a discard waits thirty seconds for the relay lock by default`() {
+        assertThat(OutboxRelaySettings(lockKey = 1).discardLockTimeout).isEqualTo(Duration.ofSeconds(30))
+    }
+
+    @Test
+    fun `the discard wait must outlast the longest cycle`() {
+        assertThatThrownBy {
+            OutboxRelaySettings(
+                lockKey = 1,
+                publishTimeout = Duration.ofSeconds(2),
+                maxCycleDuration = Duration.ofSeconds(10),
+                discardLockTimeout = Duration.ofSeconds(11),
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy { OutboxRelaySettings(lockKey = 1, maxCycleDuration = Duration.ofSeconds(29)) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+        assertThat(
+            OutboxRelaySettings(lockKey = 1, discardLockTimeout = Duration.ofSeconds(12)).discardLockTimeout,
+        ).isEqualTo(Duration.ofSeconds(12))
+    }
 }
