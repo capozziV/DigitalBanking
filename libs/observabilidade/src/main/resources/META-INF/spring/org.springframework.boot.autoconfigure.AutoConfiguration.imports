@@ -1,1 +1,2 @@
 io.github.capozziv.digitalbanking.observability.ObservabilityAutoConfiguration
+io.github.capozziv.digitalbanking.observability.SqsCorrelationIdAutoConfiguration
