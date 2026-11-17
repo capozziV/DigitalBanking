@@ -70,6 +70,18 @@ class TransferMetricsIntegrationTest : TransfersIntegrationTest() {
         assertThat(metric("transfers.pending")).isEqualTo(3.0)
     }
 
+    @Test
+    fun `the aged gauge describes its threshold in seconds, not as an ISO duration`() {
+        val description =
+            api
+                .get("/actuator/metrics/transfers.pending.aged")
+                .body!!
+                .get("description")
+                .asString()
+
+        assertThat(description).isEqualTo("Pending transfers created more than 600 seconds ago")
+    }
+
     private fun metric(name: String): Double {
         val response = api.get("/actuator/metrics/$name")
         assertThat(response.status).describedAs(response.rawBody).isEqualTo(200)

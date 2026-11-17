@@ -39,7 +39,7 @@ class TransferMetrics(
             .register(registry)
         Gauge
             .builder("transfers.pending.aged", stats) { it.pendingCreatedBefore(clock.instant().minus(pendingAgedAfter)).toDouble() }
-            .description("Pending transfers created more than $pendingAgedAfter ago")
+            .description("Pending transfers created more than ${pendingAgedAfter.seconds} seconds ago")
             .register(registry)
     }
 
