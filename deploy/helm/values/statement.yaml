@@ -11,9 +11,6 @@ image:
 
 targetGroupArn: ""
 
-serviceAccount:
-  roleArn: ""
-
 # Obrigatorios: o chart recusa o render se algum estiver vazio ou ausente (sem eles o pod cairia no padrao local do application.yml).
 requiredEnv:
   - STATEMENT_JWT_ISSUER_URI
@@ -23,7 +20,7 @@ env:
   STATEMENT_JWT_ISSUER_URI: ""
   STATEMENT_JWT_GROUPS_CLAIM: "cognito:groups"
   STATEMENT_AWS_ENDPOINT: ""
-  STATEMENT_AWS_REGION: us-east-1
+  STATEMENT_AWS_REGION: sa-east-1
   STATEMENT_REDIS_HOST: ""
   STATEMENT_REDIS_PORT: "6379"
   STATEMENT_CACHE_TIMEOUT: 100ms

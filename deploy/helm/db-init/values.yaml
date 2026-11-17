@@ -1,0 +1,39 @@
+# Job db-init: cria no RDS o banco <servico>, o dono <servico>_owner (Flyway) e o usuario <servico>_app de cada
+# servico com PostgreSQL, como infra/local/postgres/init faz no compose. Idempotente: roda a cada install/upgrade.
+# Instalar no namespace do Pod Identity (kubernetes_namespace no Terraform, padrao digitalbanking), antes dos servicos.
+# Valores sem padrao (o chart falha sem eles): dbHost, masterSecretId e secretPrefix, das saidas do Terraform.
+
+# Regiao do Secrets Manager (a mesma do ambiente).
+region: sa-east-1
+
+# Host do RDS (saida db_address) e porta.
+dbHost: ""
+dbPort: 5432
+# O RDS PostgreSQL 17 exige TLS (rds.force_ssl).
+sslMode: require
+
+# ARN do segredo da senha mestre, gerido pelo RDS (saida db_master_secret_arn).
+masterSecretId: ""
+# Prefixo dos segredos <prefixo>/<servico>-db (variavel name do Terraform, saida secret_names).
+secretPrefix: ""
+
+# Servicos com banco proprio; iguais a database_services do modulo data (conferido pelo check-service-names.py).
+services:
+  - accounts
+  - transfers
+  - notification
+  - customer
+
+# ServiceAccount do Job: o Pod Identity (Terraform, modules/access) a liga ao papel que so le os segredos acima.
+# Sem anotacao IRSA.
+serviceAccountName: db-init
+
+image:
+  # CLI da AWS com suporte ao Pod Identity (credenciais de conteiner do EKS).
+  awsCli: public.ecr.aws/aws-cli/aws-cli:2.27.0
+  # Mesma imagem do PostgreSQL local (infra/local/docker-compose.yml): so o psql e o bash.
+  postgres: postgres:17-alpine
+
+backoffLimit: 3
+activeDeadlineSeconds: 600
+runAsUser: 10001

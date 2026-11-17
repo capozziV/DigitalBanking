@@ -1,0 +1,101 @@
+# Hook post-install/post-upgrade: roda depois de a ServiceAccount e o ConfigMap existirem, e o helm espera o fim
+# do Job (falha do Job = falha do install). O Job anterior so e apagado na proxima execucao, para guardar os logs.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-init
+  labels:
+    {{- include "db-init.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: {{ .Values.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "db-init.labels" . | nindent 8 }}
+      annotations:
+        checksum/scripts: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccountName }}
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: {{ .Values.runAsUser }}
+        runAsGroup: {{ .Values.runAsUser }}
+        fsGroup: {{ .Values.runAsUser }}
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+        # As senhas so existem em memoria, no volume compartilhado entre os dois conteineres do pod.
+        - name: secrets
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Mi
+        - name: scripts
+          configMap:
+            name: db-init-scripts
+        - name: tmp
+          emptyDir: {}
+      initContainers:
+        - name: fetch-secrets
+          image: {{ .Values.image.awsCli | quote }}
+          command: ["bash", "/scripts/fetch-secrets.sh"]
+          env:
+            - name: AWS_REGION
+              value: {{ required "region e obrigatoria" .Values.region | quote }}
+            - name: MASTER_SECRET_ID
+              value: {{ required "masterSecretId e obrigatorio (saida db_master_secret_arn)" .Values.masterSecretId | quote }}
+            - name: SECRET_PREFIX
+              value: {{ required "secretPrefix e obrigatorio (variavel name do Terraform)" .Values.secretPrefix | quote }}
+            - name: SERVICES
+              value: {{ required "services e obrigatorio" .Values.services | join " " | quote }}
+            - name: SECRETS_DIR
+              value: /secrets
+            - name: HOME
+              value: /tmp
+          volumeMounts:
+            - { name: secrets, mountPath: /secrets }
+            - { name: scripts, mountPath: /scripts, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 256Mi }
+      containers:
+        - name: create-databases
+          image: {{ .Values.image.postgres | quote }}
+          command: ["bash", "/scripts/create-service-databases.sh"]
+          env:
+            - name: PGHOST
+              value: {{ required "dbHost e obrigatorio (saida db_address)" .Values.dbHost | quote }}
+            - name: PGPORT
+              value: {{ .Values.dbPort | quote }}
+            - name: PGSSLMODE
+              value: {{ .Values.sslMode | quote }}
+            - name: PGCONNECT_TIMEOUT
+              value: "10"
+            - name: SERVICES
+              value: {{ .Values.services | join " " | quote }}
+            - name: SECRETS_DIR
+              value: /secrets
+            - name: HOME
+              value: /tmp
+          volumeMounts:
+            - { name: secrets, mountPath: /secrets, readOnly: true }
+            - { name: scripts, mountPath: /scripts, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 128Mi }

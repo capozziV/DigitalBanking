@@ -50,3 +50,9 @@ variable "throttling_burst_limit" {
   type        = number
   default     = 20
 }
+
+variable "kubernetes_namespace" {
+  description = "Namespace do release do Helm; o Pod Identity associa as ServiceAccounts deste namespace aos papeis."
+  type        = string
+  default     = "digitalbanking"
+}

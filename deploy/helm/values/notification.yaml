@@ -11,9 +11,6 @@ image:
 
 targetGroupArn: ""
 
-serviceAccount:
-  roleArn: ""
-
 # Obrigatorios: o chart recusa o render se algum estiver vazio ou ausente (sem eles o pod cairia no padrao local do application.yml).
 requiredEnv:
   - NOTIFICATION_DB_URL
@@ -26,7 +23,7 @@ env:
   NOTIFICATION_JWT_ISSUER_URI: ""
   NOTIFICATION_JWT_GROUPS_CLAIM: "cognito:groups"
   NOTIFICATION_AWS_ENDPOINT: ""
-  NOTIFICATION_AWS_REGION: us-east-1
+  NOTIFICATION_AWS_REGION: sa-east-1
   NOTIFICATION_ACCOUNTS_QUEUE: notification-accounts.fifo
   NOTIFICATION_TRANSFERS_QUEUE: notification-transfers.fifo
   NOTIFICATION_ACCOUNTS_DLQ: notification-accounts-dlq.fifo

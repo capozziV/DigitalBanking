@@ -24,10 +24,8 @@ targetGroupBinding:
   enabled: true
   targetType: ip
 
-serviceAccount:
-  # A associacao do Pod Identity (Terraform) liga esta ServiceAccount, no namespace do release, ao papel do servico.
-  # roleArn so entra como anotacao IRSA se informado; com Pod Identity fica vazio.
-  roleArn: ""
+# ServiceAccount: sempre com o nome do servico e sem anotacao IRSA. A associacao do Pod Identity (Terraform,
+# modules/access) liga a ServiceAccount, no namespace do release, ao papel do servico.
 
 # Chaves de env que nao podem ficar vazias nem ausentes (o render falha). Lista por servico.
 requiredEnv: []

@@ -11,9 +11,6 @@ image:
 
 targetGroupArn: ""
 
-serviceAccount:
-  roleArn: ""
-
 # Obrigatorios: o chart recusa o render se algum estiver vazio ou ausente (sem eles o pod cairia no padrao local do application.yml).
 requiredEnv:
   - TRANSFERS_DB_URL
@@ -36,7 +33,7 @@ env:
   TRANSFERS_ACCOUNTS_URL: http://accounts:8081
   TRANSFERS_CUSTOMER_BASE_URL: http://customer:8085
   TRANSFERS_AWS_ENDPOINT: ""
-  TRANSFERS_AWS_REGION: us-east-1
+  TRANSFERS_AWS_REGION: sa-east-1
   TRANSFERS_TOPIC_ARN: ""
 
 secretEnv:
