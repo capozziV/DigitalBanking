@@ -84,4 +84,29 @@ class NotificationTextTest {
             "Sua transferência de R$ 10,00 para a conta $other não pôde ser concluída e o valor voltou para a sua conta.",
         )
     }
+
+    @Test
+    fun `account blocked says the account still receives but cannot send`() {
+        val content = NotificationText.accountBlocked(account)
+        assertThat(content.title).isEqualTo("Conta bloqueada")
+        assertThat(content.body).isEqualTo(
+            "Sua conta $account foi bloqueada. Ela continua recebendo transferências, mas não pode enviar valores enquanto estiver bloqueada.",
+        )
+    }
+
+    @Test
+    fun `account unblocked says the account can send again`() {
+        val content = NotificationText.accountUnblocked(account)
+        assertThat(content.title).isEqualTo("Conta desbloqueada")
+        assertThat(content.body).isEqualTo("Sua conta $account foi desbloqueada e já pode enviar transferências de novo.")
+    }
+
+    @Test
+    fun `account closed says the statement stays available`() {
+        val content = NotificationText.accountClosed(account)
+        assertThat(content.title).isEqualTo("Conta encerrada")
+        assertThat(content.body).isEqualTo(
+            "Sua conta $account foi encerrada. O extrato continua disponível para consulta, e você pode abrir uma conta nova quando quiser.",
+        )
+    }
 }
