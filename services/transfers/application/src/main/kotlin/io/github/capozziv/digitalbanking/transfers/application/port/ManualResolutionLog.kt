@@ -3,30 +3,25 @@ package io.github.capozziv.digitalbanking.transfers.application.port
 import java.time.Instant
 import java.util.UUID
 
-/** An admin ended a stuck transfer by hand: who, when and why. */
+/**
+ * An admin ended a stuck transfer by hand: who, when, why and with which credit of `accounts` ([creditIdempotencyKey],
+ * the key the compensation credit was recorded under on the source account).
+ */
 data class ManualResolution(
     val transferId: UUID,
     val resolvedBy: UUID,
     val reason: String,
+    val creditIdempotencyKey: String,
     val resolvedAt: Instant,
 )
 
-/** Audit trail of the manual resolutions; at most one per transfer. Written in the caller's transaction. */
+/** Audit trail of the manual resolutions; at most one per transfer and one per credit. Written in the caller's transaction. */
 interface ManualResolutionLog {
-    fun append(resolution: ManualResolution)
+    /**
+     * Records [resolution]; false, writing nothing, when its credit already resolved another transfer (one credit puts
+     * back the value of one transfer only).
+     */
+    fun append(resolution: ManualResolution): Boolean
 
     fun find(transferId: UUID): ManualResolution?
-}
-
-/** A pending transfer whose last compensation credit `accounts` refused, with that refusal. */
-data class RefusedCompensation(
-    val transferId: UUID,
-    val reason: String?,
-    val refusedAt: Instant,
-)
-
-/** Finds the transfers stuck in `Compensate` because their last compensation credit was refused. */
-interface StuckTransferFinder {
-    /** Oldest first, at most [limit]. */
-    fun findRefusedCompensations(limit: Int): List<RefusedCompensation>
 }

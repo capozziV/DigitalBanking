@@ -15,9 +15,11 @@ import io.github.capozziv.digitalbanking.transfers.application.fake.RecordingCor
 import io.github.capozziv.digitalbanking.transfers.application.port.CorrelationContext
 import io.github.capozziv.digitalbanking.transfers.application.port.EventOutbox
 import io.github.capozziv.digitalbanking.transfers.application.port.ManualResolution
-import io.github.capozziv.digitalbanking.transfers.application.port.RefusedCompensation
+import io.github.capozziv.digitalbanking.transfers.application.port.StuckTransfer
 import io.github.capozziv.digitalbanking.transfers.application.port.StuckTransferFinder
+import io.github.capozziv.digitalbanking.transfers.domain.EntryKind
 import io.github.capozziv.digitalbanking.transfers.domain.Money
+import io.github.capozziv.digitalbanking.transfers.domain.RecordedEntry
 import io.github.capozziv.digitalbanking.transfers.domain.StepCall
 import io.github.capozziv.digitalbanking.transfers.domain.Transfer
 import io.github.capozziv.digitalbanking.transfers.domain.TransferEvent
@@ -36,6 +38,7 @@ class StuckTransferAdminUseCasesTest {
     private val destination = UUID.fromString("00000000-0000-7000-8000-0000000000b2")
     private val admin = UUID.fromString("00000000-0000-7000-8000-0000000000ad")
     private val start = Instant.parse("2026-10-27T12:00:00Z")
+    private val creditKey = "back-office-credit-42"
 
     private val clock = MutableClock(start)
     private val repository = InMemoryTransferRepository()
@@ -63,7 +66,18 @@ class StuckTransferAdminUseCasesTest {
         )
     private val retry = RetryTransferUseCase(repository, runSaga, correlation, newOwner)
     private val compensate =
-        CompensateTransferManuallyUseCase(repository, resolutions, outbox, dailyLimits, tx, settings, correlation, clock, newOwner)
+        CompensateTransferManuallyUseCase(
+            repository,
+            resolutions,
+            accounts,
+            outbox,
+            dailyLimits,
+            tx,
+            settings,
+            correlation,
+            clock,
+            newOwner,
+        )
 
     private fun givenTransfer(
         step: TransferStep = TransferStep.Compensate,
@@ -84,6 +98,7 @@ class StuckTransferAdminUseCasesTest {
                     deadlineAfter = Duration.ofMinutes(2),
                 ).copy(step = step, attempts = 4, limitReserved = limitReserved)
         repository.insert(transfer)
+        accounts.entries[source to creditKey] = RecordedEntry(source, EntryKind.CREDIT, Money(500))
         if (limitReserved) dailyLimits.reserve(id, source, transfer.limitDay, transfer.amount)
         return transfer
     }
@@ -91,18 +106,22 @@ class StuckTransferAdminUseCasesTest {
     // --- list ---
 
     @Test
-    fun `lists the refused compensations with their transfer, in the finder's order`() {
-        givenTransfer()
-        val refusal = RefusedCompensation(id, "account-closed", start.plusSeconds(30))
-        val missing = RefusedCompensation(UUID.randomUUID(), "x", start)
+    fun `lists the stuck transfers as the finder reads them, in one query and without reading each transfer`() {
+        val transfer = givenTransfer()
+        val stuck = StuckTransfer(transfer, "account-closed", start.plusSeconds(30))
+        val limits = mutableListOf<Int>()
         val finder =
             object : StuckTransferFinder {
-                override fun findRefusedCompensations(limit: Int) = listOf(refusal, missing).take(limit)
+                override fun findStuckCompensations(limit: Int): List<StuckTransfer> {
+                    limits += limit
+                    return listOf(stuck)
+                }
             }
 
-        val stuck = ListStuckTransfersUseCase(finder, repository).execute(limit = 10)
+        val listed = ListStuckTransfersUseCase(finder).execute(limit = 10)
 
-        assertThat(stuck).containsExactly(StuckTransfer(repository.findById(id)!!, "account-closed", start.plusSeconds(30)))
+        assertThat(listed).containsExactly(stuck)
+        assertThat(limits).containsExactly(10)
     }
 
     // --- retry now ---
@@ -169,9 +188,9 @@ class StuckTransferAdminUseCasesTest {
         givenTransfer()
         clock.advance(Duration.ofHours(1))
 
-        val outcome = compensate.execute(id, admin, "credited back by the back office, ticket 42")
+        val outcome = compensate.execute(id, admin, "credited back by the back office, ticket 42", creditKey)
 
-        val resolution = ManualResolution(id, admin, "credited back by the back office, ticket 42", clock.instant())
+        val resolution = ManualResolution(id, admin, "credited back by the back office, ticket 42", creditKey, clock.instant())
         val saved = repository.findById(id)!!
         assertThat(outcome).isEqualTo(CompensateManuallyOutcome.Compensated(saved, resolution, repeated = false))
         assertThat(saved.status).isEqualTo(TransferStatus.COMPENSATED)
@@ -182,6 +201,7 @@ class StuckTransferAdminUseCasesTest {
         assertThat(repository.leaseOwner(id)).isNull()
         assertThat(dailyLimits.releaseCalls).containsExactly(id)
         assertThat(accounts.calls).isEmpty()
+        assertThat(accounts.entryLookups).containsExactly(source to creditKey)
     }
 
     @Test
@@ -198,6 +218,7 @@ class StuckTransferAdminUseCasesTest {
             CompensateTransferManuallyUseCase(
                 repository,
                 resolutions,
+                accounts,
                 recordingOutbox,
                 dailyLimits,
                 tx,
@@ -207,7 +228,7 @@ class StuckTransferAdminUseCasesTest {
                 newOwner,
             )
 
-        correlation.withCorrelationId("admin-request") { useCase.execute(id, admin, "why") }
+        correlation.withCorrelationId("admin-request") { useCase.execute(id, admin, "why", creditKey) }
 
         assertThat(correlationsAtAppend).containsExactly("corr-1")
     }
@@ -215,21 +236,87 @@ class StuckTransferAdminUseCasesTest {
     @Test
     fun `compensating by hand again answers the first resolution and writes nothing more`() {
         givenTransfer()
-        val first = compensate.execute(id, admin, "first") as CompensateManuallyOutcome.Compensated
+        val first = compensate.execute(id, admin, "first", creditKey) as CompensateManuallyOutcome.Compensated
         clock.advance(Duration.ofMinutes(5))
 
-        val again = compensate.execute(id, UUID.randomUUID(), "second")
+        val again = compensate.execute(id, UUID.randomUUID(), "second", creditKey)
 
         assertThat(again).isEqualTo(first.copy(repeated = true))
         assertThat(outbox.events).hasSize(1)
         assertThat(resolutions.resolutions).hasSize(1)
+        assertThat(accounts.entryLookups).hasSize(1)
+    }
+
+    @Test
+    fun `a credit accounts does not know leaves the transfer stuck and writes nothing`() {
+        givenTransfer()
+        accounts.entries.clear()
+
+        val outcome = compensate.execute(id, admin, "why", creditKey)
+
+        assertThat(outcome).isEqualTo(CompensateManuallyOutcome.CreditNotFound(creditKey))
+        assertNothingWritten()
+    }
+
+    @Test
+    fun `a credit of another amount leaves the transfer stuck and writes nothing`() {
+        givenTransfer()
+        accounts.entries[source to creditKey] = RecordedEntry(source, EntryKind.CREDIT, Money(499))
+
+        val outcome = compensate.execute(id, admin, "why", creditKey)
+
+        assertThat(outcome).isInstanceOf(CompensateManuallyOutcome.CreditMismatch::class.java)
+        assertThat((outcome as CompensateManuallyOutcome.CreditMismatch).reason).contains("499 cents")
+        assertNothingWritten()
+    }
+
+    @Test
+    fun `a debit under the key is not the compensation credit`() {
+        givenTransfer()
+        accounts.entries[source to creditKey] = RecordedEntry(source, EntryKind.DEBIT, Money(500))
+
+        assertThat(compensate.execute(id, admin, "why", creditKey)).isInstanceOf(CompensateManuallyOutcome.CreditMismatch::class.java)
+        assertNothingWritten()
+    }
+
+    @Test
+    fun `accounts not answering leaves the transfer stuck and writes nothing`() {
+        givenTransfer()
+        accounts.entriesUnavailable = true
+
+        assertThat(compensate.execute(id, admin, "why", creditKey)).isEqualTo(CompensateManuallyOutcome.AccountsUnavailable)
+        assertNothingWritten()
+    }
+
+    @Test
+    fun `a credit already used to compensate another transfer cannot compensate this one`() {
+        givenTransfer()
+        resolutions.append(ManualResolution(UUID.randomUUID(), admin, "other", creditKey, start))
+
+        val outcome = compensate.execute(id, admin, "why", creditKey)
+
+        assertThat(outcome).isEqualTo(CompensateManuallyOutcome.CreditAlreadyUsed(creditKey))
+        assertThat(repository.findById(id)!!.step).isEqualTo(TransferStep.Compensate)
+        assertThat(resolutions.find(id)).isNull()
+        assertThat(outbox.events).isEmpty()
+        assertThat(dailyLimits.releaseCalls).isEmpty()
+        assertThat(repository.leaseOwner(id)).isNull()
+    }
+
+    private fun assertNothingWritten() {
+        assertThat(repository.findById(id)!!.step).isEqualTo(TransferStep.Compensate)
+        assertThat(resolutions.resolutions).isEmpty()
+        assertThat(outbox.events).isEmpty()
+        assertThat(dailyLimits.releaseCalls).isEmpty()
+        assertThat(repository.leaseOwner(id)).isNull()
     }
 
     @Test
     fun `only a transfer in compensate can be compensated by hand`() {
         val credit = givenTransfer(TransferStep.Credit)
 
-        assertThat(compensate.execute(id, admin, "why")).isEqualTo(CompensateManuallyOutcome.NotCompensating(credit))
+        assertThat(compensate.execute(id, admin, "why", creditKey)).isEqualTo(CompensateManuallyOutcome.NotCompensating(credit))
+        assertThat(accounts.entryLookups).isEmpty()
         assertThat(resolutions.resolutions).isEmpty()
         assertThat(outbox.events).isEmpty()
     }
@@ -238,12 +325,12 @@ class StuckTransferAdminUseCasesTest {
     fun `a transfer compensated by the saga is not compensating, not a repeat`() {
         val done = givenTransfer(TransferStep.Compensated)
 
-        assertThat(compensate.execute(id, admin, "why")).isEqualTo(CompensateManuallyOutcome.NotCompensating(done))
+        assertThat(compensate.execute(id, admin, "why", creditKey)).isEqualTo(CompensateManuallyOutcome.NotCompensating(done))
     }
 
     @Test
     fun `compensating by hand an unknown transfer is not found`() {
-        assertThat(compensate.execute(id, admin, "why")).isEqualTo(CompensateManuallyOutcome.NotFound)
+        assertThat(compensate.execute(id, admin, "why", creditKey)).isEqualTo(CompensateManuallyOutcome.NotFound)
     }
 
     @Test
@@ -251,7 +338,7 @@ class StuckTransferAdminUseCasesTest {
         givenTransfer()
         repository.holdLease(id, "scheduler-run", start.plusSeconds(30))
 
-        assertThat(compensate.execute(id, admin, "why")).isEqualTo(CompensateManuallyOutcome.Busy)
+        assertThat(compensate.execute(id, admin, "why", creditKey)).isEqualTo(CompensateManuallyOutcome.Busy)
         assertThat(repository.findById(id)!!.step).isEqualTo(TransferStep.Compensate)
         assertThat(resolutions.resolutions).isEmpty()
         assertThat(outbox.events).isEmpty()
@@ -262,7 +349,7 @@ class StuckTransferAdminUseCasesTest {
     fun `a transfer that never reserved the limit releases nothing`() {
         givenTransfer(limitReserved = false)
 
-        compensate.execute(id, admin, "why")
+        compensate.execute(id, admin, "why", creditKey)
 
         assertThat(dailyLimits.releaseCalls).isEmpty()
     }
@@ -272,7 +359,7 @@ class StuckTransferAdminUseCasesTest {
         givenTransfer()
         dailyLimits.failOnRelease = true
 
-        val outcome = compensate.execute(id, admin, "why")
+        val outcome = compensate.execute(id, admin, "why", creditKey)
 
         assertThat(outcome).isInstanceOf(CompensateManuallyOutcome.Compensated::class.java)
         assertThat(repository.findById(id)!!.status).isEqualTo(TransferStatus.COMPENSATED)

@@ -80,10 +80,7 @@ class UseCaseConfiguration {
     ) = GetDailyLimitUseCase(dailyLimits, accounts, clock)
 
     @Bean
-    fun listStuckTransfersUseCase(
-        finder: StuckTransferFinder,
-        transfers: TransferRepository,
-    ) = ListStuckTransfersUseCase(finder, transfers)
+    fun listStuckTransfersUseCase(finder: StuckTransferFinder) = ListStuckTransfersUseCase(finder)
 
     /** Each admin retry runs the saga under a new lease owner, like the scheduler's runs. */
     @Bean
@@ -97,13 +94,14 @@ class UseCaseConfiguration {
     fun compensateTransferManuallyUseCase(
         transfers: TransferRepository,
         resolutions: ManualResolutionLog,
+        accounts: AccountsGateway,
         outbox: EventOutbox,
         dailyLimits: DailyLimitGateway,
         tx: TransactionRunner,
         settings: SagaSettings,
         correlation: CorrelationContext,
         clock: Clock,
-    ) = CompensateTransferManuallyUseCase(transfers, resolutions, outbox, dailyLimits, tx, settings, correlation, clock) {
+    ) = CompensateTransferManuallyUseCase(transfers, resolutions, accounts, outbox, dailyLimits, tx, settings, correlation, clock) {
         "admin-compensation-${UUID.randomUUID()}"
     }
 

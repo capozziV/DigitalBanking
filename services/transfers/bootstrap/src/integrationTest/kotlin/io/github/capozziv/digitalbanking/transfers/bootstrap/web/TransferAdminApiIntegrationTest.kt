@@ -1,11 +1,15 @@
 package io.github.capozziv.digitalbanking.transfers.bootstrap.web
 
+import com.github.tomakehurst.wiremock.client.WireMock.aResponse
 import com.github.tomakehurst.wiremock.client.WireMock.equalTo
+import com.github.tomakehurst.wiremock.client.WireMock.get
+import com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor
 import com.github.tomakehurst.wiremock.client.WireMock.post
 import com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor
 import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
 import io.github.capozziv.digitalbanking.testing.security.JwtTestSupport
 import io.github.capozziv.digitalbanking.transfers.bootstrap.TransfersIntegrationTest
+import io.github.capozziv.digitalbanking.transfers.bootstrap.saga.AccountsStubs.Companion.entriesPath
 import io.github.capozziv.digitalbanking.transfers.bootstrap.saga.AccountsStubs.Companion.entryCreated
 import io.github.capozziv.digitalbanking.transfers.bootstrap.saga.AccountsStubs.Companion.problem
 import io.github.capozziv.digitalbanking.transfers.bootstrap.saga.deleteTransfers
@@ -27,7 +31,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * The admin's way out of a compensation that `accounts` keeps refusing (a bug): list the stuck transfers, retry the
- * compensation now, or compensate by hand with a reason. Admins only: a customer or a service token gets 403.
+ * compensation now, or compensate by hand with a reason and the credit the admin recorded on the source account, which
+ * `accounts` must confirm. Admins only: a customer or a service token gets 403.
  */
 class TransferAdminApiIntegrationTest : TransfersIntegrationTest() {
     @LocalServerPort
@@ -143,8 +148,9 @@ class TransferAdminApiIntegrationTest : TransfersIntegrationTest() {
     // --- compensate by hand ---
 
     @Test
-    fun `compensating by hand ends it compensated, records the admin and the reason, and emits the event`() {
+    fun `compensating by hand ends it compensated, records the admin, the reason and the credit, and emits the event`() {
         val id = givenStuckCompensation()
+        givenCreditInAccounts()
 
         val response = admin.post("/admin/transfers/$id/manual-compensation", reason("credited back by the back office, ticket 42"))
 
@@ -156,20 +162,28 @@ class TransferAdminApiIntegrationTest : TransfersIntegrationTest() {
         assertThat(ownerJdbc.statusOf(id)).isEqualTo("COMPENSATED")
         val row =
             ownerJdbc
-                .sql("select resolved_by, reason from transfer_manual_resolution where transfer_id = :id")
+                .sql("select resolved_by, reason, credit_idempotency_key from transfer_manual_resolution where transfer_id = :id")
                 .param("id", id)
-                .query { rs, _ -> rs.getObject("resolved_by", UUID::class.java) to rs.getString("reason") }
-                .single()
-        assertThat(row).isEqualTo(adminId to "credited back by the back office, ticket 42")
+                .query { rs, _ ->
+                    Triple(rs.getObject("resolved_by", UUID::class.java), rs.getString("reason"), rs.getString("credit_idempotency_key"))
+                }.single()
+        assertThat(row).isEqualTo(Triple(adminId, "credited back by the back office, ticket 42", CREDIT_KEY))
+        assertThat(body.get("creditIdempotencyKey").asString()).isEqualTo(CREDIT_KEY)
         assertThat(ownerJdbc.outboxCorrelationIds(id)).containsExactlyEntriesOf(mapOf("TransferCompensated" to "corr-stuck"))
         assertThat(nextAttemptAt(id)).isNull()
-        assertThat(accountsServer.allServeEvents).isEmpty()
+        accountsServer.verify(
+            getRequestedFor(entriesPath(source))
+                .withQueryParam("idempotencyKey", equalTo(CREDIT_KEY))
+                .withHeader("X-Correlation-Id", equalTo("corr-stuck")),
+        )
+        assertThat(accountsServer.allServeEvents).hasSize(1)
         assertThat(ownerJdbc.sql("select count(*) from transfer_manual_resolution").query(Int::class.java).single()).isEqualTo(1)
     }
 
     @Test
     fun `compensating by hand twice answers the first resolution and writes nothing more`() {
         val id = givenStuckCompensation()
+        givenCreditInAccounts()
         val first = admin.post("/admin/transfers/$id/manual-compensation", reason("first"))
 
         val second =
@@ -181,13 +195,20 @@ class TransferAdminApiIntegrationTest : TransfersIntegrationTest() {
     }
 
     @Test
-    fun `compensating by hand needs a reason, a transfer in compensate and a free lease`() {
+    fun `compensating by hand needs a reason, a credit key, a transfer in compensate and a free lease`() {
         val id = givenStuckCompensation()
+        givenCreditInAccounts()
         val blank = admin.post("/admin/transfers/$id/manual-compensation", reason("  "))
         assertProblem(blank, 400, "validation-error")
         assertThat(blank.errorFields()).containsExactly("reason")
         assertProblem(admin.post("/admin/transfers/$id/manual-compensation", reason("x".repeat(501))), 400, "validation-error")
+        val noKey = admin.post("/admin/transfers/$id/manual-compensation", """{"reason":"x"}""")
+        assertProblem(noKey, 400, "validation-error")
+        assertThat(noKey.errorFields()).containsExactly("creditIdempotencyKey")
+        assertProblem(admin.post("/admin/transfers/$id/manual-compensation", reason("x", " ")), 400, "validation-error")
+        assertProblem(admin.post("/admin/transfers/$id/manual-compensation", reason("x", "k".repeat(256))), 400, "validation-error")
         assertProblem(admin.post("/admin/transfers/$id/manual-compensation", "{}"), 400, "validation-error")
+        assertThat(accountsServer.allServeEvents).isEmpty()
 
         val inCredit = givenTransfer("CREDIT")
         assertProblem(admin.post("/admin/transfers/$inCredit/manual-compensation", reason("x")), 409, "transfer-not-compensating")
@@ -202,6 +223,7 @@ class TransferAdminApiIntegrationTest : TransfersIntegrationTest() {
     @Test
     fun `concurrent manual compensations of the same transfer write one resolution and one event`() {
         val id = givenStuckCompensation()
+        givenCreditInAccounts()
         val threads = 8
         val start = CountDownLatch(1)
         val pool = Executors.newFixedThreadPool(threads)
@@ -227,9 +249,114 @@ class TransferAdminApiIntegrationTest : TransfersIntegrationTest() {
         assertThat(ownerJdbc.statusOf(id)).isEqualTo("COMPENSATED")
     }
 
+    @Test
+    fun `a credit accounts does not know is 422 and the transfer stays stuck`() {
+        val id = givenStuckCompensation()
+        accountsServer.stubFor(get(entriesPath(source)).willReturn(problem(404, "entry-not-found")))
+
+        val response = admin.post("/admin/transfers/$id/manual-compensation", reason("trust me"))
+
+        assertProblem(response, 422, "compensation-credit-not-found")
+        assertThat(response.body!!.get("creditIdempotencyKey").asString()).isEqualTo(CREDIT_KEY)
+        assertStillStuck(id)
+    }
+
+    @Test
+    fun `a credit of another amount or a debit under the key is 422 and the transfer stays stuck`() {
+        val id = givenStuckCompensation()
+
+        givenCreditInAccounts(amount = 2499)
+        val less = admin.post("/admin/transfers/$id/manual-compensation", reason("x"))
+        assertProblem(less, 422, "compensation-credit-mismatch")
+        assertThat(less.body!!.get("detail").asString()).contains("2499 cents")
+
+        givenCreditInAccounts(kind = "DEBIT")
+        assertProblem(admin.post("/admin/transfers/$id/manual-compensation", reason("x")), 422, "compensation-credit-mismatch")
+        assertStillStuck(id)
+    }
+
+    @Test
+    fun `accounts not answering is 503 and the transfer stays stuck`() {
+        val id = givenStuckCompensation()
+        accountsServer.stubFor(get(entriesPath(source)).willReturn(problem(503, "account-busy")))
+
+        val response = admin.post("/admin/transfers/$id/manual-compensation", reason("x"))
+
+        assertProblem(response, 503, "accounts-unavailable")
+        assertStillStuck(id)
+    }
+
+    @Test
+    fun `one credit compensates one transfer only`() {
+        val first = givenStuckCompensation()
+        val second = givenStuckCompensation()
+        givenCreditInAccounts()
+        assertThat(admin.post("/admin/transfers/$first/manual-compensation", reason("x")).status).isEqualTo(200)
+
+        val again = admin.post("/admin/transfers/$second/manual-compensation", reason("same credit"))
+
+        assertProblem(again, 409, "compensation-credit-already-used")
+        assertStillStuck(second)
+    }
+
+    @Test
+    fun `concurrent manual compensations of two transfers with the same credit compensate only one`() {
+        val transfers = (1..4).map { givenStuckCompensation() }
+        givenCreditInAccounts()
+        val start = CountDownLatch(1)
+        val pool = Executors.newFixedThreadPool(transfers.size)
+        val statuses =
+            transfers.map { id ->
+                pool.submit<Int> {
+                    start.await()
+                    admin.post("/admin/transfers/$id/manual-compensation", reason("race")).status
+                }
+            }
+
+        start.countDown()
+        val answered = statuses.map { it.get(30, TimeUnit.SECONDS) }
+        pool.shutdown()
+
+        assertThat(answered.count { it == 200 }).isEqualTo(1)
+        assertThat(answered.filter { it != 200 }).containsOnly(409)
+        assertThat(ownerJdbc.sql("select count(*) from transfer_manual_resolution").query(Int::class.java).single()).isEqualTo(1)
+        assertThat(transfers.map { ownerJdbc.statusOf(it) }.count { it == "COMPENSATED" }).isEqualTo(1)
+        assertThat(transfers.sumOf { ownerJdbc.outboxCorrelationIds(it).size }).isEqualTo(1)
+    }
+
     // --- helpers ---
 
-    private fun reason(text: String) = """{"reason":"$text"}"""
+    private fun reason(
+        text: String,
+        creditKey: String = CREDIT_KEY,
+    ) = """{"reason":"$text","creditIdempotencyKey":"$creditKey"}"""
+
+    /** `accounts` answers the read of the entry under [CREDIT_KEY] on the source account. */
+    private fun givenCreditInAccounts(
+        amount: Long = 2500,
+        kind: String = "CREDIT",
+    ) {
+        accountsServer.stubFor(
+            get(entriesPath(source))
+                .withQueryParam("idempotencyKey", equalTo(CREDIT_KEY))
+                .willReturn(
+                    aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(
+                            """{"id":"${UUID.randomUUID()}","accountId":"$source","sequence":7,"kind":"$kind","amount":$amount,""" +
+                                """"balanceAfter":2500,"description":"back office","createdAt":"2026-11-16T10:00:00Z"}""",
+                        ),
+                ),
+        )
+    }
+
+    private fun assertStillStuck(id: UUID) {
+        assertThat(ownerJdbc.statusOf(id)).isEqualTo("PENDING")
+        assertThat(resolutionCount(id)).isZero()
+        assertThat(ownerJdbc.outboxCorrelationIds(id)).isEmpty()
+        accountsServer.verify(0, postRequestedFor(urlEqualTo("/accounts/$source/credits")))
+    }
 
     private fun givenStuckCompensation(
         createdAgo: Long = 300,
@@ -321,4 +448,8 @@ class TransferAdminApiIntegrationTest : TransfersIntegrationTest() {
             .single()
 
     private fun Instant.utc(): OffsetDateTime = OffsetDateTime.ofInstant(this, ZoneOffset.UTC)
+
+    private companion object {
+        const val CREDIT_KEY = "back-office-credit-42"
+    }
 }

@@ -1,26 +1,25 @@
 package io.github.capozziv.digitalbanking.transfers.adapters.persistence
 
-import io.github.capozziv.digitalbanking.transfers.application.port.RefusedCompensation
+import io.github.capozziv.digitalbanking.transfers.application.port.StuckTransfer
 import io.github.capozziv.digitalbanking.transfers.application.port.StuckTransferFinder
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Repository
 import java.time.OffsetDateTime
-import java.util.UUID
 
 /**
- * Pending transfers in `COMPENSATE` whose latest step record is a refusal. The latest record of each transfer comes
- * from `transfer_step_transfer_idx` (`transfer_id, id`); the pending rows are read from the table, fine while few are
- * pending (as in [JdbcPendingTransferStats]).
+ * Pending transfers in `COMPENSATE` whose latest step record is a refusal, read with their transfer row in one query.
+ * The latest record of each transfer comes from `transfer_step_transfer_idx` (`transfer_id, id`); the pending rows are
+ * read from the table, fine while few are pending (as in [JdbcPendingTransferStats]).
  */
 @Repository
 class JdbcStuckTransferFinder(
     private val jdbcClient: JdbcClient,
 ) : StuckTransferFinder {
-    override fun findRefusedCompensations(limit: Int): List<RefusedCompensation> =
+    override fun findStuckCompensations(limit: Int): List<StuckTransfer> =
         jdbcClient
             .sql(
                 """
-                select t.id, last.detail, last.created_at
+                select $TRANSFER_COLUMNS, last.detail as refusal, last.created_at as refused_at
                 from transfer t
                 join lateral (
                     select s.outcome, s.detail, s.created_at
@@ -34,11 +33,15 @@ class JdbcStuckTransferFinder(
                 limit :limit
                 """.trimIndent(),
             ).param("limit", limit)
-            .query { rs, _ ->
-                RefusedCompensation(
-                    transferId = rs.getObject("id", UUID::class.java),
-                    reason = rs.getString("detail"),
-                    refusedAt = rs.getObject("created_at", OffsetDateTime::class.java).toInstant(),
+            .query { rs, rowNum ->
+                StuckTransfer(
+                    transfer = TransferRows.ROW_MAPPER.mapRow(rs, rowNum),
+                    refusal = rs.getString("refusal"),
+                    refusedAt = rs.getObject("refused_at", OffsetDateTime::class.java).toInstant(),
                 )
             }.list()
+
+    private companion object {
+        val TRANSFER_COLUMNS = TransferRows.COLUMNS.split(", ").joinToString(", ") { "t.$it" }
+    }
 }
