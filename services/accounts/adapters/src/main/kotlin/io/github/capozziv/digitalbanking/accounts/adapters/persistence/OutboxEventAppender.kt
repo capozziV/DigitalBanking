@@ -1,18 +1,23 @@
 package io.github.capozziv.digitalbanking.accounts.adapters.persistence
 
 import io.github.capozziv.digitalbanking.accounts.application.port.EventOutbox
+import io.github.capozziv.digitalbanking.accounts.domain.AccountBlocked
+import io.github.capozziv.digitalbanking.accounts.domain.AccountClosed
 import io.github.capozziv.digitalbanking.accounts.domain.AccountEvent
 import io.github.capozziv.digitalbanking.accounts.domain.AccountOpened
 import io.github.capozziv.digitalbanking.accounts.domain.AccountTypeChanged
+import io.github.capozziv.digitalbanking.accounts.domain.AccountUnblocked
 import io.github.capozziv.digitalbanking.accounts.domain.LedgerEntryRecorded
 import io.github.capozziv.digitalbanking.outbox.JdbcOutboxWriter
 import io.github.capozziv.digitalbanking.outbox.OutboxMessage
 import org.springframework.stereotype.Component
 import tools.jackson.databind.ObjectMapper
+import java.time.Instant
 import java.time.format.DateTimeFormatter
+import java.util.UUID
 
 /**
- * Maps each AccountEvent to its payload (spec, section 5) and eventVersion (1; AccountTypeChanged is 2, with overdraftLimit) and writes it to the outbox in the
+ * Maps each AccountEvent to its payload (spec, section 5) and eventVersion (1; AccountTypeChanged is 2, with overdraftLimit; AccountBlocked, AccountUnblocked and AccountClosed carry accountId, customerId and occurredAt) and writes it to the outbox in the
  * caller's transaction. Amounts are numbers of cents; instants are ISO-8601 UTC strings.
  */
 @Component
@@ -36,6 +41,9 @@ class OutboxEventAppender(
             is AccountOpened -> "AccountOpened"
             is LedgerEntryRecorded -> "LedgerEntryRecorded"
             is AccountTypeChanged -> "AccountTypeChanged"
+            is AccountBlocked -> "AccountBlocked"
+            is AccountUnblocked -> "AccountUnblocked"
+            is AccountClosed -> "AccountClosed"
         }
 
     private fun AccountEvent.eventVersion(): Int =
@@ -43,6 +51,7 @@ class OutboxEventAppender(
             is AccountOpened -> 1
             is LedgerEntryRecorded -> 1
             is AccountTypeChanged -> 2
+            is AccountBlocked, is AccountUnblocked, is AccountClosed -> 1
         }
 
     private fun AccountEvent.payload(): Map<String, Any?> =
@@ -77,5 +86,28 @@ class OutboxEventAppender(
                     "overdraftLimit" to overdraftLimit.cents,
                 )
             }
+
+            is AccountBlocked -> {
+                statusPayload(accountId, customerId, occurredAt)
+            }
+
+            is AccountUnblocked -> {
+                statusPayload(accountId, customerId, occurredAt)
+            }
+
+            is AccountClosed -> {
+                statusPayload(accountId, customerId, occurredAt)
+            }
         }
+
+    private fun statusPayload(
+        accountId: UUID,
+        customerId: UUID,
+        occurredAt: Instant,
+    ): Map<String, Any?> =
+        linkedMapOf(
+            "accountId" to accountId.toString(),
+            "customerId" to customerId.toString(),
+            "occurredAt" to DateTimeFormatter.ISO_INSTANT.format(occurredAt),
+        )
 }

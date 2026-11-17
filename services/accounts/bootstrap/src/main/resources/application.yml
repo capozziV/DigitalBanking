@@ -41,6 +41,10 @@ accounts:
     # Asked on every account opening (GET /internal/customers/{id}); slower than the timeout is 503.
     base-url: ${ACCOUNTS_CUSTOMER_BASE_URL:http://localhost:8085}
     timeout: ${ACCOUNTS_CUSTOMER_TIMEOUT:500ms}
+  transfers:
+    # Asked before closing an account (GET /internal/accounts/{id}/pending-transfers); slower than the timeout is 503.
+    base-url: ${ACCOUNTS_TRANSFERS_BASE_URL:http://localhost:8082}
+    timeout: ${ACCOUNTS_TRANSFERS_TIMEOUT:500ms}
   outbox:
     relay-enabled: true
     poll-interval: 500ms

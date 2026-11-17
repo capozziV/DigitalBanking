@@ -19,7 +19,12 @@ class InMemoryAccountRepository : AccountRepository {
         openingIdempotencyKey: String,
     ): InsertAccountResult {
         if (openingIdempotencyKey in openingKeys) return InsertAccountResult.DUPLICATE_OPENING_KEY
-        if (accounts.values.any { it.customerId == account.customerId && it.status != AccountStatus.CLOSED }) return InsertAccountResult.DUPLICATE_CUSTOMER
+        if (accounts.values.any {
+                it.customerId == account.customerId && it.status != AccountStatus.CLOSED
+            }
+        ) {
+            return InsertAccountResult.DUPLICATE_CUSTOMER
+        }
         accounts[account.id] = account
         openingKeys[openingIdempotencyKey] = account.id
         return InsertAccountResult.INSERTED

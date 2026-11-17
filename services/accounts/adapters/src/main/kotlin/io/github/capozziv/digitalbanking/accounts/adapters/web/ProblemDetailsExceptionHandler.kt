@@ -8,6 +8,11 @@ import io.github.capozziv.digitalbanking.accounts.application.CustomerBlockedExc
 import io.github.capozziv.digitalbanking.accounts.application.CustomerNotFoundException
 import io.github.capozziv.digitalbanking.accounts.application.CustomersUnavailableException
 import io.github.capozziv.digitalbanking.accounts.application.IdempotencyKeyReusedException
+import io.github.capozziv.digitalbanking.accounts.application.PendingTransfersException
+import io.github.capozziv.digitalbanking.accounts.application.TransfersUnavailableException
+import io.github.capozziv.digitalbanking.accounts.domain.AccountBlockedException
+import io.github.capozziv.digitalbanking.accounts.domain.AccountClosedException
+import io.github.capozziv.digitalbanking.accounts.domain.BalanceNotZeroException
 import io.github.capozziv.digitalbanking.accounts.domain.BalanceOverflowException
 import org.slf4j.LoggerFactory
 import org.springframework.beans.TypeMismatchException
@@ -88,6 +93,46 @@ class ProblemDetailsExceptionHandler : ResponseEntityExceptionHandler() {
             "Insufficient available balance",
             "The available balance does not cover the debit",
         ).also { it.setProperty("availableBalance", e.availableBalance.cents) }
+
+    @ExceptionHandler
+    fun handle(e: AccountBlockedException) =
+        problem(HttpStatus.UNPROCESSABLE_CONTENT, "account-blocked", "Account blocked", "The account is blocked: it takes no debits")
+
+    @ExceptionHandler
+    fun handle(e: AccountClosedException) =
+        problem(
+            HttpStatus.UNPROCESSABLE_CONTENT,
+            "account-closed",
+            "Account closed",
+            "The account is closed: it takes no entries and no changes",
+        )
+
+    @ExceptionHandler
+    fun handle(e: BalanceNotZeroException) =
+        problem(
+            HttpStatus.UNPROCESSABLE_CONTENT,
+            "balance-not-zero",
+            "Balance not zero",
+            "Only an account with a balance of exactly zero can be closed",
+        ).also { it.setProperty("balance", e.balance.cents) }
+
+    @ExceptionHandler
+    fun handle(e: PendingTransfersException) =
+        problem(
+            HttpStatus.UNPROCESSABLE_CONTENT,
+            "pending-transfers",
+            "Pending transfers",
+            "The account has outgoing transfers still pending; retry when they finish",
+        ).also { it.setProperty("count", e.count) }
+
+    @ExceptionHandler
+    fun handle(e: TransfersUnavailableException) =
+        problem(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "transfers-unavailable",
+            "Transfer service unavailable",
+            "The transfer service could not be reached; the account was not closed, retry later",
+        )
 
     @ExceptionHandler
     fun handle(e: AccountBusyException): ResponseEntity<ProblemDetail> {

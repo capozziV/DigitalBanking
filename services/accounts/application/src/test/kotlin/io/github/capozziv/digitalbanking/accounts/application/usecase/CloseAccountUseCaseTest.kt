@@ -93,7 +93,9 @@ class CloseAccountUseCaseTest {
         assertThat(outbox.events).containsExactly(AccountClosed(account.id, account.customerId, now))
         assertThat(transfers.lookups).containsExactly(account.id)
         // The final check runs under the account lock, re-reading the balance, and writes in the same transaction.
-        assertThat(log.calls).containsSubsequence("begin", "accounts.lockById", "entries.findLast", "accounts.updateStatus", "outbox.append", "end")
+        assertThat(
+            log.calls,
+        ).containsSubsequence("begin", "accounts.lockById", "entries.findLast", "accounts.updateStatus", "outbox.append", "end")
     }
 
     @Test

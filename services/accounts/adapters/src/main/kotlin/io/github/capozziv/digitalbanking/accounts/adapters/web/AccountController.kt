@@ -172,7 +172,9 @@ class AccountController(
         ),
         ApiResponse(
             responseCode = "422",
-            description = "/problems/idempotency-key-reused: the key was used for another kind or amount on this account",
+            description =
+                "/problems/idempotency-key-reused: the key was used for another kind or amount on this account. " +
+                    "/problems/account-closed: a closed account takes no credits (a blocked one does)",
             content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
@@ -217,7 +219,9 @@ class AccountController(
             description =
                 "/problems/insufficient-available-balance: the available balance (member `availableBalance`, in cents) " +
                     "does not cover the amount; nothing is recorded, so the same key can be retried later. " +
-                    "/problems/idempotency-key-reused: the key was used for another kind or amount on this account",
+                    "/problems/idempotency-key-reused: the key was used for another kind or amount on this account. " +
+                    "/problems/account-blocked: a blocked account takes no debits. " +
+                    "/problems/account-closed: a closed account takes no debits",
             content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(

@@ -46,7 +46,14 @@ class ChangeAccountStatusUseCaseTest {
     fun `blocking writes the status and appends AccountBlocked under the account lock, in one transaction`() {
         val log = CallLog()
         val tracked =
-            ChangeAccountStatusUseCase(log.accounts(accounts), log.entries(entries), log.types(types), log.outbox(outbox), log.transactions(tx), clock)
+            ChangeAccountStatusUseCase(
+                log.accounts(accounts),
+                log.entries(entries),
+                log.types(types),
+                log.outbox(outbox),
+                log.transactions(tx),
+                clock,
+            )
 
         val view = tracked.execute(account.id, AccountStatus.BLOCKED)
 

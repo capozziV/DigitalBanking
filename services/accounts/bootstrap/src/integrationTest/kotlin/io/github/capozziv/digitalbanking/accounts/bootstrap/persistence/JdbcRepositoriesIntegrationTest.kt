@@ -10,9 +10,13 @@ import io.github.capozziv.digitalbanking.accounts.application.port.LedgerEntryRe
 import io.github.capozziv.digitalbanking.accounts.application.port.TransactionRunner
 import io.github.capozziv.digitalbanking.accounts.bootstrap.AccountsIntegrationTest
 import io.github.capozziv.digitalbanking.accounts.domain.Account
+import io.github.capozziv.digitalbanking.accounts.domain.AccountBlocked
+import io.github.capozziv.digitalbanking.accounts.domain.AccountClosed
 import io.github.capozziv.digitalbanking.accounts.domain.AccountOpened
+import io.github.capozziv.digitalbanking.accounts.domain.AccountStatus
 import io.github.capozziv.digitalbanking.accounts.domain.AccountType
 import io.github.capozziv.digitalbanking.accounts.domain.AccountTypeChanged
+import io.github.capozziv.digitalbanking.accounts.domain.AccountUnblocked
 import io.github.capozziv.digitalbanking.accounts.domain.Balance
 import io.github.capozziv.digitalbanking.accounts.domain.EntryKind
 import io.github.capozziv.digitalbanking.accounts.domain.LedgerEntry
@@ -27,6 +31,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.dao.DataAccessException
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.simple.JdbcClient
 import java.sql.DriverManager
@@ -241,12 +246,55 @@ class JdbcRepositoriesIntegrationTest : AccountsIntegrationTest() {
     }
 
     @Test
-    fun `the application user can update only the type and updated_at of an account`() {
+    fun `updateStatus writes the status, which every read returns, and throws when no account is updated`() {
+        val account = openAccount()
+        val blocked = account.copy(status = AccountStatus.BLOCKED)
+
+        tx.inTransaction { accounts.updateStatus(blocked) }
+
+        assertThat(accounts.findById(account.id)).isEqualTo(blocked)
+        assertThat(tx.inTransaction { accounts.lockById(account.id) }).isEqualTo(blocked)
+        assertThat(accounts.findByOpeningIdempotencyKey("open-${account.id}")).isEqualTo(blocked)
+        assertThatThrownBy {
+            tx.inTransaction {
+                accounts.updateStatus(
+                    Account(UUID.randomUUID(), UUID.randomUUID(), AccountType.GOLD, AccountStatus.CLOSED),
+                )
+            }
+        }.isInstanceOf(IllegalStateException::class.java)
+    }
+
+    @Test
+    fun `a customer whose only account is closed gets a new one, and a blocked account still counts`() {
+        val first = openAccount()
+        tx.inTransaction { accounts.updateStatus(first.copy(status = AccountStatus.BLOCKED)) }
+        val refused = Account(ids.newId(), first.customerId, AccountType.FREE)
+        assertThat(tx.inTransaction { accounts.insert(refused, "open-${refused.id}") }).isEqualTo(InsertAccountResult.DUPLICATE_CUSTOMER)
+
+        tx.inTransaction { accounts.updateStatus(first.copy(status = AccountStatus.CLOSED)) }
+        val second = Account(ids.newId(), first.customerId, AccountType.FREE)
+
+        assertThat(tx.inTransaction { accounts.insert(second, "open-${second.id}") }).isEqualTo(InsertAccountResult.INSERTED)
+        val third = Account(ids.newId(), first.customerId, AccountType.FREE)
+        assertThat(tx.inTransaction { accounts.insert(third, "open-${third.id}") }).isEqualTo(InsertAccountResult.DUPLICATE_CUSTOMER)
+    }
+
+    @Test
+    fun `the database refuses an unknown status`() {
+        val account = openAccount()
+
+        assertThatThrownBy {
+            ownerJdbc.sql("update account set status = 'FROZEN' where id = :id").param("id", account.id).update()
+        }.isInstanceOf(DataAccessException::class.java)
+    }
+
+    @Test
+    fun `the application user can update only the type, the status and updated_at of an account`() {
         val account = openAccount()
 
         val updated =
             appJdbc
-                .sql("update account set type = 'GOLD', updated_at = now() where id = :id")
+                .sql("update account set type = 'GOLD', status = 'BLOCKED', updated_at = now() where id = :id")
                 .param("id", account.id)
                 .update()
 
@@ -256,7 +304,7 @@ class JdbcRepositoriesIntegrationTest : AccountsIntegrationTest() {
                 .describedAs("update account set %s", column)
                 .isEqualTo(INSUFFICIENT_PRIVILEGE)
         }
-        assertThat(accounts.findById(account.id)).isEqualTo(account.copy(type = AccountType.GOLD))
+        assertThat(accounts.findById(account.id)).isEqualTo(account.copy(type = AccountType.GOLD, status = AccountStatus.BLOCKED))
     }
 
     // --- grants ---
@@ -415,6 +463,30 @@ class JdbcRepositoriesIntegrationTest : AccountsIntegrationTest() {
             """{"accountId": "$accountId", "previousType": "FREE", "newType": "GOLD", "overdraftLimit": 100000}""",
             eventVersion = 2,
         )
+    }
+
+    @Test
+    fun `append writes AccountBlocked, AccountUnblocked and AccountClosed with accountId, customerId and occurredAt`() {
+        MDC.put(OutboxEventEnvelope.CORRELATION_ID_MDC_KEY, "corr-status")
+        val customerId = UUID.randomUUID()
+        val occurredAt = Instant.parse("2026-11-16T12:00:00.123456Z")
+        val events =
+            listOf(
+                "AccountBlocked" to { id: UUID -> AccountBlocked(id, customerId, occurredAt) },
+                "AccountUnblocked" to { id: UUID -> AccountUnblocked(id, customerId, occurredAt) },
+                "AccountClosed" to { id: UUID -> AccountClosed(id, customerId, occurredAt) },
+            )
+
+        for ((type, event) in events) {
+            val accountId = ids.newId()
+            tx.inTransaction { outbox.append(event(accountId)) }
+            assertOutboxRow(
+                accountId,
+                type,
+                "corr-status",
+                """{"accountId": "$accountId", "customerId": "$customerId", "occurredAt": "2026-11-16T12:00:00.123456Z"}""",
+            )
+        }
     }
 
     @Test
