@@ -3,6 +3,7 @@ package io.github.capozziv.digitalbanking.transfers.adapters.accounts
 import io.github.capozziv.digitalbanking.observability.CorrelationIdRestClientInterceptor
 import io.github.capozziv.digitalbanking.security.ServiceTokenClient
 import io.github.capozziv.digitalbanking.transfers.application.port.AccountsGateway
+import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -42,7 +43,7 @@ class AccountsClientConfiguration {
     }
 
     @Bean
-    fun accountsResponseClassifier() = AccountsResponseClassifier()
+    fun accountsResponseClassifier(meterRegistry: MeterRegistry) = AccountsResponseClassifier(meterRegistry)
 
     @Bean
     fun accountsGateway(

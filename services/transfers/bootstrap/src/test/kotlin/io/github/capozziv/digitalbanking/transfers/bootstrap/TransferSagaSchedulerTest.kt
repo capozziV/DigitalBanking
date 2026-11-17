@@ -7,6 +7,7 @@ import io.github.capozziv.digitalbanking.transfers.application.port.CallResult
 import io.github.capozziv.digitalbanking.transfers.application.port.CorrelationContext
 import io.github.capozziv.digitalbanking.transfers.application.port.DailyLimitGateway
 import io.github.capozziv.digitalbanking.transfers.application.port.DailyLimitUsage
+import io.github.capozziv.digitalbanking.transfers.application.port.EntryLookup
 import io.github.capozziv.digitalbanking.transfers.application.port.EventOutbox
 import io.github.capozziv.digitalbanking.transfers.application.port.ReservationResult
 import io.github.capozziv.digitalbanking.transfers.application.port.StepRecord
@@ -180,6 +181,11 @@ class TransferSagaSchedulerTest {
             val unusedGateway =
                 object : AccountsGateway {
                     override fun lookupAccount(id: UUID): AccountLookup = error("unused")
+
+                    override fun findEntry(
+                        accountId: UUID,
+                        idempotencyKey: String,
+                    ): EntryLookup = error("unused")
 
                     override fun perform(call: StepCall.Accounts): CallResult = error("unused")
                 }

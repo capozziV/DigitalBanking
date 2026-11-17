@@ -3,6 +3,8 @@ package io.github.capozziv.digitalbanking.transfers.application.fake
 import io.github.capozziv.digitalbanking.transfers.application.port.AccountLookup
 import io.github.capozziv.digitalbanking.transfers.application.port.AccountsGateway
 import io.github.capozziv.digitalbanking.transfers.application.port.CallResult
+import io.github.capozziv.digitalbanking.transfers.application.port.EntryLookup
+import io.github.capozziv.digitalbanking.transfers.domain.RecordedEntry
 import io.github.capozziv.digitalbanking.transfers.domain.StepCall
 import io.github.capozziv.digitalbanking.transfers.domain.StepOutcome
 import java.util.UUID
@@ -19,6 +21,13 @@ class FakeAccountsGateway(
     val lookupResults = mutableMapOf<UUID, AccountLookup>()
     val lookups = mutableListOf<UUID>()
 
+    /** Entries of `accounts` by account and idempotency key, as `GET /accounts/{id}/entries?idempotencyKey=` reads them. */
+    val entries = mutableMapOf<Pair<UUID, String>, RecordedEntry>()
+
+    /** When true, [findEntry] answers [EntryLookup.Unavailable]. */
+    var entriesUnavailable = false
+    val entryLookups = mutableListOf<Pair<UUID, String>>()
+
     /** Runs on every [perform] after the call is recorded, e.g. to advance a test clock by the call's duration. */
     var onCall: (StepCall.Accounts) -> Unit = {}
 
@@ -29,6 +38,16 @@ class FakeAccountsGateway(
     override fun lookupAccount(id: UUID): AccountLookup {
         lookups += id
         return lookupResults[id] ?: lookup
+    }
+
+    override fun findEntry(
+        accountId: UUID,
+        idempotencyKey: String,
+    ): EntryLookup {
+        check(transactions?.open != true) { "accounts called inside a database transaction" }
+        entryLookups += accountId to idempotencyKey
+        if (entriesUnavailable) return EntryLookup.Unavailable
+        return entries[accountId to idempotencyKey]?.let { EntryLookup.Found(it) } ?: EntryLookup.NotFound
     }
 
     override fun perform(call: StepCall.Accounts): CallResult {
