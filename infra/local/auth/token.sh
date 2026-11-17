@@ -4,6 +4,8 @@
 #   token.sh service [client-id]       token de maquina (client credentials, escopo digitalbanking/internal)
 # Variaveis: MOCK_OAUTH2_URL (padrao http://localhost:8090/default), TOKEN_CLIENT_ID e TOKEN_CLIENT_SECRET
 # (clientes de usuario, padrao web/local-secret). O mock aceita qualquer segredo; sao so valores de desenvolvimento.
+# MOCK_OAUTH2_HOST (opcional): Host enviado ao mock, que monta o iss do token a partir dele. Com o perfil apps do
+# compose, MOCK_OAUTH2_HOST=mock-oauth2-server:8080 da o iss http://mock-oauth2-server:8080/default, o dos conteineres.
 set -euo pipefail
 
 issuer="${MOCK_OAUTH2_URL:-http://localhost:8090/default}"
@@ -14,8 +16,11 @@ usage() {
 }
 
 request() {
-  local response
-  response="$(curl -sS --fail-with-body "$@" "${issuer}/token")" || {
+  local response host_header=()
+  if [[ -n "${MOCK_OAUTH2_HOST:-}" ]]; then
+    host_header=(-H "Host: ${MOCK_OAUTH2_HOST}")
+  fi
+  response="$(curl -sS --fail-with-body ${host_header[@]+"${host_header[@]}"} "$@" "${issuer}/token")" || {
     echo "falha ao pedir token em ${issuer}/token: ${response:-sem resposta}" >&2
     exit 1
   }
