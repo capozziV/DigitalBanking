@@ -14,6 +14,11 @@ targetGroupArn: ""
 serviceAccount:
   roleArn: ""
 
+# Obrigatorios: o chart recusa o render se algum estiver vazio ou ausente (sem eles o pod cairia no padrao local do application.yml).
+requiredEnv:
+  - NOTIFICATION_DB_URL
+  - NOTIFICATION_JWT_ISSUER_URI
+
 env:
   NOTIFICATION_DB_URL: ""
   NOTIFICATION_DB_USER: notification_app

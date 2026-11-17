@@ -14,6 +14,15 @@ targetGroupArn: ""
 serviceAccount:
   roleArn: ""
 
+# Obrigatorios: o chart recusa o render se algum estiver vazio ou ausente (sem eles o pod cairia no padrao local do application.yml).
+requiredEnv:
+  - TRANSFERS_DB_URL
+  - TRANSFERS_REDIS_HOST
+  - TRANSFERS_JWT_ISSUER_URI
+  - TRANSFERS_OAUTH_TOKEN_URI
+  - TRANSFERS_OAUTH_CLIENT_ID
+  - TRANSFERS_TOPIC_ARN
+
 env:
   TRANSFERS_DB_URL: ""
   TRANSFERS_DB_USER: transfers_app

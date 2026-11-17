@@ -14,6 +14,14 @@ targetGroupArn: ""
 serviceAccount:
   roleArn: ""
 
+# Obrigatorios: o chart recusa o render se algum estiver vazio ou ausente (sem eles o pod cairia no padrao local do application.yml).
+requiredEnv:
+  - ACCOUNTS_DB_URL
+  - ACCOUNTS_JWT_ISSUER_URI
+  - ACCOUNTS_OAUTH_TOKEN_URI
+  - ACCOUNTS_OAUTH_CLIENT_ID
+  - ACCOUNTS_TOPIC_ARN
+
 env:
   ACCOUNTS_DB_URL: ""
   ACCOUNTS_DB_USER: accounts_app

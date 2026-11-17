@@ -29,6 +29,9 @@ serviceAccount:
   # roleArn so entra como anotacao IRSA se informado; com Pod Identity fica vazio.
   roleArn: ""
 
+# Chaves de env que nao podem ficar vazias nem ausentes (o render falha). Lista por servico.
+requiredEnv: []
+
 # Variaveis de ambiente nao secretas (vao para o ConfigMap). Valores sempre texto.
 env: {}
 

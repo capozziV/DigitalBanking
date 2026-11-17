@@ -14,6 +14,11 @@ targetGroupArn: ""
 serviceAccount:
   roleArn: ""
 
+# Obrigatorios: o chart recusa o render se algum estiver vazio ou ausente (sem eles o pod cairia no padrao local do application.yml).
+requiredEnv:
+  - STATEMENT_JWT_ISSUER_URI
+  - STATEMENT_REDIS_HOST
+
 env:
   STATEMENT_JWT_ISSUER_URI: ""
   STATEMENT_JWT_GROUPS_CLAIM: "cognito:groups"
