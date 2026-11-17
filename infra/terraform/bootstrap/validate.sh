@@ -19,4 +19,16 @@ if grep -nE 'StringLike|repo:[^"]*\*' main.tf; then
   echo "trust policy nao pode usar curinga" >&2
   exit 1
 fi
+# Deny do papel: tem de existir e cobrir budgets, o proprio papel/OIDC e o bucket do estado.
+for needle in '"budgets:\*"' '"iam:\*"' 's3:DeleteBucket\*' 's3:PutBucketPolicy' 'aws_iam_role_policy_attachment" "github_guardrails"'; do
+  if ! grep -q "$needle" main.tf; then
+    echo "deny do papel do GitHub incompleto: falta $needle" >&2
+    exit 1
+  fi
+done
+# Repositorio sem curinga (a validation {} cobre o plan; aqui pega o default no HCL).
+if grep -A3 'variable "github_repository"' variables.tf | grep -E 'default.*[*?]'; then
+  echo "github_repository com curinga" >&2
+  exit 1
+fi
 echo "trust policy ok: so ref:refs/heads/main"

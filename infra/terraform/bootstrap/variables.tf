@@ -8,6 +8,11 @@ variable "github_repository" {
   description = "Repositorio do GitHub (dono/nome) autorizado a assumir o papel."
   type        = string
   default     = "capozziV/DigitalBanking"
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", var.github_repository))
+    error_message = "Use dono/nome exato, sem curinga (* ou ?)."
+  }
 }
 
 variable "services" {

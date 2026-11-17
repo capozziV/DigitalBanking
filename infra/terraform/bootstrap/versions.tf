@@ -16,7 +16,7 @@ provider "aws" {
 
   default_tags {
     tags = {
-      project = "digital-banking"
+      project = "digitalbanking"
       stack   = "bootstrap"
     }
   }

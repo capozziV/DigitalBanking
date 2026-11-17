@@ -76,6 +76,50 @@ resource "aws_iam_role_policy_attachment" "github_admin" {
   policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
 }
 
+# Deny anexado ao papel: mesmo admin, ele nao reescreve a propria trust policy, nao apaga o
+# OIDC, nao mexe no Budget nem desfaz a protecao do bucket do estado. O env nao usa nenhuma
+# dessas acoes (so le e escreve objetos do estado, o que continua permitido).
+data "aws_iam_policy_document" "github_guardrails" {
+  statement {
+    sid       = "ProtectBudgets"
+    effect    = "Deny"
+    actions   = ["budgets:*"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid     = "ProtectOwnRoleAndOidcProvider"
+    effect  = "Deny"
+    actions = ["iam:*"]
+    resources = [
+      aws_iam_role.github.arn,
+      aws_iam_openid_connect_provider.github.arn,
+    ]
+  }
+
+  statement {
+    sid    = "ProtectStateBucket"
+    effect = "Deny"
+    actions = [
+      "s3:DeleteBucket*",
+      "s3:PutBucketPolicy",
+      "s3:PutBucketVersioning",
+      "s3:PutLifecycleConfiguration",
+    ]
+    resources = [aws_s3_bucket.state.arn]
+  }
+}
+
+resource "aws_iam_policy" "github_guardrails" {
+  name   = "digital-banking-github-guardrails"
+  policy = data.aws_iam_policy_document.github_guardrails.json
+}
+
+resource "aws_iam_role_policy_attachment" "github_guardrails" {
+  role       = aws_iam_role.github.name
+  policy_arn = aws_iam_policy.github_guardrails.arn
+}
+
 # --- ECR: um repositorio por servico ---
 
 resource "aws_ecr_repository" "service" {
