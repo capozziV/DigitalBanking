@@ -1,0 +1,39 @@
+# Valores do notification para o chart deploy/helm/service.
+# Valores vazios ("") dependem do ambiente e entram na instalacao (--set ou -f), a partir dos outputs do Terraform:
+# image.repository/tag, targetGroupArn e os enderecos de banco, Redis, issuer e topico. Segredos nunca ficam aqui:
+# secretEnv so referencia Secrets do Kubernetes criados fora do chart (nome do Secret -> chaves).
+name: notification
+port: 8083
+
+image:
+  repository: ""
+  tag: ""
+
+targetGroupArn: ""
+
+serviceAccount:
+  roleArn: ""
+
+# Obrigatorios: o chart recusa o render se algum estiver vazio ou ausente (sem eles o pod cairia no padrao local do application.yml).
+requiredEnv:
+  - NOTIFICATION_DB_URL
+  - NOTIFICATION_JWT_ISSUER_URI
+
+env:
+  NOTIFICATION_DB_URL: ""
+  NOTIFICATION_DB_USER: notification_app
+  NOTIFICATION_DB_OWNER_USER: notification_owner
+  NOTIFICATION_JWT_ISSUER_URI: ""
+  NOTIFICATION_JWT_GROUPS_CLAIM: "cognito:groups"
+  NOTIFICATION_AWS_ENDPOINT: ""
+  NOTIFICATION_AWS_REGION: us-east-1
+  NOTIFICATION_ACCOUNTS_QUEUE: notification-accounts.fifo
+  NOTIFICATION_TRANSFERS_QUEUE: notification-transfers.fifo
+  NOTIFICATION_ACCOUNTS_DLQ: notification-accounts-dlq.fifo
+  NOTIFICATION_TRANSFERS_DLQ: notification-transfers-dlq.fifo
+  NOTIFICATION_DLQ_METRICS_REFRESH_INTERVAL: 30s
+
+secretEnv:
+  notification-db:
+    - NOTIFICATION_DB_PASSWORD
+    - NOTIFICATION_DB_OWNER_PASSWORD
