@@ -14,6 +14,8 @@ import java.time.Duration
  * - [publishTimeout]: limit of each publish call to the broker.
  * - [maxCycleDuration]: once exceeded, the cycle stops publishing and leaves the rest for the next one,
  *   so the leader transaction (and its connection) is never held for long.
+ * - [discardLockTimeout]: longest a manual discard waits for the relay lock; must outlast a cycle
+ *   ([maxCycleDuration] plus one [publishTimeout]), or every discard during a cycle would give up.
  */
 data class OutboxRelaySettings(
     val batchSize: Int = DEFAULT_BATCH_SIZE,
@@ -23,6 +25,7 @@ data class OutboxRelaySettings(
     val maxCycleDuration: Duration = DEFAULT_MAX_CYCLE_DURATION,
     val retryBackoff: Duration = DEFAULT_RETRY_BACKOFF,
     val maxRetryBackoff: Duration = DEFAULT_MAX_RETRY_BACKOFF,
+    val discardLockTimeout: Duration = DEFAULT_DISCARD_LOCK_TIMEOUT,
 ) {
     companion object {
         const val DEFAULT_BATCH_SIZE = 100
@@ -31,6 +34,7 @@ data class OutboxRelaySettings(
         val DEFAULT_MAX_CYCLE_DURATION: Duration = Duration.ofSeconds(10)
         val DEFAULT_RETRY_BACKOFF: Duration = Duration.ofSeconds(1)
         val DEFAULT_MAX_RETRY_BACKOFF: Duration = Duration.ofSeconds(30)
+        val DEFAULT_DISCARD_LOCK_TIMEOUT: Duration = Duration.ofSeconds(30)
     }
 
     init {
@@ -40,5 +44,8 @@ data class OutboxRelaySettings(
         require(maxCycleDuration > Duration.ZERO) { "maxCycleDuration must be positive" }
         require(retryBackoff > Duration.ZERO) { "retryBackoff must be positive" }
         require(maxRetryBackoff >= retryBackoff) { "maxRetryBackoff must not be below retryBackoff" }
+        require(discardLockTimeout >= maxCycleDuration + publishTimeout) {
+            "discardLockTimeout must not be below maxCycleDuration + publishTimeout"
+        }
     }
 }

@@ -1,12 +1,14 @@
 package io.github.capozziv.digitalbanking.outbox.relay.spring
 
 import io.github.capozziv.digitalbanking.outbox.PendingEvent
+import io.github.capozziv.digitalbanking.outbox.relay.DiscardOutcome
 import io.github.capozziv.digitalbanking.outbox.relay.EventPublisher
 import io.github.capozziv.digitalbanking.outbox.relay.OutboxBacklog
 import io.github.capozziv.digitalbanking.outbox.relay.OutboxMetrics
 import io.github.capozziv.digitalbanking.outbox.relay.OutboxRelay
 import io.github.capozziv.digitalbanking.outbox.relay.OutboxRelaySettings
 import io.github.capozziv.digitalbanking.outbox.relay.OutboxStore
+import io.github.capozziv.digitalbanking.outbox.relay.StuckEvent
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -16,6 +18,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.Collections
+import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -129,6 +132,16 @@ class OutboxRelaySchedulerTest {
             now: Instant,
             stuckAfterAttempts: Int,
         ) = OutboxBacklog(pending = 0, oldestAge = null, stuckAggregates = 0)
+
+        override fun stuckEvents(limit: Int): List<StuckEvent> = error("not used by the scheduler")
+
+        override fun discard(
+            eventId: UUID,
+            discardedBy: String,
+            reason: String,
+            lockKey: Long,
+            lockTimeout: Duration,
+        ): DiscardOutcome = error("not used by the scheduler")
     }
 
     private class NoOpPublisher : EventPublisher {
