@@ -10,6 +10,8 @@ dependencies {
     api("org.springframework:spring-test")
     // ApiDocsAssertions: the shared checks of every service's OpenAPI contract.
     implementation("org.assertj:assertj-core")
+    // AwsProfileConfigAssertions: loads the configuration of a service with the aws profile.
+    implementation("org.springframework.boot:spring-boot-test")
     implementation("tools.jackson.core:jackson-databind")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")

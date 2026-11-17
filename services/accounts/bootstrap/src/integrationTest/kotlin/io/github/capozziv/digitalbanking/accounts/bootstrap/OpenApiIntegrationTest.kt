@@ -111,6 +111,26 @@ class OpenApiIntegrationTest : AccountsIntegrationTest() {
     }
 
     @Test
+    fun `the operations on an existing account or account type document 404 as Problem Details`() {
+        val names =
+            listOf(
+                "GET /accounts/{id}",
+                "GET /accounts/{id}/entries",
+                "POST /accounts/{id}/credits",
+                "POST /accounts/{id}/debits",
+                "PUT /accounts/{id}/type",
+                "PUT /admin/account-types/{type}",
+            )
+        for (name in names) {
+            val notFound = operation(name).get("responses").get("404")
+
+            assertThat(notFound).describedAs(name).isNotNull()
+            assertThat(notFound.get("description").asString()).describedAs(name).contains("/problems/")
+            assertThat(notFound.get("content").get("application/problem+json")).describedAs(name).isNotNull()
+        }
+    }
+
+    @Test
     fun `the contract says that framework errors such as 405, 415 and unknown routes have type about-blank`() {
         val description = docs.get("info").get("description").asString()
 
