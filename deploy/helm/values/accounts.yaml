@@ -1,0 +1,35 @@
+# Valores do accounts para o chart deploy/helm/service.
+# Valores vazios ("") dependem do ambiente e entram na instalacao (--set ou -f), a partir dos outputs do Terraform:
+# image.repository/tag, targetGroupArn e os enderecos de banco, Redis, issuer e topico. Segredos nunca ficam aqui:
+# secretEnv so referencia Secrets do Kubernetes criados fora do chart (nome do Secret -> chaves).
+name: accounts
+port: 8081
+
+image:
+  repository: ""
+  tag: ""
+
+targetGroupArn: ""
+
+serviceAccount:
+  roleArn: ""
+
+env:
+  ACCOUNTS_DB_URL: ""
+  ACCOUNTS_DB_USER: accounts_app
+  ACCOUNTS_DB_OWNER_USER: accounts_owner
+  ACCOUNTS_JWT_ISSUER_URI: ""
+  ACCOUNTS_JWT_GROUPS_CLAIM: "cognito:groups"
+  ACCOUNTS_OAUTH_TOKEN_URI: ""
+  ACCOUNTS_OAUTH_CLIENT_ID: ""
+  ACCOUNTS_CUSTOMER_BASE_URL: http://customer:8085
+  ACCOUNTS_AWS_ENDPOINT: ""
+  ACCOUNTS_AWS_REGION: us-east-1
+  ACCOUNTS_TOPIC_ARN: ""
+
+secretEnv:
+  accounts-db:
+    - ACCOUNTS_DB_PASSWORD
+    - ACCOUNTS_DB_OWNER_PASSWORD
+  accounts-oauth:
+    - ACCOUNTS_OAUTH_CLIENT_SECRET
