@@ -10,6 +10,9 @@ Infraestrutura na AWS do banco digital, em `sa-east-1` ([ADR 0019](../../docs/ad
 - `modules/network`: VPC `10.20.0.0/16` em duas zonas, sub-redes públicas (só o NAT) e privadas, um NAT Gateway com EIP.
 - `modules/eks`: cluster (suporte padrão, sem o estendido, que cobra a mais), node group gerenciado 2× `t3.medium` (AL2023) nas sub-redes privadas, add-ons gerenciados (VPC CNI, kube-proxy, CoreDNS, Pod Identity Agent) e o AWS Load Balancer Controller (chart `3.6.2`) por `helm_release`, com papel por Pod Identity.
 - `modules/edge-alb`: ALB interno, listener HTTP 80 (404 no que não casa), um target group por serviço (alvo por IP, health check em `/actuator/health/readiness`) e as regras por caminho de `routes.json`, espelho das `location` do nginx local.
+- `modules/data`: RDS PostgreSQL 17 `db.t4g.micro` (senha mestre gerada e guardada pelo próprio RDS no Secrets Manager), ElastiCache Redis 7.1 `cache.t4g.micro` e os segredos por serviço (`<name>/<servico>-db` com `*_DB_PASSWORD` e `*_DB_OWNER_PASSWORD`; `<name>/accounts-oauth` e `<name>/transfers-oauth` com o segredo do app client de máquina). RDS e Redis só aceitam o security group do cluster do EKS.
+- `modules/messaging`: tópicos SNS FIFO, filas SQS FIFO com DLQ (visibilidade 30 s, 5 recebimentos), assinaturas com entrega crua e a tabela DynamoDB `statement`, tudo a partir de `resources.json`, espelho dos scripts do LocalStack.
+- `modules/access`: um papel IAM por serviço (Pod Identity), ligado à ServiceAccount de mesmo nome no namespace do release (`kubernetes_namespace`, padrão `digitalbanking`). `accounts`, `transfers` e `customer` só publicam no próprio tópico; `notification` e `statement` consomem as próprias filas e leem os atributos das DLQs; `statement` também usa `PutItem`, `GetItem` e `Query` na própria tabela. Sempre com ARN específico.
 - `envs/aws`: compõe tudo; o VPC Link da borda aponta para o listener do ALB. Backend `s3` com configuração parcial e lock nativo (`use_lockfile`); o bucket vem do stack `bootstrap`.
 
 ## ALB do Terraform, nunca do controller
@@ -21,6 +24,12 @@ O `aws-down` desinstala o chart dos serviços antes do `destroy`, para os `Targe
 
 ## Roteamento do ALB
 `modules/edge-alb/routes.json` traz os serviços (porta) e as regras. As regex do limite diário (`transfers`) e do extrato (`statement`) têm prioridade menor que o prefixo `/accounts/`, como no nginx. As `location` do actuator ficam só no local: o ALB checa a saúde direto no pod e a borda não expõe o actuator. `envs/aws/check-alb-routes.py` compara os casadores do ALB com as `location` do nginx (exato, prefixo, regex e serviço pela porta) e falha se divergirem.
+
+## Mensageria igual ao LocalStack
+`envs/aws/check-messaging.py` lê `infra/local/localstack/init/ready.d` e `modules/messaging/resources.json` e falha se diferirem em tópicos, filas, DLQs, assinaturas, atributos FIFO, visibilidade, `maxReceiveCount` ou na tabela do extrato. As filas `*-inspection.fifo` são só locais (sem consumidor) e ficam de fora.
+
+## Bancos e usuários por serviço
+O Terraform não cria os bancos e usuários dentro do RDS: ele fica em sub-rede privada e o runner não o alcança. Quem cria é um Job no cluster (como `infra/local/postgres/init`), com a senha mestre do segredo `db_master_secret_arn` e as senhas de `<servico>-db`. Os Secrets do Kubernetes dos serviços saem dos mesmos segredos, pelo runner que instala o chart.
 
 ## Etiquetas e `created_at`
 `default_tags` põe `project=digitalbanking` e `created-at` em todo recurso do provider. `created_at` (RFC 3339) não tem padrão: vem do workflow na subida, e o `aws-reaper` lê a etiqueta. Recursos que o EKS cria por conta própria (instâncias e ENIs do node group, security group do cluster) não recebem `default_tags`, mas saem com o node group e o cluster.
@@ -46,7 +55,7 @@ O `aws-down` desinstala o chart dos serviços antes do `destroy`, para os `Targe
 ```bash
 infra/terraform/envs/aws/validate.sh
 ```
-O script roda `terraform fmt -check` em toda a árvore, `init -backend=false -lockfile=readonly`, `validate`, o tflint na raiz e em cada módulo (`network`, `eks`, `edge-alb`, `edge`, `identity`) e o `check-alb-routes.py`, que compara as regras do ALB com as `location` do nginx local (recusa `^~` e `~*`, e prefixo de um serviço sombreado por outro). Não precisa de credenciais.
+O script roda `terraform fmt -check` em toda a árvore, `init -backend=false -lockfile=readonly`, `validate`, o tflint na raiz e em cada módulo (`network`, `eks`, `edge-alb`, `edge`, `identity`, `messaging`, `data`, `access`), o `check-messaging.py` e o `check-alb-routes.py`, que compara as regras do ALB com as `location` do nginx local (recusa `^~` e `~*`, e prefixo de um serviço sombreado por outro). Não precisa de credenciais.
 
 ## Decisões do ambiente efêmero
 - **Actuator fora da borda.** O ALB não tem regras para `/<servico>/actuator/`: o health check vai direto ao pod e a borda não expõe o actuator. Divergência deliberada do nginx local, que o expõe; na AWS, `/actuator/metrics` (admin) não chega pela borda. O `check-alb-routes.py` falha se um actuator aparecer no ALB. Se virar ADR, é da Clara (ADR 0021).

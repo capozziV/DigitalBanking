@@ -1,0 +1,23 @@
+{
+  "_comment": "Topicos SNS FIFO, filas SQS FIFO e DLQs, espelho de infra/local/localstack/init/ready.d. Conferido por envs/aws/check-messaging.py. As filas *-inspection.fifo existem so no LocalStack (sem consumidor) e ficam fora.",
+  "visibility_timeout_seconds": 30,
+  "max_receive_count": 5,
+  "topics": [
+    { "name": "accounts-events.fifo", "fifo": true },
+    { "name": "transfers-events.fifo", "fifo": true },
+    { "name": "customer-events.fifo", "fifo": true }
+  ],
+  "queues": [
+    { "name": "notification-accounts.fifo", "fifo": true, "dlq": "notification-accounts-dlq.fifo", "topic": "accounts-events.fifo" },
+    { "name": "notification-transfers.fifo", "fifo": true, "dlq": "notification-transfers-dlq.fifo", "topic": "transfers-events.fifo" },
+    { "name": "statement-accounts.fifo", "fifo": true, "dlq": "statement-accounts-dlq.fifo", "topic": "accounts-events.fifo" }
+  ],
+  "dead_letter_queues": [
+    { "name": "notification-accounts-dlq.fifo", "fifo": true },
+    { "name": "notification-transfers-dlq.fifo", "fifo": true },
+    { "name": "statement-accounts-dlq.fifo", "fifo": true }
+  ],
+  "dynamodb_tables": [
+    { "name": "statement", "hash_key": { "name": "accountId", "type": "S" }, "range_key": { "name": "sequence", "type": "N" } }
+  ]
+}

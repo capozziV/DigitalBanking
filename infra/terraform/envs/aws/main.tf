@@ -68,3 +68,28 @@ module "edge" {
   throttling_rate_limit  = var.throttling_rate_limit
   throttling_burst_limit = var.throttling_burst_limit
 }
+
+module "messaging" {
+  source = "../../modules/messaging"
+}
+
+module "data" {
+  source = "../../modules/data"
+
+  name                     = var.name
+  vpc_id                   = module.network.vpc_id
+  subnet_ids               = module.network.private_subnet_ids
+  client_security_group_id = module.eks.cluster_security_group_id
+  machine_client_secret    = module.identity.machine_client_secret
+}
+
+module "access" {
+  source = "../../modules/access"
+
+  name         = var.name
+  cluster_name = module.eks.cluster_name
+  namespace    = var.kubernetes_namespace
+  topic_arns   = module.messaging.topic_arns
+  queue_arns   = module.messaging.queue_arns
+  table_arns   = module.messaging.table_arns
+}
