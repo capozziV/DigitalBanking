@@ -7,13 +7,18 @@ import io.github.capozziv.digitalbanking.transfers.application.port.CustomerGate
 import io.github.capozziv.digitalbanking.transfers.application.port.DailyLimitGateway
 import io.github.capozziv.digitalbanking.transfers.application.port.EventOutbox
 import io.github.capozziv.digitalbanking.transfers.application.port.IdGenerator
+import io.github.capozziv.digitalbanking.transfers.application.port.ManualResolutionLog
+import io.github.capozziv.digitalbanking.transfers.application.port.StuckTransferFinder
 import io.github.capozziv.digitalbanking.transfers.application.port.TransactionRunner
 import io.github.capozziv.digitalbanking.transfers.application.port.TransferRepository
 import io.github.capozziv.digitalbanking.transfers.application.port.TransferStepLog
+import io.github.capozziv.digitalbanking.transfers.application.usecase.CompensateTransferManuallyUseCase
 import io.github.capozziv.digitalbanking.transfers.application.usecase.GetDailyLimitUseCase
 import io.github.capozziv.digitalbanking.transfers.application.usecase.GetTransferUseCase
+import io.github.capozziv.digitalbanking.transfers.application.usecase.ListStuckTransfersUseCase
 import io.github.capozziv.digitalbanking.transfers.application.usecase.RequestTransferUseCase
 import io.github.capozziv.digitalbanking.transfers.application.usecase.ResumeDueTransfersUseCase
+import io.github.capozziv.digitalbanking.transfers.application.usecase.RetryTransferUseCase
 import io.github.capozziv.digitalbanking.transfers.application.usecase.RunTransferSagaUseCase
 import io.github.capozziv.digitalbanking.transfers.application.usecase.SagaSettings
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -21,6 +26,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import java.time.Clock
 import java.time.Duration
+import java.util.UUID
 
 /** Wires the use cases (plain Kotlin, no Spring) to the adapters. */
 @Configuration(proxyBeanMethods = false)
@@ -72,6 +78,32 @@ class UseCaseConfiguration {
         accounts: AccountsGateway,
         clock: Clock,
     ) = GetDailyLimitUseCase(dailyLimits, accounts, clock)
+
+    @Bean
+    fun listStuckTransfersUseCase(finder: StuckTransferFinder) = ListStuckTransfersUseCase(finder)
+
+    /** Each admin retry runs the saga under a new lease owner, like the scheduler's runs. */
+    @Bean
+    fun retryTransferUseCase(
+        transfers: TransferRepository,
+        runSaga: RunTransferSagaUseCase,
+        correlation: CorrelationContext,
+    ) = RetryTransferUseCase(transfers, runSaga, correlation) { "admin-retry-${UUID.randomUUID()}" }
+
+    @Bean
+    fun compensateTransferManuallyUseCase(
+        transfers: TransferRepository,
+        resolutions: ManualResolutionLog,
+        accounts: AccountsGateway,
+        outbox: EventOutbox,
+        dailyLimits: DailyLimitGateway,
+        tx: TransactionRunner,
+        settings: SagaSettings,
+        correlation: CorrelationContext,
+        clock: Clock,
+    ) = CompensateTransferManuallyUseCase(transfers, resolutions, accounts, outbox, dailyLimits, tx, settings, correlation, clock) {
+        "admin-compensation-${UUID.randomUUID()}"
+    }
 
     /** Every saga run of the scheduler takes the lease under a new owner (see [SchedulerLeaseOwners]). */
     @Bean

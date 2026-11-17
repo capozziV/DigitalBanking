@@ -23,7 +23,7 @@ echo "$second"
 
 first_owner=$(owner_lines "$first")
 second_owner=$(owner_lines "$second")
-if [ "$(wc -l <<< "$first_owner" | tr -d ' ')" != 2 ] || [ -z "$(grep '^OWNER_ACCOUNT=.' <<< "$first_owner")" ]; then
+if [ "$(wc -l <<< "$first_owner" | tr -d ' ')" != 2 ] || ! grep -q '^OWNER_ACCOUNT=.' <<< "$first_owner"; then
   echo "FALHA: o seed nao imprimiu OWNER_ACCOUNT e OWNER_BALANCE" >&2
   exit 1
 fi

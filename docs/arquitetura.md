@@ -87,7 +87,7 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 - `accounts` (abrir conta) e `transfers` (criar transferência) consultam o `customer` na hora, sem cache; inexistente ou bloqueado dá `422`, `customer` fora dá `503`.
 - `401` e `403` em Problem Details; desconexão do cliente não vira `500`. `/actuator/health` aberto sem detalhes; o resto do actuator só para admin.
 - **Terraform da borda** (`infra/terraform/modules/identity` e `edge`, `envs/aws`): escrito e validado no CI, sem `apply` até a etapa 8.
-- **Bibliotecas compartilhadas** (só infraestrutura): `libs/security` (resource server, `Caller`, token de máquina), `libs/observabilidade` (filtro de correlation ID e propagação nas chamadas HTTP de saída) e `libs/testing-security` (emissor de JWT de teste).
+- **Bibliotecas compartilhadas** (só infraestrutura): `libs/security` (resource server, `Caller`, token de máquina), `libs/observabilidade` (filtro de correlation ID, propagação nas chamadas HTTP de saída e interceptor SQS que põe o ID da mensagem no MDC) e `libs/testing-security` (emissor de JWT de teste).
 - **Perfil Spring `aws`** (`application-aws.yml` em `services/<svc>/bootstrap/src/main/resources/`, nos cinco serviços): desliga o OpenAPI e o swagger-ui e, no `accounts`, no `transfers` e no `customer`, troca o padrão do LocalStack de `<svc>.aws.endpoint` por um valor em branco, para os SDKs usarem os endpoints reais da AWS. No `notification` e no `statement`, os endpoints (`spring.cloud.aws.sqs.endpoint` e `statement.dynamodb.endpoint`) já são em branco por padrão no `application.yml`, e o ambiente local os preenche por variável. JWT issuer, banco e Redis mantêm o padrão `localhost`: sem a variável de ambiente o serviço falha fechado. As variáveis e o `SPRING_PROFILES_ACTIVE=aws` vêm do chart Helm. O ambiente local, os testes, o smoke e o e2e usam o perfil padrão. O `AwsProfileConfigIntegrationTest` de cada serviço garante os endpoints em branco.
 - (ver [ADR 0004](adr/0004-api-gateway-http-api-na-borda.md) e [ADR 0020](adr/0020-identidade-e-autorizacao.md))
 
@@ -101,7 +101,7 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 - Apenas correlation ID, sem tracing distribuído (sem OpenTelemetry, Jaeger ou X-Ray).
 - O ID vem do header `X-Correlation-Id` ou é gerado na entrada, vai para o MDC (logs JSON) e é propagado nas chamadas HTTP, numa coluna do outbox, no envelope do evento e nos atributos SNS/SQS (raw message delivery).
 - Até existir o BFF, o serviço que recebe a chamada gera o ID; depois, o BFF gera e os serviços reaproveitam.
-- O filtro e a propagação ficam em `libs/observabilidade`, usada por todos os serviços.
+- O filtro, a propagação e o interceptor SQS (o ID do atributo da mensagem fica no MDC até o fim do processamento, inclusive na linha de erro do contêiner) ficam em `libs/observabilidade`, usada por todos os serviços.
 - (ver [ADR 0006](adr/0006-observabilidade-com-correlation-id.md))
 
 ### Frontend (etapa 9, detalhar depois)

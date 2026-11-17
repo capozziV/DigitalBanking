@@ -25,7 +25,7 @@ import java.util.concurrent.TimeoutException
  *
  * - [accessToken] returns the cached token until [RENEW_BEFORE_EXPIRY] (30 s) before it expires, or until half of its
  *   validity when the token lives 60 s or less; then it fetches a new one. Concurrent callers share a single request
- *   to the token endpoint.
+ *   to the token endpoint. A `401` from the peer drops the cached token ([onRejected]).
  * - Any failure (endpoint down, timeout, non-2xx, unexpected body) is a [ServiceTokenUnavailableException], an
  *   [IOException], so a `RestClient` with [interceptor] fails with `ResourceAccessException`, the same as an
  *   unreachable peer: the service's gateway already answers that with 503 or a retry. The secret is never logged.
@@ -82,11 +82,31 @@ class ServiceTokenClient(
         }
     }
 
-    /** Puts `Authorization: Bearer <token>` on every request of the `RestClient`. */
+    /**
+     * The peer answered `401` to [token]: drops it from the cache when it is still the cached one, so the next call
+     * asks the token endpoint again (a rotated key or a revoked token recovers without waiting for the expiry). A
+     * token already replaced is left alone, so a late `401` never drops a newer token.
+     */
+    fun onRejected(token: String) {
+        synchronized(lock) {
+            if (cached?.value == token) {
+                cached = null
+                log.warn("the peer rejected the cached service token; a new one will be requested")
+            }
+        }
+    }
+
+    /**
+     * Puts `Authorization: Bearer <token>` on every request of the `RestClient`; a `401` answer drops the token (see
+     * [onRejected]). A `403` keeps it: the token was accepted, the route or scope was not.
+     */
     fun interceptor(): ClientHttpRequestInterceptor =
         ClientHttpRequestInterceptor { request, body, execution ->
-            request.headers.setBearerAuth(accessToken())
-            execution.execute(request, body)
+            val token = accessToken()
+            request.headers.setBearerAuth(token)
+            execution.execute(request, body).also { response ->
+                if (response.statusCode.value() == HTTP_UNAUTHORIZED) onRejected(token)
+            }
         }
 
     private fun fetch(): CachedToken {
@@ -162,6 +182,7 @@ class ServiceTokenClient(
         val FAILURE_BACKOFF: Duration = Duration.ofSeconds(1)
         val DEFAULT_CONNECT_TIMEOUT: Duration = Duration.ofMillis(500)
         val DEFAULT_READ_TIMEOUT: Duration = Duration.ofMillis(1500)
+        private const val HTTP_UNAUTHORIZED = 401
         private val log = LoggerFactory.getLogger(ServiceTokenClient::class.java)
     }
 }

@@ -136,6 +136,18 @@ class StatementConsumptionIntegrationTest : StatementIntegrationTest() {
         assertThat(line).contains("[$CORRELATION_ID]").doesNotContain(ENVELOPE_CORRELATION_ID)
     }
 
+    @Test
+    fun `the container's error line of a failed message carries the correlation id of the message`(output: CapturedOutput) {
+        val correlationId = "failing-${UUID.randomUUID()}"
+        val body = """{"eventId":"${UUID.randomUUID()}","eventType":"LedgerEntryRecorded","eventVersion":1,"payload":{}}"""
+        send(UUID.randomUUID(), body, correlationId)
+
+        await { output.out.lines().any { it.contains("Error processing message") && it.contains("[$correlationId]") } }
+        // The message keeps failing until the DLQ: wait for it, so the other tests compare the DLQ depth undisturbed.
+        await(Duration.ofSeconds(60)) { visibleMessages(ACCOUNTS_DLQ) == dlqAtStart + 1 }
+        awaitEmpty()
+    }
+
     private fun dlqGauge(): Double =
         meterRegistry
             .get("statement.dlq.messages")
@@ -146,6 +158,7 @@ class StatementConsumptionIntegrationTest : StatementIntegrationTest() {
     private fun send(
         accountId: UUID,
         body: String,
+        correlationId: String = CORRELATION_ID,
     ) {
         sqs.sendMessage {
             it
@@ -159,7 +172,7 @@ class StatementConsumptionIntegrationTest : StatementIntegrationTest() {
                             MessageAttributeValue
                                 .builder()
                                 .dataType("String")
-                                .stringValue(CORRELATION_ID)
+                                .stringValue(correlationId)
                                 .build(),
                     ),
                 )

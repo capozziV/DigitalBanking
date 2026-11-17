@@ -18,10 +18,14 @@ import io.github.capozziv.digitalbanking.transfers.adapters.accounts.AccountsRes
 import io.github.capozziv.digitalbanking.transfers.adapters.accounts.HttpAccountsGateway
 import io.github.capozziv.digitalbanking.transfers.application.port.AccountLookup
 import io.github.capozziv.digitalbanking.transfers.application.port.AccountsGateway
+import io.github.capozziv.digitalbanking.transfers.application.port.EntryLookup
 import io.github.capozziv.digitalbanking.transfers.bootstrap.ServiceTokenServers
+import io.github.capozziv.digitalbanking.transfers.domain.EntryKind
 import io.github.capozziv.digitalbanking.transfers.domain.Money
+import io.github.capozziv.digitalbanking.transfers.domain.RecordedEntry
 import io.github.capozziv.digitalbanking.transfers.domain.StepCall
 import io.github.capozziv.digitalbanking.transfers.domain.StepOutcome
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
@@ -60,7 +64,7 @@ class HttpAccountsGatewayIntegrationTest {
     private fun gatewayFor(url: String): AccountsGateway {
         val properties = AccountsClientProperties(url = url)
         val restClient = AccountsClientConfiguration().accountsRestClient(properties, ServiceTokenServers.clientOf(tokenServer))
-        return HttpAccountsGateway(restClient, AccountsResponseClassifier())
+        return HttpAccountsGateway(restClient, AccountsResponseClassifier(SimpleMeterRegistry()))
     }
 
     @Test
@@ -492,4 +496,63 @@ class HttpAccountsGatewayIntegrationTest {
             .hasMessageContaining("400")
             .hasMessageContaining("validation-error")
     }
+
+    // --- find entry for the manual compensation ---
+
+    @Test
+    fun `find entry reads the account, kind and amount of the entry under the key`() {
+        server.stubFor(
+            get(urlPathEqualTo("/accounts/$accountId/entries"))
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json").withBody(creditJson())),
+        )
+
+        val lookup = gateway.findEntry(accountId, "back-office 42")
+
+        assertThat(lookup).isEqualTo(EntryLookup.Found(RecordedEntry(accountId, EntryKind.CREDIT, Money(1_000))))
+        server.verify(
+            getRequestedFor(urlPathEqualTo("/accounts/$accountId/entries"))
+                .withQueryParam("idempotencyKey", equalTo("back-office 42"))
+                .withHeader("Authorization", equalTo("Bearer ${ServiceTokenServers.SERVICE_TOKEN}")),
+        )
+    }
+
+    @Test
+    fun `find entry is NotFound for 404 entry-not-found and account-not-found`() {
+        server.stubFor(get(urlPathEqualTo("/accounts/$accountId/entries")).willReturn(problem(404, "entry-not-found")))
+        assertThat(gateway.findEntry(accountId, "k")).isEqualTo(EntryLookup.NotFound)
+
+        server.stubFor(get(urlPathEqualTo("/accounts/$accountId/entries")).willReturn(problem(404, "account-not-found")))
+        assertThat(gateway.findEntry(accountId, "k")).isEqualTo(EntryLookup.NotFound)
+    }
+
+    @Test
+    fun `find entry is Unavailable for 5xx, a rejected token, a body without kind or amount and a cut connection`() {
+        val path = urlPathEqualTo("/accounts/$accountId/entries")
+        server.stubFor(get(path).willReturn(problem(503, "account-busy")))
+        assertThat(gateway.findEntry(accountId, "k")).isEqualTo(EntryLookup.Unavailable)
+
+        server.stubFor(get(path).willReturn(problem(401, "unauthorized")))
+        assertThat(gateway.findEntry(accountId, "k")).isEqualTo(EntryLookup.Unavailable)
+
+        server.stubFor(get(path).willReturn(aResponse().withStatus(200).withBody("""{"id":"$entryId"}""")))
+        assertThat(gateway.findEntry(accountId, "k")).isEqualTo(EntryLookup.Unavailable)
+
+        server.stubFor(get(path).willReturn(aResponse().withStatus(200).withBody(creditJson().replace("CREDIT", "REFUND"))))
+        assertThat(gateway.findEntry(accountId, "k")).isEqualTo(EntryLookup.Unavailable)
+
+        server.stubFor(get(path).willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER)))
+        assertThat(gateway.findEntry(accountId, "k")).isEqualTo(EntryLookup.Unavailable)
+    }
+
+    @Test
+    fun `find entry fails loudly on any other 4xx because it points to a bug`() {
+        server.stubFor(get(urlPathEqualTo("/accounts/$accountId/entries")).willReturn(problem(400, "validation-error")))
+
+        assertThatThrownBy { gateway.findEntry(accountId, "k") }
+            .isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("400")
+            .hasMessageContaining("validation-error")
+    }
+
+    private fun creditJson() = entryJson().replace("DEBIT", "CREDIT")
 }
