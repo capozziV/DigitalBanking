@@ -68,7 +68,7 @@ class OutboxAdminController(
             "The event is never published and its consumers will not see it. Discarding the event that creates its " +
                 "aggregate (such as AccountOpened) leaves every later event of that aggregate without a useful consumer: " +
                 "notification sends them to its DLQ and statement answers 404 for the account. " +
-                "Waits for the relay cycle in progress, up to the configured discard lock timeout." +
+                "Waits for the relay cycle in progress, up to the configured discard lock timeout. " +
                 "Discarding an event that is already discarded answers 204 and changes nothing.",
     )
     @ApiResponses(
