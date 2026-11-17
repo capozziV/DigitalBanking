@@ -4,6 +4,7 @@ import io.github.capozziv.digitalbanking.accounts.application.AccountBusyExcepti
 import io.github.capozziv.digitalbanking.accounts.application.port.AccountRepository
 import io.github.capozziv.digitalbanking.accounts.application.port.InsertAccountResult
 import io.github.capozziv.digitalbanking.accounts.domain.Account
+import io.github.capozziv.digitalbanking.accounts.domain.AccountStatus
 import java.util.UUID
 
 class InMemoryAccountRepository : AccountRepository {
@@ -18,7 +19,7 @@ class InMemoryAccountRepository : AccountRepository {
         openingIdempotencyKey: String,
     ): InsertAccountResult {
         if (openingIdempotencyKey in openingKeys) return InsertAccountResult.DUPLICATE_OPENING_KEY
-        if (accounts.values.any { it.customerId == account.customerId }) return InsertAccountResult.DUPLICATE_CUSTOMER
+        if (accounts.values.any { it.customerId == account.customerId && it.status != AccountStatus.CLOSED }) return InsertAccountResult.DUPLICATE_CUSTOMER
         accounts[account.id] = account
         openingKeys[openingIdempotencyKey] = account.id
         return InsertAccountResult.INSERTED
@@ -34,6 +35,10 @@ class InMemoryAccountRepository : AccountRepository {
     override fun findByOpeningIdempotencyKey(key: String): Account? = openingKeys[key]?.let { accounts[it] }
 
     override fun updateType(account: Account) {
+        accounts[account.id] = account
+    }
+
+    override fun updateStatus(account: Account) {
         accounts[account.id] = account
     }
 

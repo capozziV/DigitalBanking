@@ -37,6 +37,13 @@ interface AccountRepository {
      * error and the adapter throws (the transaction rolls back).
      */
     fun updateType(account: Account)
+
+    /**
+     * Writes the status of an existing account, with the account lock held (lockById) in the same transaction, always
+     * with an account produced by Account.changeStatus or Account.close. Only the status column changes; updating no
+     * row is an unexpected error and the adapter throws.
+     */
+    fun updateStatus(account: Account)
 }
 
 enum class InsertAccountResult { INSERTED, DUPLICATE_OPENING_KEY, DUPLICATE_CUSTOMER }
