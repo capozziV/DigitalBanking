@@ -5,9 +5,11 @@ on:
     branches: [main]
   pull_request:
 
+# Num PR, um push novo cancela a execucao anterior do mesmo PR. Na main, cada commit tem o proprio grupo (pelo sha):
+# nada e cancelado nem descartado da fila, e todo commit da main fica com o ci-ok dele.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -29,9 +31,10 @@ jobs:
       shared: ${{ steps.filter.outputs.shared }}
       e2e: ${{ steps.filter.outputs.e2e }}
       terraform: ${{ steps.filter.outputs.terraform }}
+      lint: ${{ steps.filter.outputs.lint }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: dorny/paths-filter@v4.0.3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
           filters: |
@@ -49,6 +52,8 @@ jobs:
               - 'tests/e2e/**'
             terraform:
               - 'infra/terraform/**'
+            lint:
+              - 'api/bruno/**'
             shared:
               - 'libs/**'
               - 'build-logic/**'
@@ -64,12 +69,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '21'
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       - name: Build do accounts (compile, ktlint, testes, ArchUnit, integracao)
         env:
           # Testes com LocalStack; sem o segredo, falham no CI em vez de serem pulados.
@@ -80,9 +85,16 @@ jobs:
           :services:accounts:application:build
           :services:accounts:adapters:build
           :services:accounts:bootstrap:build
+      - name: Publicar o jar do accounts para o smoke
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: jar-accounts
+          path: services/accounts/bootstrap/build/libs/accounts.jar
+          if-no-files-found: error
+          retention-days: 1
       - name: Publicar relatorios de teste
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-reports-accounts
           path: 'services/accounts/**/build/reports/tests/'
@@ -93,12 +105,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '21'
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       - name: Build do transfers (compile, ktlint, testes, ArchUnit, integracao)
         env:
           # Testes com LocalStack; sem o segredo, falham no CI em vez de serem pulados.
@@ -112,9 +124,16 @@ jobs:
             fi
           done
           ./gradlew "${tasks[@]}"
+      - name: Publicar o jar do transfers para o smoke
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: jar-transfers
+          path: services/transfers/bootstrap/build/libs/transfers.jar
+          if-no-files-found: error
+          retention-days: 1
       - name: Publicar relatorios de teste
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-reports-transfers
           path: 'services/transfers/**/build/reports/tests/'
@@ -125,12 +144,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '21'
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       - name: Build do notification (compile, ktlint, testes, ArchUnit, integracao)
         env:
           # Testes com LocalStack; sem o segredo, falham no CI em vez de serem pulados.
@@ -144,9 +163,16 @@ jobs:
             fi
           done
           ./gradlew "${tasks[@]}"
+      - name: Publicar o jar do notification para o smoke
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: jar-notification
+          path: services/notification/bootstrap/build/libs/notification.jar
+          if-no-files-found: error
+          retention-days: 1
       - name: Publicar relatorios de teste
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-reports-notification
           path: 'services/notification/**/build/reports/tests/'
@@ -157,12 +183,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '21'
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       - name: Build do statement (compile, ktlint, testes, ArchUnit, integracao)
         env:
           # Testes com LocalStack; sem o segredo, falham no CI em vez de serem pulados.
@@ -176,9 +202,16 @@ jobs:
             fi
           done
           ./gradlew "${tasks[@]}"
+      - name: Publicar o jar do statement para o smoke
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: jar-statement
+          path: services/statement/bootstrap/build/libs/statement.jar
+          if-no-files-found: error
+          retention-days: 1
       - name: Publicar relatorios de teste
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-reports-statement
           path: 'services/statement/**/build/reports/tests/'
@@ -189,12 +222,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '21'
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       - name: Build do customer (compile, ktlint, testes, ArchUnit, integracao)
         env:
           # Testes com LocalStack; sem o segredo, falham no CI em vez de serem pulados.
@@ -208,9 +241,16 @@ jobs:
             fi
           done
           ./gradlew "${tasks[@]}"
+      - name: Publicar o jar do customer para o smoke
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: jar-customer
+          path: services/customer/bootstrap/build/libs/customer.jar
+          if-no-files-found: error
+          retention-days: 1
       - name: Publicar relatorios de teste
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-reports-customer
           path: 'services/customer/**/build/reports/tests/'
@@ -221,12 +261,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '21'
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       - name: Build das bibliotecas compartilhadas
         env:
           LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
@@ -239,7 +279,7 @@ jobs:
           ./gradlew "${tasks[@]}"
       - name: Publicar relatorios de teste
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-reports-libs
           path: 'libs/**/build/reports/tests/'
@@ -259,14 +299,42 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '21'
-      - uses: gradle/actions/setup-gradle@v6
-      - name: Gerar os jars executaveis
-        run: ./gradlew :services:accounts:bootstrap:bootJar :services:transfers:bootstrap:bootJar :services:notification:bootstrap:bootJar :services:statement:bootstrap:bootJar :services:customer:bootstrap:bootJar
+      # Os jars que os jobs de build desta execucao publicaram (jar-<servico>, um por servico que rodou).
+      - name: Baixar os jars dos jobs de build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: jar-*
+          merge-multiple: true
+          path: jars
+      # Servico pulado pelo filtro de caminhos nao publica jar; so esses sao gerados aqui.
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: Gerar os jars que faltam
+        run: |
+          mkdir -p jars
+          missing=()
+          for service in customer accounts transfers notification statement; do
+            if [ ! -f "jars/$service.jar" ]; then
+              missing+=("$service")
+            fi
+          done
+          if [ "${#missing[@]}" -eq 0 ]; then
+            echo "os cinco jars vieram dos jobs de build"
+            exit 0
+          fi
+          echo "gerando: ${missing[*]}"
+          tasks=()
+          for service in "${missing[@]}"; do
+            tasks+=(":services:$service:bootstrap:bootJar")
+          done
+          ./gradlew "${tasks[@]}"
+          for service in "${missing[@]}"; do
+            cp "services/$service/bootstrap/build/libs/$service.jar" jars/
+          done
       - name: Subir a infra local (PostgreSQL, Redis, nginx, LocalStack, mock-oauth2-server)
         env:
           LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
@@ -276,22 +344,40 @@ jobs:
             exit 1
           fi
           docker compose --env-file infra/local/.env.example -f infra/local/docker-compose.yml up --wait
+      # Os PIDs ficam em smoke-pids ("<servico> <pid>"), para os passos seguintes notarem um processo morto.
       - name: Subir os servicos customer, accounts, transfers, notification e statement
         run: |
           set -a
+          # shellcheck source=/dev/null
           . infra/local/.env.example
           set +a
-          java -jar services/customer/bootstrap/build/libs/bootstrap.jar > customer.log 2>&1 &
-          java -jar services/accounts/bootstrap/build/libs/bootstrap.jar > accounts.log 2>&1 &
-          java -jar services/transfers/bootstrap/build/libs/bootstrap.jar > transfers.log 2>&1 &
-          java -jar services/notification/bootstrap/build/libs/bootstrap.jar > notification.log 2>&1 &
-          java -jar services/statement/bootstrap/build/libs/bootstrap.jar > statement.log 2>&1 &
+          : > smoke-pids
+          for service in customer accounts transfers notification statement; do
+            java -jar "jars/$service.jar" > "$service.log" 2>&1 &
+            echo "$service $!" >> smoke-pids
+          done
       - name: Health dos cinco servicos via nginx
         run: |
-          for service in accounts transfers notifications statement customers; do
+          # Prefixo de cada servico no nginx.
+          route() {
+            case "$1" in
+              customer) echo customers ;;
+              notification) echo notifications ;;
+              *) echo "$1" ;;
+            esac
+          }
+          alive() {
+            if ! kill -0 "$2" 2> /dev/null; then
+              echo "o processo do $1 (pid $2) morreu; fim do log:" >&2
+              tail -n 80 "$1.log" >&2
+              exit 1
+            fi
+          }
+          while read -r service pid; do
             ok=false
             for _ in $(seq 1 60); do
-              if body=$(curl -fsS "http://127.0.0.1/$service/actuator/health") && echo "$body" | grep -q '"status":"UP"'; then
+              alive "$service" "$pid"
+              if body=$(curl -fsS "http://127.0.0.1/$(route "$service")/actuator/health") && grep -q '"status":"UP"' <<< "$body"; then
                 echo "$service: $body"
                 ok=true
                 break
@@ -302,23 +388,91 @@ jobs:
               echo "health do $service nao ficou UP em 60 s" >&2
               exit 1
             fi
-          done
+          done < smoke-pids
+          # Um servico que caiu enquanto o laco esperava pelos outros tambem falha aqui.
+          while read -r service pid; do
+            alive "$service" "$pid"
+          done < smoke-pids
       - name: Seed do usuario de teste do dono (duas vezes, comparadas, para provar a idempotencia)
         run: bash infra/local/seed-check.sh http://127.0.0.1 1000000
       - name: Operacoes via nginx com tokens e eventos na fila de inspecao do LocalStack
         run: bash infra/local/smoke.sh http://127.0.0.1
-      - name: Log dos servicos e do LocalStack em caso de falha
+      - name: Diagnostico em caso de falha (processos, logs dos servicos, saude e logs dos conteineres)
         if: failure()
         run: |
-          cat accounts.log || true
-          cat transfers.log || true
-          cat notification.log || true
-          cat statement.log || true
-          cat customer.log || true
-          docker compose --env-file infra/local/.env.example -f infra/local/docker-compose.yml logs localstack || true
+          compose=(docker compose --env-file infra/local/.env.example -f infra/local/docker-compose.yml)
+          echo "::group::processos dos servicos"
+          if [ -f smoke-pids ]; then
+            while read -r service pid; do
+              if kill -0 "$pid" 2> /dev/null; then
+                echo "$service (pid $pid): vivo"
+              else
+                echo "$service (pid $pid): morto"
+              fi
+            done < smoke-pids
+          fi
+          echo "::endgroup::"
+          for service in customer accounts transfers notification statement; do
+            echo "::group::log do $service"
+            cat "$service.log" || true
+            echo "::endgroup::"
+          done
+          echo "::group::conteineres e State.Health"
+          "${compose[@]}" ps -a || true
+          for container in $("${compose[@]}" ps -aq); do
+            docker inspect --format '{{.Name}} {{.State.Status}} {{json .State.Health}}' "$container" || true
+          done
+          echo "::endgroup::"
+          echo "::group::logs dos conteineres"
+          "${compose[@]}" logs --no-color --timestamps || true
+          echo "::endgroup::"
       - name: Derrubar a infra local
         if: always()
         run: docker compose --env-file infra/local/.env.example -f infra/local/docker-compose.yml down -v
+
+  # Lint do proprio CI e dos scripts: actionlint (com shellcheck nos blocos run), shellcheck nos scripts de
+  # infra/local e a copia do script das colecoes Bruno. Binarios oficiais com versao e sha256 fixos.
+  lint:
+    needs: changes
+    if: ${{ needs.changes.outputs.lint == 'true' || needs.changes.outputs.shared == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SHELLCHECK_VERSION: '0.11.0'
+      # sha256 do shellcheck-v0.11.0.linux.x86_64.tar.xz (o release nao publica arquivo de checksums).
+      SHELLCHECK_SHA256: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
+      ACTIONLINT_VERSION: '1.7.12'
+      # Do actionlint_1.7.12_checksums.txt do release.
+      ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Instalar shellcheck e actionlint
+        run: |
+          bin="$RUNNER_TEMP/bin"
+          mkdir -p "$bin"
+          curl -fsSLo "$RUNNER_TEMP/shellcheck.tar.xz" \
+            "https://github.com/koalaman/shellcheck/releases/download/v$SHELLCHECK_VERSION/shellcheck-v$SHELLCHECK_VERSION.linux.x86_64.tar.xz"
+          echo "$SHELLCHECK_SHA256  $RUNNER_TEMP/shellcheck.tar.xz" | sha256sum -c -
+          tar -xJf "$RUNNER_TEMP/shellcheck.tar.xz" -C "$RUNNER_TEMP"
+          mv "$RUNNER_TEMP/shellcheck-v$SHELLCHECK_VERSION/shellcheck" "$bin/"
+          curl -fsSLo "$RUNNER_TEMP/actionlint.tar.gz" \
+            "https://github.com/rhysd/actionlint/releases/download/v$ACTIONLINT_VERSION/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "$ACTIONLINT_SHA256  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$bin" actionlint
+          echo "$bin" >> "$GITHUB_PATH"
+      - name: actionlint (shellcheck nos blocos run)
+        run: |
+          shellcheck --version
+          actionlint -version
+          actionlint -color
+      - name: shellcheck nos scripts de infra/local
+        run: find infra/local -name '*.sh' -print0 | xargs -0 shellcheck
+      # O Bruno nao compartilha scripts entre colecoes: estas quatro copias tem de ficar iguais.
+      - name: Script das colecoes Bruno igual nas quatro copias
+        run: |
+          for collection in notification statement transfers; do
+            cmp api/bruno/accounts/collection.bru "api/bruno/$collection/collection.bru"
+          done
 
   # Testes ponta a ponta: accounts, transfers, notification, statement e customer como processos (java -jar), PostgreSQL, Redis,
   # LocalStack e mock-oauth2-server por Testcontainers. Roda quando muda qualquer servico, o proprio e2e ou o que afeta todos (`shared`).
@@ -336,12 +490,12 @@ jobs:
     # Acima do timeout de 20 min do integrationTest do e2e mais a compilacao dos cinco jars.
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '21'
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       - name: Testes ponta a ponta (gera os cinco jars e sobe os processos)
         env:
           # Sem o segredo, o teste falha no CI em vez de ser pulado.
@@ -349,7 +503,7 @@ jobs:
         run: ./gradlew :tests:e2e:build
       - name: Publicar relatorios e logs dos processos
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-reports-e2e
           path: |
@@ -363,8 +517,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
-      - uses: hashicorp/setup-terraform@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: '1.17.2'
       - name: Formato
@@ -377,7 +531,7 @@ jobs:
   # Check unico exigido pela protecao da main: falha se algum job falhou ou foi cancelado;
   # job pulado pelo filtro de caminhos conta como sucesso.
   ci-ok:
-    needs: [changes, accounts, transfers, notification, statement, customer, libs, smoke, e2e, terraform]
+    needs: [changes, accounts, transfers, notification, statement, customer, libs, smoke, e2e, terraform, lint]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

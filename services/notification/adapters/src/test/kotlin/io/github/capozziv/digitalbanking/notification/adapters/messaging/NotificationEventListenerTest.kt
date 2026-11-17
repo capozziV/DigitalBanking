@@ -13,7 +13,7 @@ import io.github.capozziv.digitalbanking.notification.application.port.Processed
 import io.github.capozziv.digitalbanking.notification.application.port.TransactionRunner
 import io.github.capozziv.digitalbanking.notification.application.usecase.ConsumeEventUseCase
 import io.github.capozziv.digitalbanking.notification.domain.Notification
-import io.github.capozziv.digitalbanking.outbox.OutboxEventEnvelope.CORRELATION_ID_MDC_KEY
+import io.github.capozziv.digitalbanking.observability.CorrelationId
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
@@ -29,14 +29,10 @@ class NotificationEventListenerTest {
     private val processed = mutableSetOf<UUID>()
     private val accounts = mutableMapOf<UUID, UUID>()
     private val saved = mutableListOf<Notification>()
-    private val correlationIdsSeen = mutableListOf<String?>()
 
     private val transactions =
         object : TransactionRunner {
-            override fun <T> inTransaction(block: () -> T): T {
-                correlationIdsSeen += MDC.get(CORRELATION_ID_MDC_KEY)
-                return block()
-            }
+            override fun <T> inTransaction(block: () -> T): T = block()
         }
 
     private val useCase =
@@ -112,9 +108,9 @@ class NotificationEventListenerTest {
         val ignoredId = UUID.randomUUID()
         val body = accountOpened(processedId)
 
-        listener.onAccountEvent(body, "corr-1")
-        listener.onAccountEvent(body, "corr-1")
-        listener.onAccountEvent(envelope("LedgerEntryRecorded", "{}", ignoredId), "corr-1")
+        listener.onAccountEvent(body)
+        listener.onAccountEvent(body)
+        listener.onAccountEvent(envelope("LedgerEntryRecorded", "{}", ignoredId))
 
         assertThat(infoLines())
             .anyMatch { "AccountOpened" in it && "$processedId" in it && it.endsWith("processed") }
@@ -123,17 +119,18 @@ class NotificationEventListenerTest {
     }
 
     @Test
-    fun `a failure is logged at WARN with the correlation ID still in the MDC, and rethrown`() {
-        assertThatThrownBy { listener.onAccountEvent("{", "corr-fail") }.isInstanceOf(MalformedEventException::class.java)
+    fun `a failure leaves the correlation ID in the MDC for the container's error line`() {
+        MDC.put(CorrelationId.MDC_KEY, "corr-fail")
 
-        val warning = logged.list.single { it.level == Level.WARN }
-        assertThat(warning.mdcPropertyMap[CORRELATION_ID_MDC_KEY]).isEqualTo("corr-fail")
-        assertThat(MDC.get(CORRELATION_ID_MDC_KEY)).isNull()
+        assertThatThrownBy { listener.onAccountEvent("{") }.isInstanceOf(MalformedEventException::class.java)
+
+        assertThat(logged.list.single { it.level == Level.WARN }.mdcPropertyMap[CorrelationId.MDC_KEY]).isEqualTo("corr-fail")
+        assertThat(MDC.get(CorrelationId.MDC_KEY)).isEqualTo("corr-fail")
     }
 
     @Test
     fun `the failure WARN carries only the exception message, since the container logs the stack trace`() {
-        assertThatThrownBy { listener.onAccountEvent("{", "corr-fail") }.isInstanceOf(MalformedEventException::class.java)
+        assertThatThrownBy { listener.onAccountEvent("{") }.isInstanceOf(MalformedEventException::class.java)
 
         val warning = logged.list.single { it.level == Level.WARN }
         assertThat(warning.throwableProxy).isNull()
@@ -141,27 +138,9 @@ class NotificationEventListenerTest {
     }
 
     @Test
-    fun `the correlation ID attribute is in the MDC while the event is consumed and removed afterwards`() {
-        listener.onAccountEvent(accountOpened(UUID.randomUUID()), "corr-123")
+    fun `a malformed body throws so the message is not acknowledged`() {
+        assertThatThrownBy { listener.onAccountEvent("{") }.isInstanceOf(MalformedEventException::class.java)
 
-        assertThat(correlationIdsSeen).containsExactly("corr-123")
-        assertThat(MDC.get(CORRELATION_ID_MDC_KEY)).isNull()
-        assertThat(saved).hasSize(1)
-    }
-
-    @Test
-    fun `a message without correlation ID is still consumed`() {
-        listener.onTransferEvent(accountOpened(UUID.randomUUID()), null)
-
-        assertThat(correlationIdsSeen).containsExactly(null)
-        assertThat(saved).hasSize(1)
-    }
-
-    @Test
-    fun `a malformed body throws so the message is not acknowledged, and the MDC is cleared`() {
-        assertThatThrownBy { listener.onAccountEvent("{", "corr-1") }.isInstanceOf(MalformedEventException::class.java)
-
-        assertThat(MDC.get(CORRELATION_ID_MDC_KEY)).isNull()
         assertThat(processed).isEmpty()
     }
 
@@ -174,13 +153,13 @@ class NotificationEventListenerTest {
                     """"destinationAccountId":"${UUID.randomUUID()}","amount":100,"description":null}""",
             )
 
-        assertThatThrownBy { listener.onTransferEvent(body, "corr-2") }.isInstanceOf(UnknownAccountException::class.java)
+        assertThatThrownBy { listener.onTransferEvent(body) }.isInstanceOf(UnknownAccountException::class.java)
         assertThat(processed).isEmpty()
     }
 
     @Test
     fun `an unsupported event is acknowledged without notifications`() {
-        listener.onAccountEvent(envelope("LedgerEntryRecorded", """{"entryId":"x"}"""), "corr-3")
+        listener.onAccountEvent(envelope("LedgerEntryRecorded", """{"entryId":"x"}"""))
 
         assertThat(processed).hasSize(1)
         assertThat(saved).isEmpty()

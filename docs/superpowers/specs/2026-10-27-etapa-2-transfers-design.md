@@ -208,11 +208,11 @@ Corpo da transferência: `{id, sourceAccountId, destinationAccountId, amount, de
 | Consumidores dos eventos de transferência | etapa 3 | roadmap |
 | Listagem de transferências | etapa 4 (extrato) | roadmap |
 | ECS Service Connect | etapa 8 | cartão `Decision` novo |
-| Desbloqueio manual de compensação recusada | quando incomodar | cartão novo |
+| Saída manual do admin para compensação recusada | débito técnico | [ADR 0016](../../adr/0016-saga-orquestrada-por-http.md), [#56](https://github.com/capozziV/DigitalBanking/issues/56) |
 | Mover os filtros de correlation ID para `libs/observabilidade` | etapa 7 | [#43](https://github.com/capozziV/DigitalBanking/issues/43) |
 
 ## Riscos
 - **Chamada em voo depois do prazo:** uma chamada que ainda estivesse no `accounts` quando a consulta pela chave roda poderia gravar depois. Com leitura de 3 s, `lock_timeout` de 2 s e prazo de 2 min, isso não acontece na prática; o `ResolveCredit` encontrar o lançamento tardio também está coberto (vai para `Completed`). Risco residual aceito e registrado no ADR 0016.
-- **Compensação recusada fica em laço:** indica bug; aparece em log `ERROR` e na métrica de transferências pendentes antigas. Desbloqueio manual fica como cartão.
+- **Compensação recusada fica em laço:** indica bug. Sem teto de tentativas (decisão do usuário, 2026-11-16); aparece em log `ERROR`, na métrica `transfers.pending.aged` e, se a causa for o token de máquina, em `transfers.accounts.service.token.rejected`. Saída manual do admin ([ADR 0016](../../adr/0016-saga-orquestrada-por-http.md), [#56](https://github.com/capozziV/DigitalBanking/issues/56)): `GET /admin/transfers/stuck`, `POST /admin/transfers/{id}/retry` e `POST /admin/transfers/{id}/manual-compensation` com `{reason, creditIdempotencyKey}`; o `transfers` confere o crédito no `accounts` (conta de origem, `CREDIT`, valor da transferência) antes de marcar Compensada, e a chave fecha uma só transferência.
 - **Tempo do CI:** o `e2e` sobe dois processos; o build seletivo evita rodá-lo em PRs só de docs.
 - **Testcontainers com dois processos Java:** se os processos ficarem lentos no runner, o plano B é rodar o `e2e` contra o docker-compose do smoke.

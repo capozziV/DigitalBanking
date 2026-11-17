@@ -4,10 +4,12 @@ import com.github.tomakehurst.wiremock.client.WireMock.post
 import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
 import io.github.capozziv.digitalbanking.outbox.relay.SnsEventPublisher
 import io.github.capozziv.digitalbanking.testing.localstack.LocalStackTestSupport
+import io.github.capozziv.digitalbanking.testing.security.JwtTestSupport
 import io.github.capozziv.digitalbanking.transfers.bootstrap.TransfersIntegrationTest
 import io.github.capozziv.digitalbanking.transfers.bootstrap.saga.AccountsStubs.Companion.entryCreated
 import io.github.capozziv.digitalbanking.transfers.bootstrap.saga.AccountsStubs.Companion.problem
 import io.github.capozziv.digitalbanking.transfers.bootstrap.web.ApiClient
+import io.github.capozziv.digitalbanking.transfers.bootstrap.web.assertProblem
 import org.assertj.core.api.Assertions.assertThat
 import org.awaitility.Awaitility.await
 import org.awaitility.core.ConditionTimeoutException
@@ -54,6 +56,19 @@ class TransferEventsIntegrationTest : TransfersIntegrationTest() {
     fun reset() {
         accountsServer.resetAll()
         ownerJdbc.deleteTransfers()
+    }
+
+    @Test
+    fun `the relay admin routes are served by the service, for admins only, in Problem Details`() {
+        val admin = api.withToken(JwtTestSupport.adminToken(UUID.randomUUID()))
+
+        val stuck = admin.get("/admin/outbox/stuck-events")
+        assertThat(stuck.status).describedAs(stuck.rawBody).isEqualTo(200)
+        assertThat(stuck.body!!.isArray).isTrue()
+        assertThat(api.get("/admin/outbox/stuck-events").status).isEqualTo(403)
+
+        val discard = admin.post("/admin/outbox/events/${UUID.randomUUID()}/discard", """{"reason":"poison event"}""")
+        assertProblem(discard, 404, "outbox-event-not-found")
     }
 
     @Test

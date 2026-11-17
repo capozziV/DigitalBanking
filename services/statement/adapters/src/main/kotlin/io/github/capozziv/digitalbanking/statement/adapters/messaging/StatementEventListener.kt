@@ -1,22 +1,22 @@
 package io.github.capozziv.digitalbanking.statement.adapters.messaging
 
 import io.awspring.cloud.sqs.annotation.SqsListener
-import io.github.capozziv.digitalbanking.outbox.OutboxEventEnvelope.CORRELATION_ID_MDC_KEY
 import io.github.capozziv.digitalbanking.statement.application.ConflictingStatementEntryException
 import io.github.capozziv.digitalbanking.statement.application.usecase.RecordOutcome
 import io.github.capozziv.digitalbanking.statement.application.usecase.RecordStatementEntryUseCase
 import io.github.capozziv.digitalbanking.statement.application.usecase.RegisterAccountUseCase
 import org.slf4j.LoggerFactory
-import org.slf4j.MDC
-import org.springframework.messaging.handler.annotation.Header
 import org.springframework.messaging.handler.annotation.Payload
 import org.springframework.stereotype.Component
 
 /**
- * Consumes the accounts FIFO queue (raw delivery: the body is the outbox envelope, `correlationId` is a message
- * attribute). The message is acknowledged only when consumption returns; any exception leaves it in the queue, and
- * the redrive policy sends it to the DLQ after the last receive. Both writes are idempotent, so a redelivery is a
- * no-op.
+ * Consumes the accounts FIFO queue (raw delivery: the body is the outbox envelope). The message is acknowledged only
+ * when consumption returns; any exception leaves it in the queue, and the redrive policy sends it to the DLQ after the
+ * last receive. Both writes are idempotent, so a redelivery is a no-op.
+ *
+ * The correlation ID (`correlationId` message attribute) is put in the MDC by `CorrelationIdSqsMessageInterceptor`
+ * (`libs/observabilidade`), which keeps it after a failure for the container's error line: this listener must not
+ * clear it.
  */
 @Component
 class StatementEventListener(
@@ -27,9 +27,7 @@ class StatementEventListener(
     @SqsListener(queueNames = [ACCOUNTS_QUEUE], acknowledgementMode = ON_SUCCESS)
     fun onAccountEvent(
         @Payload body: String,
-        @Header(name = CORRELATION_ID_ATTRIBUTE, required = false) correlationId: String?,
     ) {
-        if (correlationId != null) MDC.put(CORRELATION_ID_MDC_KEY, correlationId)
         try {
             consume(reader.read(body))
         } catch (e: ConflictingStatementEntryException) {
@@ -37,11 +35,9 @@ class StatementEventListener(
             log.error("conflicting statement entry; it returns to the queue", e)
             throw e
         } catch (e: Exception) {
-            // Logged here, with the correlation ID still in the MDC: the container logs the error after the finally.
+            // Only the message: the container's ERROR line that follows carries the stack trace.
             log.warn("failed to consume message; it returns to the queue: {}", e.toString())
             throw e
-        } finally {
-            MDC.remove(CORRELATION_ID_MDC_KEY)
         }
     }
 
@@ -69,9 +65,6 @@ class StatementEventListener(
     private companion object {
         const val ACCOUNTS_QUEUE = "\${statement.queues.accounts}"
         const val ON_SUCCESS = "ON_SUCCESS"
-
-        /** Message attribute set by the outbox relay (raw message delivery). */
-        const val CORRELATION_ID_ATTRIBUTE = "correlationId"
 
         val log = LoggerFactory.getLogger(StatementEventListener::class.java)
     }

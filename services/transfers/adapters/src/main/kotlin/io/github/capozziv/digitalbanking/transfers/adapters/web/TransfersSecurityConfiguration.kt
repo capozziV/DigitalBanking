@@ -20,6 +20,10 @@ class TransfersSecurityConfiguration {
             authorize(HttpMethod.POST, "/transfers", hasAnyRole(CUSTOMER, ADMIN))
             authorize(HttpMethod.GET, "/transfers/{id}", hasAnyRole(CUSTOMER, ADMIN))
             authorize(HttpMethod.GET, "/accounts/{accountId}/daily-limit", hasAnyRole(CUSTOMER, ADMIN))
+            // TransferAdminController: also covered by the library's /admin/** rule; listed so every route has its line.
+            authorize(HttpMethod.GET, "/admin/transfers/stuck", hasRole(ADMIN))
+            authorize(HttpMethod.POST, "/admin/transfers/{id}/retry", hasRole(ADMIN))
+            authorize(HttpMethod.POST, "/admin/transfers/{id}/manual-compensation", hasRole(ADMIN))
             // The YAML form of the OpenAPI contract: the library opens only /v3/api-docs/**, which does not match it.
             authorize(HttpMethod.GET, "/v3/api-docs.yaml", permitAll)
         }
