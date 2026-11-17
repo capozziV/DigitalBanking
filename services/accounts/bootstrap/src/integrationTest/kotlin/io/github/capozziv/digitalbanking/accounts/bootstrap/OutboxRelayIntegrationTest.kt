@@ -2,6 +2,7 @@ package io.github.capozziv.digitalbanking.accounts.bootstrap
 
 import io.github.capozziv.digitalbanking.accounts.bootstrap.web.ApiClient
 import io.github.capozziv.digitalbanking.accounts.bootstrap.web.asCustomer
+import io.github.capozziv.digitalbanking.accounts.bootstrap.web.assertProblem
 import io.github.capozziv.digitalbanking.outbox.PendingEvent
 import io.github.capozziv.digitalbanking.outbox.relay.EventPublisher
 import io.github.capozziv.digitalbanking.outbox.relay.OutboxMetrics
@@ -181,6 +182,21 @@ class OutboxRelayIntegrationTest : AccountsIntegrationTest() {
                 },
             ).containsExactlyElementsOf((1L..CREDITS_PER_ACCOUNT.toLong()).toList())
         }
+    }
+
+    @Test
+    fun `the relay admin routes are served by the service, for admins only, in Problem Details`() {
+        val stuck = api.get("/admin/outbox/stuck-events")
+        assertThat(stuck.status).describedAs(stuck.rawBody).isEqualTo(200)
+        assertThat(stuck.body!!.isArray).isTrue()
+        assertThat(api.get("/admin/outbox/stuck-events", asCustomer(UUID.randomUUID())).status).isEqualTo(403)
+
+        val discard =
+            api.post(
+                "/admin/outbox/events/${UUID.randomUUID()}/discard",
+                """{"reason":"poison event"}""",
+            )
+        assertProblem(discard, 404, "outbox-event-not-found")
     }
 
     @Test

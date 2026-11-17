@@ -7,7 +7,9 @@ import io.github.capozziv.digitalbanking.outbox.relay.OutboxRelay
 import io.github.capozziv.digitalbanking.outbox.relay.OutboxRelaySettings
 import io.github.capozziv.digitalbanking.outbox.relay.OutboxStore
 import io.github.capozziv.digitalbanking.outbox.relay.SnsEventPublisher
+import io.github.capozziv.digitalbanking.outbox.relay.web.OutboxAdminController
 import io.micrometer.core.instrument.MeterRegistry
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication
 import org.springframework.boot.context.properties.bind.Bindable
 import org.springframework.boot.context.properties.bind.Binder
 import org.springframework.context.annotation.Bean
@@ -30,6 +32,8 @@ import java.time.Duration
  * Publishes the outbox of a service to its SNS FIFO topic. A service extends this class in a `@Configuration`
  * of its own, passing the property prefix (`accounts`, `transfers`...) and the advisory lock key that elects its
  * single active relay, and keeps the `@ConditionalOnBooleanProperty("<prefix>.outbox.relay-enabled")` switch on it.
+ *
+ * Also registers the admin endpoint of the relay, the routes under `/admin/outbox/` ([OutboxAdminController]).
  *
  * Reads `<prefix>.outbox.*` ([OutboxRelayProperties]) and `<prefix>.aws.*` ([AwsProperties]) through the [Binder],
  * since a property prefix cannot be a parameter of `@ConfigurationProperties`.
@@ -67,6 +71,7 @@ abstract class OutboxRelayConfigurationSupport(
             maxCycleDuration = properties.maxCycleDuration,
             retryBackoff = properties.retryBackoff,
             maxRetryBackoff = properties.maxRetryBackoff,
+            discardLockTimeout = properties.discardLockTimeout,
         )
 
     /**
@@ -126,6 +131,14 @@ abstract class OutboxRelayConfigurationSupport(
         metrics: OutboxMetrics,
     ) = OutboxRelay(store, publisher, settings, clock, metrics)
 
+    /** In a servlet web application, routes under `/admin/outbox/`: lists the stuck events and discards one by hand (see [OutboxAdminController]). */
+    @Bean
+    @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
+    fun outboxAdminController(
+        store: OutboxStore,
+        settings: OutboxRelaySettings,
+    ) = OutboxAdminController(store, settings.lockKey, settings.discardLockTimeout)
+
     /**
      * Waits on shutdown for the longest a cycle can take: its maximum duration plus one publish call.
      * Depends on `taskScheduler` (the bean name of Spring Boot's scheduler, with platform or virtual threads)
@@ -156,6 +169,7 @@ data class OutboxRelayProperties(
     val pollInterval: Duration = Duration.ofMillis(500),
     val retryBackoff: Duration = OutboxRelaySettings.DEFAULT_RETRY_BACKOFF,
     val maxRetryBackoff: Duration = OutboxRelaySettings.DEFAULT_MAX_RETRY_BACKOFF,
+    val discardLockTimeout: Duration = OutboxRelaySettings.DEFAULT_DISCARD_LOCK_TIMEOUT,
 )
 
 /** `<prefix>.aws.*`: where the events go. A blank [endpoint] means the real AWS endpoint of [region]. */
