@@ -2,6 +2,7 @@ package io.github.capozziv.digitalbanking.accounts.application.fake
 
 import io.github.capozziv.digitalbanking.accounts.application.AccountBusyException
 import io.github.capozziv.digitalbanking.accounts.domain.Account
+import io.github.capozziv.digitalbanking.accounts.domain.AccountStatus
 import io.github.capozziv.digitalbanking.accounts.domain.AccountType
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -30,5 +31,13 @@ class InMemoryAccountRepositoryTest {
             .isInstanceOfSatisfying(AccountBusyException::class.java) {
                 assertThat(it.accountId).isEqualTo(account.id)
             }
+    }
+
+    @Test
+    fun `update status of an unknown account throws, as the adapter does, and adds nothing`() {
+        val unknown = account.copy(id = UUID.randomUUID(), status = AccountStatus.BLOCKED)
+
+        assertThatThrownBy { accounts.updateStatus(unknown) }.isInstanceOf(IllegalStateException::class.java)
+        assertThat(accounts.all()).containsExactly(account)
     }
 }

@@ -10,6 +10,7 @@ import io.github.capozziv.digitalbanking.accounts.application.fake.InMemoryLedge
 import io.github.capozziv.digitalbanking.accounts.application.fake.RecordingEventOutbox
 import io.github.capozziv.digitalbanking.accounts.application.fake.SequentialIdGenerator
 import io.github.capozziv.digitalbanking.accounts.domain.Account
+import io.github.capozziv.digitalbanking.accounts.domain.AccountStatus
 import io.github.capozziv.digitalbanking.accounts.domain.AccountType
 import io.github.capozziv.digitalbanking.accounts.domain.Balance
 import io.github.capozziv.digitalbanking.accounts.domain.EntryKind
@@ -101,6 +102,38 @@ class RecordCreditUseCaseTest {
         assertThat(retry).isEqualTo(RecordEntryResult(firstCredit, created = false))
         assertThat(entries.all()).containsExactly(firstCredit)
         assertThat(outbox.events).containsExactly(LedgerEntryRecorded(firstCredit))
+    }
+
+    @Test
+    fun `retrying a recorded credit after the account is blocked returns the original entry`() {
+        useCase.execute(credit(1500, CREDIT_KEY))
+        accounts.updateStatus(account.copy(status = AccountStatus.BLOCKED))
+
+        val retry = useCase.execute(credit(1500, CREDIT_KEY))
+
+        assertThat(retry).isEqualTo(RecordEntryResult(firstCredit, created = false))
+        assertThat(entries.all()).containsExactly(firstCredit)
+    }
+
+    @Test
+    fun `retrying a recorded credit after the account is closed returns the original entry, not a refusal`() {
+        useCase.execute(credit(1500, CREDIT_KEY))
+        // A debit takes the balance back to zero, so the account can be closed.
+        val debit =
+            firstCredit.copy(
+                id = UUID.randomUUID(),
+                sequence = 2,
+                kind = EntryKind.DEBIT,
+                balanceAfter = Balance.ZERO,
+                idempotencyKey = "debit-key-1",
+            )
+        entries.insert(debit)
+        accounts.updateStatus(account.copy(status = AccountStatus.CLOSED))
+
+        val retry = useCase.execute(credit(1500, CREDIT_KEY))
+
+        assertThat(retry).isEqualTo(RecordEntryResult(firstCredit, created = false))
+        assertThat(entries.all()).containsExactly(firstCredit, debit)
     }
 
     @Test
