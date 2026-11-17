@@ -64,6 +64,11 @@ output "service_role_arns" {
   value       = module.access.service_role_arns
 }
 
+output "db_init_role_arn" {
+  description = "ARN do papel do Job db-init (Pod Identity da ServiceAccount db-init)."
+  value       = module.access.db_init_role_arn
+}
+
 output "secret_names" {
   description = "Mapa nome-logico -> nome do segredo no Secrets Manager (db e oauth por servico)."
   value       = module.data.secret_names

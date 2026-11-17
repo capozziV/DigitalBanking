@@ -1,6 +1,6 @@
 # Terraform
 
-Infraestrutura na AWS do banco digital, em `sa-east-1` ([ADR 0019](../../docs/adr/0019-runtime-na-aws-com-eks.md)). O stack `envs/aws` é o ambiente efêmero: rede, EKS, ALB interno, identidade e borda (dados e mensageria entram na Task 5 da etapa 8).
+Infraestrutura na AWS do banco digital, em `sa-east-1` ([ADR 0019](../../docs/adr/0019-runtime-na-aws-com-eks.md)). O stack `envs/aws` é o ambiente efêmero: rede, EKS, ALB interno, identidade, borda, dados, mensageria e acessos por serviço.
 
 **Nada foi aplicado.** O código só é validado (`fmt`, `init -backend=false`, `validate`), sem credenciais da AWS. Nenhum `apply` antes da derrubada automática e do alarme de orçamento (#146), e sempre com confirmação explícita do usuário.
 
@@ -12,7 +12,7 @@ Infraestrutura na AWS do banco digital, em `sa-east-1` ([ADR 0019](../../docs/ad
 - `modules/edge-alb`: ALB interno, listener HTTP 80 (404 no que não casa), um target group por serviço (alvo por IP, health check em `/actuator/health/readiness`) e as regras por caminho de `routes.json`, espelho das `location` do nginx local.
 - `modules/data`: RDS PostgreSQL 17 `db.t4g.micro` (senha mestre gerada e guardada pelo próprio RDS no Secrets Manager), ElastiCache Redis 7.1 `cache.t4g.micro` e os segredos por serviço (`<name>/<servico>-db` com `*_DB_PASSWORD` e `*_DB_OWNER_PASSWORD`; `<name>/accounts-oauth` e `<name>/transfers-oauth` com o segredo do app client de máquina). RDS e Redis só aceitam o security group do cluster do EKS.
 - `modules/messaging`: tópicos SNS FIFO, filas SQS FIFO com DLQ (visibilidade 30 s, 5 recebimentos), assinaturas com entrega crua e a tabela DynamoDB `statement`, tudo a partir de `resources.json`, espelho dos scripts do LocalStack.
-- `modules/access`: um papel IAM por serviço (Pod Identity), ligado à ServiceAccount de mesmo nome no namespace do release (`kubernetes_namespace`, padrão `digitalbanking`). `accounts`, `transfers` e `customer` só publicam no próprio tópico; `notification` e `statement` consomem as próprias filas e leem os atributos das DLQs; `statement` também usa `PutItem`, `GetItem` e `Query` na própria tabela. Sempre com ARN específico.
+- `modules/access`: um papel IAM por serviço (Pod Identity), ligado à ServiceAccount de mesmo nome no namespace do release (`kubernetes_namespace`, padrão `digitalbanking`), e o papel do Job `db-init`, que só lê (`secretsmanager:GetSecretValue`) a senha mestre do RDS e os segredos `<name>/<servico>-db`. `accounts`, `transfers` e `customer` só publicam no próprio tópico; `notification` e `statement` consomem as próprias filas e leem os atributos das DLQs; `statement` também usa `PutItem`, `GetItem` e `Query` na própria tabela. Sempre com ARN específico.
 - `envs/aws`: compõe tudo; o VPC Link da borda aponta para o listener do ALB. Backend `s3` com configuração parcial e lock nativo (`use_lockfile`); o bucket vem do stack `bootstrap`.
 
 ## ALB do Terraform, nunca do controller
@@ -26,10 +26,20 @@ O `aws-down` desinstala o chart dos serviços antes do `destroy`, para os `Targe
 `modules/edge-alb/routes.json` traz os serviços (porta) e as regras. As regex do limite diário (`transfers`) e do extrato (`statement`) têm prioridade menor que o prefixo `/accounts/`, como no nginx. As `location` do actuator ficam só no local: o ALB checa a saúde direto no pod e a borda não expõe o actuator. `envs/aws/check-alb-routes.py` compara os casadores do ALB com as `location` do nginx (exato, prefixo, regex e serviço pela porta) e falha se divergirem.
 
 ## Mensageria igual ao LocalStack
-`envs/aws/check-messaging.py` lê `infra/local/localstack/init/ready.d` e `modules/messaging/resources.json` e falha se diferirem em tópicos, filas, DLQs, assinaturas, atributos FIFO, visibilidade, `maxReceiveCount` ou na tabela do extrato. As filas `*-inspection.fifo` são só locais (sem consumidor) e ficam de fora.
+`envs/aws/check-messaging.py` interpreta os scripts de `infra/local/localstack/init/ready.d` (atribuições, `$(...)`, a função `create_consumer_queue`; comentários ignorados) e confere cada `create-topic`, `create-queue` e `subscribe` sozinho, sem deixar o último script esconder os anteriores. Falha se diferirem de `modules/messaging/resources.json` e do `main.tf` em tópicos, filas, DLQs, assinaturas, `FifoTopic`/`FifoQueue`, `ContentBasedDeduplication=false`, `VisibilityTimeout` e `RedrivePolicy` (DLQ e `maxReceiveCount`) nos atributos da fila, `RawMessageDelivery=true` ou na tabela do extrato. As filas `*-inspection.fifo` são só locais (sem consumidor) e ficam de fora da comparação de nomes.
 
 ## Bancos e usuários por serviço
-O Terraform não cria os bancos e usuários dentro do RDS: ele fica em sub-rede privada e o runner não o alcança. Quem cria é um Job no cluster (como `infra/local/postgres/init`), com a senha mestre do segredo `db_master_secret_arn` e as senhas de `<servico>-db`. Os Secrets do Kubernetes dos serviços saem dos mesmos segredos, pelo runner que instala o chart.
+O Terraform não cria os bancos e usuários dentro do RDS: ele fica em sub-rede privada e o runner não o alcança. Quem cria é o Job do chart [`deploy/helm/db-init`](../../deploy/helm/db-init), o mesmo papel de `infra/local/postgres/init` no compose: para `accounts`, `transfers`, `notification` e `customer` (o `statement` não usa PostgreSQL), o banco `<servico>`, o dono `<servico>_owner` (o Flyway migra com ele, e as migrations dão os `grant` ao `<servico>_app`) e o usuário `<servico>_app`. Idempotente; a senha dos roles é sempre a do segredo.
+- O Job lê a senha mestre (`db_master_secret_arn`) e os segredos `<name>/<servico>-db` pelo Pod Identity da ServiceAccount `db-init` (papel `db_init_role_arn`), e os guarda só num volume em memória.
+- No RDS o usuário mestre não é superusuário: o Job se dá o role `<servico>_owner` (`WITH SET TRUE`) antes do `CREATE DATABASE ... OWNER`, exigência do PostgreSQL 16+. `deploy/helm/db-init/test-local.sh` prova isso com um mestre sem superusuário em Docker.
+- Instalação (Task 6), antes dos serviços e no mesmo namespace: `helm upgrade --install db-init deploy/helm/db-init -n digitalbanking --set dbHost=<db_address> --set masterSecretId=<db_master_secret_arn> --set secretPrefix=<name>`. O Job é hook `post-install,post-upgrade`: o `helm` espera o fim dele e falha junto.
+- Os Secrets do Kubernetes dos serviços saem dos mesmos segredos, pelo runner que instala o chart.
+
+## Namespace `digitalbanking`
+As associações do Pod Identity valem só no namespace `kubernetes_namespace` (padrão `digitalbanking`). Os charts não fixam namespace: a Task 6 instala `db-init` e os cinco serviços com `-n digitalbanking` (ou passa outro `kubernetes_namespace` ao Terraform). Em outro namespace os pods sobem sem papel e sem acesso à AWS.
+
+## Nomes iguais no Terraform e nos charts
+`envs/aws/check-service-names.py` falha se as chaves de `local.services` do `modules/access` diferirem dos `name:` de `deploy/helm/values/*.yaml` (a ServiceAccount do chart leva o nome do serviço), se `database_services` do `modules/data` diferir dos `services` do `db-init` ou dos values com `<SERVICO>_DB_URL`, ou se a ServiceAccount do `db-init` diferir de `db_init_service_account`.
 
 ## Etiquetas e `created_at`
 `default_tags` põe `project=digitalbanking` e `created-at` em todo recurso do provider. `created_at` (RFC 3339) não tem padrão: vem do workflow na subida, e o `aws-reaper` lê a etiqueta. Recursos que o EKS cria por conta própria (instâncias e ENIs do node group, security group do cluster) não recebem `default_tags`, mas saem com o node group e o cluster.
@@ -43,11 +53,12 @@ O Terraform não cria os bancos e usuários dentro do RDS: ele fica em sub-rede 
 - O log de acesso vai para um Log Group do CloudWatch (`/aws/apigateway/<nome>-http/access`) com retenção de 7 dias (`access_log_retention_days`).
 
 ## Saídas para as outras tasks
-`cluster_name`, `target_group_arns` (serviço → ARN), `edge_url`, `private_subnet_ids`, `vpc_id`, `cluster_security_group_id`, além das da identidade.
+`cluster_name`, `target_group_arns` (serviço → ARN), `edge_url`, `private_subnet_ids`, `vpc_id`, `cluster_security_group_id`, `service_role_arns`, `db_init_role_arn`, `secret_names`, `queue_urls`, `topic_arns`, `db_endpoint`, `db_address`, `db_master_secret_arn` e `redis_endpoint`, além das da identidade. Os papéis chegam aos pods pelo Pod Identity: os charts não recebem ARN de papel (sem anotação IRSA).
 
 ## Observações
 - O autorizador da borda só valida emissor e audiência (os dois app clients). A checagem do grupo `admin` (claim `cognito:groups`) e do escopo `internal` é dos serviços, que também validam o JWT (ADR 0004).
-- O segredo do app client de máquina sai como saída sensível (`machine_client_secret`) e fica no estado local; nunca em arquivo versionado. `*.tfstate` e `*.tfvars` estão no `.gitignore`.
+- O segredo do app client de máquina sai como saída sensível (`machine_client_secret`) e fica no estado; nunca em arquivo versionado. `*.tfstate` e `*.tfvars` estão no `.gitignore`.
+- **Senhas no estado.** As senhas dos serviços (`random_password`, dono e aplicação) e o segredo do app client de máquina ficam no estado do Terraform, no bucket do stack `bootstrap` (privado, criptografado e versionado; as versões antigas do estado também as guardam). Aceitável no ambiente efêmero e simulado, sem dado real. A senha mestre do RDS não passa pelo estado (`manage_master_user_password`). `ephemeral` + `secret_string_wo` tiraria as senhas do estado, mas exige Terraform 1.11+ e o repositório trava `>= 1.9`.
 - O `.terraform.lock.hcl` fixa os providers `hashicorp/aws` (`~> 6.70`) e `hashicorp/helm` (`~> 3.1`) para linux e macOS.
 - O provider `helm` pega o token do cluster pelo `aws eks get-token`: quem aplica precisa do aws CLI e é o administrador do cluster (`bootstrap_cluster_creator_admin_permissions`).
 
@@ -55,8 +66,9 @@ O Terraform não cria os bancos e usuários dentro do RDS: ele fica em sub-rede 
 ```bash
 infra/terraform/envs/aws/validate.sh
 ```
-O script roda `terraform fmt -check` em toda a árvore, `init -backend=false -lockfile=readonly`, `validate`, o tflint na raiz e em cada módulo (`network`, `eks`, `edge-alb`, `edge`, `identity`, `messaging`, `data`, `access`), o `check-messaging.py` e o `check-alb-routes.py`, que compara as regras do ALB com as `location` do nginx local (recusa `^~` e `~*`, e prefixo de um serviço sombreado por outro). Não precisa de credenciais.
+O script roda `terraform fmt -check` em toda a árvore, `init -backend=false -lockfile=readonly`, `validate`, o tflint na raiz e em cada módulo (`network`, `eks`, `edge-alb`, `edge`, `identity`, `messaging`, `data`, `access`), o `check-messaging.py`, o `check-service-names.py` e o `check-alb-routes.py`, que compara as regras do ALB com as `location` do nginx local (recusa `^~` e `~*`, e prefixo de um serviço sombreado por outro). Não precisa de credenciais.
 
 ## Decisões do ambiente efêmero
 - **Actuator fora da borda.** O ALB não tem regras para `/<servico>/actuator/`: o health check vai direto ao pod e a borda não expõe o actuator. Divergência deliberada do nginx local, que o expõe; na AWS, `/actuator/metrics` (admin) não chega pela borda. O `check-alb-routes.py` falha se um actuator aparecer no ALB. Se virar ADR, é da Clara (ADR 0021).
+- **Redis sem TLS nem AUTH.** O ElastiCache aceita só o security group do cluster; sem TLS em trânsito nem senha, como no compose local. Exposição consciente do ambiente efêmero.
 - **Endpoint público do EKS aberto.** `public_access_cidrs` fica em `0.0.0.0/0` (padrão): o runner do GitHub não tem IP fixo. A autenticação é por IAM e o ambiente é efêmero e de portfólio; é uma exposição consciente, não restringida.

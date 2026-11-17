@@ -34,3 +34,11 @@ output "secret_arns" {
     { "rds-master" = aws_db_instance.this.master_user_secret[0].secret_arn },
   )
 }
+
+output "db_init_secret_arns" {
+  description = "Segredos que o Job db-init le: a senha mestre do RDS e os <name>/<servico>-db (sem os de OAuth)."
+  value = concat(
+    [aws_db_instance.this.master_user_secret[0].secret_arn],
+    [for k in var.database_services : aws_secretsmanager_secret.db[k].arn],
+  )
+}

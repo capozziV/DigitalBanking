@@ -92,4 +92,6 @@ module "access" {
   topic_arns   = module.messaging.topic_arns
   queue_arns   = module.messaging.queue_arns
   table_arns   = module.messaging.table_arns
+
+  db_init_secret_arns = module.data.db_init_secret_arns
 }

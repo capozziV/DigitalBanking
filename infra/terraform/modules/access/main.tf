@@ -112,3 +112,32 @@ resource "aws_eks_pod_identity_association" "service" {
   service_account = each.key
   role_arn        = aws_iam_role.service[each.key].arn
 }
+
+# Job db-init (chart deploy/helm/db-init): cria bancos e usuarios dos servicos no RDS, que e privado. So le a
+# senha mestre (segredo gerido pelo RDS) e os segredos <name>/<servico>-db. Os segredos usam a chave gerida
+# aws/secretsmanager, cuja politica ja libera o Decrypt via Secrets Manager para a conta: sem kms:Decrypt aqui.
+data "aws_iam_policy_document" "db_init" {
+  statement {
+    sid       = "ReadDatabaseSecrets"
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = var.db_init_secret_arns
+  }
+}
+
+resource "aws_iam_role" "db_init" {
+  name               = "${var.name}-db-init"
+  assume_role_policy = data.aws_iam_policy_document.assume.json
+}
+
+resource "aws_iam_role_policy" "db_init" {
+  name   = "${var.name}-db-init"
+  role   = aws_iam_role.db_init.id
+  policy = data.aws_iam_policy_document.db_init.json
+}
+
+resource "aws_eks_pod_identity_association" "db_init" {
+  cluster_name    = var.cluster_name
+  namespace       = var.namespace
+  service_account = var.db_init_service_account
+  role_arn        = aws_iam_role.db_init.arn
+}
