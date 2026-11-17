@@ -4,7 +4,9 @@
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
-k8s_version="${KUBERNETES_VERSION:-1.33.0}"
+# Versao do Kubernetes do schema: igual a do EKS (variavel kubernetes_version em infra/terraform/envs/aws/variables.tf,
+# "1.36" no Terraform = 1.36.0 aqui). O CI repassa KUBERNETES_VERSION lida do Terraform.
+k8s_version="${KUBERNETES_VERSION:-1.36.0}"
 services=(accounts transfers statement notification customer)
 tg_arn="arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/validate/0123456789abcdef"
 tmp="$(mktemp -d)"

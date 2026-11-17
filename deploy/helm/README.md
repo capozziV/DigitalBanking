@@ -1,6 +1,6 @@
 # Chart Helm dos serviços
 
-Um chart (`service/`) para os cinco serviços; cada um tem o seu `values/<servico>.yaml`. Validação sem cluster: `./validate.sh` (helm lint, template, kubeconform `-strict` na versão `KUBERNETES_VERSION`, padrão 1.33.0, e regras do projeto).
+Um chart (`service/`) para os cinco serviços; cada um tem o seu `values/<servico>.yaml`. Validação sem cluster: `./validate.sh` (helm lint, template, kubeconform `-strict` na versão `KUBERNETES_VERSION`, padrão 1.36.0, a mesma do EKS, e regras do projeto).
 
 ## Valores obrigatórios
 - `image.repository`, `image.tag` (SHA do commit) e `targetGroupArn` entram na instalação.

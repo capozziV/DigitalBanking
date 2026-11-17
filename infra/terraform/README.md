@@ -44,11 +44,10 @@ O `aws-down` desinstala o chart dos serviços antes do `destroy`, para os `Targe
 
 ## Validar
 ```bash
-terraform fmt -check -recursive infra/terraform
-terraform -chdir=infra/terraform/envs/aws init -backend=false
-terraform -chdir=infra/terraform/envs/aws validate
-tflint --chdir=infra/terraform/envs/aws --init
-tflint --chdir=infra/terraform/envs/aws
-for m in network eks edge-alb; do tflint --chdir=infra/terraform/modules/$m --config=$PWD/infra/terraform/envs/aws/.tflint.hcl; done
-infra/terraform/envs/aws/check-alb-routes.py
+infra/terraform/envs/aws/validate.sh
 ```
+O script roda `terraform fmt -check` em toda a árvore, `init -backend=false -lockfile=readonly`, `validate`, o tflint na raiz e em cada módulo (`network`, `eks`, `edge-alb`, `edge`, `identity`) e o `check-alb-routes.py`, que compara as regras do ALB com as `location` do nginx local (recusa `^~` e `~*`, e prefixo de um serviço sombreado por outro). Não precisa de credenciais.
+
+## Decisões do ambiente efêmero
+- **Actuator fora da borda.** O ALB não tem regras para `/<servico>/actuator/`: o health check vai direto ao pod e a borda não expõe o actuator. Divergência deliberada do nginx local, que o expõe; na AWS, `/actuator/metrics` (admin) não chega pela borda. O `check-alb-routes.py` falha se um actuator aparecer no ALB. Se virar ADR, é da Clara (ADR 0021).
+- **Endpoint público do EKS aberto.** `public_access_cidrs` fica em `0.0.0.0/0` (padrão): o runner do GitHub não tem IP fixo. A autenticação é por IAM e o ambiente é efêmero e de portfólio; é uma exposição consciente, não restringida.
