@@ -97,7 +97,7 @@ class AccountClosingApiIntegrationTest : AccountsIntegrationTest() {
     }
 
     @Test
-    fun `transfers slower than the timeout is 503 transfers-unavailable in under a second, and the account stays active`() {
+    fun `transfers slower than the 500 ms timeout is 503 transfers-unavailable, and the account stays active`() {
         val (customerId, accountId) = openAccount()
         transfersService.answer(UUID.fromString(accountId), Behavior.Slow(Duration.ofSeconds(3)))
 
@@ -106,7 +106,8 @@ class AccountClosingApiIntegrationTest : AccountsIntegrationTest() {
         val elapsed = Duration.ofNanos(System.nanoTime() - started)
 
         assertProblem(response, 503, "transfers-unavailable")
-        assertThat(elapsed).isLessThan(Duration.ofSeconds(1))
+        // The read timeout (500 ms by default) cuts the 3 s answer; the margin is for the request itself.
+        assertThat(elapsed).isBetween(Duration.ofMillis(500), Duration.ofMillis(850))
         assertThat(statusOf(accountId)).isEqualTo("ACTIVE")
         assertThat(outboxRows(accountId, "AccountClosed")).isEmpty()
     }

@@ -145,6 +145,32 @@ class CloseAccountUseCaseTest {
     }
 
     @Test
+    fun `a credit and a debit of the same amount recorded while the transfers service is asked refuse the closing`() {
+        // Balance is zero again under the lock, but the debit belongs to a transfer the lookup never saw: it may still
+        // be PENDING, and its compensation would credit a closed account.
+        transfers.duringLookup = {
+            credit(500, sequence = 1)
+            entries.insert(
+                LedgerEntry(
+                    id = UUID.randomUUID(),
+                    accountId = account.id,
+                    sequence = 2,
+                    kind = EntryKind.DEBIT,
+                    amount = Money(500),
+                    balanceAfter = Balance.ZERO,
+                    description = null,
+                    idempotencyKey = "debit-2",
+                    createdAt = now,
+                ),
+            )
+        }
+
+        assertThatThrownBy { useCase.execute(account.id, owner) }.isInstanceOf(PendingTransfersException::class.java)
+        assertThat(statusOfAccount()).isEqualTo(AccountStatus.ACTIVE)
+        assertThat(outbox.events).isEmpty()
+    }
+
+    @Test
     fun `closing twice is AccountClosedException, without asking transfers nor a second event`() {
         useCase.execute(account.id, owner)
 

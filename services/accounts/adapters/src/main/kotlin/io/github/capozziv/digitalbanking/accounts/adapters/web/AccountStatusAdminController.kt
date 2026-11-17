@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import jakarta.validation.Valid
+import org.slf4j.LoggerFactory
 import org.springframework.http.ProblemDetail
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PutMapping
@@ -69,6 +70,12 @@ class AccountStatusAdminController(
         if (status == AccountStatus.CLOSED) {
             throw InvalidRequestException(listOf(InvalidField("status", "must be ACTIVE or BLOCKED")))
         }
-        return AccountDTO.from(changeAccountStatus.execute(id, status))
+        val view = changeAccountStatus.execute(id, status)
+        log.info("account status changed: accountId={} status={}", id, status)
+        return AccountDTO.from(view)
+    }
+
+    private companion object {
+        val log = LoggerFactory.getLogger(AccountStatusAdminController::class.java)
     }
 }

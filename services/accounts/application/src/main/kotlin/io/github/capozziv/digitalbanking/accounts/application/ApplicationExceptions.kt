@@ -35,7 +35,10 @@ class CustomersUnavailableException(
 /** The caller is no customer (a service), so it has no account of its own to open. */
 class CallerNotCustomerException : RuntimeException("the caller is not a customer")
 
-/** The account still has [count] outgoing transfers PENDING in the `transfers` service, so it cannot be closed yet. */
+/**
+ * The account still has [count] outgoing transfers PENDING in the `transfers` service, so it cannot be closed yet.
+ * When an entry lands on the account while it is being closed, [count] is 1: at least one transfer may still be PENDING.
+ */
 class PendingTransfersException(
     val accountId: UUID,
     val count: Int,

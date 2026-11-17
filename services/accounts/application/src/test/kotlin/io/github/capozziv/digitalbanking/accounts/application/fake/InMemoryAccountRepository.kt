@@ -44,6 +44,7 @@ class InMemoryAccountRepository : AccountRepository {
     }
 
     override fun updateStatus(account: Account) {
+        check(account.id in accounts) { "account ${account.id} was not updated" }
         accounts[account.id] = account
     }
 

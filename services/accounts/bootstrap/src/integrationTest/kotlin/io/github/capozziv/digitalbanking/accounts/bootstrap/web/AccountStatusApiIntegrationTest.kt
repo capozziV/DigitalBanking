@@ -4,11 +4,15 @@ import io.github.capozziv.digitalbanking.accounts.bootstrap.AccountsIntegrationT
 import io.github.capozziv.digitalbanking.testing.security.JwtTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.ExtendWith
+import org.springframework.boot.test.system.CapturedOutput
+import org.springframework.boot.test.system.OutputCaptureExtension
 import org.springframework.boot.test.web.server.LocalServerPort
 import tools.jackson.databind.json.JsonMapper
 import java.util.UUID
 
 /** `PUT /admin/accounts/{id}/status`: blocking and unblocking, and what a blocked account still does. */
+@ExtendWith(OutputCaptureExtension::class)
 class AccountStatusApiIntegrationTest : AccountsIntegrationTest() {
     @LocalServerPort
     private var port: Int = 0
@@ -18,7 +22,7 @@ class AccountStatusApiIntegrationTest : AccountsIntegrationTest() {
     private val mapper = JsonMapper.builder().build()
 
     @Test
-    fun `an admin blocks an account, which is read back as BLOCKED, with one AccountBlocked event`() {
+    fun `an admin blocks an account, which is read back as BLOCKED, with one AccountBlocked event and a log line`(output: CapturedOutput) {
         val (customerId, accountId) = openAccount()
 
         val response = api.put("/admin/accounts/$accountId/status", """{"status":"BLOCKED"}""")
@@ -37,10 +41,13 @@ class AccountStatusApiIntegrationTest : AccountsIntegrationTest() {
         assertThat(events.single().get("accountId").asString()).isEqualTo(accountId)
         assertThat(events.single().get("customerId").asString()).isEqualTo(customerId.toString())
         assertThat(events.single().get("occurredAt").asString()).isNotBlank()
+        assertThat(output.out).containsPattern("INFO.*account status changed: accountId=$accountId status=BLOCKED")
     }
 
     @Test
-    fun `an admin unblocks a blocked account with one AccountUnblocked event, and the same status again adds nothing`() {
+    fun `an admin unblocks a blocked account with one AccountUnblocked event, and the same status again adds nothing`(
+        output: CapturedOutput,
+    ) {
         val (_, accountId) = openAccount()
         api.put("/admin/accounts/$accountId/status", """{"status":"BLOCKED"}""")
 
@@ -51,6 +58,7 @@ class AccountStatusApiIntegrationTest : AccountsIntegrationTest() {
         assertThat(again.status).isEqualTo(200)
         assertThat(outboxPayloads(accountId, "AccountUnblocked")).hasSize(1)
         assertThat(outboxPayloads(accountId, "AccountBlocked")).hasSize(1)
+        assertThat(output.out).containsPattern("INFO.*account status changed: accountId=$accountId status=ACTIVE")
     }
 
     @Test
@@ -104,6 +112,21 @@ class AccountStatusApiIntegrationTest : AccountsIntegrationTest() {
                 .get("balance")
                 .asLong(),
         ).isEqualTo(1100)
+    }
+
+    @Test
+    fun `retrying a recorded debit after the account is blocked is 200 with the original entry, not 422`() {
+        val (_, accountId) = openAccount()
+        assertThat(api.post("/accounts/$accountId/credits", """{"amount":1000}""", key() + service).status).isEqualTo(201)
+        val debitKey = key()
+        val first = api.post("/accounts/$accountId/debits", """{"amount":300}""", debitKey + service)
+        assertThat(first.status).describedAs(first.rawBody).isEqualTo(201)
+        api.put("/admin/accounts/$accountId/status", """{"status":"BLOCKED"}""")
+
+        val retry = api.post("/accounts/$accountId/debits", """{"amount":300}""", debitKey + service)
+
+        assertThat(retry.status).describedAs(retry.rawBody).isEqualTo(200)
+        assertThat(retry.body!!.get("id").asString()).isEqualTo(first.body!!.get("id").asString())
     }
 
     @Test
