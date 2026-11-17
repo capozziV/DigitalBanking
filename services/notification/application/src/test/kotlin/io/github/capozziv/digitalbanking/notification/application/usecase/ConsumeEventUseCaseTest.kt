@@ -8,11 +8,15 @@ import io.github.capozziv.digitalbanking.notification.application.fake.InMemoryN
 import io.github.capozziv.digitalbanking.notification.application.fake.InMemoryProcessedEventRepository
 import io.github.capozziv.digitalbanking.notification.application.fake.MutableClock
 import io.github.capozziv.digitalbanking.notification.application.fake.SequentialIdGenerator
+import io.github.capozziv.digitalbanking.notification.domain.NotificationContent
 import io.github.capozziv.digitalbanking.notification.domain.NotificationKind
 import io.github.capozziv.digitalbanking.notification.domain.NotificationText
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.MethodSource
 import java.time.Instant
 import java.util.UUID
 
@@ -163,18 +167,18 @@ class ConsumeEventUseCaseTest {
 
     @Test
     fun `an unsupported event is ignored but marked as processed`() {
-        val event = ReceivedEvent.Unsupported(UUID.randomUUID(), "AccountClosed")
+        val event = ReceivedEvent.Unsupported(UUID.randomUUID(), "SomethingNew")
 
         val outcome = useCase.execute(event)
 
         assertThat(outcome).isEqualTo(ConsumeOutcome.IGNORED)
-        assertThat(processed.processed).containsEntry(event.eventId, "AccountClosed")
+        assertThat(processed.processed).containsEntry(event.eventId, "SomethingNew")
         assertThat(notifications.all).isEmpty()
     }
 
     @Test
     fun `an unsupported event delivered again is a duplicate`() {
-        val event = ReceivedEvent.Unsupported(UUID.randomUUID(), "AccountClosed")
+        val event = ReceivedEvent.Unsupported(UUID.randomUUID(), "SomethingNew")
         useCase.execute(event)
 
         val outcome = useCase.execute(event)
@@ -221,6 +225,46 @@ class ConsumeEventUseCaseTest {
         assertThat(notifications.all).isEmpty()
     }
 
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("accountStatusEvents")
+    fun `an account status event notifies the customer of the payload`(
+        eventType: String,
+        newEvent: (UUID, UUID, UUID) -> ReceivedEvent,
+        kind: NotificationKind,
+        text: (UUID) -> NotificationContent,
+    ) {
+        // The customer comes from the payload: the account does not need to be known here.
+        val event = newEvent(UUID.randomUUID(), aliceAccount, alice)
+
+        val outcome = useCase.execute(event)
+
+        assertThat(outcome).isEqualTo(ConsumeOutcome.PROCESSED)
+        val notification = notifications.all.single()
+        assertThat(notification.customerId).isEqualTo(alice)
+        assertThat(notification.kind).isEqualTo(kind)
+        assertThat(notification.title).isEqualTo(text(aliceAccount).title)
+        assertThat(notification.body).isEqualTo(text(aliceAccount).body)
+        assertThat(notification.sourceEventId).isEqualTo(event.eventId)
+        assertThat(notification.data).containsEntry("accountId", aliceAccount.toString())
+        assertThat(processed.processed).containsEntry(event.eventId, eventType)
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("accountStatusEvents")
+    fun `an account status event delivered twice notifies only once`(
+        eventType: String,
+        newEvent: (UUID, UUID, UUID) -> ReceivedEvent,
+    ) {
+        val event = newEvent(UUID.randomUUID(), aliceAccount, alice)
+        useCase.execute(event)
+
+        val outcome = useCase.execute(event)
+
+        assertThat(outcome).isEqualTo(ConsumeOutcome.DUPLICATE)
+        assertThat(notifications.all).hasSize(1)
+        assertThat(processed.processed).containsEntry(event.eventId, eventType)
+    }
+
     private fun openAccounts() {
         useCase.execute(ReceivedEvent.AccountOpened(UUID.randomUUID(), aliceAccount, alice, "STANDARD"))
         useCase.execute(ReceivedEvent.AccountOpened(UUID.randomUUID(), aliceSecondAccount, alice, "GOLD"))
@@ -232,4 +276,29 @@ class ConsumeEventUseCaseTest {
         destination: UUID,
         amountCents: Long,
     ) = ReceivedEvent.TransferCompleted(UUID.randomUUID(), UUID.randomUUID(), source, destination, amountCents)
+
+    companion object {
+        @JvmStatic
+        fun accountStatusEvents(): List<Arguments> =
+            listOf(
+                Arguments.of(
+                    "AccountBlocked",
+                    { e: UUID, a: UUID, c: UUID -> ReceivedEvent.AccountBlocked(e, a, c) },
+                    NotificationKind.ACCOUNT_BLOCKED,
+                    { a: UUID -> NotificationText.accountBlocked(a) },
+                ),
+                Arguments.of(
+                    "AccountUnblocked",
+                    { e: UUID, a: UUID, c: UUID -> ReceivedEvent.AccountUnblocked(e, a, c) },
+                    NotificationKind.ACCOUNT_UNBLOCKED,
+                    { a: UUID -> NotificationText.accountUnblocked(a) },
+                ),
+                Arguments.of(
+                    "AccountClosed",
+                    { e: UUID, a: UUID, c: UUID -> ReceivedEvent.AccountClosed(e, a, c) },
+                    NotificationKind.ACCOUNT_CLOSED,
+                    { a: UUID -> NotificationText.accountClosed(a) },
+                ),
+            )
+    }
 }

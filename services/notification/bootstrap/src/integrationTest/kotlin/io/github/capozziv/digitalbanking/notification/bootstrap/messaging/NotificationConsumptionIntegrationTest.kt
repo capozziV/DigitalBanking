@@ -103,6 +103,28 @@ class NotificationConsumptionIntegrationTest {
     }
 
     @Test
+    fun `account blocked, unblocked and closed notify the customer once each, even when delivered twice`() {
+        val (alice, aliceAccount) = UUID.randomUUID() to UUID.randomUUID()
+        sendAccountEvent(aliceAccount, accountOpened(aliceAccount, alice))
+        val events =
+            listOf("AccountBlocked", "AccountUnblocked", "AccountClosed").map { eventType ->
+                envelope(
+                    UUID.randomUUID(),
+                    eventType,
+                    """{"accountId":"$aliceAccount","customerId":"$alice","occurredAt":"${Instant.now()}"}""",
+                )
+            }
+        // Each send has its own deduplication ID, so SQS delivers both copies of every event.
+        events.forEach { body -> repeat(2) { sendAccountEvent(aliceAccount, body) } }
+
+        await { kindsOf(alice).size == 4 }
+        awaitEmpty(ACCOUNTS_QUEUE)
+        assertThat(visibleMessages(ACCOUNTS_DLQ)).isEqualTo(accountsDlqAtStart)
+        assertThat(kindsOf(alice))
+            .containsExactlyInAnyOrder("WELCOME", "ACCOUNT_BLOCKED", "ACCOUNT_UNBLOCKED", "ACCOUNT_CLOSED")
+    }
+
+    @Test
     fun `an unknown event type and a ledger entry recorded are acknowledged without notifications`() {
         val unknownEventId = UUID.randomUUID()
         val ledgerEventId = UUID.randomUUID()

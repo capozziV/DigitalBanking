@@ -69,6 +69,28 @@ object NotificationText {
                 "não pôde ser concluída e o valor voltou para a sua conta.",
     )
 
+    fun accountBlocked(accountId: UUID) =
+        NotificationContent(
+            title = "Conta bloqueada",
+            body =
+                "Sua conta $accountId foi bloqueada. " +
+                    "Ela continua recebendo transferências, mas não pode enviar valores enquanto estiver bloqueada.",
+        )
+
+    fun accountUnblocked(accountId: UUID) =
+        NotificationContent(
+            title = "Conta desbloqueada",
+            body = "Sua conta $accountId foi desbloqueada e já pode enviar transferências de novo.",
+        )
+
+    fun accountClosed(accountId: UUID) =
+        NotificationContent(
+            title = "Conta encerrada",
+            body =
+                "Sua conta $accountId foi encerrada. " +
+                    "O extrato continua disponível para consulta, e você pode abrir uma conta nova quando quiser.",
+        )
+
     private fun displayType(type: String) = type.lowercase().replaceFirstChar { it.uppercase() }
 
     private fun reasonText(reason: String) =

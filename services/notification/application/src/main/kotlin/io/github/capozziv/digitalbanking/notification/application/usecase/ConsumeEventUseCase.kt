@@ -71,6 +71,39 @@ class ConsumeEventUseCase(
                 )
             }
 
+            is ReceivedEvent.AccountBlocked -> {
+                listOf(
+                    accountStatusDraft(
+                        event.customerId,
+                        event.accountId,
+                        NotificationKind.ACCOUNT_BLOCKED,
+                        NotificationText.accountBlocked(event.accountId),
+                    ),
+                )
+            }
+
+            is ReceivedEvent.AccountUnblocked -> {
+                listOf(
+                    accountStatusDraft(
+                        event.customerId,
+                        event.accountId,
+                        NotificationKind.ACCOUNT_UNBLOCKED,
+                        NotificationText.accountUnblocked(event.accountId),
+                    ),
+                )
+            }
+
+            is ReceivedEvent.AccountClosed -> {
+                listOf(
+                    accountStatusDraft(
+                        event.customerId,
+                        event.accountId,
+                        NotificationKind.ACCOUNT_CLOSED,
+                        NotificationText.accountClosed(event.accountId),
+                    ),
+                )
+            }
+
             is ReceivedEvent.TransferCompleted -> {
                 transferCompletedDrafts(event)
             }
@@ -123,6 +156,14 @@ class ConsumeEventUseCase(
             ),
         )
     }
+
+    /** The payload carries the customer, so the account does not need to be known here. */
+    private fun accountStatusDraft(
+        customerId: UUID,
+        accountId: UUID,
+        kind: NotificationKind,
+        content: NotificationContent,
+    ) = Draft(customerId, kind, content, mapOf("accountId" to accountId.toString()))
 
     private fun ownerOf(accountId: UUID): UUID = knownAccounts.customerOf(accountId) ?: throw UnknownAccountException(accountId)
 

@@ -92,6 +92,35 @@ class EventEnvelopeReaderTest {
     }
 
     @Test
+    fun `AccountBlocked is read from the accounts payload`() {
+        val body = envelope("AccountBlocked", 1, accountStatusPayload())
+
+        assertThat(reader.read(body)).isEqualTo(ReceivedEvent.AccountBlocked(eventId, accountId, customerId))
+    }
+
+    @Test
+    fun `AccountUnblocked is read from the accounts payload`() {
+        val body = envelope("AccountUnblocked", 1, accountStatusPayload())
+
+        assertThat(reader.read(body)).isEqualTo(ReceivedEvent.AccountUnblocked(eventId, accountId, customerId))
+    }
+
+    @Test
+    fun `AccountClosed is read from the accounts payload`() {
+        val body = envelope("AccountClosed", 1, accountStatusPayload())
+
+        assertThat(reader.read(body)).isEqualTo(ReceivedEvent.AccountClosed(eventId, accountId, customerId))
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["AccountBlocked", "AccountUnblocked", "AccountClosed"])
+    fun `an account status event without the customer is malformed`(eventType: String) {
+        val body = envelope(eventType, 1, """{"accountId":"$accountId","occurredAt":"2026-11-16T12:00:00Z"}""")
+
+        assertThatThrownBy { reader.read(body) }.isInstanceOf(MalformedEventException::class.java)
+    }
+
+    @Test
     fun `LedgerEntryRecorded is unsupported`() {
         val body = envelope("LedgerEntryRecorded", 1, """{"entryId":"${UUID.randomUUID()}","amount":10}""")
 
@@ -149,6 +178,8 @@ class EventEnvelopeReaderTest {
 
         assertThatThrownBy { reader.read(body) }.isInstanceOf(MalformedEventException::class.java)
     }
+
+    private fun accountStatusPayload() = """{"accountId":"$accountId","customerId":"$customerId","occurredAt":"2026-11-16T12:00:00Z"}"""
 
     private fun transferPayload(
         description: String? = "rent",
