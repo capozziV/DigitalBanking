@@ -3,18 +3,29 @@ package io.github.capozziv.digitalbanking.accounts.adapters.customer
 import com.sun.net.httpserver.HttpServer
 import io.github.capozziv.digitalbanking.accounts.application.CustomersUnavailableException
 import io.github.capozziv.digitalbanking.accounts.application.port.CustomerStatus
+import io.github.capozziv.digitalbanking.security.ServiceTokenClient
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.RegisterExtension
+import org.slf4j.MDC
 import org.springframework.http.client.JdkClientHttpRequestFactory
 import org.springframework.web.client.RestClient
+import sh.stubborn.contract.stubrunner.StubsMode
+import sh.stubborn.contract.stubrunner.junit.StubRunnerExtension
 import java.net.InetSocketAddress
+import java.net.URI
 import java.net.http.HttpClient
 import java.util.UUID
 
-/** How [HttpCustomerGateway] reads each answer of the `customer` service, against a local HTTP server. */
+/**
+ * How [HttpCustomerGateway] reads each answer of the `customer` service. The answers customer describes in its contracts
+ * (ACTIVE, BLOCKED, customer-not-found) come from the stubs generated from them; the ones it does not (another
+ * customer, unknown status, stray bodies, 401/403/500, a refused connection) from a local HTTP server, which also
+ * plays the token endpoint.
+ */
 class HttpCustomerGatewayTest {
     private val customerId = UUID.randomUUID()
     private lateinit var server: HttpServer
@@ -24,13 +35,17 @@ class HttpCustomerGatewayTest {
 
     @Volatile private var answerBody = ""
 
-    @Volatile private var requestedPath: String? = null
-
     @BeforeEach
     fun startServer() {
         server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/token") { exchange ->
+            exchange.requestBody.readAllBytes()
+            val token = """{"access_token":"accounts-test-token","token_type":"Bearer","expires_in":300}""".toByteArray()
+            exchange.responseHeaders.add("Content-Type", "application/json")
+            exchange.sendResponseHeaders(200, token.size.toLong())
+            exchange.responseBody.use { it.write(token) }
+        }
         server.createContext("/internal/customers/") { exchange ->
-            requestedPath = exchange.requestURI.path
             val bytes = answerBody.toByteArray()
             exchange.responseHeaders.add("Content-Type", "application/json")
             exchange.sendResponseHeaders(answerStatus, if (bytes.isEmpty()) -1 else bytes.size.toLong())
@@ -50,6 +65,7 @@ class HttpCustomerGatewayTest {
 
     @AfterEach
     fun stopServer() {
+        MDC.clear()
         server.stop(0)
     }
 
@@ -62,25 +78,30 @@ class HttpCustomerGatewayTest {
     }
 
     @Test
-    fun `200 with ACTIVE is an active customer, asked at the internal path of that customer`() {
-        answer(200, """{"id":"$customerId","status":"ACTIVE"}""")
-
-        assertThat(gateway.findStatus(customerId)).isEqualTo(CustomerStatus.ACTIVE)
-        assertThat(requestedPath).isEqualTo("/internal/customers/$customerId")
+    fun `an active customer is ACTIVE, asked with the machine token and the correlation id (contract)`() {
+        assertThat(contractGateway().findStatus(ACTIVE_ID)).isEqualTo(CustomerStatus.ACTIVE)
     }
 
     @Test
-    fun `200 with BLOCKED is a blocked customer`() {
-        answer(200, """{"id":"$customerId","status":"BLOCKED"}""")
-
-        assertThat(gateway.findStatus(customerId)).isEqualTo(CustomerStatus.BLOCKED)
+    fun `a blocked customer is BLOCKED (contract)`() {
+        assertThat(contractGateway().findStatus(BLOCKED_ID)).isEqualTo(CustomerStatus.BLOCKED)
     }
 
     @Test
-    fun `404 is no such customer`() {
-        answer(404, """{"type":"/problems/customer-not-found","status":404}""")
+    fun `404 customer-not-found is no such customer (contract)`() {
+        assertThat(contractGateway().findStatus(MISSING_ID)).isNull()
+    }
 
-        assertThat(gateway.findStatus(customerId)).isNull()
+    /**
+     * The gateway as [CustomerClientConfiguration] wires it (machine token and correlation id on every call) against
+     * the stubs generated from the contracts of customer, which answer only a call with both.
+     */
+    private fun contractGateway(): HttpCustomerGateway {
+        MDC.put("correlationId", "corr-contract")
+        val url = customerStubs.findStubUrl(CUSTOMER_STUBS_GROUP, CUSTOMER_STUBS_ARTIFACT).toString()
+        val tokenClient = ServiceTokenClient(URI.create("http://127.0.0.1:${server.address.port}/token"), "accounts", "secret")
+        val configuration = CustomerClientConfiguration()
+        return HttpCustomerGateway(configuration.customerRestClient(CustomerClientProperties(baseUrl = url), tokenClient))
     }
 
     @Test
@@ -141,5 +162,22 @@ class HttpCustomerGatewayTest {
 
     private fun assertUnavailable() {
         assertThatThrownBy { gateway.findStatus(customerId) }.isInstanceOf(CustomersUnavailableException::class.java)
+    }
+
+    companion object {
+        const val CUSTOMER_STUBS_GROUP = "io.github.capozziv.digitalbanking.customer"
+        const val CUSTOMER_STUBS_ARTIFACT = "bootstrap"
+
+        // The customers of the contracts (services/customer/bootstrap/src/contractTest/resources/contracts/http).
+        val ACTIVE_ID: UUID = UUID.fromString("0198a1b2-0000-7000-8000-0000000000c1")
+        val BLOCKED_ID: UUID = UUID.fromString("0198a1b2-0000-7000-8000-0000000000b1")
+        val MISSING_ID: UUID = UUID.fromString("0198a1b2-0000-7000-8000-000000000404")
+
+        @JvmField
+        @RegisterExtension
+        val customerStubs: StubRunnerExtension =
+            StubRunnerExtension()
+                .stubsMode(StubsMode.CLASSPATH)
+                .downloadStub(CUSTOMER_STUBS_GROUP, CUSTOMER_STUBS_ARTIFACT)
     }
 }

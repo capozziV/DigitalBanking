@@ -1,4 +1,7 @@
-plugins { id("digitalbanking.spring-module") }
+plugins {
+    id("digitalbanking.spring-module")
+    id("digitalbanking.contract-consumer")
+}
 
 dependencies {
     implementation(project(":services:accounts:application"))
@@ -18,4 +21,7 @@ dependencies {
     implementation(libs.java.uuid.generator)
     implementation(libs.springdoc.openapi.starter.webmvc.ui)
     runtimeOnly(libs.postgresql)
+
+    // HttpCustomerGatewayTest runs against the stubs generated from the contracts of customer.
+    contractStubs(project(":services:customer:bootstrap"))
 }

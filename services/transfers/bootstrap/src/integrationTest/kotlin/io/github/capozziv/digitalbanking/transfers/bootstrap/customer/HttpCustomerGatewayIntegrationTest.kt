@@ -3,9 +3,7 @@ package io.github.capozziv.digitalbanking.transfers.bootstrap.customer
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
 import com.github.tomakehurst.wiremock.client.WireMock.aResponse
-import com.github.tomakehurst.wiremock.client.WireMock.equalTo
 import com.github.tomakehurst.wiremock.client.WireMock.get
-import com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor
 import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration.options
 import com.github.tomakehurst.wiremock.http.Fault
@@ -18,17 +16,25 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.RegisterExtension
 import org.slf4j.MDC
+import sh.stubborn.contract.stubrunner.StubsMode
+import sh.stubborn.contract.stubrunner.junit.StubRunnerExtension
 import java.time.Duration
 import java.util.UUID
 
-/** The customer client against a WireMock that answers 401 to any request without the service token. */
+/**
+ * The customer client. The answers customer gives (ACTIVE, BLOCKED, customer-not-found) come from the stubs generated
+ * from the contracts of customer, so a change of the contract breaks this test; the failures customer does not
+ * describe (timeouts, cut connections, 5xx, stray bodies) run against a WireMock that answers 401 to any request
+ * without the service token.
+ */
 class HttpCustomerGatewayIntegrationTest {
     private val server = WireMockServer(ServiceTokenServers.peerOptions())
     private val tokenServer = WireMockServer(options().dynamicPort())
     private lateinit var gateway: CustomerGateway
 
-    private val customerId = UUID.fromString("0198a1b2-0000-7000-8000-0000000000c1")
+    private val customerId = ACTIVE_ID
     private val path = "/internal/customers/$customerId"
 
     @BeforeEach
@@ -48,37 +54,31 @@ class HttpCustomerGatewayIntegrationTest {
     }
 
     @Test
-    fun `an active customer is ACTIVE, asked with the service token and the correlation id`() {
-        server.stubFor(get(urlEqualTo(path)).willReturn(customer("ACTIVE")))
+    fun `an active customer is ACTIVE, asked with the service token and the correlation id (contract)`() {
         MDC.put("correlationId", "corr-c-1")
 
-        assertThat(gateway.lookupCustomer(customerId)).isEqualTo(CustomerLookup.ACTIVE)
-        server.verify(
-            getRequestedFor(urlEqualTo(path))
-                .withHeader("Authorization", equalTo("Bearer ${ServiceTokenServers.SERVICE_TOKEN}"))
-                .withHeader("X-Correlation-Id", equalTo("corr-c-1")),
-        )
+        assertThat(contractGateway().lookupCustomer(ACTIVE_ID)).isEqualTo(CustomerLookup.ACTIVE)
     }
 
     @Test
-    fun `a blocked customer is BLOCKED`() {
-        server.stubFor(get(urlEqualTo(path)).willReturn(customer("BLOCKED")))
+    fun `a blocked customer is BLOCKED (contract)`() {
+        MDC.put("correlationId", "corr-c-2")
 
-        assertThat(gateway.lookupCustomer(customerId)).isEqualTo(CustomerLookup.BLOCKED)
+        assertThat(contractGateway().lookupCustomer(BLOCKED_ID)).isEqualTo(CustomerLookup.BLOCKED)
     }
 
     @Test
-    fun `404 is NOT_FOUND`() {
-        server.stubFor(
-            get(urlEqualTo(path)).willReturn(
-                aResponse()
-                    .withStatus(404)
-                    .withHeader("Content-Type", "application/problem+json")
-                    .withBody("""{"type":"/problems/customer-not-found","status":404}"""),
-            ),
-        )
+    fun `404 customer-not-found is NOT_FOUND (contract)`() {
+        MDC.put("correlationId", "corr-c-3")
 
-        assertThat(gateway.lookupCustomer(customerId)).isEqualTo(CustomerLookup.NOT_FOUND)
+        assertThat(contractGateway().lookupCustomer(MISSING_ID)).isEqualTo(CustomerLookup.NOT_FOUND)
+    }
+
+    /** The gateway against the stubs generated from the contracts of customer (contracts/http). */
+    private fun contractGateway(): CustomerGateway {
+        val url = customerStubs.findStubUrl(CUSTOMER_STUBS_GROUP, CUSTOMER_STUBS_ARTIFACT).toString()
+        val properties = CustomerClientProperties(url = url, timeout = Duration.ofMillis(500))
+        return CustomerClientConfiguration().customerGateway(properties, ServiceTokenServers.clientOf(tokenServer))
     }
 
     @Test
@@ -119,4 +119,21 @@ class HttpCustomerGatewayIntegrationTest {
             .withStatus(200)
             .withHeader("Content-Type", "application/json")
             .withBody("""{"id":"$customerId","status":"$status"}""")
+
+    companion object {
+        const val CUSTOMER_STUBS_GROUP = "io.github.capozziv.digitalbanking.customer"
+        const val CUSTOMER_STUBS_ARTIFACT = "bootstrap"
+
+        // The customers of the contracts (services/customer/bootstrap/src/contractTest/resources/contracts/http).
+        val ACTIVE_ID: UUID = UUID.fromString("0198a1b2-0000-7000-8000-0000000000c1")
+        val BLOCKED_ID: UUID = UUID.fromString("0198a1b2-0000-7000-8000-0000000000b1")
+        val MISSING_ID: UUID = UUID.fromString("0198a1b2-0000-7000-8000-000000000404")
+
+        @JvmField
+        @RegisterExtension
+        val customerStubs: StubRunnerExtension =
+            StubRunnerExtension()
+                .stubsMode(StubsMode.CLASSPATH)
+                .downloadStub(CUSTOMER_STUBS_GROUP, CUSTOMER_STUBS_ARTIFACT)
+    }
 }

@@ -3,7 +3,6 @@ package io.github.capozziv.digitalbanking.transfers.bootstrap.accounts
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock.aResponse
 import com.github.tomakehurst.wiremock.client.WireMock.equalTo
-import com.github.tomakehurst.wiremock.client.WireMock.equalToJson
 import com.github.tomakehurst.wiremock.client.WireMock.get
 import com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor
 import com.github.tomakehurst.wiremock.client.WireMock.post
@@ -20,9 +19,7 @@ import io.github.capozziv.digitalbanking.transfers.application.port.AccountLooku
 import io.github.capozziv.digitalbanking.transfers.application.port.AccountsGateway
 import io.github.capozziv.digitalbanking.transfers.application.port.EntryLookup
 import io.github.capozziv.digitalbanking.transfers.bootstrap.ServiceTokenServers
-import io.github.capozziv.digitalbanking.transfers.domain.EntryKind
 import io.github.capozziv.digitalbanking.transfers.domain.Money
-import io.github.capozziv.digitalbanking.transfers.domain.RecordedEntry
 import io.github.capozziv.digitalbanking.transfers.domain.StepCall
 import io.github.capozziv.digitalbanking.transfers.domain.StepOutcome
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
@@ -37,7 +34,12 @@ import java.time.Duration
 import java.util.UUID
 import kotlin.concurrent.thread
 
-/** The accounts client against a WireMock that answers 401 to any request without the service token. */
+/**
+ * The accounts client against a WireMock that answers 401 to any request without the service token, for what the
+ * contracts of accounts do not describe: timeouts, cut connections, stray bodies, statuses a proxy or a misroute
+ * gives. The answers accounts describes in its contracts run against its stubs in
+ * [HttpAccountsGatewayContractIntegrationTest].
+ */
 class HttpAccountsGatewayIntegrationTest {
     private val server = WireMockServer(ServiceTokenServers.peerOptions())
     private val tokenServer = WireMockServer(options().dynamicPort())
@@ -68,20 +70,6 @@ class HttpAccountsGatewayIntegrationTest {
     }
 
     @Test
-    fun `every call carries the service token`() {
-        server.stubFor(
-            post(urlEqualTo("/accounts/$accountId/debits"))
-                .willReturn(aResponse().withStatus(201).withHeader("Content-Type", "application/json").withBody(entryJson())),
-        )
-
-        assertThat(gateway.perform(debit()).outcome).isEqualTo(StepOutcome.Success)
-        server.verify(
-            postRequestedFor(urlEqualTo("/accounts/$accountId/debits"))
-                .withHeader("Authorization", equalTo("Bearer ${ServiceTokenServers.SERVICE_TOKEN}")),
-        )
-    }
-
-    @Test
     fun `no service token is a transient failure, never a refusal`() {
         tokenServer.stop()
 
@@ -105,30 +93,6 @@ class HttpAccountsGatewayIntegrationTest {
         .withStatus(status)
         .withHeader("Content-Type", "application/problem+json")
         .withBody("""{"type":"/problems/$slug","title":"t","status":$status}""")
-
-    @Test
-    fun `debit sends the key, the correlation id and the body, and 201 is success`() {
-        server.stubFor(
-            post(urlEqualTo("/accounts/$accountId/debits"))
-                .willReturn(aResponse().withStatus(201).withHeader("Content-Type", "application/json").withBody(entryJson())),
-        )
-        MDC.put("correlationId", "corr-123")
-
-        val result = gateway.perform(debit())
-
-        assertThat(result.outcome).isEqualTo(StepOutcome.Success)
-        assertThat(result.httpStatus).isEqualTo(201)
-        server.verify(
-            postRequestedFor(urlEqualTo("/accounts/$accountId/debits"))
-                .withHeader("Idempotency-Key", equalTo("transfer-1-debit"))
-                .withHeader("X-Correlation-Id", equalTo("corr-123"))
-                .withHeader(
-                    "Content-Type",
-                    com.github.tomakehurst.wiremock.client.WireMock
-                        .containing("application/json"),
-                ).withRequestBody(equalToJson("""{"amount":1000,"description":"Transfer to someone"}""", false, false)),
-        )
-    }
 
     @Test
     fun `credit goes to the credits path and 200 (repetition) is success`() {
@@ -162,30 +126,6 @@ class HttpAccountsGatewayIntegrationTest {
     }
 
     @Test
-    fun `422 insufficient-available-balance is a refusal`() {
-        server.stubFor(
-            post(urlEqualTo("/accounts/$accountId/debits"))
-                .willReturn(problem(422, "insufficient-available-balance")),
-        )
-
-        val result = gateway.perform(debit())
-
-        assertThat(result.outcome).isEqualTo(StepOutcome.Refused(StepOutcome.INSUFFICIENT_AVAILABLE_BALANCE))
-        assertThat(result.httpStatus).isEqualTo(422)
-    }
-
-    @Test
-    fun `404 account-not-found on a credit is a definitive refusal with the problem type`() {
-        server.stubFor(
-            post(urlEqualTo("/accounts/$accountId/credits")).willReturn(problem(404, "account-not-found")),
-        )
-
-        val result = gateway.perform(StepCall.Credit(accountId, Money(5), "transfer-1-credit", "d"))
-
-        assertThat(result.outcome).isEqualTo(StepOutcome.Refused("account-not-found"))
-    }
-
-    @Test
     fun `422 idempotency-key-reused is a definitive refusal with the problem type`() {
         server.stubFor(
             post(urlEqualTo("/accounts/$accountId/debits")).willReturn(problem(422, "idempotency-key-reused")),
@@ -208,23 +148,6 @@ class HttpAccountsGatewayIntegrationTest {
     }
 
     @Test
-    fun `find entry sends the key as a query parameter and 200 is success`() {
-        server.stubFor(
-            get(urlPathEqualTo("/accounts/$accountId/entries"))
-                .willReturn(aResponse().withStatus(200).withBody(entryJson())),
-        )
-        MDC.put("correlationId", "corr-9")
-
-        val result = gateway.perform(StepCall.FindEntry(accountId, "transfer-1-debit"))
-
-        assertThat(result.outcome).isEqualTo(StepOutcome.Success)
-        server.verify(
-            getRequestedFor(urlEqualTo("/accounts/$accountId/entries?idempotencyKey=transfer-1-debit"))
-                .withHeader("X-Correlation-Id", equalTo("corr-9")),
-        )
-    }
-
-    @Test
     fun `find entry encodes the key in the query string`() {
         server.stubFor(
             get(urlPathEqualTo("/accounts/$accountId/entries")).willReturn(aResponse().withStatus(200).withBody(entryJson())),
@@ -236,18 +159,6 @@ class HttpAccountsGatewayIntegrationTest {
             getRequestedFor(urlPathEqualTo("/accounts/$accountId/entries"))
                 .withQueryParam("idempotencyKey", equalTo("a&b=c d")),
         )
-    }
-
-    @Test
-    fun `404 entry-not-found on find entry is the entry-not-found refusal`() {
-        server.stubFor(
-            get(urlPathEqualTo("/accounts/$accountId/entries")).willReturn(problem(404, "entry-not-found")),
-        )
-
-        val result = gateway.perform(StepCall.FindEntry(accountId, "transfer-1-debit"))
-
-        assertThat(result.outcome).isEqualTo(StepOutcome.Refused(StepOutcome.ENTRY_NOT_FOUND))
-        assertThat(result.httpStatus).isEqualTo(404)
     }
 
     @Test
@@ -264,17 +175,6 @@ class HttpAccountsGatewayIntegrationTest {
         assertThat(result.outcome).isEqualTo(StepOutcome.TransientFailure)
         assertThat(result.httpStatus).isNull()
         assertThat(elapsed).isBetween(Duration.ofMillis(2_800), Duration.ofMillis(4_500))
-    }
-
-    @Test
-    fun `find entry with 404 account-not-found is that refusal, not entry-not-found`() {
-        server.stubFor(
-            get(urlPathEqualTo("/accounts/$accountId/entries")).willReturn(problem(404, "account-not-found")),
-        )
-
-        val result = gateway.perform(StepCall.FindEntry(accountId, "k"))
-
-        assertThat(result.outcome).isEqualTo(StepOutcome.Refused("account-not-found"))
     }
 
     @Test
@@ -423,28 +323,6 @@ class HttpAccountsGatewayIntegrationTest {
     }
 
     @Test
-    fun `lookup account returns the owner for 200`() {
-        server.stubFor(
-            get(urlEqualTo("/accounts/$accountId")).willReturn(
-                aResponse().withStatus(200).withHeader("Content-Type", "application/json").withBody(
-                    """{"id":"$accountId","customerId":"$entryId","type":"FREE","balance":0,"overdraftLimit":0,"availableBalance":0}""",
-                ),
-            ),
-        )
-        MDC.put("correlationId", "corr-7")
-
-        assertThat(gateway.lookupAccount(accountId)).isEqualTo(AccountLookup.Found(UUID.fromString(entryId)))
-        server.verify(getRequestedFor(urlEqualTo("/accounts/$accountId")).withHeader("X-Correlation-Id", equalTo("corr-7")))
-    }
-
-    @Test
-    fun `lookup account returns NotFound for 404 account-not-found`() {
-        server.stubFor(get(urlEqualTo("/accounts/$accountId")).willReturn(problem(404, "account-not-found")))
-
-        assertThat(gateway.lookupAccount(accountId)).isEqualTo(AccountLookup.NotFound)
-    }
-
-    @Test
     fun `lookup account returns Unavailable for 5xx, bad 200 body, cut connection and timeout`() {
         server.stubFor(get(urlEqualTo("/accounts/$accountId")).willReturn(aResponse().withStatus(503)))
         assertThat(gateway.lookupAccount(accountId)).isEqualTo(AccountLookup.Unavailable)
@@ -498,32 +376,6 @@ class HttpAccountsGatewayIntegrationTest {
     }
 
     // --- find entry for the manual compensation ---
-
-    @Test
-    fun `find entry reads the account, kind and amount of the entry under the key`() {
-        server.stubFor(
-            get(urlPathEqualTo("/accounts/$accountId/entries"))
-                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json").withBody(creditJson())),
-        )
-
-        val lookup = gateway.findEntry(accountId, "back-office 42")
-
-        assertThat(lookup).isEqualTo(EntryLookup.Found(RecordedEntry(accountId, EntryKind.CREDIT, Money(1_000))))
-        server.verify(
-            getRequestedFor(urlPathEqualTo("/accounts/$accountId/entries"))
-                .withQueryParam("idempotencyKey", equalTo("back-office 42"))
-                .withHeader("Authorization", equalTo("Bearer ${ServiceTokenServers.SERVICE_TOKEN}")),
-        )
-    }
-
-    @Test
-    fun `find entry is NotFound for 404 entry-not-found and account-not-found`() {
-        server.stubFor(get(urlPathEqualTo("/accounts/$accountId/entries")).willReturn(problem(404, "entry-not-found")))
-        assertThat(gateway.findEntry(accountId, "k")).isEqualTo(EntryLookup.NotFound)
-
-        server.stubFor(get(urlPathEqualTo("/accounts/$accountId/entries")).willReturn(problem(404, "account-not-found")))
-        assertThat(gateway.findEntry(accountId, "k")).isEqualTo(EntryLookup.NotFound)
-    }
 
     @Test
     fun `find entry is Unavailable for 5xx, a rejected token, a body without kind or amount and a cut connection`() {
