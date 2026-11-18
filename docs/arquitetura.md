@@ -96,7 +96,8 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 - Cada serviço expõe contrato OpenAPI.
 - Erros no formato Problem Details (RFC 9457).
 - Transferências exigem header `Idempotency-Key`.
-- (ver [ADR 0011](adr/0011-contratos-de-api.md))
+- Testes de contrato entre os serviços (HTTP e eventos do outbox) com o Stubborn Contract: o produtor gera os testes e o jar de stubs; o consumidor roda contra os stubs.
+- (ver [ADR 0011](adr/0011-contratos-de-api.md) e [ADR 0022](adr/0022-testes-de-contrato.md))
 
 ### Observabilidade
 - Apenas correlation ID, sem tracing distribuído (sem OpenTelemetry, Jaeger ou X-Ray).
@@ -121,4 +122,3 @@ Fonte única das decisões pendentes; cada item tem um cartão `Decision` no [bo
 **Etapa 8**
 - EKS: nós EC2 ou Fargate ([ADR 0019](adr/0019-runtime-na-aws-com-eks.md)).
 - Tempo máximo ligado e mecanismo de derrubada automática do ambiente AWS; bloqueia o deploy (cartão [#146](https://github.com/capozziV/DigitalBanking/issues/146)).
-- Ferramenta de testes de contrato: o Spring Cloud Contract foi descontinuado (sucessor: Stubborn Contract 0.2.2, único declarado para o Boot 4.1); bloqueia as Tasks 7 e 8 (cartão [#195](https://github.com/capozziV/DigitalBanking/issues/195)).

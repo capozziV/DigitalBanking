@@ -13,7 +13,7 @@ Deixar o banco digital pronto para ser mostrado: os cinco serviços sobem na AWS
 - **EKS:** node group EC2 gerenciado (2× `t3.medium`) ([ADR 0019](../../adr/0019-runtime-na-aws-com-eks.md), cartão #145).
 - **Empacotamento no Kubernetes:** um chart Helm comum aos cinco serviços, com um arquivo de valores por serviço.
 - **Imagem:** Dockerfile em camadas por serviço (camadas do Spring Boot: dependências, loader, dependências snapshot, aplicação).
-- **Testes de contrato:** Spring Cloud Contract, contratos no repositório.
+- **Testes de contrato:** Stubborn Contract (ADR 0022), contratos no repositório.
 - **Dados na AWS:** serviços gerenciados nos menores tamanhos: RDS PostgreSQL, ElastiCache Redis, DynamoDB, SNS e SQS.
 - **Acesso à conta AWS:** o usuário entrega a conta e o papel para o GitHub (OIDC) quando for subir. Até lá, tudo é construído e validado sem credenciais (`terraform validate`, `helm lint`, build das imagens); nenhum `apply` sem a confirmação explícita do usuário.
 
@@ -35,7 +35,7 @@ Deixar o banco digital pronto para ser mostrado: os cinco serviços sobem na AWS
 - **Derrubada:** (escolhida) workflow agendado a cada 30 min que lê a etiqueta `created-at` do ambiente e roda `terraform destroy` passadas 8 h, mais `down` manual; Budgets como segunda rede. Descartadas: Lambda + EventBridge (duplica o Terraform e a lógica, e um `destroy` de dentro da AWS não tem o estado na mão); só o alarme de orçamento (avisa, não derruba).
 - **Estado do Terraform:** (escolhida, proposta da coordenadora) dois stacks. O `bootstrap`, permanente e quase sem custo: bucket S3 do estado (com lock nativo do S3), papel OIDC do GitHub, repositórios ECR e o Budget. O `env`, efêmero: rede, EKS, dados, mensageria, identidade e borda. Descartada: estado local (o workflow agendado não teria o estado para destruir).
 - **Imagens:** Dockerfile em camadas (escolhido pelo usuário, visível no portfólio). Descartados: Jib, `bootBuildImage`.
-- **Contratos:** Spring Cloud Contract (escolhido pelo usuário). Descartado: Pact (pede broker ou arranjo próprio no monorepo).
+- **Contratos:** Stubborn Contract (ADR 0022; sucessor do Spring Cloud Contract, que foi descontinuado). Descartado: Pact (pede broker ou arranjo próprio no monorepo).
 
 ## 1. Imagens
 - Um `Dockerfile` por serviço (`services/<serviço>/Dockerfile`), multi-stage: a primeira etapa extrai as camadas do jar (`java -Djarmode=tools -jar app.jar extract --layers --launcher`), a segunda copia camada por camada numa imagem `eclipse-temurin:21-jre` com usuário não root, `HEALTHCHECK` não (o Kubernetes usa as probes).
@@ -70,9 +70,9 @@ Deixar o banco digital pronto para ser mostrado: os cinco serviços sobem na AWS
 - Nenhum dos três roda sem as variáveis do repositório que só existem depois do `bootstrap` aplicado pelo usuário.
 
 ## 5. Testes de contrato
-- Spring Cloud Contract no lado de quem responde: contratos em `src/contractTest/resources/contracts` do `accounts` (consultas, débito, crédito, busca de lançamento) e do `customer` (`/internal/customers/{id}`), com token de serviço. O build gera os testes do produtor e o jar de stubs.
+- Stubborn Contract (ADR 0022) no lado de quem responde: contratos em `src/contractTest/resources/contracts` do `accounts` (consultas, débito, crédito, busca de lançamento) e do `customer` (`/internal/customers/{id}`), com token de serviço. O build gera os testes do produtor e o jar de stubs.
 - Quem chama (`transfers`, `accounts`) troca os stubs escritos à mão pelos stubs do contrato (Stub Runner, WireMock) nos testes de integração dos gateways HTTP.
-- Eventos *(escolha da coordenadora)*: contratos de mensagem do Spring Cloud Contract no nível do envelope do evento, sem SNS/SQS no teste. No produtor, um `MessageVerifier` próprio e pequeno publica pelo mapeador do outbox e lê o envelope gravado; no consumidor, a mensagem do contrato é entregue direto ao tratador do listener. Se o Spring Cloud Contract não tiver linha compatível com o Spring Boot 4.1.1, o construtor para e avisa antes de trocar de ferramenta.
+- Eventos *(escolha da coordenadora)*: contratos de mensagem do Stubborn Contract (ADR 0022) no nível do envelope do evento, sem SNS/SQS no teste. No produtor, um `MessageVerifier` próprio e pequeno publica pelo mapeador do outbox e lê o envelope gravado; no consumidor, a mensagem do contrato é entregue direto ao tratador do listener. A API do Stubborn Contract 0.2.2 para mensagens é conferida na implementação; se não cobrir o envelope, o construtor para e avisa.
 
 ## 6. README e diagrama
 - `README.md` na raiz: o que é, arquitetura com diagrama Mermaid (borda, serviços, bancos, mensageria), os pontos fortes (consistência, idempotência, outbox, saga, cache, limite diário), como rodar localmente, como subir na AWS e quanto custa por subida.

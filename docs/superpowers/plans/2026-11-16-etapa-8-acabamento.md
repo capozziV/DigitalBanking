@@ -4,9 +4,9 @@
 
 **Goal:** imagens por serviço, chart Helm, Terraform completo (bootstrap e ambiente efêmero em `sa-east-1`), workflows de subir, derrubar e derrubada automática, testes de contrato, README com diagrama e ADRs revistos; tudo validado sem credenciais da AWS.
 
-**Architecture:** dois stacks Terraform: `bootstrap` (permanente: estado, OIDC, ECR, Budget) e `envs/aws` (efêmero: rede, EKS, ALB, dados, mensageria, identidade, borda). Um chart Helm comum liga os pods ao ALB por `TargetGroupBinding`. Três workflows (`aws-up`, `aws-down`, `aws-reaper`) só da `main`. Contratos HTTP e de mensagem com Spring Cloud Contract.
+**Architecture:** dois stacks Terraform: `bootstrap` (permanente: estado, OIDC, ECR, Budget) e `envs/aws` (efêmero: rede, EKS, ALB, dados, mensageria, identidade, borda). Um chart Helm comum liga os pods ao ALB por `TargetGroupBinding`. Três workflows (`aws-up`, `aws-down`, `aws-reaper`) só da `main`. Contratos HTTP e de mensagem com Stubborn Contract (ADR 0022).
 
-**Tech Stack:** Docker (Dockerfile em camadas, `eclipse-temurin:21-jre`), Helm 3, kubeconform, Terraform (AWS provider `~> 6.70`), tflint, GitHub Actions, Spring Cloud Contract, Kotlin, Spring Boot 4.1.1.
+**Tech Stack:** Docker (Dockerfile em camadas, `eclipse-temurin:21-jre`), Helm 3, kubeconform, Terraform (AWS provider `~> 6.70`), tflint, GitHub Actions, Stubborn Contract (ADR 0022), Kotlin, Spring Boot 4.1.1.
 
 **Spec:** [`docs/superpowers/specs/2026-11-16-etapa-8-acabamento-design.md`](../specs/2026-11-16-etapa-8-acabamento-design.md)
 
@@ -73,7 +73,7 @@
 - [ ] Commit `ci: subir, derrubar e derrubada automática do ambiente na AWS`.
 
 ### Task 7: contratos HTTP
-**Files:** Spring Cloud Contract no `build-logic` (plugin no produtor, Stub Runner no consumidor; linha compatível com o Boot 4.1.1, senão parar e avisar); contratos em `services/accounts/bootstrap/src/contractTest/resources/contracts` (consulta da conta, débito, crédito, busca de lançamento) e `services/customer/...` (`/internal/customers/{id}`); `transfers` e `accounts` trocam os stubs escritos à mão dos testes dos gateways HTTP pelos do contrato.
+**Files:** Stubborn Contract 0.2.2 (ADR 0022) no `build-logic` (configuração no produtor e nos stubs do consumidor, conforme a documentação da ferramenta); contratos em `services/accounts/bootstrap/src/contractTest/resources/contracts` (consulta da conta, débito, crédito, busca de lançamento) e `services/customer/...` (`/internal/customers/{id}`); `transfers` e `accounts` trocam os stubs escritos à mão dos testes dos gateways HTTP pelos do contrato.
 - [ ] **Testes:** produtor gera e passa os testes do contrato; consumidor passa com os stubs; mutante: campo renomeado no `AccountDTO` → build do `accounts` vermelho (Review Focus 5).
 - [ ] Commit `test(contract): contratos HTTP entre transfers, accounts e customer`.
 

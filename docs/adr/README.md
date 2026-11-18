@@ -24,3 +24,4 @@ Registros de decisões arquiteturais. Formato: `NNNN-titulo-em-kebab-case.md`.
 | 0018 | Extrato ordenado pela sequência do ledger | aceito | [0018](0018-chave-do-extrato-pela-sequencia.md) |
 | 0019 | Runtime na AWS com EKS (substitui parcialmente o 0001 e o 0004) | aceito | [0019](0019-runtime-na-aws-com-eks.md) |
 | 0020 | Identidade e autorização | aceito | [0020](0020-identidade-e-autorizacao.md) |
+| 0022 | Testes de contrato com Stubborn Contract | aceito | [0022](0022-testes-de-contrato.md) |
