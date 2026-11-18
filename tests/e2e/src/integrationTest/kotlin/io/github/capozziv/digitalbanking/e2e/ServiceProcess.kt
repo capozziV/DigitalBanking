@@ -24,8 +24,8 @@ class ServiceProcess(
     private val arguments: List<String>,
     private val logDir: Path,
     private val healthTimeout: Duration = Duration.ofSeconds(90),
+    val port: Int = freePort(),
 ) : AutoCloseable {
-    val port: Int = freePort()
     val baseUrl: String = "http://127.0.0.1:$port"
     private val logFile: Path = logDir.resolve("$name.log")
     private var process: Process? = null
