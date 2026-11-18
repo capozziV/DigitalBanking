@@ -1,5 +1,6 @@
 package io.github.capozziv.digitalbanking.statement.bootstrap.web
 
+import io.github.capozziv.digitalbanking.testing.security.ApiDocsAssertions
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.web.server.LocalServerPort
@@ -17,6 +18,16 @@ class OpenApiIntegrationTest : StatementWebIntegrationTest() {
     }
 
     private val statement: JsonNode by lazy { docs.get("paths").get("/accounts/{accountId}/statement").get("get") }
+
+    @Test
+    fun `the contract in JSON and YAML and the Swagger UI are open without a token`() {
+        ApiDocsAssertions.assertOpenWithoutToken(port)
+    }
+
+    @Test
+    fun `every operation documents X-Correlation-Id and the common errors as Problem Details`() {
+        ApiDocsAssertions.assertCommonContract(ApiDocsAssertions.fetchContract(port))
+    }
 
     @Test
     fun `the contract has exactly the statement operation`() {

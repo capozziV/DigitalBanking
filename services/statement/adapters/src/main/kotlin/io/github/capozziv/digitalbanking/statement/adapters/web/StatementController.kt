@@ -9,7 +9,6 @@ import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
-import org.springframework.http.ProblemDetail
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
@@ -37,19 +36,12 @@ class StatementController(
             description =
                 "/problems/validation-error: accountId not a UUID, limit not a number or outside 1..100, " +
                     "or a cursor that was not issued by this API",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
-        ),
-        ApiResponse(
-            responseCode = "401",
-            description = "/problems/unauthorized: no token, or an invalid or expired one",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "404",
             description =
                 "/problems/account-not-found: the statement knows no account with this id, or the account belongs " +
                     "to another customer (same answer, so it does not reveal that the account exists)",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
     )
     @GetMapping

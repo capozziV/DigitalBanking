@@ -24,7 +24,5 @@ class TransfersSecurityConfiguration {
             authorize(HttpMethod.GET, "/admin/transfers/stuck", hasRole(ADMIN))
             authorize(HttpMethod.POST, "/admin/transfers/{id}/retry", hasRole(ADMIN))
             authorize(HttpMethod.POST, "/admin/transfers/{id}/manual-compensation", hasRole(ADMIN))
-            // The YAML form of the OpenAPI contract: the library opens only /v3/api-docs/**, which does not match it.
-            authorize(HttpMethod.GET, "/v3/api-docs.yaml", permitAll)
         }
 }

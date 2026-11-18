@@ -20,7 +20,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import jakarta.validation.Valid
-import org.springframework.http.ProblemDetail
 import org.springframework.security.access.AccessDeniedException
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -54,11 +53,6 @@ class TransferAdminController(
                 Content(mediaType = "application/json", array = ArraySchema(schema = Schema(implementation = StuckTransferDTO::class))),
             ],
         ),
-        ApiResponse(
-            responseCode = "403",
-            description = "/problems/forbidden: the caller is not an admin",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
-        ),
     )
     @GetMapping("/stuck")
     fun stuck(): List<StuckTransferDTO> {
@@ -82,24 +76,16 @@ class TransferAdminController(
         ApiResponse(
             responseCode = "400",
             description = "/problems/validation-error: the id is not a UUID",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
-        ),
-        ApiResponse(
-            responseCode = "403",
-            description = "/problems/forbidden: the caller is not an admin",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "404",
             description = "/problems/transfer-not-found: no such transfer",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "409",
             description =
                 "/problems/transfer-not-pending: the transfer already ended (`status`). " +
                     "/problems/transfer-busy: a saga run holds the transfer now; retry in a few seconds.",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
     )
     @PostMapping("/{id}/retry")
@@ -137,17 +123,10 @@ class TransferAdminController(
             description =
                 "/problems/validation-error: `reason` missing, blank or over 500 characters, `creditIdempotencyKey` " +
                     "missing, blank or over 255 characters, or the id is not a UUID",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
-        ),
-        ApiResponse(
-            responseCode = "403",
-            description = "/problems/forbidden: the caller is not an admin",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "404",
             description = "/problems/transfer-not-found: no such transfer",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "409",
@@ -155,7 +134,6 @@ class TransferAdminController(
                 "/problems/transfer-not-compensating: the transfer is not in COMPENSATE (`step`). " +
                     "/problems/transfer-busy: a saga run holds the transfer now; retry in a few seconds. " +
                     "/problems/compensation-credit-already-used: the credit already compensated another transfer.",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "422",
@@ -163,7 +141,6 @@ class TransferAdminController(
                 "/problems/compensation-credit-not-found: accounts has no entry under `creditIdempotencyKey` on the " +
                     "source account. /problems/compensation-credit-mismatch: the entry is not a CREDIT of the " +
                     "transfer's amount on the source account (`detail` says why). The transfer stays stuck.",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "503",
@@ -171,7 +148,6 @@ class TransferAdminController(
                 "/problems/accounts-unavailable: accounts did not answer, so the credit could not be checked; retry " +
                     "after `Retry-After` seconds",
             headers = [Header(name = "Retry-After", description = "Seconds to wait before retrying (1)")],
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
     )
     @PostMapping("/{id}/manual-compensation")

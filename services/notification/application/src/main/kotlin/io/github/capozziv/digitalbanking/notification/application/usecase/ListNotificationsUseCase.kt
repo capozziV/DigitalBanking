@@ -1,7 +1,6 @@
 package io.github.capozziv.digitalbanking.notification.application.usecase
 
 import io.github.capozziv.digitalbanking.notification.application.ForeignCustomerException
-import io.github.capozziv.digitalbanking.notification.application.ownCustomerId
 import io.github.capozziv.digitalbanking.notification.application.port.NotificationCursor
 import io.github.capozziv.digitalbanking.notification.application.port.NotificationRepository
 import io.github.capozziv.digitalbanking.notification.domain.Notification
@@ -40,7 +39,7 @@ class ListNotificationsUseCase(
         caller: Caller,
         requestedCustomerId: UUID?,
     ): UUID {
-        val own = caller.ownCustomerId()
+        val own = caller.ownCustomerId() ?: throw ForeignCustomerException()
         return when {
             requestedCustomerId == null || requestedCustomerId == own -> own
             caller is Caller.Admin -> requestedCustomerId

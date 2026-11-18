@@ -13,7 +13,6 @@ import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import jakarta.validation.Valid
-import org.springframework.http.ProblemDetail
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
@@ -45,7 +44,6 @@ class CustomerController(
         ApiResponse(
             responseCode = "400",
             description = ApiDocs.VALIDATION_ERROR,
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
     )
     @PostMapping
@@ -75,7 +73,6 @@ class CustomerController(
         ApiResponse(
             responseCode = "404",
             description = ApiDocs.NOT_FOUND + ": the user has not registered yet",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
     )
     @GetMapping("/me")

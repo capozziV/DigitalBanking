@@ -21,7 +21,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import jakarta.validation.Valid
 import org.slf4j.MDC
-import org.springframework.http.ProblemDetail
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -71,7 +70,6 @@ class TransferController(
             description =
                 "/problems/missing-idempotency-key: no Idempotency-Key header. " +
                     "/problems/validation-error: invalid header or body fields, listed in `errors`.",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "422",
@@ -86,14 +84,12 @@ class TransferController(
                     "/problems/customer-not-found: the customer that owns the source account is not registered; " +
                     "nothing is stored. " +
                     "/problems/customer-blocked: the customer that owns the source account is blocked; nothing is stored.",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "404",
             description =
                 "/problems/account-not-found: the source account does not exist or is not the caller's (`accountId`); " +
                     "the same answer in both cases. An admin may transfer from any account. Nothing is stored.",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "503",
@@ -102,7 +98,6 @@ class TransferController(
                     "/problems/customers-unavailable: customer did not answer the status check in time. " +
                     "Nothing is stored; retry after `Retry-After` seconds",
             headers = [Header(name = "Retry-After", description = "Seconds to wait before retrying (1)")],
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
     )
     @PostMapping
@@ -144,14 +139,12 @@ class TransferController(
         ApiResponse(
             responseCode = "400",
             description = "/problems/validation-error: the id is not a UUID",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "404",
             description =
                 "/problems/transfer-not-found: no such transfer, or the source account is not the caller's " +
                     "(an admin sees every transfer)",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
     )
     @GetMapping("/{id}")

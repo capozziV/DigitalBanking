@@ -1,2 +1,3 @@
 io.github.capozziv.digitalbanking.security.DigitalBankingSecurityAutoConfiguration
 io.github.capozziv.digitalbanking.security.ServiceTokenAutoConfiguration
+io.github.capozziv.digitalbanking.security.ApiDocsAutoConfiguration

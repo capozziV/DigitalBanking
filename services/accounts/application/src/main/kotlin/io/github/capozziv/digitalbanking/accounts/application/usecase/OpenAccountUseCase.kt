@@ -1,5 +1,6 @@
 package io.github.capozziv.digitalbanking.accounts.application.usecase
 
+import io.github.capozziv.digitalbanking.accounts.application.CallerNotCustomerException
 import io.github.capozziv.digitalbanking.accounts.application.CustomerAlreadyHasAccountException
 import io.github.capozziv.digitalbanking.accounts.application.CustomerBlockedException
 import io.github.capozziv.digitalbanking.accounts.application.CustomerNotFoundException
@@ -48,7 +49,7 @@ class OpenAccountUseCase(
     private val customers: CustomerGateway,
 ) {
     fun execute(command: OpenAccountCommand): OpenAccountResult {
-        val customerId = command.caller.ownCustomerId()
+        val customerId = command.caller.ownCustomerId() ?: throw CallerNotCustomerException()
         when (customers.findStatus(customerId)) {
             null -> throw CustomerNotFoundException(customerId)
             CustomerStatus.BLOCKED -> throw CustomerBlockedException(customerId)
