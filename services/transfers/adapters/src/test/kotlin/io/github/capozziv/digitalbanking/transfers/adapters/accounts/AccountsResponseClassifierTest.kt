@@ -62,6 +62,12 @@ class AccountsResponseClassifierTest {
     }
 
     @Test
+    fun `422 account-blocked and account-closed are definitive refusals carrying the problem type`() {
+        assertThat(classifier.classify(422, "account-blocked")).isEqualTo(StepOutcome.Refused("account-blocked"))
+        assertThat(classifier.classify(422, "account-closed")).isEqualTo(StepOutcome.Refused("account-closed"))
+    }
+
+    @Test
     fun `400 validation-error is a definitive refusal carrying the problem type`() {
         assertThat(classifier.classify(400, "validation-error")).isEqualTo(StepOutcome.Refused("validation-error"))
     }
