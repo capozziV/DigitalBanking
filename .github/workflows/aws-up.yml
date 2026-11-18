@@ -90,7 +90,9 @@ jobs:
       # etiqueta original: rodar o aws-up outra vez nao estende o prazo de 8 h.
       - name: Etiqueta created-at
         run: |
+          ambiente_existe=0
           if [ -n "$(terraform -chdir="$TF_DIR" state list)" ]; then
+            ambiente_existe=1
             created_at=$(terraform -chdir="$TF_DIR" output -raw created_at)
             echo "ambiente ja existe: mantem created-at $created_at"
           else
@@ -98,6 +100,12 @@ jobs:
             echo "ambiente novo: created-at $created_at"
           fi
           echo "TF_VAR_created_at=$created_at" >> "$GITHUB_ENV"
+          # Ambiente vencido: o aws-down do reaper pode ter sido cancelado na fila por este aws-up (so cabe um
+          # pendente por grupo). Recusa subir; rode o aws-down.
+          if [ "$ambiente_existe" = 1 ] && [ "$(infra/aws/reaper-decision.sh "$created_at")" = destroy ]; then
+            echo "ambiente com created-at $created_at passou do prazo (ou etiqueta invalida): rode o aws-down antes" >&2
+            exit 1
+          fi
 
       - name: Terraform apply
         env:

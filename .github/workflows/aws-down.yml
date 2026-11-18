@@ -57,6 +57,7 @@ jobs:
           role-session-name: aws-down-${{ github.run_id }}
 
       - name: Terraform init
+        id: init
         env:
           TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
         run: |
@@ -79,37 +80,17 @@ jobs:
           fi
           echo "TF_VAR_created_at=$created_at" >> "$GITHUB_ENV"
 
-      # Servicos primeiro (os TargetGroupBinding saem com o controller ainda de pe), depois o db-init. O Job do
-      # db-init e hook do Helm e continua no cluster depois do uninstall: sai aqui, explicitamente.
+      # Servicos primeiro (os TargetGroupBinding saem com o controller ainda de pe), depois o db-init. Falha aqui nao
+      # pode impedir o destroy: continue-on-error, e o passo "Falhar se o Helm falhou" marca o job no fim.
       - name: helm uninstall dos servicos e do db-init
+        id: uninstall
         if: ${{ env.CLUSTER_NAME != '' }}
-        run: |
-          if ! aws eks describe-cluster --region "$AWS_REGION" --name "$CLUSTER_NAME" > /dev/null 2>&1; then
-            echo "cluster $CLUSTER_NAME nao existe: nada a desinstalar"
-            exit 0
-          fi
-          aws eks update-kubeconfig --region "$AWS_REGION" --name "$CLUSTER_NAME"
-          for release in statement notification transfers accounts customer db-init; do
-            if helm status "$release" -n "$NAMESPACE" > /dev/null 2>&1; then
-              helm uninstall "$release" -n "$NAMESPACE" --wait --timeout 10m
-            else
-              echo "release $release nao instalado"
-            fi
-          done
-          kubectl -n "$NAMESPACE" delete job db-init --ignore-not-found --wait=true
-          # Sem TargetGroupBinding restante: o controller ja tirou os alvos e o destroy leva os target groups.
-          for _ in $(seq 1 30); do
-            left=$(kubectl get targetgroupbindings.elbv2.k8s.aws -A --no-headers 2> /dev/null || true)
-            [ -n "$left" ] || break
-            echo "aguardando TargetGroupBinding sair: $left"
-            sleep 10
-          done
-          if [ -n "$left" ]; then
-            echo "TargetGroupBinding ainda presentes: $left" >&2
-            exit 1
-          fi
+        continue-on-error: true
+        run: infra/aws/helm-teardown.sh
 
       - name: Credenciais da AWS (OIDC) para o destroy
+        id: destroy-credentials
+        if: ${{ always() && steps.init.outcome == 'success' }}
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
@@ -117,11 +98,14 @@ jobs:
           role-session-name: aws-down-destroy-${{ github.run_id }}
 
       - name: Terraform destroy
+        if: ${{ always() && steps.destroy-credentials.outcome == 'success' }}
         env:
           TF_VAR_cognito_domain_prefix: ${{ vars.COGNITO_DOMAIN_PREFIX }}
         run: terraform -chdir="$TF_DIR" destroy -auto-approve
 
       - name: Credenciais da AWS (OIDC) para a conferencia
+        id: leftovers-credentials
+        if: ${{ always() && steps.init.outcome == 'success' }}
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
@@ -130,7 +114,15 @@ jobs:
 
       # So lista (Tagging API e ENIs da VPC); sobrou algo -> o job falha com a lista.
       - name: Conferir o que sobrou
+        if: ${{ always() && steps.leftovers-credentials.outcome == 'success' }}
         run: infra/aws/leftovers.sh "${VPC_ID:-}"
+
+      # O passo do Helm tem continue-on-error (o destroy tem de rodar); aqui a falha dele marca o job.
+      - name: Falhar se o Helm falhou
+        if: ${{ always() && steps.uninstall.outcome == 'failure' }}
+        run: |
+          echo "helm uninstall falhou (o destroy e a conferencia rodaram mesmo assim)" >&2
+          exit 1
 
       - name: Resumo
         if: ${{ always() }}

@@ -45,16 +45,16 @@ case "$command" in
         *) echo "$error" >&2; exit 1 ;;
       esac
     fi
-    jq -n --arg pool "$pool" --arg user "$email" --arg password "$password" \
-      '{UserPoolId: $pool, Username: $user, Password: $password, Permanent: true}' |
+    PASSWORD="$password" jq -n --arg pool "$pool" --arg user "$email" \
+      '{UserPoolId: $pool, Username: $user, Password: env.PASSWORD, Permanent: true}' |
       idp admin-set-user-password --cli-input-json file:///dev/stdin
     if [ "$group" = admin ]; then
       idp admin-add-user-to-group --user-pool-id "$pool" --username "$email" --group-name admin
     fi
 
-    token=$(jq -n --arg pool "$pool" --arg client "$COGNITO_CLIENT_ID" --arg user "$email" --arg password "$password" \
+    token=$(PASSWORD="$password" jq -n --arg pool "$pool" --arg client "$COGNITO_CLIENT_ID" --arg user "$email" \
       '{UserPoolId: $pool, ClientId: $client, AuthFlow: "ADMIN_USER_PASSWORD_AUTH",
-        AuthParameters: {USERNAME: $user, PASSWORD: $password}}' |
+        AuthParameters: {USERNAME: $user, PASSWORD: env.PASSWORD}}' |
       idp admin-initiate-auth --cli-input-json file:///dev/stdin --query AuthenticationResult.AccessToken --output text)
     if [ -z "$token" ] || [ "$token" = None ]; then
       echo "AdminInitiateAuth sem AccessToken para $email (desafio pendente?)" >&2

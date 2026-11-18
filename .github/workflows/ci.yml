@@ -607,6 +607,8 @@ jobs:
         run: infra/aws/reaper-check.test.sh
       - name: leftovers.sh
         run: infra/aws/leftovers.test.sh
+      - name: helm-teardown.sh
+        run: infra/aws/helm-teardown.test.sh
 
   # Check unico exigido pela protecao da main: falha se algum job falhou ou foi cancelado;
   # job pulado pelo filtro de caminhos conta como sucesso.

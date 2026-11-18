@@ -47,6 +47,12 @@ jobs:
           echo "decisao: $decision"
           echo "decision=$decision" >> "$GITHUB_OUTPUT"
           echo "aws-reaper: $decision" >> "$GITHUB_STEP_SUMMARY"
+      # Erro da AWS (throttling, AccessDenied): nao decide as cegas, mas o job vermelho avisa pelo GitHub que o
+      # ambiente pode estar ligado.
+      - name: Aviso de reaper sem decisao
+        if: ${{ failure() }}
+        run: |
+          echo "aws-reaper sem decisao (erro ao ler o ambiente). O ambiente pode estar ligado: confira e rode o aws-down." >> "$GITHUB_STEP_SUMMARY"
 
   down:
     needs: check

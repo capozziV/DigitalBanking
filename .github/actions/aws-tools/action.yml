@@ -23,7 +23,7 @@ runs:
           sudo "$RUNNER_TEMP/aws/install"
         fi
         aws --version
-    - name: kubectl (instala na versao do EKS se a imagem nao tiver)
+    - name: kubectl (instala na versao do EKS se a imagem nao tiver; o da imagem pode divergir, ver o README do Terraform)
       shell: bash
       run: |
         if ! command -v kubectl > /dev/null; then
