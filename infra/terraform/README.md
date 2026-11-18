@@ -2,11 +2,11 @@
 
 Infraestrutura na AWS do banco digital, em `sa-east-1` ([ADR 0019](../../docs/adr/0019-runtime-na-aws-com-eks.md)). O stack `envs/aws` é o ambiente efêmero: rede, EKS, ALB interno, identidade, borda, dados, mensageria e acessos por serviço.
 
-**Nada foi aplicado.** O código só é validado (`fmt`, `init -backend=false`, `validate`), sem credenciais da AWS. Nenhum `apply` antes da derrubada automática e do alarme de orçamento (#146), e sempre com confirmação explícita do usuário.
+**Nada foi aplicado.** O código só é validado (`fmt`, `init -backend=false`, `validate`, `tflint`), sem credenciais da AWS. Os dois stacks rodam no job `terraform` do CI pelos próprios `validate.sh`. Nenhum `apply` antes da derrubada automática e do alarme de orçamento (#146), e sempre com confirmação explícita do usuário.
 
 ## Estrutura
-- `modules/identity`: User Pool do Cognito (login por e-mail), grupo `admin`, resource server `digitalbanking` com o escopo `internal`, app client web (authorization code + PKCE, sem segredo) e app client de máquina (client credentials, escopo `digitalbanking/internal`).
-- `modules/edge`: API Gateway HTTP API, autorizador JWT do Cognito, VPC Link e uma integração `HTTP_PROXY` para o listener do ALB interno. Rotas `ANY /prefixo` e `ANY /prefixo/{proxy+}` para `/accounts`, `/transfers`, `/notifications`, `/customers` e `/admin`; extrato e limite diário ficam sob `/accounts` e `/transfers`. Todas exigem JWT.
+- `modules/identity`: User Pool do Cognito (login por e-mail), grupo `admin`, resource server `digitalbanking` com o escopo `internal`, app client web (authorization code + PKCE, sem segredo), app client de máquina (client credentials, escopo `digitalbanking/internal`) e app client de operação `ops` (só `ADMIN_USER_PASSWORD_AUTH`, sem segredo, token de 1 h), que o seed e o smoke do `aws-up` usam por `AdminInitiateAuth`. Esse fluxo exige credenciais IAM; o app client web continua sem ele.
+- `modules/edge`: API Gateway HTTP API, autorizador JWT do Cognito (audiências: os app clients web, de máquina e `ops`), VPC Link e uma integração `HTTP_PROXY` para o listener do ALB interno. Rotas `ANY /prefixo` e `ANY /prefixo/{proxy+}` para `/accounts`, `/transfers`, `/notifications`, `/customers` e `/admin`; extrato e limite diário ficam sob `/accounts` e `/transfers`. Todas exigem JWT.
 - `modules/network`: VPC `10.20.0.0/16` em duas zonas, sub-redes públicas (só o NAT) e privadas, um NAT Gateway com EIP.
 - `modules/eks`: cluster (suporte padrão, sem o estendido, que cobra a mais), node group gerenciado 2× `t3.medium` (AL2023) nas sub-redes privadas, add-ons gerenciados (VPC CNI, kube-proxy, CoreDNS, Pod Identity Agent) e o AWS Load Balancer Controller (chart `3.6.2`) por `helm_release`, com papel por Pod Identity.
 - `modules/edge-alb`: ALB interno, listener HTTP 80 (404 no que não casa), um target group por serviço (alvo por IP, health check em `/actuator/health/readiness`) e as regras por caminho de `routes.json`, espelho das `location` do nginx local.
@@ -53,7 +53,7 @@ As associações do Pod Identity valem só no namespace `kubernetes_namespace` (
 - O log de acesso vai para um Log Group do CloudWatch (`/aws/apigateway/<nome>-http/access`) com retenção de 7 dias (`access_log_retention_days`).
 
 ## Saídas para as outras tasks
-`cluster_name`, `target_group_arns` (serviço → ARN), `edge_url`, `private_subnet_ids`, `vpc_id`, `cluster_security_group_id`, `service_role_arns`, `db_init_role_arn`, `secret_names`, `queue_urls`, `topic_arns`, `db_endpoint`, `db_address`, `db_master_secret_arn` e `redis_endpoint`, além das da identidade. Os papéis chegam aos pods pelo Pod Identity: os charts não recebem ARN de papel (sem anotação IRSA).
+`cluster_name`, `user_pool_id`, `ops_client_id`, `target_group_arns` (serviço → ARN), `edge_url`, `private_subnet_ids`, `vpc_id`, `cluster_security_group_id`, `service_role_arns`, `db_init_role_arn`, `secret_names`, `queue_urls`, `topic_arns`, `db_endpoint`, `db_address`, `db_master_secret_arn` e `redis_endpoint`, além das da identidade. Os papéis chegam aos pods pelo Pod Identity: os charts não recebem ARN de papel (sem anotação IRSA).
 
 ## Observações
 - O autorizador da borda só valida emissor e audiência (os dois app clients). A checagem do grupo `admin` (claim `cognito:groups`) e do escopo `internal` é dos serviços, que também validam o JWT (ADR 0004).
@@ -62,8 +62,16 @@ As associações do Pod Identity valem só no namespace `kubernetes_namespace` (
 - O `.terraform.lock.hcl` fixa os providers `hashicorp/aws` (`~> 6.70`) e `hashicorp/helm` (`~> 3.1`) para linux e macOS.
 - O provider `helm` pega o token do cluster pelo `aws eks get-token`: quem aplica precisa do aws CLI e é o administrador do cluster (`bootstrap_cluster_creator_admin_permissions`).
 
+## Workflows na AWS
+`aws-up`, `aws-down` e `aws-reaper` (`.github/workflows/`), só da `main` (a trust do papel aceita só `repo:capozziV/DigitalBanking:ref:refs/heads/main`), no grupo de concorrência `aws-environment`. Configuração do repositório, nunca versionada: `vars.AWS_ROLE_ARN` (`github_role_arn`), `vars.TF_STATE_BUCKET` (`state_bucket`), `vars.COGNITO_DOMAIN_PREFIX`, `vars.OWNER_EMAIL` (opcional) e `secrets.OWNER_PASSWORD`. Estado em `envs/aws/terraform.tfstate` no bucket do `bootstrap`.
+- **`aws-up`** (manual): constrói as imagens, `apply` com `created_at` em RFC 3339 UTC (num ambiente que já existe, mantém a etiqueta original: subir de novo não estende o prazo), publica no ECR (pula a tag que já existe, os repositórios são imutáveis), roda `infra/aws/deploy-services.sh` (db-init, Secrets e serviços), o seed (`seed-check.sh --remote`) e o smoke (`smoke.sh --remote`) pela borda, com tokens do Cognito por `infra/aws/cognito-user.sh`. O resumo do job traz a URL da borda e o horário a partir do qual o `aws-reaper` derruba. A sessão do papel dura 1 h: o job pede credenciais de novo antes de cada fase longa.
+- **`aws-down`** (manual ou chamado pelo `aws-reaper`): `helm uninstall` dos serviços e do db-init (e `kubectl delete job db-init`), espera os `TargetGroupBinding` saírem, `terraform destroy` e `infra/aws/leftovers.sh`, que lista pela Tagging API o que tem `project=digitalbanking` fora de `stack=bootstrap` e as ENIs da VPC antiga; sobrou algo, o job falha com a lista (não apaga nada fora do Terraform).
+- **`aws-reaper`** (a cada 30 min): `infra/aws/reaper-check.sh` lê o `created-at` de cada recurso do env e passa cada valor por `infra/aws/reaper-decision.sh`; 8 h ou mais, etiqueta ausente, malformada ou mais de 10 min no futuro → chama o `aws-down`. Sem `vars.AWS_ROLE_ARN` não faz nada. O GitHub suspende agendamentos de repositório sem atividade por 60 dias; o Budget é a segunda rede.
+- Testes sem AWS, no job `aws-scripts` do CI: `infra/aws/reaper-decision.test.sh`, `reaper-check.test.sh` e `leftovers.test.sh` (aws falso no `PATH`).
+
 ## Validar
 ```bash
+infra/terraform/bootstrap/validate.sh
 infra/terraform/envs/aws/validate.sh
 ```
 O script roda `terraform fmt -check` em toda a árvore, `init -backend=false -lockfile=readonly`, `validate`, o tflint na raiz e em cada módulo (`network`, `eks`, `edge-alb`, `edge`, `identity`, `messaging`, `data`, `access`), o `check-messaging.py`, o `check-service-names.py` e o `check-alb-routes.py`, que compara as regras do ALB com as `location` do nginx local (recusa `^~` e `~*`, e prefixo de um serviço sombreado por outro). Não precisa de credenciais.

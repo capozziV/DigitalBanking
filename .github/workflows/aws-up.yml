@@ -1,0 +1,187 @@
+name: aws-up
+
+# Sobe o ambiente efemero na AWS (ADR 0019): terraform apply do envs/aws, imagens no ECR, db-init e os cinco
+# servicos no EKS, dono no Cognito, seed e smoke contra a borda. Manual e so da main (a trust do papel aceita so
+# repo:capozziV/DigitalBanking:ref:refs/heads/main). O aws-reaper derruba 8 h depois da etiqueta created-at.
+# Configuracao do repositorio (Settings > Secrets and variables > Actions), nunca versionada:
+#   vars.AWS_ROLE_ARN            papel do GitHub (saida github_role_arn do bootstrap)
+#   vars.TF_STATE_BUCKET         bucket do estado (saida state_bucket do bootstrap)
+#   vars.COGNITO_DOMAIN_PREFIX   prefixo do dominio do Cognito, unico na regiao
+#   vars.OWNER_EMAIL             e-mail do usuario do dono no Cognito (opcional; padrao owner@example.test)
+#   secrets.OWNER_PASSWORD       senha do dono no Cognito (12+ caracteres, maiuscula, minuscula, numero e simbolo)
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: sa-east-1
+  TF_DIR: infra/terraform/envs/aws
+  TF_IN_AUTOMATION: 'true'
+  TF_INPUT: 'false'
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  up:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    # Uma operacao por vez no ambiente: aws-up, aws-down e o aws-down chamado pelo aws-reaper esperam um ao outro.
+    concurrency:
+      group: aws-environment
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Conferir a configuracao do repositorio
+        env:
+          AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+          TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+          COGNITO_DOMAIN_PREFIX: ${{ vars.COGNITO_DOMAIN_PREFIX }}
+          OWNER_PASSWORD: ${{ secrets.OWNER_PASSWORD }}
+        run: |
+          missing=()
+          for name in AWS_ROLE_ARN TF_STATE_BUCKET COGNITO_DOMAIN_PREFIX OWNER_PASSWORD; do
+            [ -n "${!name}" ] || missing+=("$name")
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "configuracao ausente no repositorio: ${missing[*]}" >&2
+            exit 1
+          fi
+
+      # As imagens sao construidas antes de pedir credenciais: a sessao do papel dura 1 h.
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: Construir os jars e as cinco imagens
+        run: |
+          tasks=()
+          for service in customer accounts transfers notification statement; do
+            tasks+=(":services:$service:bootstrap:bootJar")
+          done
+          ./gradlew "${tasks[@]}"
+          for service in customer accounts transfers notification statement; do
+            docker build -t "digitalbanking/$service:$IMAGE_TAG" "services/$service"
+          done
+
+      - uses: ./.github/actions/aws-tools
+
+      - name: Credenciais da AWS (OIDC) para o Terraform
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: aws-up-${{ github.run_id }}
+
+      - name: Terraform init
+        env:
+          TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+        run: |
+          terraform -chdir="$TF_DIR" init -lockfile=readonly \
+            -backend-config="bucket=$TF_STATE_BUCKET" \
+            -backend-config="key=envs/aws/terraform.tfstate" \
+            -backend-config="region=$AWS_REGION"
+
+      # created-at (RFC 3339, UTC) e o relogio do aws-reaper. Num ambiente que ja existe, a subida de novo mantem a
+      # etiqueta original: rodar o aws-up outra vez nao estende o prazo de 8 h.
+      - name: Etiqueta created-at
+        run: |
+          if [ -n "$(terraform -chdir="$TF_DIR" state list)" ]; then
+            created_at=$(terraform -chdir="$TF_DIR" output -raw created_at)
+            echo "ambiente ja existe: mantem created-at $created_at"
+          else
+            created_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            echo "ambiente novo: created-at $created_at"
+          fi
+          echo "TF_VAR_created_at=$created_at" >> "$GITHUB_ENV"
+
+      - name: Terraform apply
+        env:
+          TF_VAR_cognito_domain_prefix: ${{ vars.COGNITO_DOMAIN_PREFIX }}
+        run: terraform -chdir="$TF_DIR" apply -auto-approve
+
+      # As saidas incluem o segredo do app client de maquina: ficam so num arquivo do runner, nunca no log.
+      - name: Saidas do Terraform
+        run: |
+          outputs="$RUNNER_TEMP/terraform-outputs.json"
+          (umask 077 && terraform -chdir="$TF_DIR" output -json > "$outputs")
+          {
+            echo "TF_OUTPUTS=$outputs"
+            echo "EDGE_URL=$(jq -er .edge_url.value "$outputs")"
+            echo "CLUSTER_NAME=$(jq -er .cluster_name.value "$outputs")"
+            echo "COGNITO_USER_POOL_ID=$(jq -er .user_pool_id.value "$outputs")"
+            echo "COGNITO_CLIENT_ID=$(jq -er .ops_client_id.value "$outputs")"
+            echo "ECR_REGISTRY=$(aws sts get-caller-identity --query Account --output text).dkr.ecr.$AWS_REGION.amazonaws.com"
+          } >> "$GITHUB_ENV"
+
+      # Sessao nova do papel antes de cada fase longa (o apply do EKS e do RDS consome boa parte da hora).
+      - name: Credenciais da AWS (OIDC) para imagens e servicos
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: aws-up-deploy-${{ github.run_id }}
+
+      # Repositorios do bootstrap com etiqueta imutavel: a imagem do mesmo SHA ja publicada nao e enviada de novo.
+      - name: Publicar as imagens no ECR
+        run: |
+          aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+          for service in customer accounts transfers notification statement; do
+            if aws ecr describe-images --region "$AWS_REGION" --repository-name "digital-banking/$service" \
+              --image-ids "imageTag=$IMAGE_TAG" > /dev/null 2>&1; then
+              echo "$service:$IMAGE_TAG ja esta no ECR"
+              continue
+            fi
+            docker tag "digitalbanking/$service:$IMAGE_TAG" "$ECR_REGISTRY/digital-banking/$service:$IMAGE_TAG"
+            docker push "$ECR_REGISTRY/digital-banking/$service:$IMAGE_TAG"
+          done
+
+      - name: kubeconfig do EKS
+        run: aws eks update-kubeconfig --region "$AWS_REGION" --name "$CLUSTER_NAME"
+
+      # db-init antes dos servicos (o helm espera o Job e o script confere status.succeeded), Secrets a partir do
+      # Secrets Manager e os cinco servicos no namespace digitalbanking, sem ARN de papel (Pod Identity).
+      - name: Instalar o db-init e os cinco servicos
+        run: infra/aws/deploy-services.sh "$TF_OUTPUTS" "$ECR_REGISTRY" "$IMAGE_TAG"
+
+      - name: Credenciais da AWS (OIDC) para o seed e o smoke
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: aws-up-smoke-${{ github.run_id }}
+
+      # Dono no grupo admin do Cognito, token por AdminInitiateAuth; duas execucoes comparadas (idempotencia).
+      - name: Seed do dono pela borda
+        env:
+          OWNER_PASSWORD: ${{ secrets.OWNER_PASSWORD }}
+          OWNER_EMAIL: ${{ vars.OWNER_EMAIL }}
+        run: bash infra/local/seed-check.sh --remote "$EDGE_URL"
+
+      - name: Smoke pela borda
+        run: bash infra/local/smoke.sh --remote "$EDGE_URL"
+
+      # O smoke apaga os proprios usuarios na saida; isto cobre um smoke interrompido.
+      - name: Apagar usuarios de smoke que sobraram
+        if: ${{ always() && env.COGNITO_USER_POOL_ID != '' }}
+        run: infra/aws/cognito-user.sh purge smoke-
+
+      - name: Resumo
+        if: ${{ always() }}
+        run: |
+          {
+            echo "## Ambiente na AWS"
+            if [ -n "${TF_VAR_created_at:-}" ]; then
+              deadline=$(date -u -d "@$(( $(date -u -d "$TF_VAR_created_at" +%s) + 8 * 3600 ))" +%Y-%m-%dT%H:%M:%SZ)
+              echo "- created-at: \`$TF_VAR_created_at\`"
+              echo "- derrubada automatica (aws-reaper) a partir de: \`$deadline\` (UTC)"
+            fi
+            echo "- borda: ${EDGE_URL:-(nao criada)}"
+            echo "- imagens: \`$IMAGE_TAG\`"
+            echo
+            echo "Derrube antes com o workflow aws-down. Se esta execucao falhou no meio, o que subiu continua cobrando ate o aws-down ou o aws-reaper."
+          } >> "$GITHUB_STEP_SUMMARY"

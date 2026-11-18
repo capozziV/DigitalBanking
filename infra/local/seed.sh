@@ -8,12 +8,23 @@
 # Idempotente: as chaves de idempotencia sao fixas, entao rodar de novo devolve a mesma conta e nao credita
 # outra vez. Para comecar do zero, recrie o ambiente com `docker compose down -v`.
 # Saida: as duas ultimas linhas sao OWNER_ACCOUNT=<id> e OWNER_BALANCE=<centavos>.
-# Uso: infra/local/seed.sh [url-base]   (padrao http://127.0.0.1; exige o compose e os cinco servicos de pe)
+# Modo --remote (ambiente na AWS, workflow aws-up): o dono e um usuario do Cognito no grupo admin, criado ou
+# atualizado por infra/aws/cognito-user.sh (AdminInitiateAuth); o id do cliente e o sub que o Cognito der.
+# E-mail em OWNER_EMAIL (padrao owner@example.test) e senha em OWNER_PASSWORD (segredo do repositorio, obrigatoria).
+# Uso: infra/local/seed.sh [--remote] [url-base]   (padrao http://127.0.0.1; exige o compose e os cinco servicos de pe)
+#      no --remote: tambem COGNITO_USER_POOL_ID, COGNITO_CLIENT_ID, AWS_REGION e credenciais da AWS.
 set -euo pipefail
 
+here="$(cd "$(dirname "$0")" && pwd)"
+remote=false
+if [ "${1:-}" = "--remote" ]; then
+  remote=true
+  shift
+fi
 base="${1:-http://127.0.0.1}"
-token_sh="$(cd "$(dirname "$0")" && pwd)/auth/token.sh"
+token_sh="$here/auth/token.sh"
 owner=00000000-0000-7000-8000-000000000001
+owner_email=owner@example.test
 corr="seed-$(date +%s)"
 out=$(mktemp)
 trap 'rm -f "$out"' EXIT
@@ -42,9 +53,19 @@ call() {
 }
 
 # O dono e admin: o mesmo token opera as proprias contas como cliente e o resto como admin.
-token=$("$token_sh" user "$owner" admin)
+if [ "$remote" = true ]; then
+  if [ -z "${OWNER_PASSWORD:-}" ]; then
+    echo "FALHA: OWNER_PASSWORD ausente (senha do dono no Cognito, segredo do repositorio)" >&2
+    exit 1
+  fi
+  owner_email="${OWNER_EMAIL:-owner@example.test}"
+  pair=$(COGNITO_USER_PASSWORD="$OWNER_PASSWORD" "$here/../aws/cognito-user.sh" token "$owner_email" admin)
+  read -r owner token <<< "$pair"
+else
+  token=$("$token_sh" user "$owner" admin)
+fi
 
-call "201|200" POST /customers '{"name":"Owner Test","email":"owner@example.test"}' > /dev/null
+call "201|200" POST /customers "{\"name\":\"Owner Test\",\"email\":\"$owner_email\"}" > /dev/null
 call 200 PUT "/admin/customers/$owner/status" '{"status":"ACTIVE"}' > /dev/null
 echo "OK: cliente $owner (Owner Test) cadastrado e ACTIVE"
 

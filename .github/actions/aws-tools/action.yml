@@ -1,0 +1,35 @@
+name: Ferramentas do ambiente na AWS
+description: >-
+  Terraform, Helm, aws CLI e kubectl para os workflows aws-up e aws-down. O aws CLI e o kubectl ja vem na imagem
+  ubuntu-latest; se faltarem, sao instalados (kubectl na versao do EKS, lida de kubernetes-version.sh, com sha256).
+
+runs:
+  using: composite
+  steps:
+    - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+      with:
+        terraform_version: '1.17.2'
+        # Sem o wrapper, `terraform output -raw/-json` sai limpo para os scripts.
+        terraform_wrapper: false
+    - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+      with:
+        version: 'v3.22.1'
+    - name: aws CLI (instala se a imagem nao tiver)
+      shell: bash
+      run: |
+        if ! command -v aws > /dev/null; then
+          curl -fsSLo "$RUNNER_TEMP/awscliv2.zip" https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
+          unzip -q "$RUNNER_TEMP/awscliv2.zip" -d "$RUNNER_TEMP"
+          sudo "$RUNNER_TEMP/aws/install"
+        fi
+        aws --version
+    - name: kubectl (instala na versao do EKS se a imagem nao tiver)
+      shell: bash
+      run: |
+        if ! command -v kubectl > /dev/null; then
+          version="v$(infra/terraform/envs/aws/kubernetes-version.sh)"
+          curl -fsSLo "$RUNNER_TEMP/kubectl" "https://dl.k8s.io/release/$version/bin/linux/amd64/kubectl"
+          echo "$(curl -fsSL "https://dl.k8s.io/release/$version/bin/linux/amd64/kubectl.sha256")  $RUNNER_TEMP/kubectl" | sha256sum -c -
+          sudo install -m 0755 "$RUNNER_TEMP/kubectl" /usr/local/bin/kubectl
+        fi
+        kubectl version --client

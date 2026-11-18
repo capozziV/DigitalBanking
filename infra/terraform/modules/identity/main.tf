@@ -62,6 +62,22 @@ resource "aws_cognito_user_pool_client" "machine" {
   supported_identity_providers         = ["COGNITO"]
 }
 
+# App client de operacao: so o fluxo ADMIN_USER_PASSWORD_AUTH, que o seed e o smoke do aws-up usam
+# (AdminInitiateAuth exige credenciais IAM do papel do GitHub; o fluxo nao fica aberto ao publico).
+# Sem segredo e sem OAuth; o app client web continua sem esse fluxo.
+resource "aws_cognito_user_pool_client" "ops" {
+  name         = "${var.name}-ops"
+  user_pool_id = aws_cognito_user_pool.this.id
+
+  generate_secret               = false
+  explicit_auth_flows           = ["ALLOW_ADMIN_USER_PASSWORD_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"]
+  prevent_user_existence_errors = "ENABLED"
+  access_token_validity         = 1
+  token_validity_units {
+    access_token = "hours"
+  }
+}
+
 # Sem dominio nao existe /oauth2/token e o client_credentials nao funciona.
 # O prefixo precisa ser unico na regiao.
 resource "aws_cognito_user_pool_domain" "this" {

@@ -61,7 +61,7 @@ module "edge" {
 
   name                   = var.name
   issuer_url             = module.identity.issuer_url
-  audiences              = [module.identity.web_client_id, module.identity.machine_client_id]
+  audiences              = [module.identity.web_client_id, module.identity.machine_client_id, module.identity.ops_client_id]
   alb_listener_arn       = module.edge_alb.listener_arn
   subnet_ids             = module.network.private_subnet_ids
   security_group_ids     = [module.edge_alb.vpc_link_security_group_id]
