@@ -121,3 +121,4 @@ Fonte única das decisões pendentes; cada item tem um cartão `Decision` no [bo
 **Etapa 8**
 - EKS: nós EC2 ou Fargate ([ADR 0019](adr/0019-runtime-na-aws-com-eks.md)).
 - Tempo máximo ligado e mecanismo de derrubada automática do ambiente AWS; bloqueia o deploy (cartão [#146](https://github.com/capozziV/DigitalBanking/issues/146)).
+- Ferramenta de testes de contrato: o Spring Cloud Contract foi descontinuado (sucessor: Stubborn Contract 0.2.2, único declarado para o Boot 4.1); bloqueia as Tasks 7 e 8 (cartão [#195](https://github.com/capozziV/DigitalBanking/issues/195)).
