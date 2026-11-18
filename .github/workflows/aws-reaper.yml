@@ -1,0 +1,63 @@
+name: aws-reaper
+
+# Derrubada automatica do ambiente efemero (ADR 0019): a cada 30 min le a etiqueta created-at dos recursos do env
+# (infra/aws/reaper-check.sh, com a decisao em reaper-decision.sh) e, passadas 8 h, chama o aws-down.
+# Etiqueta ausente ou malformada tambem derruba. Sem vars.AWS_ROLE_ARN (bootstrap ainda nao aplicado), nao faz nada.
+# O GitHub so agenda workflows da branch padrao e suspende agendamentos de repositorio sem atividade por 60 dias;
+# o AWS Budgets do bootstrap e a segunda rede.
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: sa-east-1
+
+jobs:
+  check:
+    if: ${{ github.ref == 'refs/heads/main' && vars.AWS_ROLE_ARN != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      decision: ${{ steps.decide.outputs.decision }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: aws CLI (instala se a imagem nao tiver)
+        run: |
+          if ! command -v aws > /dev/null; then
+            curl -fsSLo "$RUNNER_TEMP/awscliv2.zip" https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
+            unzip -q "$RUNNER_TEMP/awscliv2.zip" -d "$RUNNER_TEMP"
+            sudo "$RUNNER_TEMP/aws/install"
+          fi
+          aws --version
+      - name: Credenciais da AWS (OIDC)
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: aws-reaper-${{ github.run_id }}
+      - name: Decidir (none, keep ou destroy)
+        id: decide
+        run: |
+          decision=$(infra/aws/reaper-check.sh)
+          echo "decisao: $decision"
+          echo "decision=$decision" >> "$GITHUB_OUTPUT"
+          echo "aws-reaper: $decision" >> "$GITHUB_STEP_SUMMARY"
+      # Erro da AWS (throttling, AccessDenied): nao decide as cegas, mas o job vermelho avisa pelo GitHub que o
+      # ambiente pode estar ligado.
+      - name: Aviso de reaper sem decisao
+        if: ${{ failure() }}
+        run: |
+          echo "aws-reaper sem decisao (erro ao ler o ambiente). O ambiente pode estar ligado: confira e rode o aws-down." >> "$GITHUB_STEP_SUMMARY"
+
+  down:
+    needs: check
+    if: ${{ needs.check.outputs.decision == 'destroy' }}
+    uses: ./.github/workflows/aws-down.yml
+    permissions:
+      contents: read
+      id-token: write

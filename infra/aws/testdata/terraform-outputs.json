@@ -1,0 +1,36 @@
+{
+  "db_address": { "sensitive": false, "type": "string", "value": "digitalbanking-db.abcdefghijkl.sa-east-1.rds.amazonaws.com" },
+  "db_master_secret_arn": { "sensitive": false, "type": "string", "value": "arn:aws:secretsmanager:sa-east-1:123456789012:secret:rds!db-0123-abcdef" },
+  "issuer_url": { "sensitive": false, "type": "string", "value": "https://cognito-idp.sa-east-1.amazonaws.com/sa-east-1_TESTPOOL" },
+  "token_endpoint_url": { "sensitive": false, "type": "string", "value": "https://digitalbanking-test.auth.sa-east-1.amazoncognito.com/oauth2/token" },
+  "machine_client_id": { "sensitive": false, "type": "string", "value": "machineclientid0123456789" },
+  "redis_endpoint": { "sensitive": false, "type": "string", "value": "digitalbanking-redis.abc123.0001.sae1.cache.amazonaws.com" },
+  "service_role_arns": { "sensitive": false, "type": ["map", "string"], "value": {
+    "accounts": "arn:aws:iam::123456789012:role/digitalbanking-accounts",
+    "transfers": "arn:aws:iam::123456789012:role/digitalbanking-transfers",
+    "notification": "arn:aws:iam::123456789012:role/digitalbanking-notification",
+    "statement": "arn:aws:iam::123456789012:role/digitalbanking-statement",
+    "customer": "arn:aws:iam::123456789012:role/digitalbanking-customer"
+  } },
+  "db_init_role_arn": { "sensitive": false, "type": "string", "value": "arn:aws:iam::123456789012:role/digitalbanking-db-init" },
+  "secret_names": { "sensitive": false, "type": ["map", "string"], "value": {
+    "accounts-db": "digitalbanking/accounts-db",
+    "transfers-db": "digitalbanking/transfers-db",
+    "notification-db": "digitalbanking/notification-db",
+    "customer-db": "digitalbanking/customer-db",
+    "accounts-oauth": "digitalbanking/accounts-oauth",
+    "transfers-oauth": "digitalbanking/transfers-oauth"
+  } },
+  "target_group_arns": { "sensitive": false, "type": ["map", "string"], "value": {
+    "accounts": "arn:aws:elasticloadbalancing:sa-east-1:123456789012:targetgroup/db-accounts/0000000000000001",
+    "transfers": "arn:aws:elasticloadbalancing:sa-east-1:123456789012:targetgroup/db-transfers/0000000000000002",
+    "notification": "arn:aws:elasticloadbalancing:sa-east-1:123456789012:targetgroup/db-notification/0000000000000003",
+    "statement": "arn:aws:elasticloadbalancing:sa-east-1:123456789012:targetgroup/db-statement/0000000000000004",
+    "customer": "arn:aws:elasticloadbalancing:sa-east-1:123456789012:targetgroup/db-customer/0000000000000005"
+  } },
+  "topic_arns": { "sensitive": false, "type": ["map", "string"], "value": {
+    "accounts-events.fifo": "arn:aws:sns:sa-east-1:123456789012:accounts-events.fifo",
+    "transfers-events.fifo": "arn:aws:sns:sa-east-1:123456789012:transfers-events.fifo",
+    "customer-events.fifo": "arn:aws:sns:sa-east-1:123456789012:customer-events.fifo"
+  } }
+}

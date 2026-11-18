@@ -1,0 +1,136 @@
+name: aws-down
+
+# Derruba o ambiente efemero na AWS (ADR 0019): helm uninstall dos servicos e do db-init, terraform destroy do
+# envs/aws e conferencia do que sobrou (infra/aws/leftovers.sh, que so lista: falha o job se sobrou algo).
+# O chart sai antes do destroy: com o controller de pe, os TargetGroupBinding saem e o ALB e as ENIs nao ficam presos.
+# Manual (workflow_dispatch) ou chamado pelo aws-reaper (workflow_call). So da main.
+# Configuracao do repositorio: vars.AWS_ROLE_ARN, vars.TF_STATE_BUCKET e vars.COGNITO_DOMAIN_PREFIX (ver aws-up.yml).
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: sa-east-1
+  TF_DIR: infra/terraform/envs/aws
+  TF_IN_AUTOMATION: 'true'
+  TF_INPUT: 'false'
+  NAMESPACE: digitalbanking
+
+jobs:
+  down:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    # Mesmo grupo do aws-up: um aws-down chamado pelo aws-reaper espera uma subida em andamento terminar.
+    concurrency:
+      group: aws-environment
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Conferir a configuracao do repositorio
+        env:
+          AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+          TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+          COGNITO_DOMAIN_PREFIX: ${{ vars.COGNITO_DOMAIN_PREFIX }}
+        run: |
+          missing=()
+          for name in AWS_ROLE_ARN TF_STATE_BUCKET COGNITO_DOMAIN_PREFIX; do
+            [ -n "${!name}" ] || missing+=("$name")
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "configuracao ausente no repositorio: ${missing[*]}" >&2
+            exit 1
+          fi
+
+      - uses: ./.github/actions/aws-tools
+
+      - name: Credenciais da AWS (OIDC) para os charts
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: aws-down-${{ github.run_id }}
+
+      - name: Terraform init
+        id: init
+        env:
+          TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+        run: |
+          terraform -chdir="$TF_DIR" init -lockfile=readonly \
+            -backend-config="bucket=$TF_STATE_BUCKET" \
+            -backend-config="key=envs/aws/terraform.tfstate" \
+            -backend-config="region=$AWS_REGION"
+
+      # vpc_id fica guardado para o leftovers.sh conferir ENIs depois do destroy. created_at nao tem padrao e e
+      # obrigatoria ate no destroy: usa a do estado (ou o agora, se o estado estiver vazio).
+      - name: Ler o estado
+        run: |
+          created_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          if [ -n "$(terraform -chdir="$TF_DIR" state list)" ]; then
+            created_at=$(terraform -chdir="$TF_DIR" output -raw created_at 2> /dev/null || echo "$created_at")
+            echo "CLUSTER_NAME=$(terraform -chdir="$TF_DIR" output -raw cluster_name 2> /dev/null || true)" >> "$GITHUB_ENV"
+            echo "VPC_ID=$(terraform -chdir="$TF_DIR" output -raw vpc_id 2> /dev/null || true)" >> "$GITHUB_ENV"
+          else
+            echo "estado vazio: nada a derrubar pelo Terraform"
+          fi
+          echo "TF_VAR_created_at=$created_at" >> "$GITHUB_ENV"
+
+      # Servicos primeiro (os TargetGroupBinding saem com o controller ainda de pe), depois o db-init. Falha aqui nao
+      # pode impedir o destroy: continue-on-error, e o passo "Falhar se o Helm falhou" marca o job no fim.
+      - name: helm uninstall dos servicos e do db-init
+        id: uninstall
+        if: ${{ env.CLUSTER_NAME != '' }}
+        continue-on-error: true
+        run: infra/aws/helm-teardown.sh
+
+      - name: Credenciais da AWS (OIDC) para o destroy
+        id: destroy-credentials
+        if: ${{ always() && steps.init.outcome == 'success' }}
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: aws-down-destroy-${{ github.run_id }}
+
+      - name: Terraform destroy
+        if: ${{ always() && steps.destroy-credentials.outcome == 'success' }}
+        env:
+          TF_VAR_cognito_domain_prefix: ${{ vars.COGNITO_DOMAIN_PREFIX }}
+        run: terraform -chdir="$TF_DIR" destroy -auto-approve
+
+      - name: Credenciais da AWS (OIDC) para a conferencia
+        id: leftovers-credentials
+        if: ${{ always() && steps.init.outcome == 'success' }}
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: aws-down-leftovers-${{ github.run_id }}
+
+      # So lista (Tagging API e ENIs da VPC); sobrou algo -> o job falha com a lista.
+      - name: Conferir o que sobrou
+        if: ${{ always() && steps.leftovers-credentials.outcome == 'success' }}
+        run: infra/aws/leftovers.sh "${VPC_ID:-}"
+
+      # O passo do Helm tem continue-on-error (o destroy tem de rodar); aqui a falha dele marca o job.
+      - name: Falhar se o Helm falhou
+        if: ${{ always() && steps.uninstall.outcome == 'failure' }}
+        run: |
+          echo "helm uninstall falhou (o destroy e a conferencia rodaram mesmo assim)" >&2
+          exit 1
+
+      - name: Resumo
+        if: ${{ always() }}
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          {
+            echo "## aws-down"
+            echo "- created-at do ambiente: \`${TF_VAR_created_at:-?}\`"
+            echo "- resultado: $JOB_STATUS"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -2,9 +2,15 @@
 # Prova a idempotencia do seed.sh: roda o seed duas vezes seguidas e compara as linhas OWNER_ACCOUNT e OWNER_BALANCE
 # das duas execucoes. Um credito em dobro (saldo diferente) ou uma conta nova falham aqui.
 # Com o 2o argumento, confere tambem o saldo da 1a execucao (num ambiente novo, o saldo inicial do seed: 1000000).
-# Uso: infra/local/seed-check.sh [url-base] [saldo-esperado]   (padrao http://127.0.0.1; usado pelo CI)
+# Com --remote, repassa o modo ao seed.sh (ambiente na AWS, workflow aws-up).
+# Uso: infra/local/seed-check.sh [--remote] [url-base] [saldo-esperado]   (padrao http://127.0.0.1; usado pelo CI)
 set -euo pipefail
 
+mode=()
+if [ "${1:-}" = "--remote" ]; then
+  mode=(--remote)
+  shift
+fi
 base="${1:-http://127.0.0.1}"
 expected_balance="${2:-}"
 seed="$(cd "$(dirname "$0")" && pwd)/seed.sh"
@@ -15,10 +21,10 @@ owner_lines() {
 }
 
 echo "--- primeira execucao do seed"
-first=$(bash "$seed" "$base")
+first=$(bash "$seed" ${mode[@]+"${mode[@]}"} "$base")
 echo "$first"
 echo "--- segunda execucao do seed"
-second=$(bash "$seed" "$base")
+second=$(bash "$seed" ${mode[@]+"${mode[@]}"} "$base")
 echo "$second"
 
 first_owner=$(owner_lines "$first")

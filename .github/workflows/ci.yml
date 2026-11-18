@@ -31,6 +31,8 @@ jobs:
       shared: ${{ steps.filter.outputs.shared }}
       e2e: ${{ steps.filter.outputs.e2e }}
       terraform: ${{ steps.filter.outputs.terraform }}
+      helm: ${{ steps.filter.outputs.helm }}
+      aws: ${{ steps.filter.outputs.aws }}
       lint: ${{ steps.filter.outputs.lint }}
       images: ${{ steps.filter.outputs.images }}
     steps:
@@ -53,6 +55,11 @@ jobs:
               - 'tests/e2e/**'
             terraform:
               - 'infra/terraform/**'
+            helm:
+              - 'deploy/helm/**'
+            aws:
+              - 'infra/aws/**'
+              - '.github/actions/**'
             lint:
               - 'api/bruno/**'
             images:
@@ -442,7 +449,7 @@ jobs:
   # infra/local e a copia do script das colecoes Bruno. Binarios oficiais com versao e sha256 fixos.
   lint:
     needs: changes
-    if: ${{ needs.changes.outputs.lint == 'true' || needs.changes.outputs.shared == 'true' }}
+    if: ${{ needs.changes.outputs.lint == 'true' || needs.changes.outputs.aws == 'true' || needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
@@ -473,8 +480,8 @@ jobs:
           shellcheck --version
           actionlint -version
           actionlint -color
-      - name: shellcheck nos scripts de infra/local
-        run: find infra/local -name '*.sh' -print0 | xargs -0 shellcheck
+      - name: shellcheck nos scripts de infra/local e infra/aws
+        run: find infra/local infra/aws -name '*.sh' -print0 | xargs -0 shellcheck
       # O Bruno nao compartilha scripts entre colecoes: estas quatro copias tem de ficar iguais.
       - name: Script das colecoes Bruno igual nas quatro copias
         run: |
@@ -518,28 +525,95 @@ jobs:
             tests/e2e/build/reports/tests/
             tests/e2e/build/e2e-logs/
 
-  # Terraform so valida (sem credenciais da AWS e sem apply): fmt, init sem backend e validate.
+  # Terraform so valida (sem credenciais da AWS e sem apply). bootstrap: fmt, init sem backend, validate, tflint e a
+  # trust policy. envs/aws: fmt, init sem backend, validate, tflint na raiz e nos modulos e as conferencias contra o
+  # nginx, o LocalStack e os charts (check-*.py). Tudo pelos validate.sh, os mesmos que rodam na maquina.
   terraform:
     needs: changes
-    if: ${{ needs.changes.outputs.terraform == 'true' || needs.changes.outputs.shared == 'true' }}
+    if: >-
+      ${{ needs.changes.outputs.terraform == 'true' ||
+      needs.changes.outputs.helm == 'true' ||
+      needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    env:
+      # tflint --init baixa o plugin aws do GitHub; com o token, sem limite de chamadas anonimas.
+      GITHUB_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: '1.17.2'
-      - name: Formato
-        run: terraform fmt -check -recursive infra/terraform
-      - name: Init sem backend
-        run: terraform -chdir=infra/terraform/envs/aws init -backend=false -lockfile=readonly
-      - name: Validate
-        run: terraform -chdir=infra/terraform/envs/aws validate
+          terraform_wrapper: false
+      - uses: terraform-linters/setup-tflint@6ffdbaa3be476b3431f7275c26966ef32ff60337 # v6.3.2
+        with:
+          tflint_version: v0.66.0
+      - name: bootstrap (fmt, init sem backend, validate, tflint, trust policy)
+        run: infra/terraform/bootstrap/validate.sh
+      - name: envs/aws (fmt, init sem backend, validate, tflint, conferencias)
+        run: infra/terraform/envs/aws/validate.sh
+
+  # Chart Helm sem cluster: deploy/helm/validate.sh (lint, template, kubeconform -strict e regras do projeto) e o
+  # render do deploy-services.sh com saidas ficticias do Terraform. A versao do Kubernetes do kubeconform vem do
+  # kubernetes_version do Terraform (kubernetes-version.sh), fonte unica.
+  helm:
+    needs: changes
+    if: >-
+      ${{ needs.changes.outputs.helm == 'true' ||
+      needs.changes.outputs.terraform == 'true' ||
+      needs.changes.outputs.aws == 'true' ||
+      needs.changes.outputs.shared == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      KUBECONFORM_VERSION: '0.8.0'
+      # Do CHECKSUMS do release v0.8.0 (kubeconform-linux-amd64.tar.gz).
+      KUBECONFORM_SHA256: 9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+        with:
+          version: 'v3.22.1'
+      - name: Instalar o kubeconform
+        run: |
+          bin="$RUNNER_TEMP/bin"
+          mkdir -p "$bin"
+          curl -fsSLo "$RUNNER_TEMP/kubeconform.tar.gz" \
+            "https://github.com/yannh/kubeconform/releases/download/v$KUBECONFORM_VERSION/kubeconform-linux-amd64.tar.gz"
+          echo "$KUBECONFORM_SHA256  $RUNNER_TEMP/kubeconform.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/kubeconform.tar.gz" -C "$bin" kubeconform
+          echo "$bin" >> "$GITHUB_PATH"
+      - name: Versao do Kubernetes do Terraform
+        run: echo "KUBERNETES_VERSION=$(infra/terraform/envs/aws/kubernetes-version.sh)" >> "$GITHUB_ENV"
+      - name: deploy/helm/validate.sh
+        run: |
+          echo "kubeconform na versao $KUBERNETES_VERSION"
+          deploy/helm/validate.sh
+      - name: Render do deploy-services.sh (db-init e servicos a partir das saidas do Terraform)
+        run: infra/aws/deploy-services.test.sh
+
+  # Scripts do ambiente na AWS testados sem AWS (shell puro, com aws falso no PATH): decisao do aws-reaper
+  # (8 h, etiqueta ausente, malformada, fuso), a leitura das etiquetas e a conferencia de sobras do aws-down.
+  aws-scripts:
+    needs: changes
+    if: ${{ needs.changes.outputs.aws == 'true' || needs.changes.outputs.shared == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: reaper-decision.sh
+        run: infra/aws/reaper-decision.test.sh
+      - name: reaper-check.sh
+        run: infra/aws/reaper-check.test.sh
+      - name: leftovers.sh
+        run: infra/aws/leftovers.test.sh
+      - name: helm-teardown.sh
+        run: infra/aws/helm-teardown.test.sh
 
   # Check unico exigido pela protecao da main: falha se algum job falhou ou foi cancelado;
   # job pulado pelo filtro de caminhos conta como sucesso.
   ci-ok:
-    needs: [changes, accounts, transfers, notification, statement, customer, libs, images, smoke, e2e, terraform, lint]
+    needs: [changes, accounts, transfers, notification, statement, customer, libs, images, smoke, e2e, terraform, helm, aws-scripts, lint]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

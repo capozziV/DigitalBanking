@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
-# Validacao sem credenciais: fmt, init sem backend, validate e conferencia da trust policy.
+# Validacao sem credenciais: fmt, init sem backend, validate, tflint e conferencia da trust policy.
 set -euo pipefail
 cd "$(dirname "$0")"
 
 terraform fmt -check -recursive
 terraform init -backend=false -input=false >/dev/null
 terraform validate
+
+tflint --init >/dev/null
+tflint
 
 # A trust policy aceita so a main: toda linha de "sub" no HCL tem de ser ref:refs/heads/main.
 subs=$(grep -n 'values *= *\["repo:' main.tf || true)

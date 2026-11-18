@@ -42,6 +42,16 @@ output "web_client_id" {
   value = module.identity.web_client_id
 }
 
+output "user_pool_id" {
+  description = "User Pool do Cognito (usuarios do dono e do smoke, criados pelo aws-up)."
+  value       = module.identity.user_pool_id
+}
+
+output "ops_client_id" {
+  description = "App client do seed e do smoke (AdminInitiateAuth)."
+  value       = module.identity.ops_client_id
+}
+
 output "machine_client_id" {
   value = module.identity.machine_client_id
 }
