@@ -10,6 +10,7 @@ create table outbox (
     correlation_id text,
     occurred_at    timestamptz not null,
     published_at   timestamptz null,
+    -- Failed publication attempts; -1 marks an event discarded by hand (POST /admin/outbox/events/{eventId}/discard).
     attempts       int         not null default 0,
     last_error     text
 );

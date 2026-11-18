@@ -16,7 +16,7 @@ import org.springframework.security.config.annotation.web.AuthorizeHttpRequestsD
  * ```
  * The block is the Spring Security Kotlin DSL of `authorizeHttpRequests`. The chain wraps it like this (first match
  * wins):
- * 1. fixed rules: `/actuator/health/` and the OpenAPI docs open, `/error` open, `/admin/` for [CallerRoles.ADMIN],
+ * 1. fixed rules: `/actuator/health/` and the OpenAPI docs (JSON, YAML, Swagger UI) open, `/error` open, `/admin/` for [CallerRoles.ADMIN],
  *    `/internal/` for [CallerRoles.SERVICE], the rest of `/actuator/` for [CallerRoles.ADMIN];
  * 2. the rules of this service;
  * 3. anything else is denied (403 with a token, 401 without). A route nobody declared is never open by accident.

@@ -1,13 +1,20 @@
 package io.github.capozziv.digitalbanking.transfers.adapters.accounts
 
 import io.github.capozziv.digitalbanking.transfers.domain.StepOutcome
+import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
 
 /**
  * Turns a response of `accounts` into a [StepOutcome]. A wrong answer here makes the saga compensate when it
  * should not, or the opposite, so anything that is not clearly a success or a definitive refusal is transient.
+ *
+ * A rejected service token (`401`/`403`) also counts on [SERVICE_TOKEN_REJECTED], tagged by `status`: the saga retries
+ * it with no ceiling, so the counter (with `transfers.pending.aged`) is how an operator notices a token that is never
+ * accepted.
  */
-class AccountsResponseClassifier {
+class AccountsResponseClassifier(
+    private val meterRegistry: MeterRegistry,
+) {
     /**
      * @param status HTTP status, or null when no response arrived (timeout, refused or cut connection).
      * @param problemType last segment of the Problem Details `type` (`/problems/<slug>`), when the body had one.
@@ -37,6 +44,7 @@ class AccountsResponseClassifier {
         status: Int,
         problemType: String?,
     ): StepOutcome {
+        meterRegistry.counter(SERVICE_TOKEN_REJECTED, "status", status.toString()).increment()
         log.error("accounts rejected the service token: status {}, problem type {}", status, problemType)
         return StepOutcome.TransientFailure
     }
@@ -60,6 +68,9 @@ class AccountsResponseClassifier {
         }
 
     companion object {
+        /** Counter of `accounts` answers that rejected the machine token of transfers, tagged `status` (401 or 403). */
+        const val SERVICE_TOKEN_REJECTED = "transfers.accounts.service.token.rejected"
+
         /**
          * Last path segment of a Problem Details `type`, or null when it carries no information: absent, blank or
          * `about:blank` (what Spring answers for routes it does not map).

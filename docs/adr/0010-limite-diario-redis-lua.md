@@ -15,12 +15,16 @@ Transferências têm limite diário. A verificação precisa ser atômica sob co
 - **Trava única:** toda reserva, pela via do Redis ou do PostgreSQL, roda numa transação que começa com `pg_advisory_xact_lock` por conta e dia.
 - **Epoch:** a tabela `daily_limit_epoch` (conta e dia) é incrementada a cada reserva feita pela via do PostgreSQL e a cada `release` que falha no Redis. A via do Redis compara o epoch com o do contador e, se diferir, reconstrói antes de conferir.
 - **Fallback:** com o Redis fora, a conferência é feita no PostgreSQL, na mesma trava. Se o PostgreSQL também falhar, há retentativa até o prazo da saga ([ADR 0016](0016-saga-orquestrada-por-http.md)) e depois `FAILED` com `daily-limit-unavailable`.
+- **Circuit breaker do Redis** (#159): 5 falhas seguidas abrem o circuito (OPEN) por 10 s; nesse período a reserva vai direto ao PostgreSQL, sem chamar o Redis. Passado o prazo, o circuito vai a HALF_OPEN e deixa passar uma única chamada, a sonda: se ela der certo, volta a CLOSED; se falhar, reabre. Os valores são configuráveis.
+- **`lock_timeout` na trava** (#160): a espera por `pg_advisory_xact_lock` é limitada (2 s, local à transação). Estourado o prazo, a reserva fica indisponível e a saga tenta de novo, dentro do prazo dela.
+- **`usage` sem trava:** a consulta de uso soma as reservas no PostgreSQL, sem a trava e sem tocar no Redis; leitura nunca espera uma reserva.
+- **Marcador de instância** (#160): o contador guarda o `run_id` do Redis que o semeou; outra instância respondendo força a reconstrução.
 - **Valor padrão** (decidido em 2026-11-12): R$ 5.000,00 (500000 centavos), único para todas as contas no MVP. A variação por tipo de conta fica para depois do MVP.
 
 ## Consequências
 - Positivas: verificação e reserva atômicas; sem brecha entre as duas vias; falha de `release` ou reserva desfeita deixa o contador acima do real (lado seguro), e o epoch faz a próxima reserva reconstruí-lo; retentativas não consomem limite duas vezes; perda ou queda do Redis não quebra o limite.
-- Negativas: dois lugares com o mesmo dado (Redis e PostgreSQL); uma transação curta por reserva; contenção só entre transferências da mesma conta e dia; liberação no Redis é melhor esforço; exige rotina de reconstrução e o epoch.
-- **Risco aceito no MVP:** perda parcial de escritas no Redis (failover com réplica assíncrona, ou restauração de snapshot antigo) pode deixar o contador abaixo do real com o mesmo epoch, e o limite pode ser passado. Aceito porque o banco é simulado e o ElastiCache do ambiente efêmero não tem failover. Mitigação futura no cartão de débito técnico #160.
+- Negativas: dois lugares com o mesmo dado (Redis e PostgreSQL); uma transação curta por reserva; contenção só entre transferências da mesma conta e dia; liberação no Redis é melhor esforço; exige rotina de reconstrução e o epoch; com o circuito aberto, toda reserva paga a trava e a soma no PostgreSQL; sob contenção forte, a reserva pode falhar por `lock_timeout` (`daily-limit-unavailable` se persistir até o prazo da saga); o `reserve.lua` lê o `run_id` (`INFO server`) a cada reserva, dentro do mesmo script.
+- **Risco aceito:** perda parcial de escritas no Redis (failover com réplica assíncrona, ou restauração de snapshot antigo) podia deixar o contador abaixo do real com o mesmo epoch. Mitigado (#160): o contador guarda o `run_id` da instância do Redis que o semeou e é reconstruído quando outra instância responde (reinício, failover ou snapshot restaurado). Resta o caso raro de a mesma instância perder escritas sem reiniciar, aceito porque o banco é simulado.
 
 ## Alternativas consideradas
 - **Só Redis, sem trava no PostgreSQL:** deixa brecha entre o Redis e o fallback, que poderia passar do limite. Descartada.

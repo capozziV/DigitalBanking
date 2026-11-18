@@ -1,5 +1,6 @@
 package io.github.capozziv.digitalbanking.transfers.bootstrap.web
 
+import io.github.capozziv.digitalbanking.testing.security.ApiDocsAssertions
 import io.github.capozziv.digitalbanking.transfers.bootstrap.TransfersIntegrationTest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -18,9 +19,58 @@ class OpenApiIntegrationTest : TransfersIntegrationTest() {
     }
 
     @Test
-    fun `the contract has exactly the three operations of the API`() {
+    fun `the contract in JSON and YAML and the Swagger UI are open without a token`() {
+        ApiDocsAssertions.assertOpenWithoutToken(port)
+    }
+
+    @Test
+    fun `every operation documents X-Correlation-Id and the common errors as Problem Details`() {
+        ApiDocsAssertions.assertCommonContract(ApiDocsAssertions.fetchContract(port))
+    }
+
+    @Test
+    fun `the contract has exactly the operations of the API, the admin ones included`() {
         assertThat(operations().map { it.first })
-            .containsExactlyInAnyOrder("POST /transfers", "GET /transfers/{id}", "GET /accounts/{accountId}/daily-limit")
+            .containsExactlyInAnyOrder(
+                "POST /transfers",
+                "GET /transfers/{id}",
+                "GET /accounts/{accountId}/daily-limit",
+                "GET /admin/transfers/stuck",
+                "POST /admin/transfers/{id}/retry",
+                "POST /admin/transfers/{id}/manual-compensation",
+            )
+    }
+
+    @Test
+    fun `the manual compensation documents the reason, the credit check, the admin-only access and the conflicts`() {
+        val responses = operation("POST /admin/transfers/{id}/manual-compensation").get("responses")
+
+        assertThat(responses.get("400").get("description").asString()).contains("reason").contains("creditIdempotencyKey")
+        assertThat(responses.get("422").get("description").asString())
+            .contains("/problems/compensation-credit-not-found")
+            .contains("/problems/compensation-credit-mismatch")
+        assertThat(responses.get("503").get("description").asString()).contains("/problems/accounts-unavailable")
+        assertThat(responses.get("403").get("description").asString()).contains("/problems/forbidden")
+        assertThat(responses.get("409").get("description").asString())
+            .contains("/problems/transfer-not-compensating")
+            .contains("/problems/transfer-busy")
+            .contains("/problems/compensation-credit-already-used")
+        assertThat(
+            docs
+                .get("components")
+                .get("schemas")
+                .get("ManualCompensationDTO")
+                .get("properties")
+                .propertyNames(),
+        ).containsExactlyInAnyOrder("transfer", "resolvedBy", "reason", "creditIdempotencyKey", "resolvedAt")
+        assertThat(
+            docs
+                .get("components")
+                .get("schemas")
+                .get("CompensateManuallyDTO")
+                .get("properties")
+                .propertyNames(),
+        ).containsExactlyInAnyOrder("reason", "creditIdempotencyKey")
     }
 
     @Test

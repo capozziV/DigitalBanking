@@ -66,6 +66,21 @@ class JdbcTransferRepositoryIntegrationTest : TransfersIntegrationTest() {
     }
 
     @Test
+    fun `saveIfOwner never clears a reservation flag already set by the daily limit`() {
+        // The gateway marks limit_reserved under its lock; a save from a copy read before that must not undo it.
+        val transfer = aTransfer(step = TransferStep.ReserveLimit)
+        repository.insert(transfer)
+        ownerJdbc.sql("update transfer set limit_reserved = true where id = :id").param("id", transfer.id).update()
+        val now = transfer.createdAt.plusSeconds(1)
+        repository.tryAcquireLease(transfer.id, "a", now.plusSeconds(30), now)
+        val stale = transfer.copy(step = TransferStep.Debit, limitReserved = false, updatedAt = now)
+
+        assertThat(repository.saveIfOwner(stale, "a", now, now.plusSeconds(60), now)).isTrue()
+
+        assertThat(repository.findById(transfer.id)!!.limitReserved).isTrue()
+    }
+
+    @Test
     fun `round trips every field of a transfer in each of the 9 steps`() {
         allSteps.forEach { step ->
             val transfer = aTransfer(step = step, failureReason = "some-reason", attempts = 3)

@@ -3,13 +3,8 @@ package io.github.capozziv.digitalbanking.statement.adapters.web
 import io.swagger.v3.oas.models.Components
 import io.swagger.v3.oas.models.OpenAPI
 import io.swagger.v3.oas.models.info.Info
-import io.swagger.v3.oas.models.media.Content
-import io.swagger.v3.oas.models.media.MediaType
-import io.swagger.v3.oas.models.media.Schema
-import io.swagger.v3.oas.models.responses.ApiResponse
 import io.swagger.v3.oas.models.security.SecurityRequirement
 import io.swagger.v3.oas.models.security.SecurityScheme
-import org.springdoc.core.customizers.OpenApiCustomizer
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
@@ -34,25 +29,6 @@ class OpenApiConfiguration {
                 ),
             ).addSecurityItem(SecurityRequirement().addList(BEARER_AUTH))
 
-    /** Every operation can fail with an unexpected error, answered by the generic handler as 500 internal-error. */
-    @Bean
-    fun internalErrorResponseCustomizer(): OpenApiCustomizer =
-        OpenApiCustomizer { openApi ->
-            openApi.paths.orEmpty().values.flatMap { it.readOperations() }.forEach { operation ->
-                operation.responses.addApiResponse(
-                    "500",
-                    ApiResponse()
-                        .description("${ApiDocs.PROBLEMS}internal-error: unexpected error; the detail does not expose the cause")
-                        .content(
-                            Content().addMediaType(
-                                ApiDocs.PROBLEM_JSON,
-                                MediaType().schema(Schema<Any>().`$ref`("#/components/schemas/ProblemDetail")),
-                            ),
-                        ),
-                )
-            }
-        }
-
     private companion object {
         const val BEARER_AUTH = "bearerAuth"
 
@@ -76,10 +52,4 @@ class OpenApiConfiguration {
               response.
             """.trimIndent()
     }
-}
-
-/** Texts shared by the OpenAPI annotations of the controller. */
-internal object ApiDocs {
-    const val PROBLEMS = "/problems/"
-    const val PROBLEM_JSON = "application/problem+json"
 }

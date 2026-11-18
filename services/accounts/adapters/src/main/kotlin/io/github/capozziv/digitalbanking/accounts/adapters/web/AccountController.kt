@@ -28,7 +28,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses
 import jakarta.validation.Valid
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
-import org.springframework.http.ProblemDetail
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -87,12 +86,10 @@ class AccountController(
         ApiResponse(
             responseCode = "400",
             description = ApiDocs.BAD_REQUEST,
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "409",
             description = "/problems/customer-already-has-account: the customer already has an account (opened with another key)",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "422",
@@ -100,14 +97,12 @@ class AccountController(
                 "/problems/idempotency-key-reused: the key was used to open the account of another customer. " +
                     "/problems/customer-not-found: the customer service has no customer for the token. " +
                     "/problems/customer-blocked: the customer is blocked",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "503",
             description =
                 "/problems/customers-unavailable: the customer service is down, slower than the timeout or " +
                     "answered an error; nothing was written, retry later",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
     )
     @PostMapping
@@ -135,12 +130,10 @@ class AccountController(
         ApiResponse(
             responseCode = "400",
             description = "/problems/validation-error: the id is not a UUID",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "404",
             description = "/problems/account-not-found: no such account, or an account of another customer",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
     )
     @GetMapping("/{id}")
@@ -163,23 +156,19 @@ class AccountController(
         ApiResponse(
             responseCode = "400",
             description = ApiDocs.BAD_REQUEST,
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "404",
             description = "/problems/account-not-found",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "422",
             description = "/problems/idempotency-key-reused: the key was used for another kind or amount on this account",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "503",
             description = ApiDocs.ACCOUNT_BUSY,
             headers = [Header(name = "Retry-After", description = ApiDocs.RETRY_AFTER, schema = Schema(type = "integer"))],
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
     )
     @PostMapping("/{id}/credits")
@@ -205,12 +194,10 @@ class AccountController(
         ApiResponse(
             responseCode = "400",
             description = ApiDocs.BAD_REQUEST,
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "404",
             description = "/problems/account-not-found",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "422",
@@ -218,13 +205,11 @@ class AccountController(
                 "/problems/insufficient-available-balance: the available balance (member `availableBalance`, in cents) " +
                     "does not cover the amount; nothing is recorded, so the same key can be retried later. " +
                     "/problems/idempotency-key-reused: the key was used for another kind or amount on this account",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "503",
             description = ApiDocs.ACCOUNT_BUSY,
             headers = [Header(name = "Retry-After", description = ApiDocs.RETRY_AFTER, schema = Schema(type = "integer"))],
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
     )
     @PostMapping("/{id}/debits")
@@ -256,14 +241,12 @@ class AccountController(
         ApiResponse(
             responseCode = "400",
             description = "/problems/validation-error: the id is not a UUID, or idempotencyKey is missing, blank or over 255 characters",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "404",
             description =
                 "/problems/account-not-found: no such account, or an account of another customer. " +
                     "/problems/entry-not-found: no entry was recorded on this account with the key",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
     )
     @GetMapping("/{id}/entries")
@@ -287,18 +270,15 @@ class AccountController(
         ApiResponse(
             responseCode = "400",
             description = "/problems/validation-error: the id is not a UUID or the type is missing or unknown",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "404",
             description = "/problems/account-not-found",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "503",
             description = ApiDocs.ACCOUNT_BUSY,
             headers = [Header(name = "Retry-After", description = ApiDocs.RETRY_AFTER, schema = Schema(type = "integer"))],
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
     )
     @PutMapping("/{id}/type")

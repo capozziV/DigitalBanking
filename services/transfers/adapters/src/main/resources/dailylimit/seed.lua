@@ -4,7 +4,8 @@
 if redis.call('EXISTS', KEYS[1]) == 1 then
     return 0
 end
-redis.call('HSET', KEYS[1], 'epoch', ARGV[1], 'total', 0)
+local run_id = string.match(redis.call('INFO', 'server'), 'run_id:(%x+)')
+redis.call('HSET', KEYS[1], 'epoch', ARGV[1], 'instance', run_id, 'total', 0)
 for i = 3, #ARGV, 2 do
     redis.call('HSET', KEYS[1], ARGV[i], ARGV[i + 1])
     redis.call('HINCRBY', KEYS[1], 'total', ARGV[i + 1])

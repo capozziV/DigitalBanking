@@ -11,7 +11,6 @@ import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
-import org.springframework.http.ProblemDetail
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
@@ -39,18 +38,15 @@ class DailyLimitController(
             description =
                 "/problems/account-not-found: the account does not exist or is not the caller's (`accountId`); " +
                     "the same answer in both cases",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "503",
             description = "/problems/accounts-unavailable: accounts did not answer the owner check; retry after `Retry-After` seconds",
             headers = [Header(name = "Retry-After", description = "Seconds to wait before retrying (1)")],
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "400",
             description = "/problems/validation-error: the account id is not a UUID",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
     )
     @GetMapping

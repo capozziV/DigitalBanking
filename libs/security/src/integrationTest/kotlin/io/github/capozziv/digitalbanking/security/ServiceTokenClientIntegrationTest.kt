@@ -34,6 +34,8 @@ class ServiceTokenClientIntegrationTest {
 
     @Volatile private var tokenDelay = Duration.ZERO
 
+    @Volatile private var peerStatus = 204
+
     private val server =
         HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0).apply {
             executor = Executors.newFixedThreadPool(8)
@@ -58,7 +60,7 @@ class ServiceTokenClientIntegrationTest {
             }
             createContext("/peer") { exchange ->
                 peerAuthorizations += exchange.requestHeaders.getFirst("Authorization")
-                exchange.sendResponseHeaders(204, -1)
+                exchange.sendResponseHeaders(peerStatus, -1)
                 exchange.close()
             }
             start()
@@ -241,6 +243,61 @@ class ServiceTokenClientIntegrationTest {
 
         assertThat(peerAuthorizations).containsExactly("Bearer token-1", "Bearer token-1")
         assertThat(tokenRequests).hasSize(1)
+    }
+
+    @Test
+    fun `a 401 from the peer drops the cached token, so the next call asks for a new one`() {
+        val restClient = peerClient(client())
+        peerStatus = 401
+        callPeer(restClient)
+
+        peerStatus = 204
+        callPeer(restClient)
+
+        assertThat(peerAuthorizations).containsExactly("Bearer token-1", "Bearer token-2")
+        assertThat(tokenRequests).hasSize(2)
+    }
+
+    @Test
+    fun `a 403 from the peer keeps the cached token`() {
+        val restClient = peerClient(client())
+        peerStatus = 403
+        callPeer(restClient)
+
+        peerStatus = 204
+        callPeer(restClient)
+
+        assertThat(peerAuthorizations).containsExactly("Bearer token-1", "Bearer token-1")
+        assertThat(tokenRequests).hasSize(1)
+    }
+
+    @Test
+    fun `a late 401 for a token already replaced does not drop the new one`() {
+        val client = client()
+        val restClient = peerClient(client)
+        peerStatus = 401
+        callPeer(restClient)
+        assertThat(client.accessToken()).isEqualTo("token-2")
+
+        client.onRejected("token-1")
+
+        assertThat(client.accessToken()).isEqualTo("token-2")
+        assertThat(tokenRequests).hasSize(2)
+    }
+
+    private fun peerClient(client: ServiceTokenClient) =
+        RestClient
+            .builder()
+            .baseUrl(baseUrl)
+            .requestInterceptor(client.interceptor())
+            .build()
+
+    /** Calls the peer and ignores its status: the test looks at what reached the peer and the token endpoint. */
+    private fun callPeer(restClient: RestClient) {
+        restClient
+            .get()
+            .uri("/peer")
+            .exchange { _, response -> response.statusCode.value() }
     }
 
     @Test

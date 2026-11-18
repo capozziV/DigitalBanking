@@ -73,6 +73,7 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 - Os tópicos são SNS FIFO: `accounts-events.fifo`, com `MessageGroupId` = conta (ordem garantida por conta), e `transfers-events.fifo`, com `MessageGroupId` = transferência (um evento final por transferência). Nos dois, `MessageDeduplicationId` = `eventId`.
 - Relay (`OutboxRelay`) dentro de cada serviço, com um relay ativo por vez (trava consultiva do PostgreSQL). Falha de publicação bloqueia só a conta afetada. Outbox guardado para sempre; envelope com `eventVersion`.
 - A leitura do lote pula os eventos seguintes de uma conta presa, que não ocupa o lote das outras. Limites de tempo: 2 s por publicação e 10 s por ciclo (configuráveis).
+- Evento preso se destrava por descarte manual (só `ADMIN`): `GET /admin/outbox/stuck-events` e `POST /admin/outbox/events/{eventId}/discard`, com motivo obrigatório, em `accounts`, `transfers` e `customer`, chamados direto na porta do serviço (o nginx não roteia). Descartar é perda deliberada, com consequências nos consumidores (ver [ADR 0015](adr/0015-outbox-relay-lider-e-sns-fifo.md)).
 - O `notification` consome com `@SqsListener` (Spring Cloud AWS) as filas FIFO `notification-accounts.fifo` e `notification-transfers.fifo`, cada uma com DLQ FIFO (`notification-accounts-dlq.fifo`, `notification-transfers-dlq.fifo`); a mensagem vai para a DLQ na 5ª tentativa.
 - Idempotência do consumidor pela tabela `processed_events`, gravada na mesma transação das notificações; a mensagem é confirmada só depois do commit.
 - O `statement` (porta 8084, sem PostgreSQL) consome `AccountOpened` e `LedgerEntryRecorded` do `accounts-events.fifo` na fila FIFO `statement-accounts.fifo`, com DLQ `statement-accounts-dlq.fifo` (5 tentativas, visibilidade 30 s). Não usa `processed_events`: o `PutItem` condicional é a idempotência.
@@ -87,7 +88,8 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 - `accounts` (abrir conta) e `transfers` (criar transferência) consultam o `customer` na hora, sem cache; inexistente ou bloqueado dá `422`, `customer` fora dá `503`.
 - `401` e `403` em Problem Details; desconexão do cliente não vira `500`. `/actuator/health` aberto sem detalhes; o resto do actuator só para admin.
 - **Terraform da borda** (`infra/terraform/modules/identity` e `edge`, `envs/aws`): escrito e validado no CI, sem `apply` até a etapa 8.
-- **Bibliotecas compartilhadas** (só infraestrutura): `libs/security` (resource server, `Caller`, token de máquina), `libs/observabilidade` (filtro de correlation ID e propagação nas chamadas HTTP de saída) e `libs/testing-security` (emissor de JWT de teste).
+- **Bibliotecas compartilhadas** (só infraestrutura): `libs/security` (resource server, `Caller`, token de máquina), `libs/observabilidade` (filtro de correlation ID, propagação nas chamadas HTTP de saída e interceptor SQS que põe o ID da mensagem no MDC) e `libs/testing-security` (emissor de JWT de teste).
+- **Perfil Spring `aws`** (`application-aws.yml` em `services/<svc>/bootstrap/src/main/resources/`, nos cinco serviços): desliga o OpenAPI e o swagger-ui e, no `accounts`, no `transfers` e no `customer`, troca o padrão do LocalStack de `<svc>.aws.endpoint` por um valor em branco, para os SDKs usarem os endpoints reais da AWS. No `notification` e no `statement`, os endpoints (`spring.cloud.aws.sqs.endpoint` e `statement.dynamodb.endpoint`) já são em branco por padrão no `application.yml`, e o ambiente local os preenche por variável. JWT issuer, banco e Redis mantêm o padrão `localhost`: sem a variável de ambiente o serviço falha fechado. As variáveis e o `SPRING_PROFILES_ACTIVE=aws` vêm do chart Helm. O ambiente local, os testes, o smoke e o e2e usam o perfil padrão. O `AwsProfileConfigIntegrationTest` de cada serviço garante os endpoints em branco.
 - (ver [ADR 0004](adr/0004-api-gateway-http-api-na-borda.md) e [ADR 0020](adr/0020-identidade-e-autorizacao.md))
 
 ### Contratos
@@ -100,7 +102,7 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 - Apenas correlation ID, sem tracing distribuído (sem OpenTelemetry, Jaeger ou X-Ray).
 - O ID vem do header `X-Correlation-Id` ou é gerado na entrada, vai para o MDC (logs JSON) e é propagado nas chamadas HTTP, numa coluna do outbox, no envelope do evento e nos atributos SNS/SQS (raw message delivery).
 - Até existir o BFF, o serviço que recebe a chamada gera o ID; depois, o BFF gera e os serviços reaproveitam.
-- O filtro e a propagação ficam em `libs/observabilidade`, usada por todos os serviços.
+- O filtro, a propagação e o interceptor SQS (o ID do atributo da mensagem fica no MDC até o fim do processamento, inclusive na linha de erro do contêiner) ficam em `libs/observabilidade`, usada por todos os serviços.
 - (ver [ADR 0006](adr/0006-observabilidade-com-correlation-id.md))
 
 ### Frontend (etapa 9, detalhar depois)

@@ -1,7 +1,7 @@
 package io.github.capozziv.digitalbanking.notification.application.usecase
 
+import io.github.capozziv.digitalbanking.notification.application.ForeignCustomerException
 import io.github.capozziv.digitalbanking.notification.application.NotificationNotFoundException
-import io.github.capozziv.digitalbanking.notification.application.ownCustomerId
 import io.github.capozziv.digitalbanking.notification.application.port.NotificationRepository
 import io.github.capozziv.digitalbanking.notification.application.port.TransactionRunner
 import io.github.capozziv.digitalbanking.security.Caller
@@ -22,7 +22,7 @@ class MarkNotificationsReadUseCase(
         upTo: UUID,
     ): Int =
         transactions.inTransaction {
-            val customerId = caller.ownCustomerId()
+            val customerId = caller.ownCustomerId() ?: throw ForeignCustomerException()
             val anchor =
                 notifications.find(upTo)?.takeIf { it.customerId == customerId }
                     ?: throw NotificationNotFoundException(upTo)

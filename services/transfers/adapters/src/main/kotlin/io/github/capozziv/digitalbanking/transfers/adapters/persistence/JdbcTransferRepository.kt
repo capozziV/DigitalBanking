@@ -23,17 +23,17 @@ class JdbcTransferRepository(
 ) : TransferRepository {
     override fun findById(id: UUID): Transfer? =
         jdbcClient
-            .sql("select $COLUMNS from transfer where id = :id")
+            .sql("select ${TransferRows.COLUMNS} from transfer where id = :id")
             .param("id", id)
-            .query(ROW_MAPPER)
+            .query(TransferRows.ROW_MAPPER)
             .optional()
             .orElse(null)
 
     override fun findByIdempotencyKey(key: String): Transfer? =
         jdbcClient
-            .sql("select $COLUMNS from transfer where idempotency_key = :key")
+            .sql("select ${TransferRows.COLUMNS} from transfer where idempotency_key = :key")
             .param("key", key)
-            .query(ROW_MAPPER)
+            .query(TransferRows.ROW_MAPPER)
             .optional()
             .orElse(null)
 
@@ -90,7 +90,8 @@ class JdbcTransferRepository(
 
     /**
      * The lease must be valid at [now]; `updated_at` is only data, it takes no part in the decision. `limit_reserved`
-     * was already set by the daily limit gateway under its lock when the reservation was made; this write only repeats it.
+     * was already set by the daily limit gateway under its lock when the reservation was made; this write only repeats it
+     * and never clears it, so a copy read before the reservation cannot undo the gateway's mark.
      */
     override fun saveIfOwner(
         transfer: Transfer,
@@ -104,7 +105,7 @@ class JdbcTransferRepository(
                 """
                 update transfer set status = :status, step = :step, failure_reason = :failureReason, attempts = :attempts,
                                     next_attempt_at = :nextAttemptAt, locked_until = :leaseUntil, updated_at = :updatedAt,
-                                    limit_reserved = :limitReserved
+                                    limit_reserved = limit_reserved or :limitReserved
                 where id = :id and lock_owner = :owner and locked_until >= :now
                 """.trimIndent(),
             ).param("status", transfer.status.name)
@@ -156,32 +157,4 @@ class JdbcTransferRepository(
             .list()
 
     private fun Instant.utc(): OffsetDateTime = OffsetDateTime.ofInstant(this, ZoneOffset.UTC)
-
-    private companion object {
-        const val COLUMNS =
-            "id, source_account_id, destination_account_id, amount, description, idempotency_key, step, failure_reason, " +
-                "deadline_at, attempts, correlation_id, created_at, updated_at, limit_day, limit_reserved, source_customer_id"
-
-        val ROW_MAPPER =
-            RowMapper { rs, _ ->
-                Transfer(
-                    id = rs.getObject("id", UUID::class.java),
-                    sourceAccountId = rs.getObject("source_account_id", UUID::class.java),
-                    destinationAccountId = rs.getObject("destination_account_id", UUID::class.java),
-                    amount = Money(rs.getLong("amount")),
-                    description = rs.getString("description"),
-                    idempotencyKey = rs.getString("idempotency_key"),
-                    step = TransferStep.fromName(rs.getString("step")),
-                    failureReason = rs.getString("failure_reason"),
-                    deadline = rs.getObject("deadline_at", OffsetDateTime::class.java).toInstant(),
-                    attempts = rs.getInt("attempts"),
-                    correlationId = rs.getString("correlation_id"),
-                    createdAt = rs.getObject("created_at", OffsetDateTime::class.java).toInstant(),
-                    updatedAt = rs.getObject("updated_at", OffsetDateTime::class.java).toInstant(),
-                    limitDay = rs.getObject("limit_day", LocalDate::class.java),
-                    limitReserved = rs.getBoolean("limit_reserved"),
-                    sourceCustomerId = rs.getObject("source_customer_id", UUID::class.java),
-                )
-            }
-    }
 }

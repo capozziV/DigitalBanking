@@ -13,7 +13,6 @@ import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import jakarta.validation.Valid
-import org.springframework.http.ProblemDetail
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -43,17 +42,10 @@ class NotificationController(
         ApiResponse(
             responseCode = "400",
             description = "/problems/validation-error: customerId not a UUID, or a cursor that was not issued by this API",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
-        ),
-        ApiResponse(
-            responseCode = "401",
-            description = "/problems/unauthorized: no token, or an invalid or expired one",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "404",
             description = "/problems/notification-not-found: a customer asked for the notifications of another customer",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
     )
     @GetMapping
@@ -86,17 +78,10 @@ class NotificationController(
         ApiResponse(
             responseCode = "400",
             description = "/problems/validation-error: upTo missing or not a UUID, or malformed JSON",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
-        ),
-        ApiResponse(
-            responseCode = "401",
-            description = "/problems/unauthorized: no token, or an invalid or expired one",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "404",
             description = "/problems/notification-not-found: upTo does not exist or belongs to another customer; nothing is marked",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
     )
     @PostMapping("/read")
