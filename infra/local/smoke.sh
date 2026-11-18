@@ -15,8 +15,10 @@
 #    sequence 2 (debito de 300, saldo 700) e sequence 1 (credito de 1000, saldo 1000), do mais novo para o mais antigo;
 #    o mesmo extrato pedido por outro cliente responde 404 account-not-found.
 # 5. status da conta: o admin bloqueia (PUT /admin/accounts/{id}/status), o debito e recusado (422), o admin desbloqueia
-#    e o encerramento com saldo e recusado (POST /accounts/{id}/close, 422). O encerramento com saldo zero consulta o
-#    transfers e entra aqui quando ele tiver a rota de pendentes (Task 2).
+#    e o encerramento com saldo e recusado (POST /accounts/{id}/close, 422). Com saldo zero e sem transferencias pendentes
+#    (o accounts consulta o transfers), o encerramento responde 200 e a conta fica CLOSED; depois, debito e credito
+#    sao recusados (422). A recusa por transferencia pendente (422 pending-transfers) fica nos testes do accounts e do
+#    transfers: a saga conclui rapido demais para o smoke prender uma transferencia em PENDING.
 # Uso: infra/local/smoke.sh [url-base]   (padrao http://127.0.0.1; exige o compose de pe)
 set -euo pipefail
 
@@ -255,3 +257,15 @@ if [ "$blocked:$unblocked" != "BLOCKED:ACTIVE" ]; then
   exit 1
 fi
 echo "OK: conta $status_id bloqueada, desbloqueada e encerramento com saldo recusado"
+
+# Esvazia a conta e encerra: saldo zero e sem pendentes -> 200 CLOSED; conta encerrada recusa debito e credito.
+call 201 "$admin" POST "/accounts/$status_id/debits" '{"amount":100,"description":"smoke esvaziar"}' > /dev/null
+closed=$(call 200 "$status_token" POST "/accounts/$status_id/close" | jq -r .status)
+closed_read=$(call 200 "$status_token" GET "/accounts/$status_id" | jq -r .status)
+call 422 "$admin" POST "/accounts/$status_id/debits" '{"amount":1,"description":"conta encerrada"}' > /dev/null
+call 422 "$admin" POST "/accounts/$status_id/credits" '{"amount":1,"description":"conta encerrada"}' > /dev/null
+if [ "$closed:$closed_read" != "CLOSED:CLOSED" ]; then
+  echo "FALHA: encerramento da conta $status_id: '$closed:$closed_read' (esperado 'CLOSED:CLOSED')" >&2
+  exit 1
+fi
+echo "OK: conta $status_id encerrada com saldo zero (CLOSED); debito e credito recusados"

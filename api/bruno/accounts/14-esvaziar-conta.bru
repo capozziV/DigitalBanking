@@ -20,13 +20,13 @@ headers {
 
 body:json {
   {
-    "amount": 1700,
+    "amount": 700,
     "description": "esvazia a conta antes de encerrar"
   }
 }
 
 tests {
-  // Saldo da colecao ate aqui: +1000 (03), -300 (04) e +1000 (11) = 1700; zera a conta para o encerramento (15).
+  // Saldo da colecao ate aqui: +1000 (03) e -300 (04) = 700 (o credito do cliente em 11 e recusado com 403); zera a conta para o encerramento (15).
   test("201 com o lancamento de debito", function () {
     expect(res.status).to.equal(201);
     expect(res.body.kind).to.equal("DEBIT");
