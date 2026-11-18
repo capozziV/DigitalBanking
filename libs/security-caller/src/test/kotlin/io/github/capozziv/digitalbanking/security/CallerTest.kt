@@ -28,4 +28,15 @@ class CallerTest {
     fun `a service never acts as a customer`() {
         assertThat(Caller.Service.actsAsCustomer(customerId)).isFalse()
     }
+
+    @Test
+    fun `the own customer of a customer is itself and of an admin is its user`() {
+        assertThat(Caller.Customer(customerId).ownCustomerId()).isEqualTo(customerId)
+        assertThat(Caller.Admin(otherId).ownCustomerId()).isEqualTo(otherId)
+    }
+
+    @Test
+    fun `a service has no own customer`() {
+        assertThat(Caller.Service.ownCustomerId()).isNull()
+    }
 }

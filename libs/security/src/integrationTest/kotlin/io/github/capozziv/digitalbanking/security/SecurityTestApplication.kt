@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler
 
 /** A service in miniature: its own route rules, a controller that reads the caller and a catch-all 500 handler. */
 @SpringBootConfiguration
@@ -53,9 +54,12 @@ class SecurityTestController {
     fun boom(): String = error("boom")
 }
 
-/** Like the services' ProblemDetailsExceptionHandler: anything unexpected is a 500 logged as ERROR. */
+/**
+ * Like the services' ProblemDetailsExceptionHandler: framework errors (404 of an unknown route, 405, ...) keep their
+ * status, anything unexpected is a 500 logged as ERROR.
+ */
 @RestControllerAdvice
-class CatchAllExceptionHandler {
+class CatchAllExceptionHandler : ResponseEntityExceptionHandler() {
     @ExceptionHandler
     fun handle(e: Exception): ProblemDetail {
         LoggerFactory.getLogger(CatchAllExceptionHandler::class.java).error("unexpected error", e)

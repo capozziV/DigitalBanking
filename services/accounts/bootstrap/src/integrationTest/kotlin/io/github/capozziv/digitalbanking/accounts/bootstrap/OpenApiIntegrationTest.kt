@@ -2,6 +2,7 @@ package io.github.capozziv.digitalbanking.accounts.bootstrap
 
 import io.github.capozziv.digitalbanking.accounts.bootstrap.web.ApiClient
 import io.github.capozziv.digitalbanking.accounts.bootstrap.web.assertProblem
+import io.github.capozziv.digitalbanking.testing.security.ApiDocsAssertions
 import io.github.capozziv.digitalbanking.testing.security.JwtTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -23,6 +24,16 @@ class OpenApiIntegrationTest : AccountsIntegrationTest() {
         val response = ApiClient(port).get("/v3/api-docs")
         assertThat(response.status).describedAs(response.rawBody).isEqualTo(200)
         response.body!!
+    }
+
+    @Test
+    fun `the contract in JSON and YAML and the Swagger UI are open without a token`() {
+        ApiDocsAssertions.assertOpenWithoutToken(port)
+    }
+
+    @Test
+    fun `every operation documents X-Correlation-Id and the common errors as Problem Details`() {
+        ApiDocsAssertions.assertCommonContract(ApiDocsAssertions.fetchContract(port))
     }
 
     @Test
@@ -97,6 +108,26 @@ class OpenApiIntegrationTest : AccountsIntegrationTest() {
                 .asString()
 
         assertThat(unprocessable).contains("/problems/insufficient-available-balance").contains("/problems/idempotency-key-reused")
+    }
+
+    @Test
+    fun `the operations on an existing account or account type document 404 as Problem Details`() {
+        val names =
+            listOf(
+                "GET /accounts/{id}",
+                "GET /accounts/{id}/entries",
+                "POST /accounts/{id}/credits",
+                "POST /accounts/{id}/debits",
+                "PUT /accounts/{id}/type",
+                "PUT /admin/account-types/{type}",
+            )
+        for (name in names) {
+            val notFound = operation(name).get("responses").get("404")
+
+            assertThat(notFound).describedAs(name).isNotNull()
+            assertThat(notFound.get("description").asString()).describedAs(name).contains("/problems/")
+            assertThat(notFound.get("content").get("application/problem+json")).describedAs(name).isNotNull()
+        }
     }
 
     @Test
