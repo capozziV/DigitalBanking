@@ -81,6 +81,9 @@ class IdentityEndToEndIntegrationTest {
         val account = accounts.openAccount(owner)
         accounts.credit(account, 500)
 
+        // The owner is a customer, not an admin: 403, and the account stays as it was.
+        assertThat(accounts.changeStatusAsCustomer(account, owner, "BLOCKED").status).isEqualTo(403)
+
         val blocked = accounts.changeStatus(account, "BLOCKED")
         assertThat(blocked.status).describedAs(blocked.body).isEqualTo(200)
         assertThat(blocked.json().get("status").asString()).isEqualTo("BLOCKED")

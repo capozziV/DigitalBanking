@@ -56,7 +56,7 @@ class OpenApiConfiguration {
               or of an admin. A customer only transfers from, and only sees, its own accounts and transfers; someone else's is answered
               with 404, as if it did not exist. An admin may do everything except `/internal/**`.
             - `/internal/**` takes only a service token (machine token, scope `digitalbanking/internal`): accounts
-              asks there how many `PENDING` transfers leave an account before closing it. Any other caller is 403.
+              asks there how many `PENDING` transfers leave an account before closing it. A customer or admin token is 403; no token is 401.
             - Before a transfer is created, the customer that owns the source account is checked with the customer
               service, every time: not registered or blocked is 422, customer unavailable is 503.
             - `X-Correlation-Id` is accepted on every request (generated when absent or invalid), forwarded to accounts

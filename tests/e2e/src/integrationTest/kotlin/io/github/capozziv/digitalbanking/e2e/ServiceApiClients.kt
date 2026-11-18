@@ -127,6 +127,13 @@ class AccountsApiClient(
         status: String,
     ): HttpResult = send("PUT", "$baseUrl/admin/accounts/$account/status", tokens.admin(), """{"status":"$status"}""")
 
+    /** The same call with the token of a customer, who must not be allowed to change an account status. */
+    fun changeStatusAsCustomer(
+        account: UUID,
+        customerId: UUID,
+        status: String,
+    ): HttpResult = send("PUT", "$baseUrl/admin/accounts/$account/status", tokens.customer(customerId), """{"status":"$status"}""")
+
     /** `POST /accounts/{id}/close` with the token of the account's customer (or an admin when it was not opened here). */
     fun close(account: UUID): HttpResult {
         val owner = owners[account]

@@ -29,7 +29,7 @@ spring:
 digitalbanking:
   security:
     groups-claim: ${ACCOUNTS_JWT_GROUPS_CLAIM:groups}
-    # Machine token (client credentials) for the calls to the customer service.
+    # Machine token (client credentials) for the calls to the customer and transfers services.
     service-token:
       token-uri: ${ACCOUNTS_OAUTH_TOKEN_URI:http://localhost:8090/default/token}
       client-id: ${ACCOUNTS_OAUTH_CLIENT_ID:accounts}

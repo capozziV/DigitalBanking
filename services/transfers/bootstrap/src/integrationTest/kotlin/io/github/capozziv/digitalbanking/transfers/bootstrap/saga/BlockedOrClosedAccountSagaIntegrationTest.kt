@@ -5,7 +5,6 @@ import com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath
 import com.github.tomakehurst.wiremock.client.WireMock.post
 import com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor
 import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
-import io.github.capozziv.digitalbanking.transfers.application.port.DailyLimitGateway
 import io.github.capozziv.digitalbanking.transfers.bootstrap.TransfersIntegrationTest
 import io.github.capozziv.digitalbanking.transfers.bootstrap.saga.AccountsStubs.Companion.entryCreated
 import io.github.capozziv.digitalbanking.transfers.bootstrap.saga.AccountsStubs.Companion.problem
@@ -17,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.web.server.LocalServerPort
+import org.springframework.data.redis.core.StringRedisTemplate
 import java.time.LocalDate
 import java.util.UUID
 
@@ -31,7 +31,7 @@ class BlockedOrClosedAccountSagaIntegrationTest : TransfersIntegrationTest() {
     private var port: Int = 0
 
     @Autowired
-    private lateinit var dailyLimits: DailyLimitGateway
+    private lateinit var redisTemplate: StringRedisTemplate
 
     private val api by lazy { ApiClient(port) }
     private val stubs by lazy { AccountsStubs(accountsServer) }
@@ -58,7 +58,7 @@ class BlockedOrClosedAccountSagaIntegrationTest : TransfersIntegrationTest() {
         assertThat(statusAndReason(id)).isEqualTo("FAILED" to "account-blocked")
         accountsServer.verify(0, postRequestedFor(urlEqualTo("/accounts/$destination/credits")))
         accountsServer.verify(0, postRequestedFor(urlEqualTo("/accounts/$source/credits")))
-        assertThat(dailyLimits.usage(source, limitDay(id)).used).isZero()
+        assertLimitGivenBack(id)
         assertThat(outboxEventTypes(id)).containsExactly("TransferFailed")
     }
 
@@ -72,7 +72,7 @@ class BlockedOrClosedAccountSagaIntegrationTest : TransfersIntegrationTest() {
         val id = UUID.fromString(response.body!!.get("transferId").asString())
         assertThat(statusAndReason(id)).isEqualTo("FAILED" to "account-closed")
         accountsServer.verify(0, postRequestedFor(urlEqualTo("/accounts/$destination/credits")))
-        assertThat(dailyLimits.usage(source, limitDay(id)).used).isZero()
+        assertLimitGivenBack(id)
     }
 
     @Test
@@ -94,8 +94,18 @@ class BlockedOrClosedAccountSagaIntegrationTest : TransfersIntegrationTest() {
                 .withHeader("Idempotency-Key", equalTo("transfer-$id-compensation"))
                 .withRequestBody(matchingJsonPath("$.amount", equalTo("300000"))),
         )
-        assertThat(dailyLimits.usage(source, limitDay(id)).used).isZero()
+        assertLimitGivenBack(id)
         assertThat(outboxEventTypes(id)).containsExactly("TransferCompensated")
+    }
+
+    /**
+     * Reads the Redis counter, not `usage`: `usage` sums the PostgreSQL rows and already leaves out FAILED and
+     * COMPENSATED transfers, so it would stay at zero even without the release.
+     */
+    private fun assertLimitGivenBack(id: UUID) {
+        val counter = "daily-limit:v1:$source:${limitDay(id)}"
+        assertThat(redisTemplate.opsForHash<String, String>().hasKey(counter, id.toString())).isFalse()
+        assertThat(redisTemplate.opsForHash<String, String>().get(counter, "total")).isEqualTo("0")
     }
 
     private fun transfer(amount: Long): ApiResponse =

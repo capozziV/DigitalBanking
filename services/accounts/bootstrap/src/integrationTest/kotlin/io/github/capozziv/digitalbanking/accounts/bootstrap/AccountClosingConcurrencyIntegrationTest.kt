@@ -12,6 +12,7 @@ import org.awaitility.Awaitility.await
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.http.HttpMethod
+import org.springframework.test.context.TestPropertySource
 import java.sql.Connection
 import java.sql.DriverManager
 import java.time.Duration
@@ -27,7 +28,11 @@ import java.util.concurrent.TimeUnit
  * balance under the lock, so a debit after it is refused (422 account-closed) and a credit before it refuses it
  * (422 balance-not-zero). The deterministic cases hold the account lock in a transaction of the owner user, so the
  * requests queue on the row in a known order.
+ *
+ * The lock timeout is long here: the requests wait on the row lock while the test polls for the waiters, and the
+ * path up to that wait (JWT, read, machine token, call to transfers) can take longer than the default 2 s on a busy CI.
  */
+@TestPropertySource(properties = ["accounts.lock-timeout=30s"])
 class AccountClosingConcurrencyIntegrationTest : AccountsIntegrationTest() {
     @LocalServerPort
     private var port: Int = 0
@@ -121,7 +126,7 @@ class AccountClosingConcurrencyIntegrationTest : AccountsIntegrationTest() {
 
     /** Waits until [count] sessions of the application user wait for a row lock on the account table. */
     private fun awaitLockWaiters(count: Int) {
-        await().atMost(Duration.ofSeconds(1)).pollInterval(Duration.ofMillis(10)).until {
+        await().atMost(Duration.ofSeconds(10)).pollInterval(Duration.ofMillis(10)).until {
             ownerJdbc
                 .sql(
                     """
