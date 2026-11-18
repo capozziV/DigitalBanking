@@ -1,6 +1,7 @@
 package io.github.capozziv.digitalbanking.customer.bootstrap
 
 import io.github.capozziv.digitalbanking.customer.bootstrap.web.ApiClient
+import io.github.capozziv.digitalbanking.customer.bootstrap.web.assertProblem
 import io.github.capozziv.digitalbanking.outbox.relay.SnsEventPublisher
 import io.github.capozziv.digitalbanking.testing.localstack.LocalStackTestSupport
 import io.github.capozziv.digitalbanking.testing.security.JwtTestSupport
@@ -73,6 +74,19 @@ class OutboxRelayIntegrationTest : CustomerIntegrationTest() {
                     .asString(),
             ).isEqualTo(sub.toString())
         }
+    }
+
+    @Test
+    fun `the relay admin routes are served by the service, for admins only, in Problem Details`() {
+        val admin = JwtTestSupport.adminToken(UUID.randomUUID())
+
+        val stuck = api.get("/admin/outbox/stuck-events", admin)
+        assertThat(stuck.status).describedAs(stuck.rawBody).isEqualTo(200)
+        assertThat(stuck.body!!.isArray).isTrue()
+        assertThat(api.get("/admin/outbox/stuck-events", JwtTestSupport.customerToken(UUID.randomUUID())).status).isEqualTo(403)
+
+        val discard = api.post("/admin/outbox/events/${UUID.randomUUID()}/discard", """{"reason":"poison event"}""", admin)
+        assertProblem(discard, 404, "outbox-event-not-found")
     }
 
     /** Reads (and deletes) the inspection queue until [expected] events of the customer arrived, then polls a little more for duplicates. */

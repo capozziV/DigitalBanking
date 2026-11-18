@@ -21,6 +21,8 @@ import org.springframework.security.web.SecurityFilterChain
  * - [CallerResolver] turns it into a [Caller]; the groups claim is `digitalbanking.security.groups-claim`.
  * - The route rules are the fixed ones plus each [SecurityRules] bean (see [SecurityRules]).
  * - 401 and 403 are Problem Details (`/problems/unauthorized`, `/problems/forbidden`).
+ * - The OpenAPI contract (JSON and YAML) and the Swagger UI are open ([API_DOCS_ROUTES]); the `aws` profile of each
+ *   service turns springdoc off, and then these routes are 404.
  * - Stateless, no CSRF (bearer tokens only, no cookies).
  *
  * A service that declares its own `SecurityFilterChain` turns this chain off.
@@ -54,9 +56,7 @@ class DigitalBankingSecurityAutoConfiguration {
             sessionManagement { sessionCreationPolicy = SessionCreationPolicy.STATELESS }
             authorizeHttpRequests {
                 authorize("/actuator/health/**", permitAll)
-                authorize("/v3/api-docs/**", permitAll)
-                authorize("/swagger-ui/**", permitAll)
-                authorize("/swagger-ui.html", permitAll)
+                API_DOCS_ROUTES.forEach { authorize(it, permitAll) }
                 authorize("/error", permitAll)
                 authorize("/admin/**", hasRole(CallerRoles.ADMIN))
                 authorize("/internal/**", hasRole(CallerRoles.SERVICE))
@@ -75,6 +75,11 @@ class DigitalBankingSecurityAutoConfiguration {
             }
         }
         return http.build()
+    }
+
+    private companion object {
+        // Served by springdoc. The pattern of the JSON groups under /v3/api-docs/ does not match the YAML form.
+        val API_DOCS_ROUTES = listOf("/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml", "/swagger-ui/**", "/swagger-ui.html")
     }
 }
 

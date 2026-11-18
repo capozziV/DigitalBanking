@@ -3,10 +3,15 @@ package io.github.capozziv.digitalbanking.transfers.adapters.accounts
 import io.github.capozziv.digitalbanking.transfers.adapters.accounts.dto.AccountsAccountResponseDTO
 import io.github.capozziv.digitalbanking.transfers.adapters.accounts.dto.AccountsEntryRequestDTO
 import io.github.capozziv.digitalbanking.transfers.adapters.accounts.dto.AccountsEntryResponseDTO
+import io.github.capozziv.digitalbanking.transfers.adapters.accounts.dto.AccountsLedgerEntryResponseDTO
 import io.github.capozziv.digitalbanking.transfers.adapters.accounts.dto.AccountsProblemDTO
 import io.github.capozziv.digitalbanking.transfers.application.port.AccountLookup
 import io.github.capozziv.digitalbanking.transfers.application.port.AccountsGateway
 import io.github.capozziv.digitalbanking.transfers.application.port.CallResult
+import io.github.capozziv.digitalbanking.transfers.application.port.EntryLookup
+import io.github.capozziv.digitalbanking.transfers.domain.EntryKind
+import io.github.capozziv.digitalbanking.transfers.domain.Money
+import io.github.capozziv.digitalbanking.transfers.domain.RecordedEntry
 import io.github.capozziv.digitalbanking.transfers.domain.StepCall
 import io.github.capozziv.digitalbanking.transfers.domain.StepOutcome
 import org.slf4j.LoggerFactory
@@ -29,7 +34,8 @@ import java.util.UUID
  * [lookupAccount] follows the same rule for the network and the peer (they become [AccountLookup.Unavailable], and so
  * do a 200 without the owner of the account and a 401 or 403 that rejects the service token), but
  * throws [IllegalStateException] on a 4xx other than "account not found": that is a bug in this client or a
- * misrouted request, and it must not be taken for a missing account.
+ * misrouted request, and it must not be taken for a missing account. [findEntry] follows the same rule, with "entry
+ * not found" and "account not found" as [EntryLookup.NotFound].
  *
  * The [restClient] adds the correlation id and the machine token to every call (see [AccountsClientConfiguration]).
  */
@@ -65,6 +71,46 @@ class HttpAccountsGateway(
                 }
             }
         }
+    }
+
+    override fun findEntry(
+        accountId: UUID,
+        idempotencyKey: String,
+    ): EntryLookup {
+        var entry: RecordedEntry? = null
+        val result =
+            send(
+                describe = "find entry $idempotencyKey of account $accountId",
+                request = restClient.get().uri("/accounts/{id}/entries?idempotencyKey={key}", accountId, idempotencyKey),
+                isValidSuccessBody = { body -> read<AccountsLedgerEntryResponseDTO>(body)?.toRecordedEntry()?.also { entry = it } != null },
+            )
+        return when (val outcome = result.outcome) {
+            StepOutcome.Success -> {
+                EntryLookup.Found(checkNotNull(entry))
+            }
+
+            StepOutcome.TransientFailure -> {
+                EntryLookup.Unavailable
+            }
+
+            is StepOutcome.Refused -> {
+                if (outcome.reason == StepOutcome.ENTRY_NOT_FOUND || outcome.reason == ACCOUNT_NOT_FOUND) {
+                    EntryLookup.NotFound
+                } else {
+                    // Any other 4xx on this read means a bug in this client or a misrouted request, not a missing entry.
+                    error(
+                        "unexpected response to GET /accounts/$accountId/entries: status ${result.httpStatus}, reason ${outcome.reason}",
+                    )
+                }
+            }
+        }
+    }
+
+    /** Null when the kind is not one this client knows, or the amount is not a positive number of cents. */
+    private fun AccountsLedgerEntryResponseDTO.toRecordedEntry(): RecordedEntry? {
+        val entryKind = EntryKind.entries.firstOrNull { it.name == kind } ?: return null
+        if (amount <= 0) return null
+        return RecordedEntry(accountId, entryKind, Money(amount))
     }
 
     override fun perform(call: StepCall.Accounts): CallResult =

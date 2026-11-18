@@ -1,6 +1,7 @@
 package io.github.capozziv.digitalbanking.transfers.adapters.dailylimit
 
 import org.springframework.jdbc.core.simple.JdbcClient
+import java.time.Duration
 import java.time.LocalDate
 import java.util.UUID
 
@@ -11,11 +12,21 @@ import java.util.UUID
 class JdbcDailyLimitStore(
     private val jdbc: JdbcClient,
 ) {
-    /** Waits for, then holds until the transaction ends, the lock of the account and day shared by every reservation. */
+    /**
+     * Waits for, then holds until the transaction ends, the lock of the account and day shared by every reservation.
+     * Waits at most [timeout] (`lock_timeout`, local to the transaction), then throws a
+     * [org.springframework.dao.PessimisticLockingFailureException].
+     */
     fun lock(
         accountId: UUID,
         day: LocalDate,
+        timeout: Duration,
     ) {
+        jdbc
+            .sql("select set_config('lock_timeout', :timeout, true)")
+            .param("timeout", "${timeout.toMillis()}ms")
+            .query { _, _ -> Unit }
+            .single()
         jdbc
             .sql("select pg_advisory_xact_lock(hashtextextended(cast(:accountId as text) || ':' || cast(:day as text), 0))")
             .param("accountId", accountId.toString())

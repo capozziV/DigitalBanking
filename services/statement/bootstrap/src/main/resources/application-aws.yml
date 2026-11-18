@@ -1,0 +1,9 @@
+# Profile of the deploy on AWS (stage 8). The local environment, the tests, smoke and e2e run without it.
+# The AWS endpoints of this service are already blank by default (application.yml): the real ones of the region.
+
+# No OpenAPI contract nor Swagger UI on AWS: the routes are 404 (the security library leaves them open).
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

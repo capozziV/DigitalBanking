@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.web.server.LocalServerPort
+import org.springframework.data.redis.core.StringRedisTemplate
 import java.time.LocalDate
 import java.util.UUID
 
@@ -25,6 +26,9 @@ class DailyLimitSagaIntegrationTest : TransfersIntegrationTest() {
 
     @Autowired
     private lateinit var dailyLimits: DailyLimitGateway
+
+    @Autowired
+    private lateinit var redisTemplate: StringRedisTemplate
 
     private val api by lazy { ApiClient(port) }
     private val stubs by lazy { AccountsStubs(accountsServer) }
@@ -72,6 +76,28 @@ class DailyLimitSagaIntegrationTest : TransfersIntegrationTest() {
         accountsServer.resetAll()
         stubs.accountExists(source)
         accountsServer.stubFor(post(urlEqualTo("/accounts/$source/debits")).willReturn(entryCreated()))
+        val full = transfer(destinationThatCredits(), 500_000)
+
+        assertThat(full.status).describedAs(full.rawBody).isEqualTo(201)
+    }
+
+    @Test
+    fun `a compensated transfer gives its reservation back to the redis counter`() {
+        accountsServer.stubFor(post(urlEqualTo("/accounts/$source/debits")).willReturn(entryCreated()))
+        accountsServer.stubFor(post(urlEqualTo("/accounts/$source/credits")).willReturn(entryCreated()))
+        val missing = UUID.randomUUID()
+        stubs.accountExists(missing)
+        accountsServer.stubFor(post(urlEqualTo("/accounts/$missing/credits")).willReturn(problem(404, "account-not-found")))
+
+        val compensated = transfer(missing, 300_000)
+
+        assertThat(compensated.status).describedAs(compensated.rawBody).isEqualTo(200)
+        assertThat(compensated.body!!.get("status").asString()).isEqualTo("COMPENSATED")
+        val id = UUID.fromString(compensated.body.get("id").asString())
+        val counter = "daily-limit:v1:$source:${limitDay(id)}"
+        assertThat(redisTemplate.opsForHash<String, String>().hasKey(counter, id.toString())).isFalse()
+        assertThat(redisTemplate.opsForHash<String, String>().get(counter, "total")).isEqualTo("0")
+
         val full = transfer(destinationThatCredits(), 500_000)
 
         assertThat(full.status).describedAs(full.rawBody).isEqualTo(201)

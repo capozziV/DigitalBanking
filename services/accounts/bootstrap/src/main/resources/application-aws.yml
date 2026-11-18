@@ -1,0 +1,13 @@
+# Profile of the deploy on AWS (stage 8). The local environment, the tests, smoke and e2e run without it.
+
+# No OpenAPI contract nor Swagger UI on AWS: the routes are 404 (the security library leaves them open).
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+accounts:
+  aws:
+    # Blank: the SDK uses the real endpoint of the region and the default credential chain.
+    endpoint: ${ACCOUNTS_AWS_ENDPOINT:}

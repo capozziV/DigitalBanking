@@ -10,7 +10,6 @@ import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import org.slf4j.LoggerFactory
-import org.springframework.http.ProblemDetail
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
@@ -39,12 +38,10 @@ class AccountClosingController(
         ApiResponse(
             responseCode = "400",
             description = "/problems/validation-error: the id is not a UUID",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "404",
             description = "/problems/account-not-found: no such account, or an account of another customer",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "422",
@@ -52,7 +49,6 @@ class AccountClosingController(
                 "/problems/balance-not-zero: the balance (member `balance`, in cents) is not zero. " +
                     "/problems/pending-transfers: outgoing transfers still pending (member `count`). " +
                     "/problems/account-closed: the account is already closed",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "503",
@@ -60,7 +56,6 @@ class AccountClosingController(
                 "/problems/transfers-unavailable: the transfer service is down, slower than the timeout or answered an " +
                     "error; the account was not closed, retry later. " + ApiDocs.ACCOUNT_BUSY,
             headers = [Header(name = "Retry-After", description = ApiDocs.RETRY_AFTER, schema = Schema(type = "integer"))],
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
     )
     @PostMapping("/{id}/close")

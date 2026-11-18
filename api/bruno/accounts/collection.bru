@@ -7,6 +7,9 @@ auth:bearer {
 }
 
 script:pre-request {
+  // Copia identica em accounts, notification, statement e transfers (o Bruno nao compartilha scripts entre colecoes):
+  // mude as quatro juntas; o job lint do CI falha se divergirem. O customer tem uma variante propria (cliente sem
+  // cadastro) e tambem segue as mudancas do pedido de token.
   // Tokens do mock-oauth2-server (como infra/local/auth/token.sh), uma vez por execucao da colecao:
   // - customerToken: cliente novo, ja cadastrado no customer (o token padrao das requisicoes, por heranca);
   // - otherCustomerToken: outro cliente cadastrado, para ver o 404 do recurso alheio;

@@ -1,5 +1,6 @@
 package io.github.capozziv.digitalbanking.customer.application.usecase
 
+import io.github.capozziv.digitalbanking.customer.application.CallerHasNoCustomerException
 import io.github.capozziv.digitalbanking.customer.application.CustomerNotFoundException
 import io.github.capozziv.digitalbanking.customer.application.port.CustomerRepository
 import io.github.capozziv.digitalbanking.customer.application.port.TransactionRunner
@@ -19,5 +20,5 @@ class GetCustomerUseCase(
 class GetOwnCustomerUseCase(
     private val getCustomer: GetCustomerUseCase,
 ) {
-    fun execute(caller: Caller): Customer = getCustomer.execute(caller.ownCustomerId())
+    fun execute(caller: Caller): Customer = getCustomer.execute(caller.ownCustomerId() ?: throw CallerHasNoCustomerException())
 }

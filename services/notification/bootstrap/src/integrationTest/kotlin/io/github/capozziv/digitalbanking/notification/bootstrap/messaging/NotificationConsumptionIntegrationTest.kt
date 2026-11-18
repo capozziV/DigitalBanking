@@ -159,6 +159,17 @@ class NotificationConsumptionIntegrationTest {
     }
 
     @Test
+    fun `the container's error line of a failed message carries the correlation id of the message`(output: CapturedOutput) {
+        val correlationId = "failing-${UUID.randomUUID()}"
+        send(ACCOUNTS_QUEUE, "broken-${UUID.randomUUID()}", """{"eventId":"not-a-uuid","eventType":"AccountOpened"}""", correlationId)
+
+        await { output.out.lines().any { it.contains("Error processing message") && it.contains("[$correlationId]") } }
+        // The message keeps failing until the DLQ: wait for it, so the other tests compare the DLQ depth undisturbed.
+        await(Duration.ofSeconds(60)) { visibleMessages(ACCOUNTS_DLQ) == accountsDlqAtStart + 1 }
+        awaitEmpty(ACCOUNTS_QUEUE)
+    }
+
+    @Test
     fun `the DLQ gauge is exposed by the metrics endpoint with the queue tag`() {
         val response =
             ApiClient(
@@ -282,6 +293,7 @@ class NotificationConsumptionIntegrationTest {
         queue: String,
         group: String,
         body: String,
+        correlationId: String = CORRELATION_ID,
     ) {
         sqs.sendMessage {
             it
@@ -295,7 +307,7 @@ class NotificationConsumptionIntegrationTest {
                             MessageAttributeValue
                                 .builder()
                                 .dataType("String")
-                                .stringValue(CORRELATION_ID)
+                                .stringValue(correlationId)
                                 .build(),
                     ),
                 )

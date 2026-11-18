@@ -11,7 +11,12 @@ A transferência mexe em duas contas do `accounts` sem transação distribuída:
 - **HTTP síncrono ao `accounts`**, com os endpoints de crédito e débito existentes. `POST /transfers` roda a saga na requisição; em falha passageira devolve `202` com a transferência `PENDING`, e um agendador termina depois.
 - **Idempotência por passo:** a chave de cada chamada é derivada do `transferId` (`transfer-<id>-debit`, `-credit`, `-compensation`), então repetir uma chamada é seguro.
 - **Prazo de 2 minutos** (configurável) desde a criação, só para falha passageira em `ReserveLimit`, débito e crédito. No `ReserveLimit`, vencido o prazo a transferência termina `FAILED` com `daily-limit-unavailable` ([ADR 0010](0010-limite-diario-redis-lua.md)). Em débito e crédito, vencido o prazo, o `transfers` não repete a chamada: **consulta o lançamento pela chave** (`GET /accounts/{id}/entries?idempotencyKey=…`, endpoint novo, sem gravar nada) para resolver a dúvida. Débito encontrado leva à compensação; crédito encontrado leva à conclusão; lançamento ausente leva à falha (débito) ou à compensação (crédito).
-- **Compensação** é um crédito de volta na origem, tentado até conseguir.
+- **Compensação** é um crédito de volta na origem, tentado até conseguir, sem teto de tentativas.
+- **Saída manual do admin** ([#56](https://github.com/capozziV/DigitalBanking/issues/56)), para quando o `accounts` recusa a compensação para sempre (bug):
+  - `GET /admin/transfers/stuck` lista as transferências presas;
+  - `POST /admin/transfers/{id}/retry` roda a saga de novo agora;
+  - `POST /admin/transfers/{id}/manual-compensation` com `{reason, creditIdempotencyKey}`: o admin credita a origem à mão no `accounts` e informa a chave desse crédito. O `transfers` confere no `accounts` que o lançamento existe na conta de origem, é `CREDIT` e tem o valor da transferência; só então marca a transferência Compensada (`COMPENSATED`). A chave é única: um crédito fecha uma só transferência.
+  - Conferir no `accounts` em vez de confiar na palavra do admin, porque Compensada promete que o valor voltou à origem.
 - **Arrendamento** (`locked_until`, `lock_owner`) em vez de trava de banco durante a chamada HTTP: nenhuma transação fica aberta esperando o `accounts`, e a saga roda em um lugar só. Perder o arrendamento é seguro por causa das chaves idempotentes.
 - Eventos `TransferCompleted`, `TransferFailed` e `TransferCompensated` pelo outbox ([ADR 0015](0015-outbox-relay-lider-e-sns-fifo.md)).
 
@@ -19,7 +24,7 @@ A transferência mexe em duas contas do `accounts` sem transação distribuída:
 - Positivas: o cliente costuma saber o resultado na primeira resposta; sem componente novo de mensageria nesta etapa; a saga sobrevive a queda do `transfers` (o agendador retoma) e a repetição de chamadas; a consulta pela chave evita pagar em dobro; cada passo é testável isolado.
 - Negativas: `transfers` e `accounts` ficam acoplados em tempo de execução (o `accounts` fora do ar deixa transferências `PENDING`); o endpoint de consulta é um contrato novo no `accounts`; há um prazo e um arrendamento a ajustar.
 - **Risco residual aceito:** uma chamada ainda em voo no `accounts` quando a consulta roda poderia gravar depois. Com leitura de 3 s, `lock_timeout` de 2 s e prazo de 2 min, não acontece na prática; se o crédito tardio aparecer na consulta, a transferência conclui.
-- **Compensação recusada em laço:** o crédito na origem não tem regra de recusa, então uma recusa indica bug. O passo continua tentando com a espera máxima e registra `ERROR`; a transferência não termina sozinha. Desbloqueio manual fica no cartão [#56](https://github.com/capozziV/DigitalBanking/issues/56).
+- **Compensação recusada em laço:** o crédito na origem não tem regra de recusa, então uma recusa indica bug. O passo continua tentando com a espera máxima e registra `ERROR`; a transferência não termina sozinha. A métrica `transfers.pending.aged` mostra as transferências presas, e `transfers.accounts.service.token.rejected` mostra o `accounts` recusando o token de máquina. A saída é manual, pelo admin (acima); a conferência no `accounts` custa uma consulta a mais e exige que o admin informe a chave do crédito.
 
 ## Alternativas consideradas
 - **Comandos por mensageria (SNS/SQS):** antecipa a etapa 3 e obriga o `accounts` a ter um consumidor novo.

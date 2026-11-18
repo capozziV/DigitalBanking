@@ -12,7 +12,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import jakarta.validation.Valid
 import org.slf4j.LoggerFactory
-import org.springframework.http.ProblemDetail
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -42,23 +41,19 @@ class AccountStatusAdminController(
         ApiResponse(
             responseCode = "400",
             description = "/problems/validation-error: the id is not a UUID, or the status is missing, unknown or CLOSED",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "404",
             description = "/problems/account-not-found",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "422",
             description = "/problems/account-closed: a closed account never changes status",
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
         ApiResponse(
             responseCode = "503",
             description = ApiDocs.ACCOUNT_BUSY,
             headers = [Header(name = "Retry-After", description = ApiDocs.RETRY_AFTER, schema = Schema(type = "integer"))],
-            content = [Content(mediaType = ApiDocs.PROBLEM_JSON, schema = Schema(implementation = ProblemDetail::class))],
         ),
     )
     @PutMapping("/{id}/status")

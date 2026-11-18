@@ -1,6 +1,7 @@
 package io.github.capozziv.digitalbanking.customer.bootstrap
 
 import io.github.capozziv.digitalbanking.customer.bootstrap.web.ApiClient
+import io.github.capozziv.digitalbanking.testing.security.ApiDocsAssertions
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.web.server.LocalServerPort
@@ -24,6 +25,16 @@ class OpenApiIntegrationTest : CustomerIntegrationTest() {
             .flatMap { path ->
                 paths.get(path).propertyNames().map { method -> "${method.uppercase()} $path" to paths.get(path).get(method) }
             }.toMap()
+    }
+
+    @Test
+    fun `the contract in JSON and YAML and the Swagger UI are open without a token`() {
+        ApiDocsAssertions.assertOpenWithoutToken(port)
+    }
+
+    @Test
+    fun `every operation documents X-Correlation-Id and the common errors as Problem Details`() {
+        ApiDocsAssertions.assertCommonContract(ApiDocsAssertions.fetchContract(port))
     }
 
     @Test

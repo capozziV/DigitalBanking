@@ -51,6 +51,7 @@ internal fun JdbcClient.outboxCorrelationIds(transferId: UUID): Map<String, Stri
 
 internal fun JdbcClient.deleteTransfers() {
     sql("delete from transfer_step").update()
+    sql("delete from transfer_manual_resolution").update()
     sql("delete from transfer").update()
     sql("delete from outbox").update()
 }

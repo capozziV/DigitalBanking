@@ -12,12 +12,16 @@ dependencies {
     api("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.slf4j:slf4j-api")
     implementation("tools.jackson.core:jackson-databind")
+    // Only to document the common error responses in the services that publish an OpenAPI contract.
+    compileOnly(libs.springdoc.openapi.starter.webmvc.ui)
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation(libs.springdoc.openapi.starter.webmvc.ui)
 
     integrationTestImplementation(project(":libs:testing-security"))
     // Services use both libs: proves 401/403 keep the X-Correlation-Id (the correlation filter runs first).
     integrationTestImplementation(project(":libs:observabilidade"))
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-test")
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-actuator")
+    integrationTestImplementation(libs.springdoc.openapi.starter.webmvc.ui)
 }
