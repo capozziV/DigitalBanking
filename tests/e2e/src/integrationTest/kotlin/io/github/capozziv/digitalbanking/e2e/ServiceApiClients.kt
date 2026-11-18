@@ -121,6 +121,18 @@ class AccountsApiClient(
         check(result.status == 201) { "debit: ${result.status} ${result.body}" }
     }
 
+    /** `PUT /admin/accounts/{id}/status` with an admin token; returns status and body as they came. */
+    fun changeStatus(
+        account: UUID,
+        status: String,
+    ): HttpResult = send("PUT", "$baseUrl/admin/accounts/$account/status", tokens.admin(), """{"status":"$status"}""")
+
+    /** `POST /accounts/{id}/close` with the token of the account's customer (or an admin when it was not opened here). */
+    fun close(account: UUID): HttpResult {
+        val owner = owners[account]
+        return send("POST", "$baseUrl/accounts/$account/close", if (owner != null) tokens.customer(owner) else tokens.admin())
+    }
+
     fun account(account: UUID): JsonNode {
         val result = send("GET", "$baseUrl/accounts/$account", tokens.admin())
         check(result.status == 200) { "get account: ${result.status} ${result.body}" }

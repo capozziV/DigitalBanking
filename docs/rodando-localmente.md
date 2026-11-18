@@ -76,6 +76,8 @@ Para rodar só os testes unitários, sem Docker:
 ## 4. Subir os serviços `customer`, `accounts`, `transfers`, `notification` e `statement`
 Todos validam o JWT do `mock-oauth2-server` (`*_JWT_ISSUER_URI`; veja [Identidade local](#identidade-local-mock-oauth2-server)). O `customer` sobe primeiro: o `accounts` o consulta a cada abertura de conta e o `transfers` a cada pedido de transferência, direto e com token de máquina (`ACCOUNTS_CUSTOMER_BASE_URL` e `TRANSFERS_CUSTOMER_BASE_URL`, padrão `http://localhost:8085`; tempo máximo `ACCOUNTS_CUSTOMER_TIMEOUT` e `TRANSFERS_CUSTOMER_TIMEOUT`, padrão `500ms`). Com o `customer` fora, essas duas operações respondem `503 customers-unavailable`.
 
+O `accounts` também consulta o `transfers` ao encerrar uma conta (`POST /accounts/{id}/close`), direto e com token de máquina, para saber se há transferências pendentes: `ACCOUNTS_TRANSFERS_BASE_URL` (padrão `http://localhost:8082`) e `ACCOUNTS_TRANSFERS_TIMEOUT` (padrão `500ms`). Com o `transfers` fora ou lento, só o encerramento responde `503 transfers-unavailable`; o resto do `accounts` segue normal. Bloquear e desbloquear (`PUT /admin/accounts/{id}/status`, só admin) não dependem do `transfers`.
+
 Localmente os serviços sobem com o perfil padrão (LocalStack, swagger-ui ligado). O perfil `aws` é só do deploy na AWS; veja [arquitetura](arquitetura.md#borda-e-segurança).
 
 O `customer` lê `CUSTOMER_DB_*`, `CUSTOMER_AWS_ENDPOINT` (LocalStack) e `CUSTOMER_JWT_ISSUER_URI`, e publica `CustomerRegistered`, `CustomerBlocked` e `CustomerUnblocked` no tópico `customer-events.fifo` pelo outbox. Num terminal novo:

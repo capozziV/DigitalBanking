@@ -14,6 +14,9 @@
 # 4. statement: espera ate 30 s e confere, em GET /accounts/{id}/statement, os lancamentos da conta do passo 1:
 #    sequence 2 (debito de 300, saldo 700) e sequence 1 (credito de 1000, saldo 1000), do mais novo para o mais antigo;
 #    o mesmo extrato pedido por outro cliente responde 404 account-not-found.
+# 5. status da conta: o admin bloqueia (PUT /admin/accounts/{id}/status), o debito e recusado (422), o admin desbloqueia
+#    e o encerramento com saldo e recusado (POST /accounts/{id}/close, 422). O encerramento com saldo zero consulta o
+#    transfers e entra aqui quando ele tiver a rota de pendentes (Task 2).
 # Uso: infra/local/smoke.sh [url-base]   (padrao http://127.0.0.1; exige o compose de pe)
 set -euo pipefail
 
@@ -234,3 +237,21 @@ case "$stranger_type" in
     exit 1
     ;;
 esac
+
+# --- status da conta ---
+# Conta nova, depois da conferencia de eventos da conta do passo 1 (bloquear emite eventos novos).
+pair=$(new_customer)
+read -r _ status_token <<< "$pair"
+status_id=$(call 201 "$status_token" POST /accounts | jq -r .id)
+call 201 "$admin" POST "/accounts/$status_id/credits" '{"amount":100,"description":"smoke credito"}' > /dev/null
+call 403 "$status_token" PUT "/admin/accounts/$status_id/status" '{"status":"BLOCKED"}' > /dev/null
+blocked=$(call 200 "$admin" PUT "/admin/accounts/$status_id/status" '{"status":"BLOCKED"}' | jq -r .status)
+call 422 "$admin" POST "/accounts/$status_id/debits" '{"amount":1,"description":"conta bloqueada"}' > /dev/null
+unblocked=$(call 200 "$admin" PUT "/admin/accounts/$status_id/status" '{"status":"ACTIVE"}' | jq -r .status)
+# Com saldo, o encerramento e recusado antes de consultar o transfers (422 balance-not-zero).
+call 422 "$status_token" POST "/accounts/$status_id/close" > /dev/null
+if [ "$blocked:$unblocked" != "BLOCKED:ACTIVE" ]; then
+  echo "FALHA: status da conta $status_id: '$blocked:$unblocked' (esperado 'BLOCKED:ACTIVE')" >&2
+  exit 1
+fi
+echo "OK: conta $status_id bloqueada, desbloqueada e encerramento com saldo recusado"
