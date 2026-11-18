@@ -27,13 +27,21 @@ interface DailyLimitGateway {
         amount: Money,
     ): ReservationResult
 
-    /** Best effort; never throws for a Redis failure. */
+    /**
+     * Gives the transfer's reservation back, after its failed or compensated state is saved (the source of truth already
+     * stopped counting it). Best effort, never throws for a Redis failure: when the counter cannot be updated, the next
+     * reservation of the account and day rebuilds it from the source of truth.
+     */
     fun release(
         transferId: UUID,
         accountId: UUID,
         day: LocalDate,
     )
 
+    /**
+     * The reservations of the account on [day], for display: read from the source of truth without the lock of the
+     * account and day, so it neither waits for nor delays reservations, and may miss one committing at that moment.
+     */
     fun usage(
         accountId: UUID,
         day: LocalDate,

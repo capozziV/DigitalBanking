@@ -4,6 +4,7 @@ import io.github.capozziv.digitalbanking.transfers.application.port.DailyLimitGa
 import io.github.capozziv.digitalbanking.transfers.application.port.DailyLimitUsage
 import io.github.capozziv.digitalbanking.transfers.application.port.ReservationResult
 import io.github.capozziv.digitalbanking.transfers.domain.Money
+import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.data.redis.core.StringRedisTemplate
@@ -17,13 +18,17 @@ import java.util.UUID
  *
  * Every reservation runs in its own transaction that starts with the lock of the account and day, so reservations of
  * the same account and day never overlap, whichever path they take:
- * - **Redis:** a counter seeded with another epoch than PostgreSQL's (or missing) is rebuilt from PostgreSQL, then
- *   `reserve.lua` decides; a reservation marks the transfer `limit_reserved` before the commit releases the lock.
- * - **PostgreSQL (any Redis failure):** sums the reservations, marks the transfer and bumps the epoch, which makes the
- *   next reservation through Redis rebuild the counter first.
+ * - **Redis:** a counter seeded with another epoch than PostgreSQL's, by another Redis instance (`run_id`: a restart,
+ *   a failover or an old snapshot may have lost writes) or missing is rebuilt from PostgreSQL, then `reserve.lua`
+ *   decides; a reservation marks the transfer `limit_reserved` before the commit releases the lock.
+ * - **PostgreSQL (any Redis failure, or the [circuit] open):** sums the reservations, marks the transfer and bumps the
+ *   epoch, which makes the next reservation through Redis rebuild the counter first.
  *
- * The Redis counter can only be above the real reservations (a release that failed, a reservation undone after the
- * Lua), never below; the TTL renewed by every reservation bounds how long.
+ * The wait for the lock is bounded by [DailyLimitProperties.lockTimeout]; past it the reservation is unavailable and the
+ * saga retries. When a reservation counted by `reserve.lua` is undone by PostgreSQL (rollback or failed commit), and
+ * when a release fails in Redis, the epoch is bumped so the next reservation rebuilds the counter; the counter stays
+ * above the real reservations only if that bump fails too, and then the TTL renewed by every reservation bounds how
+ * long. It is never below them while the Redis instance keeps its writes.
  */
 class RedisDailyLimitGateway(
     private val redis: StringRedisTemplate,
@@ -32,9 +37,17 @@ class RedisDailyLimitGateway(
     private val transactions: TransactionTemplate,
     private val properties: DailyLimitProperties,
     private val meterRegistry: MeterRegistry,
+    private val circuit: RedisCircuitBreaker,
 ) : DailyLimitGateway {
     private val limit = Money(properties.amount)
     private val ttlSeconds = properties.counterTtl.seconds.toString()
+
+    init {
+        Gauge
+            .builder(CIRCUIT_STATE, circuit) { it.state.code.toDouble() }
+            .description("State of the circuit breaker of the daily limit in Redis: 0 closed, 1 open, 2 half-open")
+            .register(meterRegistry)
+    }
 
     override fun reserve(
         transferId: UUID,
@@ -45,11 +58,21 @@ class RedisDailyLimitGateway(
         check(!TransactionSynchronizationManager.isActualTransactionActive()) {
             "the daily limit must be reserved outside a database transaction"
         }
+        var countedInRedis = false
         val outcome =
             try {
-                checkNotNull(transactions.execute { reserveLocked(transferId, accountId, day, amount) })
+                checkNotNull(transactions.execute { reserveLocked(transferId, accountId, day, amount) { countedInRedis = true } })
             } catch (e: RuntimeException) {
-                log.warn("daily limit unavailable for transfer {} (account {}, day {}): {}", transferId, accountId, day, e.message)
+                log.warn(
+                    "daily limit unavailable for transfer {} (account {}, day {}): {}: {}",
+                    transferId,
+                    accountId,
+                    day,
+                    e.javaClass.simpleName,
+                    e.message,
+                )
+                // The counter holds a reservation that PostgreSQL does not: make the next reservation rebuild it.
+                if (countedInRedis) invalidateCounter(accountId, day)
                 countReservation(ERROR)
                 return ReservationResult.UNAVAILABLE
             }
@@ -71,8 +94,8 @@ class RedisDailyLimitGateway(
     }
 
     /**
-     * The counter now holds the released amount, and the TTL renewed by every reservation could keep it for the whole
-     * day. Bumping the epoch (no lock needed: the upsert is atomic) makes the next reservation rebuild it.
+     * The counter holds an amount PostgreSQL does not count, and the TTL renewed by every reservation could keep it for
+     * the whole day. Bumping the epoch (no lock needed: the upsert is atomic) makes the next reservation rebuild it.
      */
     private fun invalidateCounter(
         accountId: UUID,
@@ -89,19 +112,8 @@ class RedisDailyLimitGateway(
         accountId: UUID,
         day: LocalDate,
     ): DailyLimitUsage {
-        val used =
-            checkNotNull(
-                transactions.execute {
-                    store.lock(accountId, day)
-                    val epoch = store.epoch(accountId, day)
-                    try {
-                        usedInRedis(accountId, day, epoch)
-                    } catch (e: RedisUnavailableException) {
-                        log.warn("daily limit usage of account {} on {} read from postgres: {}", accountId, day, e.message)
-                        store.reservations(accountId, day).values.sum()
-                    }
-                },
-            )
+        // A value to show: read from the source of truth without the lock, so it never waits for nor delays reservations.
+        val used = store.reservations(accountId, day).values.sum()
         return DailyLimitUsage(day, limit, used, (limit.cents - used).coerceAtLeast(0))
     }
 
@@ -111,12 +123,13 @@ class RedisDailyLimitGateway(
         accountId: UUID,
         day: LocalDate,
         amount: Money,
+        onCountedInRedis: () -> Unit,
     ): Outcome {
-        store.lock(accountId, day)
+        store.lock(accountId, day, properties.lockTimeout)
         val epoch = store.epoch(accountId, day)
         val reserved =
             try {
-                reserveInRedis(transferId, accountId, day, amount, epoch)
+                reserveInRedis(transferId, accountId, day, amount, epoch, onCountedInRedis)
             } catch (e: RedisUnavailableException) {
                 log.warn(
                     "daily limit of transfer {} falls back to postgres (account {}, day {}): {}",
@@ -139,10 +152,10 @@ class RedisDailyLimitGateway(
         day: LocalDate,
         amount: Money,
         epoch: Long,
+        onCountedInRedis: () -> Unit,
     ): Boolean {
         val key = key(accountId, day)
         repeat(RESERVE_TRIES) {
-            rebuildIfStale(key, accountId, day, epoch)
             val answer =
                 redisCall {
                     redis.execute(
@@ -152,12 +165,20 @@ class RedisDailyLimitGateway(
                         amount.cents.toString(),
                         limit.cents.toString(),
                         ttlSeconds,
+                        epoch.toString(),
                     )
                 }
             when (answer) {
-                LUA_RESERVED -> return true
-                LUA_EXCEEDED -> return false
+                LUA_RESERVED -> {
+                    onCountedInRedis()
+                    return true
+                }
+
+                LUA_EXCEEDED -> {
+                    return false
+                }
             }
+            rebuild(key, accountId, day, epoch)
         }
         throw RedisUnavailableException("the counter $key went missing right after it was rebuilt")
     }
@@ -176,39 +197,39 @@ class RedisDailyLimitGateway(
         return Outcome.FALLBACK_RESERVED
     }
 
-    private fun usedInRedis(
-        accountId: UUID,
-        day: LocalDate,
-        epoch: Long,
-    ): Long {
-        val key = key(accountId, day)
-        rebuildIfStale(key, accountId, day, epoch)
-        return redisCall { redis.opsForHash<String, String>().get(key, TOTAL) }?.toLong()
-            ?: throw RedisUnavailableException("the counter $key went missing right after it was rebuilt")
-    }
-
-    /** A counter missing, or seeded with another epoch than PostgreSQL's, is replaced by the reservations in PostgreSQL. */
-    private fun rebuildIfStale(
+    /**
+     * Replaces the counter, missing or seeded with another epoch than PostgreSQL's or by another Redis instance than the
+     * one that answers now (`reserve.lua` tells), by the reservations in PostgreSQL. The script records the `run_id` of
+     * the instance, new on every start and different on a replica promoted by a failover.
+     */
+    private fun rebuild(
         key: String,
         accountId: UUID,
         day: LocalDate,
         epoch: Long,
     ) {
-        val stored = redisCall { redis.opsForHash<String, String>().get(key, EPOCH) }
-        if (stored == epoch.toString()) return
         redisCall { redis.delete(key) }
         val pairs = store.reservations(accountId, day).flatMap { (id, cents) -> listOf(id.toString(), cents.toString()) }
         redisCall { redis.execute(scripts.seed, listOf(key), epoch.toString(), ttlSeconds, *pairs.toTypedArray()) }
         meterRegistry.counter(REBUILDS).increment()
     }
 
-    /** Runs a Redis command, turning any failure into [RedisUnavailableException], so a PostgreSQL error never is one. */
-    private fun <T> redisCall(command: () -> T): T =
-        try {
-            command()
-        } catch (e: RuntimeException) {
-            throw RedisUnavailableException(e.message ?: e.javaClass.simpleName)
-        }
+    /**
+     * Runs a Redis command through the [circuit], turning any failure into [RedisUnavailableException], so a
+     * PostgreSQL error never is one. With the circuit open the command is not sent at all.
+     */
+    private fun <T> redisCall(command: () -> T): T {
+        if (!circuit.tryAcquire()) throw RedisUnavailableException("the circuit breaker of redis is open")
+        val result =
+            try {
+                command()
+            } catch (e: RuntimeException) {
+                circuit.onFailure()
+                throw RedisUnavailableException(e.message ?: e.javaClass.simpleName)
+            }
+        circuit.onSuccess()
+        return result
+    }
 
     private fun countReservation(result: String) = meterRegistry.counter(RESERVATIONS, RESULT, result).increment()
 
@@ -233,10 +254,9 @@ class RedisDailyLimitGateway(
     private companion object {
         const val RESERVATIONS = "transfers.daily_limit.reservations"
         const val REBUILDS = "transfers.daily_limit.rebuilds"
+        const val CIRCUIT_STATE = "transfers.daily_limit.circuit.state"
         const val RESULT = "result"
         const val ERROR = "error"
-        const val TOTAL = "total"
-        const val EPOCH = "epoch"
         const val LUA_RESERVED = 1L
         const val LUA_EXCEEDED = 0L
         const val RESERVE_TRIES = 2

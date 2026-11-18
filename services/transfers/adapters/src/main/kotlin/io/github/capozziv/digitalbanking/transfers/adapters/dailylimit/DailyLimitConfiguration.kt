@@ -28,5 +28,13 @@ class DailyLimitConfiguration {
         properties: DailyLimitProperties,
         meterRegistry: MeterRegistry,
     ): DailyLimitGateway =
-        RedisDailyLimitGateway(redis, DailyLimitScripts(), JdbcDailyLimitStore(jdbc), transactions, properties, meterRegistry)
+        RedisDailyLimitGateway(
+            redis,
+            DailyLimitScripts(),
+            JdbcDailyLimitStore(jdbc),
+            transactions,
+            properties,
+            meterRegistry,
+            RedisCircuitBreaker(properties.circuitBreaker.failureThreshold, properties.circuitBreaker.openDuration),
+        )
 }

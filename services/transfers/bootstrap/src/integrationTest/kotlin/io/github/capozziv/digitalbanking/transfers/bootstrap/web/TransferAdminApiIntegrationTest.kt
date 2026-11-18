@@ -243,7 +243,9 @@ class TransferAdminApiIntegrationTest : TransfersIntegrationTest() {
         val answered = statuses.map { it.get(30, TimeUnit.SECONDS) }
         pool.shutdown()
 
-        assertThat(answered).containsOnly(200, 409).contains(200)
+        // Every answer is 200 (the resolution, first or repeated) or 409 (transfer-busy while another holds the lease);
+        // how many of each depends on the interleaving: requests that run one after another all answer 200.
+        assertThat(answered).isSubsetOf(200, 409).contains(200)
         assertThat(resolutionCount(id)).isEqualTo(1)
         assertThat(ownerJdbc.outboxCorrelationIds(id)).containsExactlyEntriesOf(mapOf("TransferCompensated" to "corr-stuck"))
         assertThat(ownerJdbc.statusOf(id)).isEqualTo("COMPENSATED")
