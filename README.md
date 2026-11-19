@@ -38,6 +38,7 @@ flowchart LR
     transfers -- "HTTP, token de máquina" --> accounts
     transfers -- "HTTP" --> customer
     accounts -- "HTTP" --> customer
+    accounts -- "HTTP, token de máquina (encerramento)" --> transfers
 
     pg[("PostgreSQL<br/>um banco por serviço")]
     redis[("Redis")]

@@ -6,7 +6,7 @@
 Deixar o banco digital pronto para ser mostrado: os cinco serviços sobem na AWS com um comando, ficam no ar por no máximo 8 horas para quem quiser testar e somem sozinhos. Antes disso, o repositório ganha testes de contrato entre os serviços, imagem por serviço e um README que explica o sistema com um diagrama.
 
 ## Decisões desta etapa (usuário, 2026-11-16)
-- **Região:** `sa-east-1` (menos latência para quem testa no lançamento); trocar para `us-east-1` mais tarde por custo é uma mudança de variável.
+- **Região:** `sa-east-1` (menos latência para quem testa no lançamento); a região fica fixa: trocá-la (por exemplo para `us-east-1`, por custo) exige mudar os workflows, os values do Helm e o `validate.sh`.
 - **Tempo máximo ligado:** 8 horas.
 - **Derrubada:** workflow agendado no GitHub Actions que roda `terraform destroy` depois das 8 h, e workflows manuais (`workflow_dispatch`) para subir e derrubar a qualquer momento.
 - **Orçamento:** AWS Budgets de US$ 20/mês, com alertas em 50%, 80% e 100% para o e-mail do usuário.

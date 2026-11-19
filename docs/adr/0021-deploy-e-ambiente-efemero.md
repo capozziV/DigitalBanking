@@ -7,7 +7,7 @@
 O [ADR 0019](0019-runtime-na-aws-com-eks.md) pôs os serviços no EKS e proibiu qualquer deploy antes de existirem a derrubada automática e o alarme de orçamento (cartão #146). Ficaram em aberto o tipo de nó do EKS, o tempo máximo ligado e o mecanismo de derrubada. O projeto é de portfólio, sem dados reais: o ambiente precisa subir com um comando, ficar no ar só enquanto alguém testa e sumir sozinho, sem custo esquecido. Detalhes na [spec da etapa 8](../superpowers/specs/2026-11-16-etapa-8-acabamento-design.md).
 
 ## Decisão
-- **Região `sa-east-1`** (variável `region`): menos latência para quem testa. Trocar por custo é mudar a variável.
+- **Região `sa-east-1`:** menos latência para quem testa. A região é `sa-east-1`; trocá-la exige mudar os workflows, os values do Helm e o `validate.sh`.
 - **Dois stacks Terraform.** `infra/terraform/bootstrap`, permanente e aplicado pelo usuário: bucket do estado (lock nativo do S3), provedor OIDC e papel do GitHub, um repositório ECR por serviço (etiqueta imutável) e o AWS Budgets. `infra/terraform/envs/aws`, efêmero: rede (um NAT Gateway), EKS, ALB interno, Cognito, API Gateway, RDS, ElastiCache, DynamoDB, SNS/SQS e IAM dos pods. O estado do `env` fica no bucket do `bootstrap`, para o workflow agendado conseguir destruí-lo.
 - **EKS com node group EC2 gerenciado**, 2× `t3.medium` (AL2023) nas sub-redes privadas, no suporte padrão do Kubernetes (sem o estendido, que cobra a mais). Decisão do usuário (cartão #145).
 - **Dados nos menores tamanhos:** RDS PostgreSQL `db.t4g.micro` (um banco por serviço, sem Multi-AZ), ElastiCache Redis `cache.t4g.micro`. Cada serviço roda com um pod (`replicas: 1`).
