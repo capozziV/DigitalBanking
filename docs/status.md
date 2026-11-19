@@ -4,12 +4,11 @@
 
 **Última atualização:** 2026-11-19
 **Board:** [Digital Banking no GitHub Projects](https://github.com/users/capozziV/projects/2)
-**Fase atual:** etapa 8 (acabamento) concluída na branch `etapa-8-acabamento`, com revisão final aprovada; PR para a `main`. Spec da etapa 9 (frontend) escrita, aguardando aprovação do usuário.
-**Próximo passo:** merge da etapa 8 com o `ci-ok` verde; aprovação da spec da etapa 9 ([spec](superpowers/specs/2026-11-19-etapa-9-frontend-design.md)) e, depois, o plano. A subida real na AWS (Task 10, cartão #182) é do usuário.
+**Fase atual:** etapa 9 (frontend) em execução na branch `etapa-9-frontend`; spec aprovada pelo usuário em 2026-11-19 e [plano](superpowers/plans/2026-11-19-etapa-9-frontend.md) com 13 tasks (#206–#218). Etapa 8 no PR #205, aguardando o `ci-ok`.
+**Próximo passo:** onda 1 da etapa 9 (Tasks 1–5 e 12) em andamento; depois as ondas 2–4 do plano. Merge do PR #205 com o `ci-ok` verde. A subida real na AWS (cartão #182) é do usuário.
 
 ## Em andamento
-- **PR #203** (#194, timeout do customer no e2e): aprovado pela Beatriz; merge quando o `ci-ok` passar.
-- **Etapa 9:** decisões do usuário registradas na spec (cliente só, visual off-white preto e branco, menu lateral, login e cadastro próprios com senha de 6 dígitos, bônus de R$ 100, usuário de demonstração, telefone verificado como chave de transferência com SMS simulado). Backlog: telas de admin (#201), observabilidade (#202), SMS real (#204).
+- **Etapa 9, onda 1:** Task 1 bônus (#206), Task 2 `GET /accounts/me` e `/recipient` (#207), Task 3 telefone do cliente (#208), Task 4 Cognito e borda (#209), Task 5 esqueleto do `frontend/` (#210), Task 12 ADR 0024 e docs (#217). Branches `etapa-9/task-N` a partir da `etapa-9-frontend`.
 
 ## Como usar o board
 - Colunas: **Backlog** (pendência sem resposta, ou etapa anterior fora de Done), **Ready** (sem pendência e etapa anterior em Done), **In progress**, **In review** (revisão da Beatriz) e **Done** (revisado, build, testes e lint verdes, merge feito).
