@@ -11,7 +11,7 @@ get {
 }
 
 script:pre-request {
-  // Gera os lancamentos: o cliente abre uma conta e o admin faz tres creditos; depois espera o extrato ter os tres
+  // Gera os lancamentos: o cliente abre uma conta e o admin faz dois creditos; depois espera o extrato ter os tres (o bonus de boas-vindas e os dois creditos)
   // (ate 30 s), lido com o token do cliente.
   const axios = require("axios");
   const base = bru.getEnvVar("baseUrl");
@@ -20,7 +20,7 @@ script:pre-request {
   const opened = await axios.post(`${base}/accounts`, null,
     { headers: { ...bearer("customerToken"), "Idempotency-Key": guid() } });
   const accountId = opened.data.id;
-  for (const amount of [1000, 2000, 3000]) {
+  for (const amount of [1000, 2000]) {
     await axios.post(`${base}/accounts/${accountId}/credits`, { amount, description: "bruno credito" },
       { headers: { ...bearer("adminToken"), "Idempotency-Key": guid() } });
   }
@@ -37,13 +37,13 @@ script:pre-request {
 }
 
 tests {
-  test("200 com os tres creditos, do mais novo para o mais antigo", function () {
+  test("200 com o bonus e os dois creditos, do mais novo para o mais antigo", function () {
     expect(res.status).to.equal(200);
     expect(res.body.accountId).to.equal(bru.getVar("accountId"));
     expect(res.body.entries.map((e) => e.sequence)).to.eql([3, 2, 1]);
     expect(res.body.entries.map((e) => e.kind)).to.eql(["CREDIT", "CREDIT", "CREDIT"]);
-    expect(res.body.entries.map((e) => e.amount)).to.eql([3000, 2000, 1000]);
-    expect(res.body.entries.map((e) => e.balanceAfter)).to.eql([6000, 3000, 1000]);
+    expect(res.body.entries.map((e) => e.amount)).to.eql([2000, 1000, 10000]);
+    expect(res.body.entries.map((e) => e.balanceAfter)).to.eql([13000, 11000, 10000]);
     expect(res.body.nextCursor).to.equal(null);
   });
 }

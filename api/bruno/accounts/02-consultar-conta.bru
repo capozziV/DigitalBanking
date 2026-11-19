@@ -11,14 +11,14 @@ get {
 }
 
 tests {
-  // Conta recem-aberta (01): tipo FREE, sem lancamentos e sem cheque especial (limite 0 do FREE).
-  test("200 com a conta do cliente, saldo e saldo disponivel zerados", function () {
+  // Conta recem-aberta (01): tipo FREE, so com o bonus de boas-vindas de 10000 e sem cheque especial (limite 0 do FREE).
+  test("200 com a conta do cliente, saldo e saldo disponivel iguais ao bonus", function () {
     expect(res.status).to.equal(200);
     expect(res.body.id).to.equal(bru.getVar("accountId"));
     expect(res.body.customerId).to.equal(bru.getVar("customerId"));
     expect(res.body.type).to.equal("FREE");
-    expect(res.body.balance).to.equal(0);
+    expect(res.body.balance).to.equal(10000);
     expect(res.body.overdraftLimit).to.equal(0);
-    expect(res.body.availableBalance).to.equal(0);
+    expect(res.body.availableBalance).to.equal(10000);
   });
 }

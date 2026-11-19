@@ -16,8 +16,11 @@ import io.github.capozziv.digitalbanking.accounts.application.port.LedgerEntryRe
 import io.github.capozziv.digitalbanking.accounts.application.port.TransactionRunner
 import io.github.capozziv.digitalbanking.accounts.domain.Account
 import io.github.capozziv.digitalbanking.accounts.domain.Balance
+import io.github.capozziv.digitalbanking.accounts.domain.Money
 import io.github.capozziv.digitalbanking.accounts.domain.currentBalance
 import io.github.capozziv.digitalbanking.security.Caller
+import java.time.Clock
+import java.time.Instant
 import java.util.UUID
 
 /** Opens the account of the [caller] itself: its customer id comes from the token, never from the request body. */
@@ -32,7 +35,9 @@ data class OpenAccountResult(
 )
 
 /**
- * Opens the account and returns its view read in the same transaction; a new account has no entries, so its balance is zero.
+ * Opens the account and returns its view read in the same transaction. A new account starts with the welcome bonus
+ * credit (sequence 1, recorded in that transaction), so its balance is the bonus; with no bonus configured (null)
+ * it starts at zero.
  *
  * First asks the `customer` service, outside the transaction (no connection held during the call), whether the
  * customer exists and is active: [CustomerNotFoundException], [CustomerBlockedException] or
@@ -47,6 +52,8 @@ class OpenAccountUseCase(
     private val tx: TransactionRunner,
     private val ids: IdGenerator,
     private val customers: CustomerGateway,
+    private val welcomeBonus: Money?,
+    private val clock: Clock,
 ) {
     fun execute(command: OpenAccountCommand): OpenAccountResult {
         val customerId = command.caller.ownCustomerId() ?: throw CallerNotCustomerException()
@@ -67,7 +74,22 @@ class OpenAccountUseCase(
             when (accounts.insert(account, idempotencyKey)) {
                 InsertAccountResult.INSERTED -> {
                     outbox.append(event)
-                    OpenAccountResult(AccountView.of(account, Balance.ZERO, types.findLimit(account.type)), created = true)
+                    val balance =
+                        welcomeBonus?.let { amount ->
+                            val bonus =
+                                account.credit(
+                                    last = null,
+                                    entryId = ids.newId(),
+                                    amount = amount,
+                                    description = WELCOME_BONUS_DESCRIPTION,
+                                    idempotencyKey = welcomeBonusKey(account.id),
+                                    now = Instant.now(clock),
+                                )
+                            entries.insert(bonus.entry)
+                            outbox.append(bonus.event)
+                            bonus.entry.balanceAfter
+                        } ?: Balance.ZERO
+                    OpenAccountResult(AccountView.of(account, balance, types.findLimit(account.type)), created = true)
                 }
 
                 InsertAccountResult.DUPLICATE_OPENING_KEY -> {
@@ -87,4 +109,10 @@ class OpenAccountUseCase(
                 }
             }
         }
+
+    companion object {
+        const val WELCOME_BONUS_DESCRIPTION = "Bônus de boas-vindas"
+
+        fun welcomeBonusKey(accountId: UUID): String = "welcome-bonus:$accountId"
+    }
 }

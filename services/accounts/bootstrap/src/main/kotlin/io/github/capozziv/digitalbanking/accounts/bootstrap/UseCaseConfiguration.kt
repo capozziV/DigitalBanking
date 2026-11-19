@@ -18,6 +18,8 @@ import io.github.capozziv.digitalbanking.accounts.application.usecase.ListAccoun
 import io.github.capozziv.digitalbanking.accounts.application.usecase.OpenAccountUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.RecordCreditUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.RecordDebitUseCase
+import io.github.capozziv.digitalbanking.accounts.domain.Money
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import java.time.Clock
@@ -42,7 +44,9 @@ class UseCaseConfiguration {
         tx: TransactionRunner,
         ids: IdGenerator,
         customers: CustomerGateway,
-    ) = OpenAccountUseCase(accounts, entries, types, outbox, tx, ids, customers)
+        clock: Clock,
+        @Value("\${accounts.welcome-bonus.amount:10000}") welcomeBonusCents: Long,
+    ) = OpenAccountUseCase(accounts, entries, types, outbox, tx, ids, customers, welcomeBonusCents.takeIf { it > 0 }?.let(::Money), clock)
 
     @Bean
     fun getAccountUseCase(
