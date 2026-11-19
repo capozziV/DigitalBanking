@@ -65,6 +65,16 @@ data class Transfer(
     }
 
     /**
+     * Why [key] cannot name the compensation credit, or `null` when it can. A key in the saga's compensation pattern
+     * (`transfer-<id>-compensation`) belongs to the transfer in its `<id>`: another transfer's saga credit never proves
+     * this one was put back. This transfer's own saga key is accepted, being the credit the saga itself would write.
+     */
+    fun manualCreditKeyMismatch(key: String): String? {
+        val owner = SAGA_COMPENSATION_KEY.matchEntire(key)?.groupValues?.get(1)
+        return if (owner != null && owner != id.toString()) "the key is the saga compensation credit of another transfer" else null
+    }
+
+    /**
      * Why [entry] cannot stand for the compensation credit, or null when it can: a credit of exactly [amount] on the
      * source account, which puts back what the debit took.
      */
@@ -133,6 +143,8 @@ data class Transfer(
         }
 
     companion object {
+        private val SAGA_COMPENSATION_KEY = Regex("transfer-(.+)-compensation")
+
         fun request(
             id: UUID,
             sourceAccountId: UUID,
