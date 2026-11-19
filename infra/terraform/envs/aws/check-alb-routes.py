@@ -23,6 +23,16 @@ ROOT = Path(__file__).resolve().parents[4]
 NGINX = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "infra/local/nginx/nginx.conf"
 ROUTES = Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "infra/terraform/modules/edge-alb/routes.json"
 
+# Rotas do app (etapa 9): `/` vai ao web (80) e `/bff` ao BFF (3000). O ALB tem de te-las sempre. O nginx local
+# so as ganha na Task 10; ate la, a ausencia delas no nginx e aceita (vale so para estes casadores). Quando o
+# nginx as tiver, apague EDGE_NOT_IN_NGINX_YET e o script volta a exigir igualdade total.
+EDGE_REQUIRED = {
+    (("prefix", "/"), 80),
+    (("exact", "/bff"), 3000),
+    (("prefix", "/bff/"), 3000),
+}
+EDGE_NOT_IN_NGINX_YET = EDGE_REQUIRED
+
 LOCATION = re.compile(r"\blocation\s+(=|~\*|~|\^~)?\s*(\S+)\s*\{(.*?)\}", re.S)
 LOCATION_WORD = re.compile(r"\blocation\b")
 PROXY = re.compile(r"proxy_pass\s+http://[^:/\s]+:(\d+)(/\S*)?;")
@@ -91,14 +101,18 @@ def main():
     alb, priorities = alb_routes(config)
     errors = []
 
+    for missing in sorted(EDGE_REQUIRED - alb):
+        errors.append(f"rota do app ausente no ALB: {missing}")
+    alb_compared = alb - (EDGE_NOT_IN_NGINX_YET - nginx)
+
     for missing in sorted(nginx - alb):
         errors.append(f"no nginx e fora do ALB: {missing}")
-    for extra in sorted(alb - nginx):
+    for extra in sorted(alb_compared - nginx):
         errors.append(f"no ALB e fora do nginx: {extra}")
     for matcher in sorted(local_only & {m for m, _ in alb}):
         errors.append(f"actuator e so local, mas esta no ALB: {matcher}")
 
-    nginx_ports = {port for _, port in nginx}
+    nginx_ports = {port for _, port in nginx} | {port for _, port in EDGE_NOT_IN_NGINX_YET}
     if nginx_ports != set(config["services"].values()):
         errors.append(f"portas diferentes: nginx {sorted(nginx_ports)}, ALB {sorted(config['services'].values())}")
 

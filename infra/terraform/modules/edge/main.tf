@@ -48,6 +48,21 @@ resource "aws_apigatewayv2_route" "service" {
   authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
 }
 
+locals {
+  public_route_keys = flatten([for prefix in var.public_route_prefixes : ["ANY ${prefix}", "ANY ${prefix}/{proxy+}"]])
+}
+
+# O BFF (/bff) e o web (/, pela rota padrao) sao publicos: o login e feito pelo BFF, com cookie de sessao.
+# O web e a rota padrao, que so recebe o que nenhuma rota de servico (com JWT) casou.
+resource "aws_apigatewayv2_route" "public" {
+  for_each = toset(concat(local.public_route_keys, ["$default"]))
+
+  api_id             = aws_apigatewayv2_api.this.id
+  route_key          = each.value
+  target             = "integrations/${aws_apigatewayv2_integration.alb.id}"
+  authorization_type = "NONE"
+}
+
 resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.this.id
   name        = "$default"
