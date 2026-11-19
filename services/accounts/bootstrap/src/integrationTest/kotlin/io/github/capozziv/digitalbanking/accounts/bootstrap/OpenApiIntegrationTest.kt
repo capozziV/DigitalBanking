@@ -37,13 +37,15 @@ class OpenApiIntegrationTest : AccountsIntegrationTest() {
     }
 
     @Test
-    fun `the contract has exactly the ten paths and methods of the specs`() {
+    fun `the contract has exactly the twelve paths and methods of the specs`() {
         val paths = docs.get("paths")
         val operations =
             paths.propertyNames().flatMap { path -> paths.get(path).propertyNames().map { method -> "${method.uppercase()} $path" } }
 
         assertThat(operations).containsExactlyInAnyOrder(
             "POST /accounts",
+            "GET /accounts/me",
+            "GET /accounts/recipient",
             "GET /accounts/{id}",
             "GET /accounts/{id}/entries",
             "POST /accounts/{id}/credits",

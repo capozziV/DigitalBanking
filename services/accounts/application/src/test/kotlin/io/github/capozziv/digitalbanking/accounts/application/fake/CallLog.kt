@@ -52,6 +52,9 @@ class CallLog {
         object : AccountRepository by delegate {
             override fun findById(id: UUID): Account? = delegate.findById(id).also { record("accounts.findById") }
 
+            override fun findNotClosedByCustomerId(customerId: UUID): Account? =
+                delegate.findNotClosedByCustomerId(customerId).also { record("accounts.findNotClosedByCustomerId") }
+
             override fun lockById(id: UUID): Account? = delegate.lockById(id).also { record("accounts.lockById") }
 
             override fun updateType(account: Account) {
