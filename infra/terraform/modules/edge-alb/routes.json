@@ -11,6 +11,7 @@
     { "priority": 10, "service": "transfers", "regex": ["^/accounts/[^/]+/daily-limit$"] },
     { "priority": 20, "service": "statement", "regex": ["^/accounts/[^/]+/statement$"] },
     { "priority": 100, "service": "accounts", "paths": ["/accounts", "/accounts/*", "/admin/account-types*"] },
+    { "priority": 110, "service": "accounts", "paths": ["/admin/accounts/*"] },
     { "priority": 200, "service": "transfers", "paths": ["/transfers", "/transfers/*"] },
     { "priority": 300, "service": "notification", "paths": ["/notifications", "/notifications/*"] },
     { "priority": 500, "service": "customer", "paths": ["/customers", "/customers/*", "/admin/customers/*"] }

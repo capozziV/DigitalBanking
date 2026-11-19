@@ -52,7 +52,12 @@ variable "throttling_burst_limit" {
 }
 
 variable "kubernetes_namespace" {
-  description = "Namespace do release do Helm; o Pod Identity associa as ServiceAccounts deste namespace aos papeis."
+  description = "Namespace do release do Helm; o Pod Identity associa as ServiceAccounts deste namespace aos papeis. Fixo em digitalbanking: infra/aws/deploy-services.sh e o aws-down.yml usam o mesmo literal."
   type        = string
   default     = "digitalbanking"
+
+  validation {
+    condition     = var.kubernetes_namespace == "digitalbanking"
+    error_message = "O namespace e fixo em digitalbanking (deploy-services.sh e aws-down.yml); mude os tres juntos."
+  }
 }

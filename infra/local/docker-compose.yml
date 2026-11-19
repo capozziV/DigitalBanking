@@ -141,6 +141,7 @@ services:
       ACCOUNTS_OAUTH_CLIENT_ID: ${ACCOUNTS_OAUTH_CLIENT_ID:-accounts}
       ACCOUNTS_OAUTH_CLIENT_SECRET: ${ACCOUNTS_OAUTH_CLIENT_SECRET:-local-secret}
       ACCOUNTS_CUSTOMER_BASE_URL: http://customer:8085
+      ACCOUNTS_TRANSFERS_BASE_URL: http://transfers:8082
     ports:
       - "8081:8081"
     depends_on: *apps-infra
