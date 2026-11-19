@@ -82,13 +82,21 @@ data class Transfer(
     }
 
     /**
-     * Why [key] cannot name the compensation credit, or `null` when it can. A key in the saga's compensation pattern
-     * (`transfer-<id>-compensation`) belongs to the transfer in its `<id>`: another transfer's saga credit never proves
-     * this one was put back. This transfer's own saga key is accepted, being the credit the saga itself would write.
+     * Why [key] cannot name the compensation credit, or `null` when it can. A key in the saga's pattern
+     * (`transfer-<id>-debit|credit|compensation`) belongs to the transfer in its `<id>`: the credit of another saga
+     * (its compensation, or its destination credit) never proves this one was put back. Among the saga keys only this
+     * transfer's own compensation key is accepted, being the credit the saga itself would write; the `<id>` is
+     * compared as a UUID, so letter case does not matter.
      */
     fun manualCreditKeyMismatch(key: String): String? {
-        val owner = SAGA_COMPENSATION_KEY.matchEntire(key)?.groupValues?.get(1)
-        return if (owner != null && owner != id.toString()) "the key is the saga compensation credit of another transfer" else null
+        val match = SAGA_KEY.matchEntire(key) ?: return null
+        val (owner, step) = match.destructured
+        val own = runCatching { UUID.fromString(owner) }.getOrNull() == id
+        return when {
+            !own -> "the key is a saga key of another transfer"
+            step != "compensation" -> "the key is the $step key of this transfer, not its compensation credit"
+            else -> null
+        }
     }
 
     /**
@@ -160,7 +168,7 @@ data class Transfer(
         }
 
     companion object {
-        private val SAGA_COMPENSATION_KEY = Regex("transfer-(.+)-compensation")
+        private val SAGA_KEY = Regex("transfer-(.+)-(debit|credit|compensation)")
 
         fun request(
             id: UUID,
