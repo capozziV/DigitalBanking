@@ -194,7 +194,30 @@ class EventContractsTest {
 
         assertThat(saved)
             .extracting({ it.customerId }, { it.kind }, { it.data })
-            .containsExactly(tuple(SENDER, NotificationKind.TRANSFER_COMPENSATED, transferData()))
+            .containsExactly(
+                tuple(SENDER, NotificationKind.TRANSFER_COMPENSATED, transferData() + ("reason" to "credit-not-confirmed")),
+            )
+    }
+
+    @Test
+    fun `a compensated transfer with a reason says why the credit did not happen`() {
+        knowBothAccounts()
+
+        assertThat(stubs.trigger("transferCompensated")).isTrue()
+
+        assertThat(saved.single().body).contains("não foi possível confirmar o crédito na conta de destino")
+    }
+
+    @Test
+    fun `a compensated transfer without a reason keeps the generic text`() {
+        knowBothAccounts()
+
+        assertThat(stubs.trigger("transferCompensatedWithoutReason")).isTrue()
+
+        assertThat(saved)
+            .extracting({ it.kind }, { it.data })
+            .containsExactly(tuple(NotificationKind.TRANSFER_COMPENSATED, transferData()))
+        assertThat(saved.single().body).contains("não pôde ser concluída e o valor voltou para a sua conta")
     }
 
     private fun knowBothAccounts() {

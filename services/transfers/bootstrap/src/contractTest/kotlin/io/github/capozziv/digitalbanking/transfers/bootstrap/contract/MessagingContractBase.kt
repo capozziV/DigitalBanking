@@ -67,7 +67,19 @@ abstract class MessagingContractBase {
 
     fun transferCompensated() =
         outbox.append(
-            TransferEvent.TransferCompensated(TRANSFER_ID, SOURCE_ACCOUNT_ID, DESTINATION_ACCOUNT_ID, Money(5000), "Rent"),
+            TransferEvent.TransferCompensated(
+                TRANSFER_ID,
+                SOURCE_ACCOUNT_ID,
+                DESTINATION_ACCOUNT_ID,
+                Money(5000),
+                "Rent",
+                "credit-not-confirmed",
+            ),
+        )
+
+    fun transferCompensatedWithoutReason() =
+        outbox.append(
+            TransferEvent.TransferCompensated(TRANSFER_ID, SOURCE_ACCOUNT_ID, DESTINATION_ACCOUNT_ID, Money(5000), "Rent", null),
         )
 
     private companion object {

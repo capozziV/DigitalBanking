@@ -2,7 +2,7 @@ package contracts.messaging
 
 import sh.stubborn.contract.spec.Contract
 
-// TransferCompensated v1, as notification tells the sender the amount came back.
+// TransferCompensated v2 with the reason the credit was refused, as notification tells the sender why the amount came back.
 Contract.make {
     description 'transfers returns the amount of a transfer to the source'
     label 'transferCompensated'
@@ -14,7 +14,7 @@ Contract.make {
         body(
             eventId: $(consumer('0198a1b2-0000-7000-8000-0000000e2003'), producer(regex(uuid()))),
             eventType: 'TransferCompensated',
-            eventVersion: 1,
+            eventVersion: 2,
             occurredAt: $(consumer('2026-11-18T12:00:00.000001Z'), producer(regex(iso8601WithOffset()))),
             aggregateId: '0198a1b2-0000-7000-8000-00000000f001',
             correlationId: 'contract-correlation-id',
@@ -24,6 +24,7 @@ Contract.make {
                 destinationAccountId: '0198a1b2-0000-7000-8000-000000000002',
                 amount              : 5000,
                 description         : 'Rent',
+                reason              : 'credit-not-confirmed',
             ],
         )
     }
