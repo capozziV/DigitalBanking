@@ -1,0 +1,13 @@
+# Contexto das imagens web e bff: so os fontes entram, nunca dependencias nem saidas de build.
+**/node_modules
+**/dist
+**/.angular
+**/coverage
+e2e/**
+!e2e/package.json
+playwright-report
+test-results
+blob-report
+**/*.tsbuildinfo
+**/Dockerfile
+README.md

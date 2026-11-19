@@ -34,7 +34,7 @@ import { CLOCK, SessionService } from './session/session.service.js';
       useFactory: (config: AppConfig, store: KeyValueStore) =>
         config.identityProvider === 'cognito'
           ? new CognitoIdentityProvider(config.cognitoRegion, config.cognitoClientId)
-          : new LocalIdentityProvider(store, config.mockOauth2Url),
+          : new LocalIdentityProvider(store, config.mockOauth2Url, config.mockOauth2Host),
     },
     { provide: CLOCK, useValue: () => Date.now() },
     { provide: FETCH, useValue: fetch },

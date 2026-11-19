@@ -1,0 +1,40 @@
+# Valores do web (Angular servido por nginx sem root) para o chart deploy/helm/service.
+# Valores vazios ("") entram na instalacao (--set ou -f), a partir dos outputs do Terraform: image.repository/tag e
+# targetGroupArn. Nao e um servico Spring: sem perfil, sem actuator e sem acesso a AWS (nada de segredo nem de papel).
+name: web
+port: 80
+
+image:
+  repository: ""
+  tag: ""
+
+targetGroupArn: ""
+
+# Sem perfil Spring: o ConfigMap nao leva SPRING_PROFILES_ACTIVE.
+springProfile: ""
+
+# O nginx escuta na 80 sem root (imagem frontend/web/Dockerfile): libera portas baixas so neste pod.
+sysctls:
+  - name: net.ipv4.ip_unprivileged_port_start
+    value: "0"
+
+requiredEnv: []
+
+env: {}
+
+secretEnv: {}
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 32Mi
+  limits:
+    memory: 128Mi
+
+# O health do ALB checa "/" (routes.json); as probes batem no mesmo caminho.
+probes:
+  livenessPath: /
+  readinessPath: /
+  startup:
+    periodSeconds: 2
+    failureThreshold: 30

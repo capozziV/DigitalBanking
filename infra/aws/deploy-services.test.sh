@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Teste do deploy-services.sh sem cluster nem AWS: renderiza o db-init e os cinco servicos a partir de saidas
+# Teste do deploy-services.sh sem cluster nem AWS: renderiza o db-init, os cinco servicos e o app (bff e web) a partir de saidas
 # ficticias do Terraform (testdata/terraform-outputs.json), valida com kubeconform -strict e confere que cada valor
 # veio da saida certa, que nenhum ARN de papel chega aos charts e que uma saida faltando derruba a renderizacao.
 # Exige helm, kubeconform e jq. Roda no CI (job helm).
@@ -47,6 +47,15 @@ done
 for svc in transfers statement; do
   has "$svc" '"digitalbanking-redis.abc123.0001.sae1.cache.amazonaws.com"'
 done
+# App (etapa 9): bff com o client do Cognito e o Redis provisionados, web so com imagem e target group.
+for svc in bff web; do
+  has "$svc" "image: \"$registry/digital-banking/$svc:$tag\""
+  has "$svc" "targetGroupARN: \"$(jq -r --arg s "$svc" '.target_group_arns.value[$s]' "$fixture")\""
+done
+has bff '"bffclientid0123456789"'
+has bff '"sa-east-1"'
+has bff '"redis://digitalbanking-redis.abc123.0001.sae1.cache.amazonaws.com:6379"'
+has bff '"http://accounts:8081"'
 echo "ok: valores de cada servico vieram das saidas certas"
 
 # O Pod Identity liga o papel pela ServiceAccount: nenhum ARN de papel nem anotacao IRSA nos manifestos.
@@ -56,7 +65,7 @@ fi
 echo "ok: nenhum ARN de papel nos charts"
 
 # Saida do Terraform faltando derruba a renderizacao (sem cair no padrao local do application.yml).
-for missing in topic_arns redis_endpoint target_group_arns db_master_secret_arn; do
+for missing in topic_arns redis_endpoint target_group_arns db_master_secret_arn cognito_bff_client_id; do
   jq --arg k "$missing" 'del(.[$k])' "$fixture" > "$tmp/partial.json"
   if "$here/deploy-services.sh" --render "$tmp/partial" "$tmp/partial.json" "$registry" "$tag" > /dev/null 2>&1; then
     fail "renderizou sem a saida $missing"

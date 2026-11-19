@@ -10,6 +10,7 @@ export interface AppConfig {
   redisUrl: string;
   cookieSecure: boolean;
   mockOauth2Url: string;
+  mockOauth2Host?: string;
   services: Record<BackendService, string>;
   logLevel: string;
 }
@@ -35,6 +36,7 @@ export function loadConfig(env: Env): AppConfig {
     redisUrl: env['REDIS_URL'] ?? 'redis://localhost:6379',
     cookieSecure: env['COOKIE_SECURE'] !== 'false',
     mockOauth2Url: env['MOCK_OAUTH2_URL'] ?? 'http://localhost:8090/default',
+    mockOauth2Host: env['MOCK_OAUTH2_HOST'] || undefined,
     services: {
       accounts: env['ACCOUNTS_URL'] ?? 'http://localhost:8081',
       transfers: env['TRANSFERS_URL'] ?? 'http://localhost:8082',
