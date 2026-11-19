@@ -45,7 +45,7 @@ O "por dentro" (correlation ID, linha do tempo da saga, logs) fica para uma etap
 | Senha | **Exatamente 6 dígitos numéricos**, validados nas nossas telas e no BFF; bloqueio por tentativas erradas do Cognito ligado. É fraca de propósito: o banco é simulado, sem dinheiro nem dados reais, e o ADR registra isso |
 | Bônus | R$ 100 (10000 centavos) creditados ao abrir a conta |
 | Usuário de demonstração | Sim, pelo seed, além do cadastro. Sem botão "entrar como demo": o usuário guarda o e-mail e a senha e os envia ao recrutador |
-| Destino da transferência | **Telefone celular** do destinatário, com confirmação do nome mascarado antes de enviar |
+| Destino da transferência | **Telefone celular** do destinatário, com confirmação do **nome completo** antes de enviar |
 | Verificação do telefone | **Nenhuma**, nem real nem simulada (decisão do usuário, 2026-11-19). O app só confere o formato |
 | Troca do telefone | Permitida em "Minha conta" |
 | Testes | Unidade (Angular e NestJS) e Playwright |
@@ -73,7 +73,7 @@ As telas aprovadas como referência estão em `.superpowers/brainstorm/2215-1795
 | Completar cadastro | Nome e telefone celular no primeiro acesso, se `GET /customers/me` responder 404 | `POST /customers` |
 | Início | Cartão do saldo (saldo disponível, tipo de conta, cheque especial, Transferir e Extrato), limite diário usado e disponível, últimos lançamentos; sem conta, botão "Abrir conta" | `GET /accounts/...`, `GET /accounts/{id}/daily-limit`, `GET /accounts/{id}/statement` |
 | Extrato | Lançamentos paginados com o ícone de entrada e saída; o bônus aparece como "Bônus de boas-vindas" | `GET /accounts/{id}/statement` (cursor) |
-| Transferir | Em passos: (1) o cliente digita o telefone do destinatário e aperta "Próximo"; (2) o app mostra o nome do destinatário ("Ana S.") e pede o valor; (3) "Confirmar" envia; depois o status até `COMPLETED`, `FAILED` ou `COMPENSATED`, com o motivo em português | busca por telefone (nova), `POST /transfers`, `GET /transfers/{id}` |
+| Transferir | Em passos: (1) o cliente digita o telefone do destinatário e aperta "Próximo"; (2) o app mostra o **nome completo** do destinatário ("Ana Souza") para conferir e pede o valor; (3) "Confirmar" envia; depois o status até `COMPLETED`, `FAILED` ou `COMPENSATED`, com o motivo em português | busca por telefone (nova), `POST /transfers`, `GET /transfers/{id}` |
 | Avisos | Lista de notificações, marcar como lidas, contador no menu | `GET /notifications`, `POST /notifications/read` |
 | Minha conta | Dados do cliente e da conta; trocar o telefone; encerrar conta (saldo zero, sem pendentes) | `GET /customers/me`, troca do telefone (nova), `POST /accounts/{id}/close` |
 
@@ -102,7 +102,7 @@ O builder confere os caminhos exatos de cada rota no OpenAPI de cada serviço.
 - **customer: telefone do cliente.**
   - O cliente ganha o campo telefone: celular brasileiro, guardado em E.164 (`+55DD9XXXXXXXX`), com formato validado e **único** entre os clientes. **Não há verificação** do número, nem real nem simulada.
   - **Troca do telefone** em "Minha conta": o número novo também precisa ser único. Uma transferência é resolvida no momento do envio, então trocar o telefone depois não afeta transferências já feitas.
-  - **Busca por telefone:** devolve só o nome mascarado e o que o BFF precisa para achar a conta. Ela revela que o número tem conta, como o PIX faz. Como não há verificação, qualquer um pode cadastrar um número que não é seu. As duas coisas são aceitáveis no banco simulado e ficam registradas no ADR.
+  - **Busca por telefone:** devolve o **nome completo** e o que o BFF precisa para achar a conta. Ela revela que o número tem conta e o nome completo do dono (decisão do usuário, mais do que o PIX mostra). Como não há verificação, qualquer um pode cadastrar um número que não é seu. As duas coisas são aceitáveis no banco simulado e ficam registradas no ADR.
   - O evento de cadastro (`CustomerRegistered`) e um evento de troca de telefone carregam o telefone. A versão segue o padrão dos eventos.
   - Termo novo no `CONTEXT.md`: **Telefone**.
 - **BFF:** junta a busca por telefone com a conta não encerrada do cliente (cada cliente tem uma só) para montar o destino da transferência.
