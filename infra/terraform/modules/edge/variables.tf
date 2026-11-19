@@ -34,6 +34,12 @@ variable "route_prefixes" {
   default     = ["/accounts", "/transfers", "/notifications", "/customers", "/admin"]
 }
 
+variable "public_route_prefixes" {
+  description = "Prefixos sem autorizador JWT: o BFF (/bff) autentica pelo cookie de sessao, nao pelo cabecalho Authorization."
+  type        = list(string)
+  default     = ["/bff"]
+}
+
 variable "tags" {
   description = "Tags aplicadas aos recursos."
   type        = map(string)

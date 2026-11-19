@@ -42,6 +42,11 @@ output "web_client_id" {
   value = module.identity.web_client_id
 }
 
+output "cognito_bff_client_id" {
+  description = "App client do BFF no Cognito (variavel COGNITO_CLIENT_ID do chart bff)."
+  value       = module.identity.bff_client_id
+}
+
 output "user_pool_id" {
   description = "User Pool do Cognito (usuarios do dono e do smoke, criados pelo aws-up)."
   value       = module.identity.user_pool_id

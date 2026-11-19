@@ -60,7 +60,7 @@ resource "aws_lb_target_group" "service" {
   deregistration_delay = 15
 
   health_check {
-    path                = var.health_check_path
+    path                = local.routing.health[each.key]
     port                = "traffic-port"
     protocol            = "HTTP"
     matcher             = "200"
