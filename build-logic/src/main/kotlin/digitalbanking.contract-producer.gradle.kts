@@ -8,7 +8,9 @@ import sh.stubborn.contract.verifier.config.TestMode
  *
  * Layout (one folder per kind of contract under src/contractTest/resources/contracts):
  * - contracts/http/      HTTP contracts. The generated tests extend <package>.HttpContractBase.
- * - contracts/messaging/ message contracts. The generated tests extend <package>.MessagingContractBase.
+ * - contracts/messaging/ message contracts. The generated tests extend <package>.MessagingContractBase, a Spring test
+ *                        context with the service's outbox mapper and OutboxMessagingContractConfiguration of
+ *                        libs/testing-outbox-contract (the `sentTo` of a contract is the SNS topic name).
  * <package> is io.github.capozziv.digitalbanking.<service>.bootstrap.contract, where the base classes live (in
  * src/contractTest/kotlin) and where the tests are generated (class <Folder>ContractTest, e.g. HttpContractTest).
  *
@@ -55,6 +57,11 @@ dependencies {
     "contractTestImplementation"(project(":libs:security"))
     "contractTestImplementation"(project(":libs:observabilidade"))
     "contractTestImplementation"(project(":libs:testing-security"))
+    // Message contracts: the event goes through the service's outbox mapper into a real outbox table (PostgreSQL in a
+    // container, so they need Docker) and is read back as the envelope the relay publishes. The JSON mapper is the one
+    // Spring Boot configures from the service's application.yml, as in production.
+    "contractTestImplementation"(project(":libs:testing-outbox-contract"))
+    "contractTestImplementation"("org.springframework.boot:spring-boot-starter-jackson")
 }
 
 // The Usage value is the one digitalbanking.contract-consumer asks for.

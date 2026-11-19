@@ -50,8 +50,11 @@ jobs:
               - 'services/customer/bootstrap/src/contractTest/**'
             notification:
               - 'services/notification/**'
+              - 'services/accounts/bootstrap/src/contractTest/resources/contracts/messaging/**'
+              - 'services/transfers/bootstrap/src/contractTest/resources/contracts/messaging/**'
             statement:
               - 'services/statement/**'
+              - 'services/accounts/bootstrap/src/contractTest/resources/contracts/messaging/**'
             customer:
               - 'services/customer/**'
             e2e:
