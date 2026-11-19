@@ -18,12 +18,19 @@ O Spring Cloud Contract, a escolha inicial, passou para o Stubborn.sh e não rec
 - Stubs locais com `StubsMode.CLASSPATH`, pela configuração Gradle entre projetos, sem repositório de artefatos.
 - A base do produtor é um `@WebMvcTest` com os casos de uso mockados. Entram a serialização e a segurança reais; ficam de fora o `JwtDecoder` real e a semântica dos casos de uso, que os testes de integração (ex.: os 152 do `accounts`) cobrem.
 - `wiremock-standalone` removido do `transfers`: conflita com o Stub Runner (`ClassCastException` no Handlebars). O WireMock agora chega só como dependência transitiva do Stub Runner.
-- No CI, o `paths-filter` faz o contrato do `accounts` disparar o `transfers`, e o contrato do `customer` disparar o `accounts` e o `transfers`.
+- No CI, o `paths-filter` faz o contrato HTTP do `accounts` disparar o `transfers`, e o contrato do `customer` disparar o `accounts` e o `transfers`. Os contratos de mensagem do `accounts` disparam `statement` e `notification`; os do `transfers`, `notification`.
+- Contratos de mensagem dos eventos do outbox (4 do `accounts`, 3 do `transfers`, que passa a ser produtor de mensagem). O Stubborn 0.2.2 oferece `MessageVerifierReceiver` e `MessageVerifierSender` para plugar um verificador, mas os prontos cobrem só JMS, Kafka, Rabbit, Camel, Spring Integration e Spring Cloud Stream; não há SNS/SQS.
+- Produtor: lib `libs/testing-outbox-contract`, só de infraestrutura. O `OutboxMessageVerifier` grava pelo mapeador do outbox do serviço num PostgreSQL de contêiner, lê pela consulta do relay e devolve o envelope em JSON, o mesmo corpo que o `SnsEventPublisher` envia. O `sentTo` é o nome do tópico tirado do ARN configurado, então o contrato confere também o tópico.
+- O projeto declara o bean `contractVerifierMessaging` inteiro: o bean no-op padrão monta receivers próprios e ignora o receiver declarado.
+- Consumidor: `statement` e `notification` usam `StubRunnerExtension.messageVerifierSender(...)` com `trigger(label)` e entregam a mensagem direto ao tratador do listener, sem SQS.
+- Fora do contrato de mensagem: atributos de mensagem do SNS, eventos do `customer` e eventos de status da conta (cartão #198).
 
 ## Consequências
 - Positivas: contrato quebrado no produtor derruba o build do produtor; os stubs do consumidor deixam de divergir do produtor; ferramenta mantida e declarada compatível com o Boot do projeto.
 - Negativas: ferramenta nova e de versão 0.x, com risco de mudança de API entre versões; menos material de apoio que o Spring Cloud Contract. Se vier outra ferramenta, a troca fica isolada nas convenções do `build-logic` e nos arquivos de contrato.
-- Positiva: o contrato roda no `check` sem Docker, porque a base é `@WebMvcTest`.
+- Positiva: o contrato HTTP roda no `check` sem Docker, porque a base é `@WebMvcTest`.
+- Negativa: o `contractTest` de `accounts` e `transfers` exige Docker, por causa do PostgreSQL de contêiner dos contratos de mensagem. O `./gradlew test` segue sem Docker.
+- Negativa: declarar o bean `contractVerifierMessaging` inteiro acopla o projeto ao funcionamento interno do Stubborn; uma atualização pode mudar a autoconfiguração no-op ou a assinatura do bean e quebrar os contratos de mensagem. Reconferir ao subir a versão.
 - Negativa: o contrato não prova o `JwtDecoder` real nem a semântica dos casos de uso (mockados); isso fica com os testes de integração.
 - Negativa: falhas de rede (timeouts, corpos estranhos, conexão cortada) não cabem em stub de contrato e continuam com WireMock escrito à mão nos testes do `transfers`.
 - Negativa: contratos em Groovy DSL são uma segunda linguagem no repositório, e a troca de versão do Kotlin não os afeta nem os valida.
