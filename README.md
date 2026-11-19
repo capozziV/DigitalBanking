@@ -104,7 +104,7 @@ Os cinco serviços também sobem pelas imagens Docker (perfil `apps` do compose)
 Região `sa-east-1`. **Ainda não houve subida real:** o código é validado no CI sem credenciais (`terraform validate`, `tflint`, `helm lint`, `kubeconform`, `actionlint` e testes dos scripts). Detalhes em [`infra/terraform/README.md`](infra/terraform/README.md) e [`deploy/helm/README.md`](deploy/helm/README.md).
 
 ### Uma vez, pelo usuário
-1. Aplicar o stack [`infra/terraform/bootstrap`](infra/terraform/bootstrap) com credenciais de administrador da conta, informando `budget_alert_email` (variável sensível sem padrão, por exemplo em `TF_VAR_budget_alert_email`). Ele cria o bucket do estado, o papel `digital-banking-github` (OIDC, só da `main`), os repositórios ECR e o Budget de US$ 20/mês. O `bootstrap` não declara backend: o estado dele fica com quem aplica.
+1. Aplicar o stack [`infra/terraform/bootstrap`](infra/terraform/bootstrap) com credenciais de administrador da conta, informando `budget_alert_email` (variável sensível sem padrão, por exemplo em `TF_VAR_budget_alert_email`). Ele cria o bucket do estado, o papel `digital-banking-github` (OIDC, só da `main`), os repositórios ECR e o Budget de US$ 20/mês. O `bootstrap` não declara backend: o estado dele é local, na máquina de quem aplica; se ele se perder, é preciso recuperá-lo com `terraform import`.
 2. Em *Settings > Secrets and variables > Actions* do repositório:
    - `vars.AWS_ROLE_ARN`: saída `github_role_arn` do `bootstrap`;
    - `vars.TF_STATE_BUCKET`: saída `state_bucket`;

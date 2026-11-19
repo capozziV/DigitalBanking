@@ -8,7 +8,7 @@
 - **Infraestrutura como código:** Terraform.
 - **Local:** docker-compose em `infra/local/` com PostgreSQL (um banco por serviço), Redis, nginx (no papel do API Gateway), `mock-oauth2-server` (no papel do Cognito) e LocalStack (SNS, SQS e DynamoDB, conta gratuita com token). Perfil `apps` sobe os cinco serviços pelas imagens Docker. Testes de integração com Testcontainers.
 - **Frontend (etapa 9):** Angular + BFF em Node/NestJS.
-- **Diagramas:** Excalidraw.
+- **Diagramas:** Mermaid (no `README.md`).
 
 ## Serviços
 | Serviço | Responsabilidade | Dados |

@@ -4,7 +4,7 @@
 - **Data:** 2026-11-12
 
 ## Contexto
-O [ADR 0001](0001-stack-kotlin-spring-boot-aws.md) previa ECS Fargate para rodar os serviços, e o [ADR 0004](0004-api-gateway-http-api-na-borda.md) previa ECS Service Connect nas chamadas entre serviços. O projeto é de portfólio, e Kubernetes pesa mais nele que ECS. O ambiente na AWS é efêmero: sobe por cerca de 1 dia para acesso e é destruído, sendo recriado sob demanda com Terraform.
+O [ADR 0001](0001-stack-kotlin-spring-boot-aws.md) previa ECS Fargate para rodar os serviços, e o [ADR 0004](0004-api-gateway-http-api-na-borda.md) previa ECS Service Connect nas chamadas entre serviços. O projeto é de portfólio, e Kubernetes pesa mais nele que ECS. O ambiente na AWS é efêmero: sobe por no máximo 8 h para acesso ([ADR 0021](0021-deploy-e-ambiente-efemero.md)) e é destruído, sendo recriado sob demanda com Terraform.
 
 ## Decisão
 - Os serviços rodam no **Amazon EKS**, no lugar do ECS.
