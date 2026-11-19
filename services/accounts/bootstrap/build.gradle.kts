@@ -1,4 +1,7 @@
-plugins { id("digitalbanking.spring-boot-app") }
+plugins {
+    id("digitalbanking.spring-boot-app")
+    id("digitalbanking.contract-producer")
+}
 
 dependencies {
     implementation(project(":services:accounts:adapters"))

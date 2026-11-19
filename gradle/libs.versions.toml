@@ -9,8 +9,9 @@ assertj = "3.27.7"
 springdoc = "3.1.1"
 java-uuid-generator = "5.2.0"
 aws-sdk = "2.57.1"
-wiremock = "3.13.2"
 spring-cloud-aws = "4.2.1"
+# Consumer-driven contracts (ADR 0022): successor of Spring Cloud Contract, built on Spring Boot 4.1.
+stubborn-contract = "0.2.2"
 
 [libraries]
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
@@ -28,15 +29,16 @@ testcontainers-localstack = { module = "org.testcontainers:testcontainers-locals
 aws-sdk-bom = { module = "software.amazon.awssdk:bom", version.ref = "aws-sdk" }
 aws-sdk-dynamodb = { module = "software.amazon.awssdk:dynamodb" }
 aws-sdk-sns = { module = "software.amazon.awssdk:sns" }
-wiremock-standalone = { module = "org.wiremock:wiremock-standalone", version.ref = "wiremock" }
 aws-sdk-sqs = { module = "software.amazon.awssdk:sqs" }
 # Spring Cloud AWS BOM (starters have no version). Import aws-sdk-bom next to it: Gradle picks the higher SDK version,
 # so the project's aws-sdk wins over the one the Spring Cloud AWS BOM brings.
 spring-cloud-aws-bom = { module = "io.awspring.cloud:spring-cloud-aws-dependencies", version.ref = "spring-cloud-aws" }
 spring-cloud-aws-starter-sqs = { module = "io.awspring.cloud:spring-cloud-aws-starter-sqs" }
+stubborn-contract-bom = { module = "sh.stubborn:stubborn-contract-dependencies", version.ref = "stubborn-contract" }
 
 # Dependencias de plugin para o build-logic
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 kotlin-allopen = { module = "org.jetbrains.kotlin:kotlin-allopen", version.ref = "kotlin" }
 spring-boot-gradle-plugin = { module = "org.springframework.boot:spring-boot-gradle-plugin", version.ref = "spring-boot" }
 ktlint-gradle = { module = "org.jlleitschuh.gradle:ktlint-gradle", version.ref = "ktlint-gradle" }
+stubborn-contract-gradle-plugin = { module = "sh.stubborn:stubborn-contract-gradle-plugin", version.ref = "stubborn-contract" }

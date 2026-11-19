@@ -1,4 +1,7 @@
-plugins { id("digitalbanking.spring-boot-app") }
+plugins {
+    id("digitalbanking.spring-boot-app")
+    id("digitalbanking.contract-consumer")
+}
 
 dependencies {
     implementation(project(":services:transfers:adapters"))
@@ -26,7 +29,15 @@ dependencies {
     integrationTestImplementation("org.flywaydb:flyway-core")
     integrationTestImplementation(libs.testcontainers.postgresql)
     integrationTestImplementation(libs.testcontainers.junit.jupiter)
-    integrationTestImplementation(libs.wiremock.standalone)
+
+    // The gateway tests run against the stubs generated from the contracts of accounts and customer. The Stub Runner
+    // brings WireMock (with Jetty 12) for the hand-written stubs too: wiremock-standalone shades the Handlebars that
+    // the Stub Runner registers its helpers with, and the two cannot share a classpath.
+    contractStubs(project(":services:accounts:bootstrap"))
+    contractStubs(project(":services:customer:bootstrap"))
+    // The hand-written stubs and the checks on the stub servers use WireMock directly. The version comes from the
+    // Stubborn Contract BOM; wiremock-standalone must not be used, for the reason above.
+    integrationTestImplementation("org.wiremock:wiremock-jetty12")
 }
 
 // TransferEventsIntegrationTest runs LocalStack with the same init scripts as the local compose. The directory is a

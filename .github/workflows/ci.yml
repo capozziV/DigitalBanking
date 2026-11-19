@@ -43,8 +43,11 @@ jobs:
           filters: |
             accounts:
               - 'services/accounts/**'
+              - 'services/customer/bootstrap/src/contractTest/**'
             transfers:
               - 'services/transfers/**'
+              - 'services/accounts/bootstrap/src/contractTest/**'
+              - 'services/customer/bootstrap/src/contractTest/**'
             notification:
               - 'services/notification/**'
             statement:
