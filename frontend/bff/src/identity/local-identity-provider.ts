@@ -1,5 +1,6 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import type { KeyValueStore } from '../redis/key-value-store.js';
+import { httpFetch } from './http-fetch.js';
 import { IdentityError, IdentityProvider, type Tokens } from './identity-provider.js';
 
 const USER_PREFIX = 'bff:local-user:';
@@ -33,7 +34,9 @@ export class LocalIdentityProvider extends IdentityProvider {
   constructor(
     private readonly store: KeyValueStore,
     private readonly mockUrl: string,
-    private readonly fetchFn: typeof fetch = fetch,
+    /** Host sent to the mock: it builds the token `iss` from it (see MOCK_OAUTH2_HOST in infra/local/auth/token.sh). */
+    private readonly mockHost?: string,
+    private readonly fetchFn: typeof fetch = httpFetch as typeof fetch,
   ) {
     super();
   }
@@ -77,6 +80,7 @@ export class LocalIdentityProvider extends IdentityProvider {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           Authorization: `Basic ${Buffer.from('web:local-secret').toString('base64')}`,
+          ...(this.mockHost ? { Host: this.mockHost } : {}),
         },
         body: new URLSearchParams({
           grant_type: 'password',

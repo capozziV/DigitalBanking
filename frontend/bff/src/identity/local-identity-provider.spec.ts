@@ -20,8 +20,27 @@ describe('LocalIdentityProvider', () => {
     provider = new LocalIdentityProvider(
       store,
       'http://mock.test/default',
+      undefined,
       fetchMock as unknown as typeof fetch,
     );
+  });
+
+  it('sends the configured Host header to the mock so the iss matches what the services validate', async () => {
+    const withHost = new LocalIdentityProvider(
+      store,
+      'http://mock.test/default',
+      'localhost:8090',
+      fetchMock as unknown as typeof fetch,
+    );
+    await withHost.signUp('ana@example.test', '123456');
+    await withHost.signIn('ana@example.test', '123456');
+    expect(fetchMock.mock.calls[0]![1].headers['Host']).toBe('localhost:8090');
+  });
+
+  it('sends no Host header when none is configured', async () => {
+    await provider.signUp('ana@example.test', '123456');
+    await provider.signIn('ana@example.test', '123456');
+    expect(fetchMock.mock.calls[0]![1].headers).not.toHaveProperty('Host');
   });
 
   it('accepts sign-up without a code and stores only a hash of the password', async () => {

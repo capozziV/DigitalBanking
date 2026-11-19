@@ -4,6 +4,7 @@ import { LocalIdentityProvider } from './local-identity-provider.js';
 
 // Needs the compose services: `docker compose -f infra/local/docker-compose.yml up -d --wait redis mock-oauth2-server`.
 const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
+const MOCK_HOST = process.env['MOCK_OAUTH2_HOST'] || 'localhost:8090';
 const MOCK_URL = process.env['MOCK_OAUTH2_URL'] ?? 'http://localhost:8090/default';
 
 function claims(jwt: string): Record<string, unknown> {
@@ -12,7 +13,7 @@ function claims(jwt: string): Record<string, unknown> {
 
 describe('LocalIdentityProvider against mock-oauth2-server and Redis', () => {
   const store = new RedisKeyValueStore(REDIS_URL);
-  const provider = new LocalIdentityProvider(store, MOCK_URL);
+  const provider = new LocalIdentityProvider(store, MOCK_URL, MOCK_HOST);
   const email = `it-${randomUUID()}@example.test`;
 
   afterAll(async () => {
@@ -33,6 +34,7 @@ describe('LocalIdentityProvider against mock-oauth2-server and Redis', () => {
     expect(sub).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     expect(claims(second.accessToken)['sub']).toBe(sub);
     expect(claims(refreshed.accessToken)['sub']).toBe(sub);
+    expect(claims(first.accessToken)['iss']).toBe(`http://${MOCK_HOST}/default`);
     expect(first.expiresInSeconds).toBeGreaterThan(60);
     await expect(provider.signIn(email, '000000')).rejects.toMatchObject({
       code: 'invalid_credentials',

@@ -50,6 +50,8 @@ env_value() {
   # Chaves do bff, sem prefixo de servico (nao e Spring): o client do Cognito do BFF e o Redis provisionado (sem TLS).
   case "$svc:$key" in
     bff:COGNITO_CLIENT_ID) out cognito_bff_client_id; return ;;
+    # Regiao do user pool: a do registro do ECR (<conta>.dkr.ecr.<regiao>.amazonaws.com), a mesma do ambiente.
+    bff:COGNITO_REGION) sed -E 's/^[^.]+\.dkr\.ecr\.([^.]+)\.amazonaws\.com.*/\1/' <<< "$registry"; return ;;
     bff:REDIS_URL) echo "redis://$redis:6379"; return ;;
   esac
   upper=$(tr '[:lower:]' '[:upper:]' <<< "$svc")

@@ -16,13 +16,14 @@ springProfile: ""
 
 # Obrigatorios: o chart recusa o render se algum estiver vazio ou ausente.
 requiredEnv:
+  - COGNITO_REGION
   - COGNITO_CLIENT_ID
   - REDIS_URL
 
 env:
   IDENTITY_PROVIDER: cognito
   COGNITO_CLIENT_ID: ""
-  AWS_REGION: sa-east-1
+  COGNITO_REGION: sa-east-1
   # O Redis provisionado (ElastiCache, sem senha, so acessivel de dentro da VPC); o BFF usa o prefixo bff: nas chaves.
   REDIS_URL: ""
   # A borda e HTTPS (API Gateway HTTP API): o cookie leva Secure.
