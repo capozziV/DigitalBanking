@@ -9,6 +9,15 @@
     "web": 80,
     "bff": 3000
   },
+  "health": {
+    "accounts": "/actuator/health/readiness",
+    "transfers": "/actuator/health/readiness",
+    "notification": "/actuator/health/readiness",
+    "statement": "/actuator/health/readiness",
+    "customer": "/actuator/health/readiness",
+    "web": "/",
+    "bff": "/bff/health"
+  },
   "rules": [
     { "priority": 10, "service": "transfers", "regex": ["^/accounts/[^/]+/daily-limit$"] },
     { "priority": 20, "service": "statement", "regex": ["^/accounts/[^/]+/statement$"] },
