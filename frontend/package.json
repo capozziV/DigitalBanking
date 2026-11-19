@@ -1,0 +1,28 @@
+{
+  "name": "digital-banking-frontend",
+  "private": true,
+  "version": "0.0.0",
+  "workspaces": [
+    "web",
+    "bff",
+    "e2e"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "test": "npm test -w web && npm test -w bff",
+    "build": "npm run build -w web && npm run build -w bff",
+    "e2e": "npm run e2e -w e2e"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "angular-eslint": "^22.8.0",
+    "eslint": "^10.15.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.10.1",
+    "typescript-eslint": "^8.73.0"
+  }
+}

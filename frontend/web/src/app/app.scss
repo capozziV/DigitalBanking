@@ -1,0 +1,16 @@
+.page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+}
+
+.card {
+  width: min(100%, 420px);
+  padding: 32px;
+  text-align: center;
+}
+
+h1 {
+  margin: 0 0 8px;
+}

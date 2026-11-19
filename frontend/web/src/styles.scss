@@ -1,0 +1,66 @@
+@use '@angular/material' as mat;
+
+// Own theme: no color accents. Black and grey on a light grey page.
+:root {
+  --bank-bg: #f5f5f7;
+  --bank-text: #1d1d1f;
+  --bank-muted: #86868b;
+  --bank-card-bg: #ffffff;
+  --bank-card-radius: 18px;
+  --bank-card-shadow: 0 1px 3px rgb(0 0 0 / 8%), 0 4px 16px rgb(0 0 0 / 4%);
+  --bank-font:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+
+  @include mat.theme(
+    (
+      color: mat.$azure-palette,
+      typography: (
+        plain-family: (
+          -apple-system,
+          BlinkMacSystemFont,
+          'SF Pro Text',
+          'Segoe UI',
+          Roboto,
+          sans-serif,
+        ),
+        brand-family: (
+          -apple-system,
+          BlinkMacSystemFont,
+          'SF Pro Display',
+          'Segoe UI',
+          Roboto,
+          sans-serif,
+        ),
+      ),
+      density: 0,
+    )
+  );
+
+  // Override the Material system tokens with the project palette.
+  --mat-sys-primary: #1d1d1f;
+  --mat-sys-on-primary: #ffffff;
+  --mat-sys-surface: var(--bank-card-bg);
+  --mat-sys-background: var(--bank-bg);
+  --mat-sys-on-surface: var(--bank-text);
+  --mat-sys-on-surface-variant: var(--bank-muted);
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+  background: var(--bank-bg);
+  color: var(--bank-text);
+  font-family: var(--bank-font);
+}
+
+.card {
+  background: var(--bank-card-bg);
+  border-radius: var(--bank-card-radius);
+  box-shadow: var(--bank-card-shadow);
+}
+
+.muted {
+  color: var(--bank-muted);
+}
