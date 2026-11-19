@@ -3,10 +3,10 @@
 ## Stack
 - **Backend:** Kotlin + Spring Boot 4.1, JDK 21, Spring MVC com virtual threads, Spring JDBC (`JdbcClient`) na persistência, Gradle Kotlin DSL multi-módulo, monorepo.
 - **Arquitetura por serviço:** Clean Architecture (`domain` → `application` → `adapters` → `bootstrap`), um módulo Gradle por camada, regras validadas com ArchUnit. Pacote raiz `io.github.capozziv.digitalbanking`.
-- **AWS:** RDS PostgreSQL, DynamoDB, SNS, SQS + DLQ, ElastiCache (Redis), Cognito, API Gateway (HTTP API), EKS ([ADR 0019](adr/0019-runtime-na-aws-com-eks.md)). O ambiente na AWS é efêmero: sobe por cerca de 1 dia e é destruído e recriado sob demanda com Terraform.
+- **AWS:** RDS PostgreSQL, DynamoDB, SNS, SQS + DLQ, ElastiCache (Redis), Cognito, API Gateway (HTTP API), EKS ([ADR 0019](adr/0019-runtime-na-aws-com-eks.md)), em `sa-east-1`. O ambiente na AWS é efêmero: sobe sob demanda, fica no máximo 8 h e é destruído com Terraform ([ADR 0021](adr/0021-deploy-e-ambiente-efemero.md)).
 - **Lint:** ktlint.
 - **Infraestrutura como código:** Terraform.
-- **Local:** docker-compose em `infra/local/` com PostgreSQL (um banco por serviço), Redis e nginx (no papel do API Gateway) e LocalStack (SNS/SQS, conta gratuita com token, desde o bloco 2 da etapa 1; cobrirá também o DynamoDB na etapa 4). Testes de integração com Testcontainers.
+- **Local:** docker-compose em `infra/local/` com PostgreSQL (um banco por serviço), Redis, nginx (no papel do API Gateway), `mock-oauth2-server` (no papel do Cognito) e LocalStack (SNS, SQS e DynamoDB, conta gratuita com token). Perfil `apps` sobe os cinco serviços pelas imagens Docker. Testes de integração com Testcontainers.
 - **Frontend (etapa 9):** Angular + BFF em Node/NestJS.
 - **Diagramas:** Excalidraw.
 
@@ -16,7 +16,7 @@
 | customer | Cadastro e status do cliente (porta 8085, eventos `customer-events.fifo`) | PostgreSQL próprio |
 | accounts | Contas, ledger imutável e saldo (fonte da verdade) | PostgreSQL |
 | transfers | Saga orquestrada de transferência, idempotência, limite diário | PostgreSQL + Redis |
-| statement | Extrato para leitura (CQRS) | DynamoDB (Redis para a primeira página chega na etapa 5) |
+| statement | Extrato para leitura (CQRS) | DynamoDB + Redis (cache da 1ª página) |
 | notification | Consome eventos e grava notificações dentro do aplicativo (sininho) | PostgreSQL |
 
 ## Fluxo de entrada
@@ -31,10 +31,10 @@ ALB público ── /     → Angular (nginx)
                  API Gateway HTTP API (autorizador JWT Cognito)
                           │ VPC Link
                           ▼
-                 ALB interno → customer / accounts / transfers / statement
+                 ALB interno → customer / accounts / transfers / statement / notification
                                (chamadas entre serviços pelo DNS de Service do Kubernetes)
 ```
-Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia versionada no repositório.
+Até a etapa 9 não existe BFF: testes manuais usam a coleção Bruno versionada em `api/bruno/`.
 
 ## Decisões tomadas
 ### Dados e consistência
@@ -83,11 +83,11 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 - **API Gateway HTTP API** substitui um gateway em Spring: roteamento por caminho, autorizador JWT nativo do Cognito, VPC Link para ALB interno.
 - Os serviços **também** validam o JWT (Spring Security resource server); não confiam só na borda.
 - Localmente, nginx faz o roteamento por caminho. Cognito no LocalStack é recurso pago: localmente, o `mock-oauth2-server` no docker-compose emite JWT com JWKS e os serviços o validam como validam o do Cognito.
-- Na AWS os serviços rodam no EKS e se chamam pelo DNS de Service do Kubernetes ([ADR 0019](adr/0019-runtime-na-aws-com-eks.md)). Nenhum deploy na AWS antes da derrubada automática com tempo máximo ligado e do alarme de orçamento (#146).
+- Na AWS os serviços rodam no EKS e se chamam pelo DNS de Service do Kubernetes ([ADR 0019](adr/0019-runtime-na-aws-com-eks.md)). Deploy só com a derrubada automática e o alarme de orçamento ativos ([ADR 0021](adr/0021-deploy-e-ambiente-efemero.md)).
 - **Identidade:** o id do cliente é o `sub` do usuário. Três chamadores: cliente, admin (grupo `admin`, claim configurável) e serviço (token de máquina por client credentials, escopo `digitalbanking/internal`). Recurso de outro cliente devolve `404`; sem token, `401`; rota de admin sem o grupo, `403`.
 - `accounts` (abrir conta) e `transfers` (criar transferência) consultam o `customer` na hora, sem cache; inexistente ou bloqueado dá `422`, `customer` fora dá `503`.
 - `401` e `403` em Problem Details; desconexão do cliente não vira `500`. `/actuator/health` aberto sem detalhes; o resto do actuator só para admin.
-- **Terraform da borda** (`infra/terraform/modules/identity` e `edge`, `envs/aws`): escrito e validado no CI, sem `apply` até a etapa 8.
+- **Terraform da borda** (`infra/terraform/modules/identity` e `edge`): parte do ambiente efêmero `envs/aws`, aplicado pelo `aws-up` ([ADR 0021](adr/0021-deploy-e-ambiente-efemero.md)).
 - **Bibliotecas compartilhadas** (só infraestrutura): `libs/security` (resource server, `Caller`, token de máquina), `libs/observabilidade` (filtro de correlation ID, propagação nas chamadas HTTP de saída e interceptor SQS que põe o ID da mensagem no MDC) e `libs/testing-security` (emissor de JWT de teste).
 - **Perfil Spring `aws`** (`application-aws.yml` em `services/<svc>/bootstrap/src/main/resources/`, nos cinco serviços): desliga o OpenAPI e o swagger-ui e, no `accounts`, no `transfers` e no `customer`, troca o padrão do LocalStack de `<svc>.aws.endpoint` por um valor em branco, para os SDKs usarem os endpoints reais da AWS. No `notification` e no `statement`, os endpoints (`spring.cloud.aws.sqs.endpoint` e `statement.dynamodb.endpoint`) já são em branco por padrão no `application.yml`, e o ambiente local os preenche por variável. JWT issuer, banco e Redis mantêm o padrão `localhost`: sem a variável de ambiente o serviço falha fechado. As variáveis e o `SPRING_PROFILES_ACTIVE=aws` vêm do chart Helm. O ambiente local, os testes, o smoke e o e2e usam o perfil padrão. O `AwsProfileConfigIntegrationTest` de cada serviço garante os endpoints em branco.
 - (ver [ADR 0004](adr/0004-api-gateway-http-api-na-borda.md) e [ADR 0020](adr/0020-identidade-e-autorizacao.md))
@@ -106,6 +106,16 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 - O filtro, a propagação e o interceptor SQS (o ID do atributo da mensagem fica no MDC até o fim do processamento, inclusive na linha de erro do contêiner) ficam em `libs/observabilidade`, usada por todos os serviços.
 - (ver [ADR 0006](adr/0006-observabilidade-com-correlation-id.md))
 
+### Deploy na AWS
+- Dois stacks Terraform: `infra/terraform/bootstrap` (permanente, aplicado pelo usuário: estado, papel OIDC do GitHub, ECR, Budget) e `infra/terraform/envs/aws` (efêmero).
+- EKS em `sa-east-1` com node group EC2 gerenciado, 2× `t3.medium`; RDS `db.t4g.micro`, ElastiCache `cache.t4g.micro`, um NAT Gateway.
+- ALB interno do Terraform; o AWS Load Balancer Controller só liga os pods por `TargetGroupBinding`. Pod Identity por serviço, sem IRSA. Job `db-init` cria bancos e usuários no RDS.
+- Um chart Helm comum (`deploy/helm/service`) e imagem por `Dockerfile` em camadas, etiquetada com o SHA do commit.
+- Workflows `aws-up`, `aws-down` e `aws-reaper`, só da `main`. Tempo máximo ligado de 8 h pela etiqueta `created-at`; etiqueta ausente ou malformada derruba. Budget de US$ 20/mês (alertas em 50%, 80% e 100%).
+- Papel do GitHub com `AdministratorAccess` e policy de deny ([ADR 0019](adr/0019-runtime-na-aws-com-eks.md)).
+- Actuator fora da borda; endpoint público do EKS aberto para `0.0.0.0/0`; Redis sem TLS nem AUTH.
+- (ver [ADR 0021](adr/0021-deploy-e-ambiente-efemero.md), [`infra/terraform/README.md`](../infra/terraform/README.md) e [`deploy/helm/README.md`](../deploy/helm/README.md))
+
 ### Frontend (etapa 9, detalhar depois)
 - Angular (standalone components, signals); Angular Material como biblioteca de componentes.
 - BFF em NestJS: login OAuth2 com Cognito (`openid-client`), sessão no Redis, cookie `HttpOnly`, CSRF, refresh de token, correlation ID via `AsyncLocalStorage`, logs JSON com pino.
@@ -119,6 +129,4 @@ Até a etapa 9 não existe BFF: testes manuais usam uma coleção Bruno/Insomnia
 ## Em aberto
 Fonte única das decisões pendentes; cada item tem um cartão `Decision` no [board](https://github.com/users/capozziV/projects/2). Ao decidir, registre no ADR indicado (ou crie um), remova o item daqui e feche o cartão.
 
-**Etapa 8**
-- EKS: nós EC2 ou Fargate ([ADR 0019](adr/0019-runtime-na-aws-com-eks.md)).
-- Tempo máximo ligado e mecanismo de derrubada automática do ambiente AWS; bloqueia o deploy (cartão [#146](https://github.com/capozziV/DigitalBanking/issues/146)).
+Nenhum item em aberto.

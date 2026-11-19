@@ -10,7 +10,7 @@ O [ADR 0001](0001-stack-kotlin-spring-boot-aws.md) previa ECS Fargate para rodar
 - Os serviços rodam no **Amazon EKS**, no lugar do ECS.
 - A descoberta de serviços usa o **DNS de Service do Kubernetes**; a decisão do ECS Service Connect (cartão #55) deixa de valer.
 - Nenhum deploy na AWS antes de existir a **derrubada automática com tempo máximo ligado** e um **alarme de orçamento** (cartão #146).
-- Nós EC2 ou Fargate, tempo máximo ligado e mecanismo de derrubada ficam em "Em aberto" em `docs/arquitetura.md`, para o brainstorming da etapa 8.
+- Nós EC2 ou Fargate, tempo máximo ligado e mecanismo de derrubada: decididos na etapa 8, no [ADR 0021](0021-deploy-e-ambiente-efemero.md) (node group EC2 gerenciado, 8 h, `aws-reaper`).
 
 ### Papel do GitHub Actions
 O GitHub Actions assume, por OIDC, o papel IAM `digital-banking-github` (criado pelo Terraform em `infra/terraform/bootstrap/`). O papel cria e destrói o ambiente `env` inteiro (VPC, EKS, RDS, ElastiCache, ALB, IAM dos pods), por isso tem **`AdministratorAccess`**. Os controles que compensam:
