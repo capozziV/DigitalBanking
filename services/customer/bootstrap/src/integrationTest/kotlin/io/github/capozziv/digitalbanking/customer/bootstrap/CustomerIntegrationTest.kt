@@ -9,6 +9,8 @@ import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.TestPropertySource
 import org.testcontainers.postgresql.PostgreSQLContainer
+import java.util.concurrent.atomic.AtomicLong
+import kotlin.random.Random
 
 /**
  * Base of every integration test of the customer service. One PostgreSQL container is shared by all subclasses
@@ -37,6 +39,11 @@ abstract class CustomerIntegrationTest {
     }
 
     companion object {
+        private val phoneSequence = AtomicLong(Random.nextLong(0, 50_000_000))
+
+        /** A valid phone no other test has used on the shared database: +55119 and a sequence of eight digits. */
+        fun nextPhone(): String = "+55119" + phoneSequence.getAndIncrement().toString().padStart(8, '0')
+
         const val APP_USER = "customer_app"
         const val APP_PASSWORD = "app"
 

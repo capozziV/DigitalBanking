@@ -38,7 +38,13 @@ class RouteRulesIntegrationTest : CustomerIntegrationTest() {
         routes.forEach { (method, pattern) ->
             val path = pattern.replace(Regex("\\{[^}]+}"), sub.toString())
             val token = if (pattern.startsWith("/internal/")) service else admin
-            val response = api.send(method, path, body = """{"name":"Ana","email":"ana@example.test","status":"ACTIVE"}""", token = token)
+            val response =
+                api.send(
+                    method,
+                    path,
+                    body = """{"name":"Ana","email":"ana@example.test","phone":"+5511987654321","status":"ACTIVE"}""",
+                    token = token,
+                )
             assertThat(response.status).describedAs("$method $pattern").isNotIn(401, 403)
         }
     }

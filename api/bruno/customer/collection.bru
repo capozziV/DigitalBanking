@@ -27,6 +27,11 @@ script:pre-request {
     }
     const sub = bru.interpolate("{{$guid}}");
     bru.setVar("customerId", sub);
+    // Telefones unicos por execucao: o cadastro, a troca e a busca usam os mesmos valores. O "+" vai como %2B na URL.
+    const digits = () => String(Math.floor(Math.random() * 100000000)).padStart(8, "0");
+    bru.setVar("customerPhone", "+55119" + digits());
+    bru.setVar("customerNewPhone", "+55119" + digits());
+    bru.setVar("customerNewPhoneEncoded", encodeURIComponent(bru.getVar("customerNewPhone")));
     bru.setVar("adminToken", await userToken(bru.getEnvVar("adminSub"), true));
     bru.setVar("customerToken", await userToken(sub, false));
   }

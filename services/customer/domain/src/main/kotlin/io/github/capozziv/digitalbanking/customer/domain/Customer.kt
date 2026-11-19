@@ -14,6 +14,7 @@ data class Customer(
     val id: UUID,
     val name: String,
     val email: String,
+    val phone: PhoneNumber,
     val status: CustomerStatus,
     val createdAt: Instant,
     val updatedAt: Instant,
@@ -34,6 +35,17 @@ data class Customer(
             else -> copy(status = newStatus, updatedAt = now) to CustomerUnblocked(id)
         }
 
+    /** Sets [newPhone]. The same number is a no-op without event, so repeating the change is safe. */
+    fun changePhone(
+        newPhone: PhoneNumber,
+        now: Instant,
+    ): Pair<Customer, CustomerPhoneChanged?> =
+        if (newPhone == phone) {
+            this to null
+        } else {
+            copy(phone = newPhone, updatedAt = now) to CustomerPhoneChanged(id, phone, newPhone)
+        }
+
     companion object {
         const val MAX_NAME_LENGTH = 120
         const val MAX_EMAIL_LENGTH = 254
@@ -48,10 +60,11 @@ data class Customer(
             id: UUID,
             name: String,
             email: String,
+            phone: PhoneNumber,
             now: Instant,
         ): Pair<Customer, CustomerRegistered> {
-            val customer = Customer(id, name.trim(), email.trim(), CustomerStatus.ACTIVE, now, now)
-            return customer to CustomerRegistered(id, customer.name, customer.email)
+            val customer = Customer(id, name.trim(), email.trim(), phone, CustomerStatus.ACTIVE, now, now)
+            return customer to CustomerRegistered(id, customer.name, customer.email, phone)
         }
     }
 }
@@ -65,6 +78,13 @@ data class CustomerRegistered(
     override val customerId: UUID,
     val name: String,
     val email: String,
+    val phone: PhoneNumber,
+) : CustomerEvent
+
+data class CustomerPhoneChanged(
+    override val customerId: UUID,
+    val previousPhone: PhoneNumber,
+    val newPhone: PhoneNumber,
 ) : CustomerEvent
 
 data class CustomerBlocked(

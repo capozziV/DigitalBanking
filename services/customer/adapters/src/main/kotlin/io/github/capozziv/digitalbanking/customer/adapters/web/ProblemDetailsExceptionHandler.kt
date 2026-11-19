@@ -1,7 +1,9 @@
 package io.github.capozziv.digitalbanking.customer.adapters.web
 
 import io.github.capozziv.digitalbanking.customer.application.CallerHasNoCustomerException
+import io.github.capozziv.digitalbanking.customer.application.CustomerNotFoundByPhoneException
 import io.github.capozziv.digitalbanking.customer.application.CustomerNotFoundException
+import io.github.capozziv.digitalbanking.customer.application.PhoneAlreadyInUseException
 import org.slf4j.LoggerFactory
 import org.springframework.beans.TypeMismatchException
 import org.springframework.http.HttpHeaders
@@ -11,12 +13,18 @@ import org.springframework.http.ProblemDetail
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.MethodArgumentNotValidException
+import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.context.request.WebRequest
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler
 import tools.jackson.core.JacksonException
 import java.net.URI
+
+/** A query parameter that is not a valid phone, found in the web layer (the body is validated by bean validation). */
+class InvalidPhoneException(
+    val field: String,
+) : RuntimeException("$field is not a valid phone")
 
 /** A field that failed validation, as listed in `errors` of the validation-error problem. */
 data class InvalidField(
@@ -34,6 +42,18 @@ class ProblemDetailsExceptionHandler : ResponseEntityExceptionHandler() {
     @ExceptionHandler
     fun handle(e: CustomerNotFoundException) = problem(HttpStatus.NOT_FOUND, "customer-not-found", "Customer not found", e.message)
 
+    @ExceptionHandler
+    fun handle(e: CustomerNotFoundByPhoneException) =
+        problem(HttpStatus.NOT_FOUND, "customer-not-found", "Customer not found", "No customer has this phone")
+
+    @ExceptionHandler
+    fun handle(e: PhoneAlreadyInUseException) =
+        problem(HttpStatus.CONFLICT, "phone-already-in-use", "Phone already in use", "Another customer already has this phone")
+
+    @ExceptionHandler
+    fun handle(e: InvalidPhoneException) =
+        badRequest(listOf(InvalidField(e.field, "must be a Brazilian mobile number in E.164, such as +5511987654321")))
+
     /** Only a service token has no customer; the route rules already keep it away, so this is a second fence. */
     @ExceptionHandler
     fun handle(e: CallerHasNoCustomerException) =
@@ -45,6 +65,13 @@ class ProblemDetailsExceptionHandler : ResponseEntityExceptionHandler() {
         status: HttpStatusCode,
         request: WebRequest,
     ): ResponseEntity<Any> = badRequest(ex.bindingResult.fieldErrors.map { InvalidField(it.field, it.defaultMessage ?: "is invalid") })
+
+    override fun handleMissingServletRequestParameter(
+        ex: MissingServletRequestParameterException,
+        headers: HttpHeaders,
+        status: HttpStatusCode,
+        request: WebRequest,
+    ): ResponseEntity<Any> = badRequest(listOf(InvalidField(ex.parameterName, "is required")))
 
     /** A path variable that does not convert, such as a customer id that is not a UUID. */
     override fun handleTypeMismatch(

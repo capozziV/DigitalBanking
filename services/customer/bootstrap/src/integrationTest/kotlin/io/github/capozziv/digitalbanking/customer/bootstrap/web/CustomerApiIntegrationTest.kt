@@ -13,10 +13,26 @@ class CustomerApiIntegrationTest : CustomerIntegrationTest() {
 
     private val api by lazy { ApiClient(port) }
 
+    private fun encodedLookup(
+        phone: String,
+        token: String,
+    ): java.net.http.HttpResponse<String> =
+        java.net.http.HttpClient
+            .newHttpClient()
+            .send(
+                java.net.http.HttpRequest
+                    .newBuilder(java.net.URI.create("http://localhost:$port/customers/lookup?phone=${phone.replace("+", "%2B")}"))
+                    .header("Authorization", "Bearer $token")
+                    .build(),
+                java.net.http.HttpResponse.BodyHandlers
+                    .ofString(),
+            )
+
     private fun body(
         name: String = "Ana Souza",
         email: String = "ana@example.test",
-    ) = """{"name":"$name","email":"$email"}"""
+        phone: String = nextPhone(),
+    ) = """{"name":"$name","email":"$email","phone":"$phone"}"""
 
     @Test
     fun `a customer registers with 201 and a repeat gives 200 with the same record`() {
@@ -31,6 +47,7 @@ class CustomerApiIntegrationTest : CustomerIntegrationTest() {
         assertThat(first.body!!.get("id").asString()).isEqualTo(sub.toString())
         assertThat(first.body.get("name").asString()).isEqualTo("Ana Souza")
         assertThat(first.body.get("email").asString()).isEqualTo("ana@example.test")
+        assertThat(first.body.get("phone").asString()).startsWith("+55")
         assertThat(first.body.get("status").asString()).isEqualTo("ACTIVE")
         assertThat(repeat.status).describedAs(repeat.rawBody).isEqualTo(200)
         assertThat(repeat.body).isEqualTo(first.body)
@@ -73,6 +90,7 @@ class CustomerApiIntegrationTest : CustomerIntegrationTest() {
 
         assertProblem(api.post("/customers", body()), 401, "unauthorized")
         assertProblem(api.get("/customers/me"), 401, "unauthorized")
+        assertProblem(api.put("/customers/me/phone", """{"phone":"+5511987654321"}"""), 401, "unauthorized")
         assertProblem(api.get("/admin/customers/$id"), 401, "unauthorized")
         assertProblem(api.put("/admin/customers/$id/status", """{"status":"BLOCKED"}"""), 401, "unauthorized")
         assertProblem(api.get("/internal/customers/$id"), 401, "unauthorized")
@@ -100,9 +118,139 @@ class CustomerApiIntegrationTest : CustomerIntegrationTest() {
         assertProblem(badEmail, 400, "validation-error")
         assertThat(badEmail.errorFields()).containsExactly("email")
         assertProblem(empty, 400, "validation-error")
-        assertThat(empty.errorFields()).containsExactlyInAnyOrder("name", "email")
+        assertThat(empty.errorFields()).containsExactlyInAnyOrder("name", "email", "phone")
         assertProblem(longName, 400, "validation-error")
         assertThat(longName.errorFields()).containsExactly("name")
+    }
+
+    @Test
+    fun `a phone that is not a Brazilian mobile number in E164 is 400 validation-error on the phone field`() {
+        val token = JwtTestSupport.customerToken(UUID.randomUUID())
+
+        listOf("11987654321", "(11) 98765-4321", "+551134567890", "+5501987654321", "+55119876543210", "").forEach {
+            val response = api.post("/customers", body(phone = it), token)
+            assertProblem(response, 400, "validation-error")
+            assertThat(response.errorFields()).describedAs(it).containsOnly("phone")
+        }
+    }
+
+    @Test
+    fun `registering with a phone another customer has is 409 phone-already-in-use and creates nothing`() {
+        val phone = nextPhone()
+        api.post("/customers", body(phone = phone), JwtTestSupport.customerToken(UUID.randomUUID()))
+        val second = UUID.randomUUID()
+        val token = JwtTestSupport.customerToken(second)
+
+        assertProblem(api.post("/customers", body(phone = phone), token), 409, "phone-already-in-use")
+
+        assertProblem(api.get("/customers/me", token), 404, "customer-not-found")
+    }
+
+    @Test
+    fun `the customer changes its phone and every read shows the new one`() {
+        val sub = UUID.randomUUID()
+        val token = JwtTestSupport.customerToken(sub)
+        api.post("/customers", body(), token)
+        val newPhone = nextPhone()
+
+        val changed = api.put("/customers/me/phone", """{"phone":"$newPhone"}""", token)
+
+        assertThat(changed.status).describedAs(changed.rawBody).isEqualTo(200)
+        assertThat(changed.body!!.get("phone").asString()).isEqualTo(newPhone)
+        assertThat(
+            api
+                .get("/customers/me", token)
+                .body!!
+                .get("phone")
+                .asString(),
+        ).isEqualTo(newPhone)
+        assertThat(api.put("/customers/me/phone", """{"phone":"$newPhone"}""", token).status).isEqualTo(200)
+    }
+
+    @Test
+    fun `change phone to a number in use is refused with 409 and the phone stays`() {
+        val sub = UUID.randomUUID()
+        val token = JwtTestSupport.customerToken(sub)
+        val mine = nextPhone()
+        val taken = nextPhone()
+        api.post("/customers", body(phone = mine), token)
+        api.post("/customers", body(phone = taken), JwtTestSupport.customerToken(UUID.randomUUID()))
+
+        assertProblem(api.put("/customers/me/phone", """{"phone":"$taken"}""", token), 409, "phone-already-in-use")
+
+        assertThat(
+            api
+                .get("/customers/me", token)
+                .body!!
+                .get("phone")
+                .asString(),
+        ).isEqualTo(mine)
+    }
+
+    @Test
+    fun `change phone validates the number, needs a registration and refuses a service token`() {
+        val token = JwtTestSupport.customerToken(UUID.randomUUID())
+
+        val invalid = api.put("/customers/me/phone", """{"phone":"123"}""", token)
+        val missing = api.put("/customers/me/phone", "{}", token)
+
+        assertProblem(invalid, 400, "validation-error")
+        assertThat(invalid.errorFields()).containsExactly("phone")
+        assertProblem(missing, 400, "validation-error")
+        assertProblem(api.put("/customers/me/phone", """{"phone":"${nextPhone()}"}""", token), 404, "customer-not-found")
+        assertProblem(api.put("/customers/me/phone", """{"phone":"${nextPhone()}"}""", JwtTestSupport.serviceToken()), 403, "forbidden")
+        assertProblem(api.put("/customers/me/phone", """{"phone":"${nextPhone()}"}"""), 401, "unauthorized")
+    }
+
+    @Test
+    fun `lookup returns the customer id and the full name, and nothing else`() {
+        val sub = UUID.randomUUID()
+        val phone = nextPhone()
+        api.post("/customers", body(name = "Ana Souza", phone = phone), JwtTestSupport.customerToken(sub))
+
+        // The ApiClient re-encodes its path as a template, so this request goes by plain HTTP with the plus as %2B.
+        val response = encodedLookup(phone, JwtTestSupport.customerToken(UUID.randomUUID()))
+
+        assertThat(response.statusCode()).describedAs(response.body()).isEqualTo(200)
+        val body =
+            tools.jackson.databind.json.JsonMapper
+                .builder()
+                .build()
+                .readTree(response.body())
+        assertThat(body.propertyNames()).containsExactlyInAnyOrder("customerId", "fullName")
+        assertThat(body.get("customerId").asString()).isEqualTo(sub.toString())
+        assertThat(body.get("fullName").asString()).isEqualTo("Ana Souza")
+    }
+
+    @Test
+    fun `lookup reads a plus sign that was not encoded in the query string`() {
+        val sub = UUID.randomUUID()
+        val phone = nextPhone()
+        api.post("/customers", body(phone = phone), JwtTestSupport.customerToken(sub))
+
+        val response = api.get("/customers/lookup?phone=$phone", JwtTestSupport.customerToken(UUID.randomUUID()))
+
+        assertThat(response.status).describedAs(response.rawBody).isEqualTo(200)
+        assertThat(response.body!!.get("customerId").asString()).isEqualTo(sub.toString())
+    }
+
+    @Test
+    fun `lookup of an unknown phone is 404 and of an invalid or missing phone is 400`() {
+        val token = JwtTestSupport.customerToken(UUID.randomUUID())
+
+        assertProblem(api.get("/customers/lookup?phone=${nextPhone()}", token), 404, "customer-not-found")
+        val invalid = api.get("/customers/lookup?phone=11987654321", token)
+        val missing = api.get("/customers/lookup", token)
+        assertProblem(invalid, 400, "validation-error")
+        assertThat(invalid.errorFields()).containsExactly("phone")
+        assertProblem(missing, 400, "validation-error")
+        assertThat(missing.errorFields()).containsExactly("phone")
+    }
+
+    @Test
+    fun `lookup requires authentication and refuses a service token`() {
+        assertProblem(api.get("/customers/lookup?phone=+5511987654321"), 401, "unauthorized")
+        assertProblem(api.get("/customers/lookup?phone=+5511987654321", JwtTestSupport.serviceToken()), 403, "forbidden")
     }
 
     @Test

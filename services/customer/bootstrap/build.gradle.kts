@@ -20,6 +20,8 @@ dependencies {
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-webmvc")
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-jdbc")
     integrationTestImplementation("org.awaitility:awaitility") // version managed by the Spring Boot BOM
+    integrationTestImplementation("org.flywaydb:flyway-core") // the migration test runs Flyway up to a version; Boot BOM version
+    integrationTestImplementation(libs.flyway.postgresql)
     integrationTestImplementation(libs.testcontainers.postgresql)
     integrationTestImplementation(libs.testcontainers.junit.jupiter)
 }

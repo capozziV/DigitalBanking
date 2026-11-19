@@ -116,13 +116,20 @@ else
   admin=$("$token_sh" user "$admin_sub" admin)
 fi
 
+# Telefone ficticio e unico derivado do sub: +55 11 9 e oito digitos tirados dos digitos do uuid.
+phone_of() {
+  local digits
+  digits=$(printf '%s' "$1" | tr -dc '0-9')00000000
+  printf '+55119%s' "${digits:0:8}"
+}
+
 # Cliente novo: usuario novo, cadastro no customer com o proprio token. Imprime "<sub> <token>"; use com
 # pair=$(new_customer), para o set -e valer (numa substituicao de processo a falha passaria em silencio).
 new_customer() {
   local pair sub token
   pair=$(new_user) || exit 1
   read -r sub token <<< "$pair"
-  call 201 "$token" POST /customers "{\"name\":\"Smoke Customer\",\"email\":\"smoke-$sub@example.test\"}" > /dev/null
+  call 201 "$token" POST /customers "{\"name\":\"Smoke Customer\",\"email\":\"smoke-$sub@example.test\",\"phone\":\"$(phone_of "$sub")\"}" > /dev/null
   echo "$sub $token"
 }
 

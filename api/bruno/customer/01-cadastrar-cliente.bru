@@ -13,7 +13,8 @@ post {
 body:json {
   {
     "name": "Bruno Customer",
-    "email": "bruno-{{customerId}}@example.test"
+    "email": "bruno-{{customerId}}@example.test",
+    "phone": "{{customerPhone}}"
   }
 }
 
@@ -23,5 +24,6 @@ tests {
     expect(res.status).to.equal(201);
     expect(res.body.id).to.equal(bru.getVar("customerId"));
     expect(res.body.status).to.equal("ACTIVE");
+    expect(res.body.phone).to.equal(bru.getVar("customerPhone"));
   });
 }
