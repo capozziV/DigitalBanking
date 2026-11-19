@@ -1,6 +1,7 @@
 package io.github.capozziv.digitalbanking.accounts.adapters.web.dto
 
 import io.github.capozziv.digitalbanking.accounts.application.usecase.AccountView
+import io.github.capozziv.digitalbanking.accounts.domain.AccountStatus
 import io.github.capozziv.digitalbanking.accounts.domain.AccountType
 import io.github.capozziv.digitalbanking.accounts.domain.AccountTypeLimit
 import io.github.capozziv.digitalbanking.accounts.domain.EntryKind
@@ -13,6 +14,7 @@ data class AccountDTO(
     val id: UUID,
     val customerId: UUID,
     val type: AccountType,
+    val status: AccountStatus,
     val balance: Long,
     val overdraftLimit: Long,
     val availableBalance: Long,
@@ -23,6 +25,7 @@ data class AccountDTO(
                 id = view.account.id,
                 customerId = view.account.customerId,
                 type = view.account.type,
+                status = view.account.status,
                 balance = view.balance.cents,
                 overdraftLimit = view.overdraftLimit.cents,
                 availableBalance = view.availableBalance.cents,

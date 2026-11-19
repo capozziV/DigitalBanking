@@ -40,6 +40,17 @@ class JdbcTransferRepositoryIntegrationTest : TransfersIntegrationTest() {
         )
 
     @Test
+    fun `countPendingFrom counts the pending transfers leaving the account, whatever their step`() {
+        val account = UUID.randomUUID()
+        allSteps.forEach { step -> repository.insert(aTransfer(step = step).copy(sourceAccountId = account)) }
+        repository.insert(aTransfer(step = TransferStep.Debit).copy(destinationAccountId = account))
+        repository.insert(aTransfer(step = TransferStep.Debit))
+
+        assertThat(repository.countPendingFrom(account)).isEqualTo(6)
+        assertThat(repository.countPendingFrom(UUID.randomUUID())).isZero()
+    }
+
+    @Test
     fun `round trips the limit day and the reservation flag`() {
         val reserved = aTransfer(limitDay = LocalDate.parse("2026-11-12"), limitReserved = true)
         val notReserved = aTransfer(limitDay = LocalDate.parse("2026-11-13"), limitReserved = false)

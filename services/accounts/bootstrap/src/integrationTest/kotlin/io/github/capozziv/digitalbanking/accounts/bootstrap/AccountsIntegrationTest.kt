@@ -21,7 +21,8 @@ import java.util.UUID
  * (a subclass @TestPropertySource overrides this one).
  *
  * Security: tokens are signed by [JwtTestSupport] (its decoder replaces the one built from the issuer URI), and the
- * token endpoint and the `customer` service are the [CustomerServiceStub], where every customer is ACTIVE by default.
+ * token endpoint and the `customer` service are the [CustomerServiceStub], where every customer is ACTIVE by default; the
+ * `transfers` service is the [TransfersServiceStub], where no account has a pending transfer by default.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = ["accounts.outbox.relay-enabled=false"])
@@ -33,6 +34,8 @@ abstract class AccountsIntegrationTest {
     }
 
     protected val customerService: CustomerServiceStub get() = CustomerServiceStub.instance
+
+    protected val transfersService: TransfersServiceStub get() = TransfersServiceStub.instance
 
     /** Marks as published every pending outbox event, such as those left by other tests on the shared database. */
     protected fun markPendingOutboxEventsPublished() {
@@ -81,6 +84,9 @@ abstract class AccountsIntegrationTest {
         /** Set by a subclass (with its own @DynamicPropertySource) to point the `customer` service elsewhere. */
         const val CUSTOMER_BASE_URL_OVERRIDE = "accounts-test.customer-base-url"
 
+        /** Set by a subclass (with its own @DynamicPropertySource) to point the `transfers` service elsewhere. */
+        const val TRANSFERS_BASE_URL_OVERRIDE = "accounts-test.transfers-base-url"
+
         /** Set by a subclass (with its own @DynamicPropertySource) to point the token endpoint elsewhere. */
         const val TOKEN_URI_OVERRIDE = "accounts-test.token-uri"
 
@@ -91,6 +97,9 @@ abstract class AccountsIntegrationTest {
         fun customerServiceProperties(registry: DynamicPropertyRegistry) {
             registry.add("accounts.customer.base-url") {
                 "\${$CUSTOMER_BASE_URL_OVERRIDE:${CustomerServiceStub.instance.baseUrl}}"
+            }
+            registry.add("accounts.transfers.base-url") {
+                "\${$TRANSFERS_BASE_URL_OVERRIDE:${TransfersServiceStub.instance.baseUrl}}"
             }
             registry.add("digitalbanking.security.service-token.token-uri") {
                 "\${$TOKEN_URI_OVERRIDE:${CustomerServiceStub.instance.baseUrl}/token}"

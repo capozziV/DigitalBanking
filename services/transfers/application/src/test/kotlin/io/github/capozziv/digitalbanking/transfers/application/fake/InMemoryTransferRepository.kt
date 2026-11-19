@@ -2,6 +2,7 @@ package io.github.capozziv.digitalbanking.transfers.application.fake
 
 import io.github.capozziv.digitalbanking.transfers.application.port.TransferRepository
 import io.github.capozziv.digitalbanking.transfers.domain.Transfer
+import io.github.capozziv.digitalbanking.transfers.domain.TransferStatus
 import java.time.Instant
 import java.util.UUID
 
@@ -108,4 +109,7 @@ class InMemoryTransferRepository : TransferRepository {
             .filter { nextAttempts[it.id]?.isAfter(now) == false }
             .take(limit)
             .map { it.id }
+
+    override fun countPendingFrom(sourceAccountId: UUID): Long =
+        transfers.values.count { it.sourceAccountId == sourceAccountId && it.status == TransferStatus.PENDING }.toLong()
 }

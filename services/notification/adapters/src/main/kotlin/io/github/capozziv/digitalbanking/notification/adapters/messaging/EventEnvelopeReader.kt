@@ -88,6 +88,21 @@ class EventEnvelopeReader {
                 )
             }
 
+            "AccountBlocked" -> {
+                val payload = envelope.payload()
+                ReceivedEvent.AccountBlocked(eventId, payload.uuid("accountId"), payload.uuid("customerId"))
+            }
+
+            "AccountUnblocked" -> {
+                val payload = envelope.payload()
+                ReceivedEvent.AccountUnblocked(eventId, payload.uuid("accountId"), payload.uuid("customerId"))
+            }
+
+            "AccountClosed" -> {
+                val payload = envelope.payload()
+                ReceivedEvent.AccountClosed(eventId, payload.uuid("accountId"), payload.uuid("customerId"))
+            }
+
             else -> {
                 ReceivedEvent.Unsupported(eventId, eventType)
             }

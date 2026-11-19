@@ -76,12 +76,19 @@ class TransferAuthorizationIntegrationTest : TransfersIntegrationTest() {
     }
 
     @Test
-    fun `every route of the service lets an admin in`() {
+    fun `every route of the service lets an admin in, except the internal ones, which are for services only`() {
         val admin = api.withToken(JwtTestSupport.adminToken(UUID.randomUUID()))
-        val routes =
-            handlerMapping.handlerMethods.keys.flatMap { info ->
-                info.methodsCondition.methods.flatMap { method -> info.patternValues.map { pattern -> method.name to pattern } }
-            }
+        val (internal, routes) =
+            handlerMapping.handlerMethods.keys
+                .flatMap { info ->
+                    info.methodsCondition.methods.flatMap { method -> info.patternValues.map { pattern -> method.name to pattern } }
+                }.partition { (_, pattern) -> pattern.startsWith("/internal/") }
+
+        assertThat(internal).isNotEmpty()
+        for ((method, pattern) in internal) {
+            val path = pattern.replace(Regex("\\{[^}]+}"), UUID.randomUUID().toString())
+            assertProblem(admin.send(HttpMethod.valueOf(method), path), 403, "forbidden")
+        }
 
         assertThat(routes).isNotEmpty()
         for ((method, pattern) in routes) {

@@ -170,6 +170,8 @@ class TransferSagaSchedulerTest {
             owner: String,
         ) = unused()
 
+        override fun countPendingFrom(sourceAccountId: UUID): Long = unused()
+
         private fun unused(): Nothing = error("not used by the scheduler tests")
     }
 

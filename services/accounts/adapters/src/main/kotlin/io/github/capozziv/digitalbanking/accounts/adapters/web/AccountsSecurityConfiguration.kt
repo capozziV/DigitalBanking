@@ -26,5 +26,9 @@ class AccountsSecurityConfiguration {
             authorize(HttpMethod.POST, "/accounts/{id}/credits", hasAnyRole(SERVICE, ADMIN))
             authorize(HttpMethod.POST, "/accounts/{id}/debits", hasAnyRole(SERVICE, ADMIN))
             authorize(HttpMethod.PUT, "/accounts/{id}/type", hasRole(ADMIN))
+            // Closing: the owner (checked by the use case, 404 for anyone else) or an admin; never a service.
+            authorize(HttpMethod.POST, "/accounts/{id}/close", hasAnyRole(CUSTOMER, ADMIN))
+            // Already admin only by the `/admin/**` rule of the library; listed so the rule is visible here.
+            authorize(HttpMethod.PUT, "/admin/accounts/{id}/status", hasRole(ADMIN))
         }
 }

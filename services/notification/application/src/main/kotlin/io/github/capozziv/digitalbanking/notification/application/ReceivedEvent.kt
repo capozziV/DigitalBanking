@@ -59,6 +59,30 @@ sealed interface ReceivedEvent {
         override val eventType: String get() = "TransferCompensated"
     }
 
+    data class AccountBlocked(
+        override val eventId: UUID,
+        val accountId: UUID,
+        val customerId: UUID,
+    ) : ReceivedEvent {
+        override val eventType: String get() = "AccountBlocked"
+    }
+
+    data class AccountUnblocked(
+        override val eventId: UUID,
+        val accountId: UUID,
+        val customerId: UUID,
+    ) : ReceivedEvent {
+        override val eventType: String get() = "AccountUnblocked"
+    }
+
+    data class AccountClosed(
+        override val eventId: UUID,
+        val accountId: UUID,
+        val customerId: UUID,
+    ) : ReceivedEvent {
+        override val eventType: String get() = "AccountClosed"
+    }
+
     /** Any event type this service does not notify about. */
     data class Unsupported(
         override val eventId: UUID,

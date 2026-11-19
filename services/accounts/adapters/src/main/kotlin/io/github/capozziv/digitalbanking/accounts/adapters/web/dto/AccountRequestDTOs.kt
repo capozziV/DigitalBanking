@@ -1,7 +1,9 @@
 package io.github.capozziv.digitalbanking.accounts.adapters.web.dto
 
+import io.github.capozziv.digitalbanking.accounts.domain.AccountStatus
 import io.github.capozziv.digitalbanking.accounts.domain.AccountType
 import io.github.capozziv.digitalbanking.accounts.domain.LedgerEntry
+import io.swagger.v3.oas.annotations.media.Schema
 import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Positive
@@ -34,4 +36,11 @@ data class ChangeAccountTypeDTO(
 
 data class ChangeOverdraftLimitDTO(
     @field:NotNull @field:PositiveOrZero val overdraftLimit: Long?,
+)
+
+/** Only ACTIVE or BLOCKED: an account is closed by `POST /accounts/{id}/close`, never by a status change. */
+data class ChangeAccountStatusDTO(
+    @field:NotNull
+    @field:Schema(allowableValues = ["ACTIVE", "BLOCKED"])
+    val status: AccountStatus?,
 )

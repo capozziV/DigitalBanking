@@ -13,6 +13,7 @@ import io.github.capozziv.digitalbanking.transfers.application.port.TransactionR
 import io.github.capozziv.digitalbanking.transfers.application.port.TransferRepository
 import io.github.capozziv.digitalbanking.transfers.application.port.TransferStepLog
 import io.github.capozziv.digitalbanking.transfers.application.usecase.CompensateTransferManuallyUseCase
+import io.github.capozziv.digitalbanking.transfers.application.usecase.CountPendingTransfersUseCase
 import io.github.capozziv.digitalbanking.transfers.application.usecase.GetDailyLimitUseCase
 import io.github.capozziv.digitalbanking.transfers.application.usecase.GetTransferUseCase
 import io.github.capozziv.digitalbanking.transfers.application.usecase.ListStuckTransfersUseCase
@@ -71,6 +72,9 @@ class UseCaseConfiguration {
 
     @Bean
     fun getTransferUseCase(transfers: TransferRepository) = GetTransferUseCase(transfers)
+
+    @Bean
+    fun countPendingTransfersUseCase(transfers: TransferRepository) = CountPendingTransfersUseCase(transfers)
 
     @Bean
     fun getDailyLimitUseCase(

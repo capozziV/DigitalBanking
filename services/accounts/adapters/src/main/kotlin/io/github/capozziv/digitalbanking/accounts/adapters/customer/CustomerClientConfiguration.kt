@@ -3,6 +3,7 @@ package io.github.capozziv.digitalbanking.accounts.adapters.customer
 import io.github.capozziv.digitalbanking.accounts.application.port.CustomerGateway
 import io.github.capozziv.digitalbanking.observability.CorrelationIdRestClientInterceptor
 import io.github.capozziv.digitalbanking.security.ServiceTokenClient
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -37,5 +38,7 @@ class CustomerClientConfiguration {
     }
 
     @Bean
-    fun customerGateway(customerRestClient: RestClient): CustomerGateway = HttpCustomerGateway(customerRestClient)
+    fun customerGateway(
+        @Qualifier("customerRestClient") customerRestClient: RestClient,
+    ): CustomerGateway = HttpCustomerGateway(customerRestClient)
 }
