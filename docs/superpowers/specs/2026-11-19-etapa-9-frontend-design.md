@@ -46,8 +46,8 @@ O "por dentro" (correlation ID, linha do tempo da saga, logs) fica para uma etap
 | Bônus | R$ 100 (10000 centavos) creditados ao abrir a conta |
 | Usuário de demonstração | Sim, pelo seed, além do cadastro. Sem botão "entrar como demo": o usuário guarda o e-mail e a senha e os envia ao recrutador |
 | Destino da transferência | **Telefone celular** do destinatário, com confirmação do nome mascarado antes de enviar |
-| Verificação do telefone | Sim, por código de 6 dígitos por SMS, atrás de uma porta. Nesta etapa o adaptador é **simulado**: o app mostra o código num aviso "SMS recebido". O SMS real da AWS fica para depois |
-| Troca do telefone | Permitida em "Minha conta", com verificação do número novo |
+| Verificação do telefone | **Nenhuma**, nem real nem simulada (decisão do usuário, 2026-11-19). O app só confere o formato |
+| Troca do telefone | Permitida em "Minha conta" |
 | Testes | Unidade (Angular e NestJS) e Playwright |
 | Idioma | Português |
 
@@ -70,12 +70,12 @@ As telas aprovadas como referência estão em `.superpowers/brainstorm/2215-1795
 |---|---|---|
 | Entrar | E-mail e senha de 6 dígitos; link para Criar conta | Cognito |
 | Criar conta | E-mail, senha de 6 dígitos (com confirmação), depois o código recebido por e-mail | Cognito |
-| Completar cadastro | Nome e telefone celular no primeiro acesso, se `GET /customers/me` responder 404; depois, o código de verificação do telefone | `POST /customers`, verificação do telefone (nova) |
+| Completar cadastro | Nome e telefone celular no primeiro acesso, se `GET /customers/me` responder 404 | `POST /customers` |
 | Início | Cartão do saldo (saldo disponível, tipo de conta, cheque especial, Transferir e Extrato), limite diário usado e disponível, últimos lançamentos; sem conta, botão "Abrir conta" | `GET /accounts/...`, `GET /accounts/{id}/daily-limit`, `GET /accounts/{id}/statement` |
 | Extrato | Lançamentos paginados com o ícone de entrada e saída; o bônus aparece como "Bônus de boas-vindas" | `GET /accounts/{id}/statement` (cursor) |
 | Transferir | Telefone do destinatário e valor; o app mostra o nome mascarado ("Ana S.") para confirmar; depois o status até `COMPLETED`, `FAILED` ou `COMPENSATED`, com o motivo em português | busca por telefone (nova), `POST /transfers`, `GET /transfers/{id}` |
 | Avisos | Lista de notificações, marcar como lidas, contador no menu | `GET /notifications`, `POST /notifications/read` |
-| Minha conta | Dados do cliente e da conta; trocar o telefone (com verificação do número novo); encerrar conta (saldo zero, sem pendentes) | `GET /customers/me`, troca do telefone (nova), `POST /accounts/{id}/close` |
+| Minha conta | Dados do cliente e da conta; trocar o telefone; encerrar conta (saldo zero, sem pendentes) | `GET /customers/me`, troca do telefone (nova), `POST /accounts/{id}/close` |
 
 O builder confere os caminhos exatos de cada rota no OpenAPI de cada serviço.
 
@@ -100,13 +100,11 @@ O builder confere os caminhos exatos de cada rota no OpenAPI de cada serviço.
   - Termo novo no `CONTEXT.md`: **Bônus de boas-vindas**.
   - O valor fica numa configuração, com o padrão de 10000.
 - **customer: telefone do cliente.**
-  - O cliente ganha o campo telefone (celular brasileiro, guardado em E.164, `+55DD9XXXXXXXX`), **único** entre os clientes e **verificado** por código de 6 dígitos com validade curta e limite de tentativas.
-  - A transferência só aceita destinatário com telefone verificado.
-  - O envio do código fica numa **porta** (`PhoneVerificationSender` ou nome equivalente). O adaptador desta etapa é simulado: o código chega ao app, que o mostra no aviso "SMS recebido". O SMS real da AWS é um adaptador futuro (cartão próprio no Backlog).
-  - **Troca do telefone:** o cliente pede a troca, verifica o número novo e só então o antigo é liberado. Uma transferência é resolvida no momento do envio; trocar o telefone depois não afeta transferências já feitas.
-  - **Busca por telefone:** devolve só o nome mascarado e o que o BFF precisa para achar a conta; revela que o número tem conta, como o PIX. É aceitável no banco simulado e fica no ADR.
-  - O evento de cadastro (`CustomerRegistered`) e um evento de troca de telefone carregam o telefone; a versão segue o padrão dos eventos.
-  - Termos novos no `CONTEXT.md`: **Telefone** e **Verificação do telefone**.
+  - O cliente ganha o campo telefone: celular brasileiro, guardado em E.164 (`+55DD9XXXXXXXX`), com formato validado e **único** entre os clientes. **Não há verificação** do número, nem real nem simulada.
+  - **Troca do telefone** em "Minha conta": o número novo também precisa ser único. Uma transferência é resolvida no momento do envio, então trocar o telefone depois não afeta transferências já feitas.
+  - **Busca por telefone:** devolve só o nome mascarado e o que o BFF precisa para achar a conta. Ela revela que o número tem conta, como o PIX faz. Como não há verificação, qualquer um pode cadastrar um número que não é seu. As duas coisas são aceitáveis no banco simulado e ficam registradas no ADR.
+  - O evento de cadastro (`CustomerRegistered`) e um evento de troca de telefone carregam o telefone. A versão segue o padrão dos eventos.
+  - Termo novo no `CONTEXT.md`: **Telefone**.
 - **BFF:** junta a busca por telefone com a conta não encerrada do cliente (cada cliente tem uma só) para montar o destino da transferência.
 - **Cognito (`modules/identity`):**
   - política de senha com mínimo de 6 e sem exigência de classes;
@@ -129,8 +127,8 @@ O builder confere os caminhos exatos de cada rota no OpenAPI de cada serviço.
   4. transferir para o usuário de demonstração;
   5. ver `COMPLETED`, o extrato e a notificação;
   6. tentar uma transferência acima do limite e ver a recusa.
-- Mutantes no padrão do projeto: senha com 5 ou 7 dígitos é recusada no BFF; o bônus é lançado uma vez só; telefone não verificado não recebe transferência; dois clientes não ficam com o mesmo telefone.
-- O Playwright também cobre a verificação do telefone (código do aviso simulado) e a transferência pelo telefone do usuário de demonstração.
+- Mutantes no padrão do projeto: senha com 5 ou 7 dígitos é recusada no BFF; o bônus é lançado uma vez só; dois clientes não ficam com o mesmo telefone.
+- O Playwright também cobre a transferência pelo telefone do usuário de demonstração.
 
 ### 6.6 Pontos fechados na leitura do builder (decisões da coordenadora)
 - **Cliente já nasce Ativo:** `POST /customers` cria o cliente com `CustomerStatus.ACTIVE` (`Customer.kt`); o cadastro não precisa de rota de admin.
@@ -145,7 +143,7 @@ O builder confere os caminhos exatos de cada rota no OpenAPI de cada serviço.
 - O BFF nunca guarda token no navegador.
 - Nada de segredo versionado.
 - O `domain` do accounts segue sem Spring.
-- ADR novo para a senha numérica de 6 dígitos, o login pela API do Cognito, o telefone como chave de transferência e a verificação simulada.
+- ADR novo para a senha numérica de 6 dígitos, o login pela API do Cognito, e o telefone sem verificação como chave de transferência.
 
 ## 8. Deixado ao builder
 - As versões exatas de Angular, NestJS e Playwright, conferidas na fonte primária.
