@@ -1,5 +1,6 @@
 package io.github.capozziv.digitalbanking.accounts.domain
 
+import java.time.Instant
 import java.util.UUID
 
 sealed interface AccountEvent {
@@ -23,4 +24,22 @@ data class AccountTypeChanged(
     val previousType: AccountType,
     val newType: AccountType,
     val overdraftLimit: OverdraftLimit,
+) : AccountEvent
+
+data class AccountBlocked(
+    override val accountId: UUID,
+    val customerId: UUID,
+    val occurredAt: Instant,
+) : AccountEvent
+
+data class AccountUnblocked(
+    override val accountId: UUID,
+    val customerId: UUID,
+    val occurredAt: Instant,
+) : AccountEvent
+
+data class AccountClosed(
+    override val accountId: UUID,
+    val customerId: UUID,
+    val occurredAt: Instant,
 ) : AccountEvent

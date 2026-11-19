@@ -7,8 +7,11 @@ import io.github.capozziv.digitalbanking.accounts.application.port.EventOutbox
 import io.github.capozziv.digitalbanking.accounts.application.port.IdGenerator
 import io.github.capozziv.digitalbanking.accounts.application.port.LedgerEntryRepository
 import io.github.capozziv.digitalbanking.accounts.application.port.TransactionRunner
+import io.github.capozziv.digitalbanking.accounts.application.port.TransfersGateway
+import io.github.capozziv.digitalbanking.accounts.application.usecase.ChangeAccountStatusUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.ChangeAccountTypeUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.ChangeOverdraftLimitUseCase
+import io.github.capozziv.digitalbanking.accounts.application.usecase.CloseAccountUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.FindEntryByIdempotencyKeyUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.GetAccountUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.ListAccountTypesUseCase
@@ -84,6 +87,27 @@ class UseCaseConfiguration {
         outbox: EventOutbox,
         tx: TransactionRunner,
     ) = ChangeAccountTypeUseCase(accounts, entries, types, outbox, tx)
+
+    @Bean
+    fun changeAccountStatusUseCase(
+        accounts: AccountRepository,
+        entries: LedgerEntryRepository,
+        types: AccountTypeRepository,
+        outbox: EventOutbox,
+        tx: TransactionRunner,
+        clock: Clock,
+    ) = ChangeAccountStatusUseCase(accounts, entries, types, outbox, tx, clock)
+
+    @Bean
+    fun closeAccountUseCase(
+        accounts: AccountRepository,
+        entries: LedgerEntryRepository,
+        types: AccountTypeRepository,
+        outbox: EventOutbox,
+        tx: TransactionRunner,
+        transfers: TransfersGateway,
+        clock: Clock,
+    ) = CloseAccountUseCase(accounts, entries, types, outbox, tx, transfers, clock)
 
     @Bean
     fun listAccountTypesUseCase(types: AccountTypeRepository) = ListAccountTypesUseCase(types)

@@ -8,6 +8,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.MountableFile
 import software.amazon.awssdk.services.sqs.SqsClient
 import tools.jackson.databind.json.JsonMapper
+import java.net.ServerSocket
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -109,13 +110,21 @@ class EndToEndEnvironment : AutoCloseable {
             TransfersDatabase(jdbcUrl("transfers"), "transfers_owner", DATABASE_PASSWORDS.getValue("TRANSFERS_DB_OWNER_PASSWORD"))
 
         val logDir = systemPath("e2e.log-dir")
+        val transfersPort = ServerSocket(0).use { it.localPort }
         customer =
             ServiceProcess("customer", systemPath("e2e.customer-jar"), customerEnvironment(), emptyList(), logDir)
         accounts =
-            ServiceProcess("accounts", systemPath("e2e.accounts-jar"), accountsEnvironment(), emptyList(), logDir)
+            ServiceProcess("accounts", systemPath("e2e.accounts-jar"), accountsEnvironment(transfersPort), emptyList(), logDir)
         proxy = AccountsProxy(accounts.baseUrl)
         transfers =
-            ServiceProcess("transfers", systemPath("e2e.transfers-jar"), transfersEnvironment(), SAGA_ARGUMENTS, logDir)
+            ServiceProcess(
+                "transfers",
+                systemPath("e2e.transfers-jar"),
+                transfersEnvironment(),
+                SAGA_ARGUMENTS,
+                logDir,
+                port = transfersPort,
+            )
         notification =
             ServiceProcess(
                 "notification",
@@ -164,7 +173,7 @@ class EndToEndEnvironment : AutoCloseable {
             "CUSTOMER_JWT_ISSUER_URI" to issuer(),
         )
 
-    private fun accountsEnvironment() =
+    private fun accountsEnvironment(transfersPort: Int) =
         mapOf(
             "ACCOUNTS_DB_URL" to jdbcUrl("accounts"),
             "ACCOUNTS_DB_USER" to "accounts_app",
@@ -177,6 +186,10 @@ class EndToEndEnvironment : AutoCloseable {
             "ACCOUNTS_JWT_ISSUER_URI" to issuer(),
             "ACCOUNTS_OAUTH_TOKEN_URI" to "${issuer()}/token",
             "ACCOUNTS_CUSTOMER_BASE_URL" to customer.baseUrl,
+            // The transfers port is reserved before the accounts starts: closing an account asks the transfers directly.
+            "ACCOUNTS_TRANSFERS_BASE_URL" to "http://127.0.0.1:$transfersPort",
+            // The first request to a fresh transfers can pass the default 500 ms (cold JVM); the 503 itself is tested in accounts.
+            "ACCOUNTS_TRANSFERS_TIMEOUT" to "5s",
         )
 
     private fun transfersEnvironment() =

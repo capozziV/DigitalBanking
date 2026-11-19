@@ -1,0 +1,28 @@
+meta {
+  name: Desbloquear conta
+  type: http
+  seq: 13
+}
+
+put {
+  url: {{baseUrl}}/admin/accounts/{{accountId}}/status
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminToken}}
+}
+
+body:json {
+  {
+    "status": "ACTIVE"
+  }
+}
+
+tests {
+  test("200 com a conta ACTIVE", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.status).to.equal("ACTIVE");
+  });
+}

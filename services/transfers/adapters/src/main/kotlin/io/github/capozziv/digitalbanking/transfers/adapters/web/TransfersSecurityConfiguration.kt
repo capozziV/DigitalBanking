@@ -2,14 +2,16 @@ package io.github.capozziv.digitalbanking.transfers.adapters.web
 
 import io.github.capozziv.digitalbanking.security.CallerRoles.ADMIN
 import io.github.capozziv.digitalbanking.security.CallerRoles.CUSTOMER
+import io.github.capozziv.digitalbanking.security.CallerRoles.SERVICE
 import io.github.capozziv.digitalbanking.security.SecurityRules
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpMethod
 
 /**
- * Who may reach each route of transfers. Every route of [TransferController] and [DailyLimitController] is listed:
- * the security library denies any route without a rule. Service tokens get none of them (no peer calls transfers).
+ * Who may reach each route of transfers. Every route of [TransferController], [DailyLimitController] and
+ * [PendingTransfersController] is listed: the security library denies any route without a rule. A service token gets
+ * only the internal route, which accounts calls before closing an account; no user, not even an admin, gets it.
  * Whether the transfer or the account belongs to the caller is decided by the use cases (404 for someone else's).
  */
 @Configuration
@@ -24,5 +26,7 @@ class TransfersSecurityConfiguration {
             authorize(HttpMethod.GET, "/admin/transfers/stuck", hasRole(ADMIN))
             authorize(HttpMethod.POST, "/admin/transfers/{id}/retry", hasRole(ADMIN))
             authorize(HttpMethod.POST, "/admin/transfers/{id}/manual-compensation", hasRole(ADMIN))
+            // PendingTransfersController: also covered by the library's /internal/** rule (service token only).
+            authorize(HttpMethod.GET, "/internal/accounts/{accountId}/pending-transfers", hasRole(SERVICE))
         }
 }

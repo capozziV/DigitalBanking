@@ -89,7 +89,7 @@ class AccountController(
         ),
         ApiResponse(
             responseCode = "409",
-            description = "/problems/customer-already-has-account: the customer already has an account (opened with another key)",
+            description = "/problems/customer-already-has-account: the customer already has a non-closed account (opened with another key)",
         ),
         ApiResponse(
             responseCode = "422",
@@ -163,7 +163,9 @@ class AccountController(
         ),
         ApiResponse(
             responseCode = "422",
-            description = "/problems/idempotency-key-reused: the key was used for another kind or amount on this account",
+            description =
+                "/problems/idempotency-key-reused: the key was used for another kind or amount on this account. " +
+                    "/problems/account-closed: a closed account takes no credits (a blocked one does)",
         ),
         ApiResponse(
             responseCode = "503",
@@ -204,7 +206,9 @@ class AccountController(
             description =
                 "/problems/insufficient-available-balance: the available balance (member `availableBalance`, in cents) " +
                     "does not cover the amount; nothing is recorded, so the same key can be retried later. " +
-                    "/problems/idempotency-key-reused: the key was used for another kind or amount on this account",
+                    "/problems/idempotency-key-reused: the key was used for another kind or amount on this account. " +
+                    "/problems/account-blocked: a blocked account takes no debits. " +
+                    "/problems/account-closed: a closed account takes no debits",
         ),
         ApiResponse(
             responseCode = "503",

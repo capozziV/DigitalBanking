@@ -29,7 +29,7 @@ spring:
 digitalbanking:
   security:
     groups-claim: ${ACCOUNTS_JWT_GROUPS_CLAIM:groups}
-    # Machine token (client credentials) for the calls to the customer service.
+    # Machine token (client credentials) for the calls to the customer and transfers services.
     service-token:
       token-uri: ${ACCOUNTS_OAUTH_TOKEN_URI:http://localhost:8090/default/token}
       client-id: ${ACCOUNTS_OAUTH_CLIENT_ID:accounts}
@@ -41,6 +41,10 @@ accounts:
     # Asked on every account opening (GET /internal/customers/{id}); slower than the timeout is 503.
     base-url: ${ACCOUNTS_CUSTOMER_BASE_URL:http://localhost:8085}
     timeout: ${ACCOUNTS_CUSTOMER_TIMEOUT:500ms}
+  transfers:
+    # Asked before closing an account (GET /internal/accounts/{id}/pending-transfers); slower than the timeout is 503.
+    base-url: ${ACCOUNTS_TRANSFERS_BASE_URL:http://localhost:8082}
+    timeout: ${ACCOUNTS_TRANSFERS_TIMEOUT:500ms}
   outbox:
     relay-enabled: true
     poll-interval: 500ms

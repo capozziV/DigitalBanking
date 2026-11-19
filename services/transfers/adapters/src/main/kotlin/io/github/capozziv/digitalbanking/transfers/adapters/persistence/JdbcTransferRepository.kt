@@ -156,5 +156,16 @@ class JdbcTransferRepository(
             .query { rs, _ -> rs.getObject("id", UUID::class.java) }
             .list()
 
+    /**
+     * Asked once per account closing, so no index of its own: it reads the rows of the source account among the
+     * pending ones, which the saga keeps few.
+     */
+    override fun countPendingFrom(sourceAccountId: UUID): Long =
+        jdbcClient
+            .sql("select count(*) from transfer where source_account_id = :source and status = 'PENDING'")
+            .param("source", sourceAccountId)
+            .query(Long::class.java)
+            .single()
+
     private fun Instant.utc(): OffsetDateTime = OffsetDateTime.ofInstant(this, ZoneOffset.UTC)
 }

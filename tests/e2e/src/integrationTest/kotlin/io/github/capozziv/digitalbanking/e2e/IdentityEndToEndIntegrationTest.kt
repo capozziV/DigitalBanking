@@ -75,6 +75,32 @@ class IdentityEndToEndIntegrationTest {
         assertThat(accounts.balance(destination)).isEqualTo(1_000L)
     }
 
+    @Test
+    fun `an admin blocks and unblocks an account, and closing one with balance is refused`() {
+        val owner = UUID.randomUUID()
+        val account = accounts.openAccount(owner)
+        accounts.credit(account, 500)
+
+        // The owner is a customer, not an admin: 403, and the account stays as it was.
+        assertThat(accounts.changeStatusAsCustomer(account, owner, "BLOCKED").status).isEqualTo(403)
+
+        val blocked = accounts.changeStatus(account, "BLOCKED")
+        assertThat(blocked.status).describedAs(blocked.body).isEqualTo(200)
+        assertThat(blocked.json().get("status").asString()).isEqualTo("BLOCKED")
+        assertThat(accounts.changeStatus(account, "ACTIVE").status).isEqualTo(200)
+
+        // Balance 500: refused before asking transfers.
+        val notEmpty = accounts.close(account)
+        assertThat(notEmpty.status).describedAs(notEmpty.body).isEqualTo(422)
+        assertThat(notEmpty.json().get("type").asString()).endsWith("/problems/balance-not-zero")
+
+        // Closing at zero balance asks the real transfers service (no pending transfers) and succeeds.
+        val empty = accounts.openAccount()
+        val closed = accounts.close(empty)
+        assertThat(closed.status).describedAs(closed.body).isEqualTo(200)
+        assertThat(closed.json().get("status").asString()).isEqualTo("CLOSED")
+    }
+
     private companion object {
         val SAGA_FINISH_TIMEOUT: Duration = Duration.ofSeconds(90)
         val STATEMENT_TIMEOUT: Duration = Duration.ofSeconds(30)

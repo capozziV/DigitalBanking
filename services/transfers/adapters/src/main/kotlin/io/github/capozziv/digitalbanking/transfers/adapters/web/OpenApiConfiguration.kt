@@ -30,7 +30,10 @@ class OpenApiConfiguration {
                         .type(SecurityScheme.Type.HTTP)
                         .scheme("bearer")
                         .bearerFormat("JWT")
-                        .description("Access token of a customer or of an admin (group `admin`)."),
+                        .description(
+                            "Access token of a customer, of an admin (group `admin`) or of a service " +
+                                "(scope `digitalbanking/internal`).",
+                        ),
                 ),
             )
 
@@ -49,9 +52,11 @@ class OpenApiConfiguration {
               `type` `/problems/<slug>`; `400 /problems/validation-error` lists the invalid fields in `errors`.
             - Errors raised by the framework itself (404 unknown route, 405 method not allowed, 415 unsupported
               media type, ...) are Problem Details without a `type` member, which RFC 9457 defines as `about:blank`.
-            - Every operation needs `Authorization: Bearer <JWT>` of a customer or of an admin (`bearerAuth`). A
-              customer only transfers from, and only sees, its own accounts and transfers; someone else's is answered
-              with 404, as if it did not exist. An admin may do everything.
+            - Every operation needs `Authorization: Bearer <JWT>` (`bearerAuth`); outside `/internal/**`, of a customer
+              or of an admin. A customer only transfers from, and only sees, its own accounts and transfers; someone else's is answered
+              with 404, as if it did not exist. An admin may do everything except `/internal/**`.
+            - `/internal/**` takes only a service token (machine token, scope `digitalbanking/internal`): accounts
+              asks there how many `PENDING` transfers leave an account before closing it. A customer or admin token is 403; no token is 401.
             - Before a transfer is created, the customer that owns the source account is checked with the customer
               service, every time: not registered or blocked is 422, customer unavailable is 503.
             - `X-Correlation-Id` is accepted on every request (generated when absent or invalid), forwarded to accounts

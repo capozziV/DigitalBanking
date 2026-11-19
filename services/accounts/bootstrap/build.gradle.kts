@@ -19,6 +19,7 @@ dependencies {
     integrationTestImplementation("org.awaitility:awaitility") // version managed by the Spring Boot BOM
     integrationTestImplementation(libs.testcontainers.postgresql)
     integrationTestImplementation(libs.testcontainers.junit.jupiter)
+    integrationTestImplementation(libs.wiremock.standalone)
 }
 
 // OutboxRelayIntegrationTest runs LocalStack with the same init scripts as the local compose. The directory is a

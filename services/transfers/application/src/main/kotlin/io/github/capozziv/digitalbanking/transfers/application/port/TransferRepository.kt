@@ -52,4 +52,7 @@ interface TransferRepository {
         now: Instant,
         limit: Int,
     ): List<UUID>
+
+    /** How many PENDING transfers leave [sourceAccountId]; transfers that only arrive at it are not counted. */
+    fun countPendingFrom(sourceAccountId: UUID): Long
 }

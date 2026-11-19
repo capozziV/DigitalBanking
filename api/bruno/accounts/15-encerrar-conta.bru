@@ -1,0 +1,19 @@
+meta {
+  name: Encerrar conta
+  type: http
+  seq: 15
+}
+
+post {
+  url: {{baseUrl}}/accounts/{{accountId}}/close
+  body: none
+  auth: inherit
+}
+
+tests {
+  // Saldo zero (14) e nenhuma transferencia pendente: o encerramento consulta o transfers e responde 200.
+  test("200 com a conta CLOSED", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.status).to.equal("CLOSED");
+  });
+}

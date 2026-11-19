@@ -37,7 +37,7 @@ class OpenApiIntegrationTest : AccountsIntegrationTest() {
     }
 
     @Test
-    fun `the contract has exactly the eight paths and methods of the spec`() {
+    fun `the contract has exactly the ten paths and methods of the specs`() {
         val paths = docs.get("paths")
         val operations =
             paths.propertyNames().flatMap { path -> paths.get(path).propertyNames().map { method -> "${method.uppercase()} $path" } }
@@ -51,7 +51,51 @@ class OpenApiIntegrationTest : AccountsIntegrationTest() {
             "PUT /accounts/{id}/type",
             "GET /admin/account-types",
             "PUT /admin/account-types/{type}",
+            "PUT /admin/accounts/{id}/status",
+            "POST /accounts/{id}/close",
         )
+    }
+
+    @Test
+    fun `closing documents its refusals and transfers-unavailable, and the status change documents account-closed`() {
+        val close = operation("POST /accounts/{id}/close").get("responses")
+        val status = operation("PUT /admin/accounts/{id}/status").get("responses")
+
+        assertThat(close.get("422").get("description").asString())
+            .contains("/problems/balance-not-zero")
+            .contains("/problems/pending-transfers")
+            .contains("/problems/account-closed")
+        assertThat(close.get("503").get("description").asString()).contains("/problems/transfers-unavailable")
+        assertThat(close.get("404").get("description").asString()).contains("/problems/account-not-found")
+        assertThat(status.get("422").get("description").asString()).contains("/problems/account-closed")
+        assertThat(status.get("400").get("description").asString()).contains("/problems/validation-error")
+    }
+
+    @Test
+    fun `the account carries its status, and debits and credits document account-blocked and account-closed`() {
+        val status =
+            docs
+                .get("components")
+                .get("schemas")
+                .get("AccountDTO")
+                .get("properties")
+                .get("status")
+        val debit =
+            operation("POST /accounts/{id}/debits")
+                .get("responses")
+                .get("422")
+                .get("description")
+                .asString()
+        val credit =
+            operation("POST /accounts/{id}/credits")
+                .get("responses")
+                .get("422")
+                .get("description")
+                .asString()
+
+        assertThat(status).isNotNull()
+        assertThat(debit).contains("/problems/account-blocked").contains("/problems/account-closed")
+        assertThat(credit).contains("/problems/account-closed").doesNotContain("/problems/account-blocked")
     }
 
     @Test
@@ -89,7 +133,15 @@ class OpenApiIntegrationTest : AccountsIntegrationTest() {
 
     @Test
     fun `the operations that lock the account document 503 account-busy with a Retry-After header`() {
-        for (name in listOf("POST /accounts/{id}/credits", "POST /accounts/{id}/debits", "PUT /accounts/{id}/type")) {
+        val locking =
+            listOf(
+                "POST /accounts/{id}/credits",
+                "POST /accounts/{id}/debits",
+                "PUT /accounts/{id}/type",
+                "PUT /admin/accounts/{id}/status",
+                "POST /accounts/{id}/close",
+            )
+        for (name in locking) {
             val busy = operation(name).get("responses").get("503")
 
             assertThat(busy).describedAs(name).isNotNull()

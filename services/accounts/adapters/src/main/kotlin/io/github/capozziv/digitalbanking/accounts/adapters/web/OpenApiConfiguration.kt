@@ -45,14 +45,17 @@ class OpenApiConfiguration {
             - Every operation needs `Authorization: Bearer <JWT>` (scheme `bearerAuth`); without a valid token the
               answer is 401 /problems/unauthorized. Who may call what:
               - customer (user token without the `admin` group): opens its own account and reads its own account
-                and entries; the account of another customer is 404 /problems/account-not-found;
-              - admin (group `admin`): everything, including credits, debits, the account type and `/admin/**`;
+                and entries, and closes its own account; the account of another customer is 404
+                /problems/account-not-found;
+              - admin (group `admin`): everything, including credits, debits, the account type, closing any account
+                and `/admin/**` (account type limits, blocking and unblocking accounts);
                 an admin who is also a customer opens its own account;
               - service (machine token, scope `digitalbanking/internal`): reads any account, credits, debits and
                 the entry lookup.
             - A role that may not call an operation, and any route without a rule, are denied with
               403 /problems/forbidden.
             - Amounts are whole cents (integers); `amount` > 0.
+            - An account is ACTIVE, BLOCKED (takes credits, refuses debits) or CLOSED (refuses both, for good).
             - Errors are Problem Details (RFC 9457, `application/problem+json`). Errors of this API have a relative
               `type` `/problems/<slug>`; `400 /problems/validation-error` lists the invalid fields in `errors`.
             - Errors raised by the framework itself (405 method not allowed, 415 unsupported media type, 404 of

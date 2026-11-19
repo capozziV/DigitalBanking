@@ -29,7 +29,7 @@ class OpenApiIntegrationTest : TransfersIntegrationTest() {
     }
 
     @Test
-    fun `the contract has exactly the operations of the API, the admin ones included`() {
+    fun `the contract has exactly the operations of the API, the admin and internal ones included`() {
         assertThat(operations().map { it.first })
             .containsExactlyInAnyOrder(
                 "POST /transfers",
@@ -38,6 +38,7 @@ class OpenApiIntegrationTest : TransfersIntegrationTest() {
                 "GET /admin/transfers/stuck",
                 "POST /admin/transfers/{id}/retry",
                 "POST /admin/transfers/{id}/manual-compensation",
+                "GET /internal/accounts/{accountId}/pending-transfers",
             )
     }
 

@@ -58,6 +58,11 @@ class CallLog {
                 delegate.updateType(account)
                 record("accounts.updateType")
             }
+
+            override fun updateStatus(account: Account) {
+                delegate.updateStatus(account)
+                record("accounts.updateStatus")
+            }
         }
 
     fun entries(delegate: LedgerEntryRepository): LedgerEntryRepository =
