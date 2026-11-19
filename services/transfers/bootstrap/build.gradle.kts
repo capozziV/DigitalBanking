@@ -1,6 +1,8 @@
 plugins {
     id("digitalbanking.spring-boot-app")
     id("digitalbanking.contract-consumer")
+    // Message contracts of the transfer events (contracts/messaging), consumed by notification.
+    id("digitalbanking.contract-producer")
 }
 
 dependencies {
