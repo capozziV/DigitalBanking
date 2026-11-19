@@ -149,7 +149,7 @@ class StuckTransferAdminUseCasesTest {
         assertThat((outcome as RetryTransferOutcome.Ran).transfer.status).isEqualTo(TransferStatus.COMPENSATED)
         assertThat(accounts.calls.single()).isInstanceOf(StepCall.Credit::class.java)
         assertThat(correlationOfCall).isEqualTo("corr-1")
-        assertThat(outbox.events).containsExactly(TransferEvent.TransferCompensated(id, source, destination, Money(500), "rent"))
+        assertThat(outbox.events).containsExactly(TransferEvent.TransferCompensated(id, source, destination, Money(500), "rent", null))
     }
 
     @Test
@@ -196,7 +196,7 @@ class StuckTransferAdminUseCasesTest {
         assertThat(saved.status).isEqualTo(TransferStatus.COMPENSATED)
         assertThat(saved.updatedAt).isEqualTo(clock.instant())
         assertThat(resolutions.find(id)).isEqualTo(resolution)
-        assertThat(outbox.events).containsExactly(TransferEvent.TransferCompensated(id, source, destination, Money(500), "rent"))
+        assertThat(outbox.events).containsExactly(TransferEvent.TransferCompensated(id, source, destination, Money(500), "rent", null))
         assertThat(repository.nextAttemptAt(id)).isNull()
         assertThat(repository.leaseOwner(id)).isNull()
         assertThat(dailyLimits.releaseCalls).containsExactly(id)

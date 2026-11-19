@@ -112,7 +112,9 @@ class RunTransferSagaUseCaseTest {
         assertThat(result!!.status).isEqualTo(TransferStatus.COMPENSATED)
         assertThat(accounts.calls.last())
             .isEqualTo(StepCall.Credit(source, Money(500), "transfer-$id-compensation", "Transfer $id compensation"))
-        assertThat(outbox.events).containsExactly(TransferEvent.TransferCompensated(id, source, destination, Money(500), "rent"))
+        assertThat(result.failureReason).isEqualTo("account-not-found")
+        assertThat(outbox.events)
+            .containsExactly(TransferEvent.TransferCompensated(id, source, destination, Money(500), "rent", "account-not-found"))
     }
 
     @Test

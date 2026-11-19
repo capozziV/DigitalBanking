@@ -28,5 +28,7 @@ sealed interface TransferEvent {
         val destinationAccountId: UUID,
         val amount: Money,
         val description: String?,
+        /** Why the credit on the destination did not happen; null when the saga compensated without a refusal. */
+        val reason: String?,
     ) : TransferEvent
 }

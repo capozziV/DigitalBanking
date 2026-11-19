@@ -98,10 +98,10 @@ class TransferTest {
     }
 
     @Test
-    fun `refusal that compensates does not record a failure reason`() {
+    fun `refusal that compensates records the refusal as the failure reason`() {
         val t = transfer(TransferStep.Credit).advance(StepOutcome.Refused("account-not-found"), beforeDeadline)
         assertThat(t.step).isEqualTo(TransferStep.Compensate)
-        assertThat(t.failureReason).isNull()
+        assertThat(t.failureReason).isEqualTo("account-not-found")
     }
 
     private val nonTerminalSteps =

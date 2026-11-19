@@ -55,6 +55,8 @@ sealed interface ReceivedEvent {
         val sourceAccountId: UUID,
         val destinationAccountId: UUID,
         val amountCents: Long,
+        /** Why the credit was refused; null for version 1 events, which did not carry it. */
+        val reason: String? = null,
     ) : ReceivedEvent {
         override val eventType: String get() = "TransferCompensated"
     }

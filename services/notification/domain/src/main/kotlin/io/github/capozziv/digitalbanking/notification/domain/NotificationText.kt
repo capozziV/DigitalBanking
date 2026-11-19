@@ -59,14 +59,20 @@ object NotificationText {
                 "foi recusada: ${reasonText(reason)}. Nenhum valor saiu da sua conta.",
     )
 
+    /** [reason] is null for events that did not carry it (version 1) or when the saga compensated without a refusal. */
     fun transferCompensated(
         amountCents: Long,
         destinationAccountId: UUID,
+        reason: String? = null,
     ) = NotificationContent(
         title = "Transferência devolvida",
         body =
             "Sua transferência de ${MoneyFormat.brl(amountCents)} para a conta $destinationAccountId " +
-                "não pôde ser concluída e o valor voltou para a sua conta.",
+                if (reason == null) {
+                    "não pôde ser concluída e o valor voltou para a sua conta."
+                } else {
+                    "não pôde ser concluída: ${reasonText(reason)}. O valor voltou para a sua conta."
+                },
     )
 
     fun accountBlocked(accountId: UUID) =
@@ -100,6 +106,7 @@ object NotificationText {
             "daily-limit-exceeded" -> "o limite diário de transferências da conta seria ultrapassado"
             "account-blocked" -> "uma das contas está bloqueada"
             "account-closed" -> "uma das contas está encerrada"
+            "credit-not-confirmed" -> "não foi possível confirmar o crédito na conta de destino"
             "daily-limit-unavailable" -> "não foi possível conferir o limite diário agora, tente novamente"
             else -> "não foi possível processar a transferência"
         }
