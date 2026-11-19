@@ -23,13 +23,16 @@ import io.github.capozziv.digitalbanking.accounts.domain.AvailableBalance
 import io.github.capozziv.digitalbanking.accounts.domain.Balance
 import io.github.capozziv.digitalbanking.accounts.domain.EntryKind
 import io.github.capozziv.digitalbanking.accounts.domain.LedgerEntry
+import io.github.capozziv.digitalbanking.accounts.domain.LedgerEntryRecorded
 import io.github.capozziv.digitalbanking.accounts.domain.Money
 import io.github.capozziv.digitalbanking.accounts.domain.OverdraftLimit
 import io.github.capozziv.digitalbanking.security.Caller
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import java.time.Clock
 import java.time.Instant
+import java.time.ZoneOffset
 import java.util.UUID
 
 class OpenAccountUseCaseTest {
@@ -43,10 +46,32 @@ class OpenAccountUseCaseTest {
         )
     private val tx = DirectTransactionRunner()
     private val customers = StubCustomerGateway()
-    private val useCase = OpenAccountUseCase(accounts, entries, types, outbox, tx, SequentialIdGenerator(), customers)
+    private val now = Instant.parse("2026-11-19T12:00:00Z")
+    private val clock = Clock.fixed(now, ZoneOffset.UTC)
+    private val useCase =
+        OpenAccountUseCase(accounts, entries, types, outbox, tx, SequentialIdGenerator(), customers, Money(BONUS_CENTS), clock)
 
     private val expectedAccount = Account(SequentialIdGenerator.idAt(1), customerId, AccountType.FREE)
-    private val expectedView = AccountView(expectedAccount, Balance.ZERO, OverdraftLimit(1_000), AvailableBalance(1_000))
+    private val expectedView =
+        AccountView(
+            expectedAccount,
+            Balance(BONUS_CENTS),
+            OverdraftLimit(1_000),
+            AvailableBalance(BONUS_CENTS + 1_000),
+        )
+    private val bonusEntry =
+        LedgerEntry(
+            id = SequentialIdGenerator.idAt(2),
+            accountId = expectedAccount.id,
+            sequence = 1,
+            kind = EntryKind.CREDIT,
+            amount = Money(BONUS_CENTS),
+            balanceAfter = Balance(BONUS_CENTS),
+            description = "Bônus de boas-vindas",
+            idempotencyKey = "welcome-bonus:${expectedAccount.id}",
+            createdAt = now,
+        )
+    private val expectedEvents = listOf(AccountOpened(expectedAccount.id, customerId, AccountType.FREE), LedgerEntryRecorded(bonusEntry))
 
     private fun tracked(log: CallLog) =
         OpenAccountUseCase(
@@ -57,16 +82,50 @@ class OpenAccountUseCaseTest {
             log.transactions(tx),
             SequentialIdGenerator(),
             customers,
+            Money(BONUS_CENTS),
+            clock,
         )
 
     @Test
-    fun `opening a new account creates a free account and appends account opened to the outbox`() {
+    fun `opening an account records a welcome bonus credit of 10000 cents`() {
         val result = useCase.execute(OpenAccountCommand(Caller.Customer(customerId), OPENING_KEY))
 
         assertThat(result).isEqualTo(OpenAccountResult(expectedView, created = true))
         assertThat(accounts.all()).containsExactly(expectedAccount)
-        assertThat(outbox.events).containsExactly(AccountOpened(expectedAccount.id, customerId, AccountType.FREE))
+        assertThat(outbox.events).containsExactlyElementsOf(expectedEvents)
         assertThat(tx.transactions).isEqualTo(1)
+        assertThat(entries.findLast(expectedAccount.id)).isEqualTo(bonusEntry)
+    }
+
+    @Test
+    fun `retry with the same opening key does not record a second bonus`() {
+        useCase.execute(OpenAccountCommand(Caller.Customer(customerId), OPENING_KEY))
+
+        val retry = useCase.execute(OpenAccountCommand(Caller.Customer(customerId), OPENING_KEY))
+
+        assertThat(retry.created).isFalse()
+        assertThat(retry.view.balance).isEqualTo(Balance(BONUS_CENTS))
+        assertThat(entries.all()).containsExactly(bonusEntry)
+        assertThat(outbox.events).hasSize(2)
+    }
+
+    @Test
+    fun `without a configured bonus the account starts at zero with no entry`() {
+        val noBonus =
+            OpenAccountUseCase(accounts, entries, types, outbox, tx, SequentialIdGenerator(), customers, welcomeBonus = null, clock = clock)
+
+        val result = noBonus.execute(OpenAccountCommand(Caller.Customer(customerId), OPENING_KEY))
+
+        assertThat(result.view.balance).isEqualTo(Balance.ZERO)
+        assertThat(entries.all()).isEmpty()
+        assertThat(outbox.events).containsExactly(AccountOpened(expectedAccount.id, customerId, AccountType.FREE))
+    }
+
+    @Test
+    fun `the view of a new account shows the bonus balance`() {
+        val result = useCase.execute(OpenAccountCommand(Caller.Customer(customerId), OPENING_KEY))
+
+        assertThat(result.view.balance).isEqualTo(Balance(BONUS_CENTS))
     }
 
     @Test
@@ -77,7 +136,7 @@ class OpenAccountUseCaseTest {
 
         assertThat(retry).isEqualTo(OpenAccountResult(expectedView, created = false))
         assertThat(accounts.all()).containsExactly(expectedAccount)
-        assertThat(outbox.events).containsExactly(AccountOpened(expectedAccount.id, customerId, AccountType.FREE))
+        assertThat(outbox.events).containsExactlyElementsOf(expectedEvents)
     }
 
     @Test
@@ -87,7 +146,7 @@ class OpenAccountUseCaseTest {
 
         tracked.execute(OpenAccountCommand(Caller.Customer(customerId), OPENING_KEY))
 
-        assertThat(log.calls).containsExactly("begin", "outbox.append", "types.findLimit", "end")
+        assertThat(log.calls).containsExactly("begin", "outbox.append", "entries.insert", "outbox.append", "types.findLimit", "end")
     }
 
     @Test
@@ -97,10 +156,10 @@ class OpenAccountUseCaseTest {
             LedgerEntry(
                 id = UUID.fromString("0199a0b0-0000-7000-8000-000000000101"),
                 accountId = expectedAccount.id,
-                sequence = 1,
+                sequence = 2,
                 kind = EntryKind.CREDIT,
                 amount = Money(4_000),
-                balanceAfter = Balance(4_000),
+                balanceAfter = Balance(BONUS_CENTS + 4_000),
                 description = null,
                 idempotencyKey = "credit-key-1",
                 createdAt = Instant.parse("2026-10-22T12:00:00Z"),
@@ -113,7 +172,7 @@ class OpenAccountUseCaseTest {
 
         assertThat(retry).isEqualTo(
             OpenAccountResult(
-                AccountView(expectedAccount, Balance(4_000), OverdraftLimit(1_000), AvailableBalance(5_000)),
+                AccountView(expectedAccount, Balance(BONUS_CENTS + 4_000), OverdraftLimit(1_000), AvailableBalance(BONUS_CENTS + 5_000)),
                 created = false,
             ),
         )
@@ -130,7 +189,7 @@ class OpenAccountUseCaseTest {
                 assertThat(it.key).isEqualTo(OPENING_KEY)
             }
         assertThat(accounts.all()).containsExactly(expectedAccount)
-        assertThat(outbox.events).containsExactly(AccountOpened(expectedAccount.id, customerId, AccountType.FREE))
+        assertThat(outbox.events).containsExactlyElementsOf(expectedEvents)
     }
 
     @Test
@@ -142,7 +201,7 @@ class OpenAccountUseCaseTest {
                 assertThat(it.customerId).isEqualTo(customerId)
             }
         assertThat(accounts.all()).containsExactly(expectedAccount)
-        assertThat(outbox.events).containsExactly(AccountOpened(expectedAccount.id, customerId, AccountType.FREE))
+        assertThat(outbox.events).containsExactlyElementsOf(expectedEvents)
     }
 
     @Test
@@ -153,7 +212,9 @@ class OpenAccountUseCaseTest {
         tracked(log).execute(OpenAccountCommand(Caller.Customer(customerId), OPENING_KEY))
 
         assertThat(customers.lookups).containsExactly(customerId)
-        assertThat(log.calls).containsExactly("customers.findStatus", "begin", "outbox.append", "types.findLimit", "end")
+        assertThat(
+            log.calls,
+        ).containsExactly("customers.findStatus", "begin", "outbox.append", "entries.insert", "outbox.append", "types.findLimit", "end")
     }
 
     @Test
@@ -207,5 +268,6 @@ class OpenAccountUseCaseTest {
 
     private companion object {
         const val OPENING_KEY = "open-key-1"
+        const val BONUS_CENTS = 10_000L
     }
 }

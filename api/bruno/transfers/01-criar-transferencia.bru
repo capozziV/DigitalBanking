@@ -28,7 +28,7 @@ script:pre-request {
   const axios = require("axios");
   bru.setVar("transferKey", bru.interpolate("{{$guid}}"));
 
-  // Abre a origem do cliente (com saldo 1000, credito do admin) e o destino de outro cliente pelo accounts,
+  // Abre a origem do cliente (com o bonus de 10000 e o credito de 1000 do admin) e o destino de outro cliente pelo accounts,
   // para a colecao rodar sozinha. A transferencia vai com o token do cliente da origem (heranca da colecao).
   const base = bru.getEnvVar("baseUrl");
   const bearer = (name) => ({ Authorization: `Bearer ${bru.getVar(name)}` });
