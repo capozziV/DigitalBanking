@@ -18,6 +18,10 @@ DATA = ROOT / "infra/terraform/modules/data"
 VALUES = ROOT / "deploy/helm/values"
 DB_INIT = ROOT / "deploy/helm/db-init/values.yaml"
 
+# App do cliente (etapa 9): o web e o bff nao acessam a AWS por papel (o BFF so chama a API publica do Cognito e o
+# Redis pela rede), entao nao tem papel no Pod Identity; ainda assim os values tem de existir.
+APP_SERVICES = {"web", "bff"}
+
 errors = []
 
 
@@ -73,7 +77,11 @@ def compare(label_a, a, label_b, b):
 
 access = access_services()
 values = chart_values()
-compare("modules/access (local.services)", access, "deploy/helm/values (name:)", set(values))
+for app in sorted(APP_SERVICES - set(values)):
+    errors.append(f"{app}: app do cliente sem deploy/helm/values/{app}.yaml")
+for app in sorted(APP_SERVICES & access):
+    errors.append(f"{app}: app do cliente nao deve ter papel no Pod Identity (modules/access)")
+compare("modules/access (local.services)", access, "deploy/helm/values (name:)", set(values) - APP_SERVICES)
 
 db_init_text = DB_INIT.read_text()
 services_block = re.search(r"^services:\n((?:  - .*\n)+)", db_init_text, re.M)

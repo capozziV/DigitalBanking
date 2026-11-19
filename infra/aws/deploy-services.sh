@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Instala no EKS, a partir das saidas do Terraform (envs/aws), o Job db-init e os cinco servicos, no namespace do
-# Pod Identity (digitalbanking). Usado pelo workflow aws-up.
+# Instala no EKS, a partir das saidas do Terraform (envs/aws), o Job db-init, os cinco servicos e o app (bff e web),
+# no namespace do Pod Identity (digitalbanking). Usado pelo workflow aws-up.
 #   deploy-services.sh <outputs.json> <registro-ecr> <tag>             instala (exige helm, kubectl e aws CLI)
 #   deploy-services.sh --render <dir> <outputs.json> <registro-ecr> <tag>   so renderiza (helm template), sem cluster
 #                                                                           nem AWS: o CI confere o mapeamento
@@ -15,6 +15,8 @@ here="$(cd "$(dirname "$0")" && pwd)"
 charts="$here/../../deploy/helm"
 namespace=digitalbanking
 services=(customer accounts transfers notification statement)
+# App do cliente (etapa 9): sem banco nem papel na AWS; entram depois dos servicos, o bff antes do web.
+app_services=(bff web)
 
 render_dir=""
 if [ "${1:-}" = "--render" ]; then
@@ -45,6 +47,11 @@ required_env() { awk '/^requiredEnv:/{f=1;next} f&&/^  - /{print $2;next} f{exit
 # Chave nova sem origem aqui falha, em vez de o pod subir com o padrao local do application.yml.
 env_value() {
   local svc="$1" key="$2" upper
+  # Chaves do bff, sem prefixo de servico (nao e Spring): o client do Cognito do BFF e o Redis provisionado (sem TLS).
+  case "$svc:$key" in
+    bff:COGNITO_CLIENT_ID) out cognito_bff_client_id; return ;;
+    bff:REDIS_URL) echo "redis://$redis:6379"; return ;;
+  esac
   upper=$(tr '[:lower:]' '[:upper:]' <<< "$svc")
   case "${key#"${upper}"_}" in
     DB_URL) echo "jdbc:postgresql://$db_address:5432/$svc?sslmode=require" ;;
@@ -78,11 +85,11 @@ load_service_args() {
 if [ -n "$render_dir" ]; then
   mkdir -p "$render_dir"
   helm template db-init "$charts/db-init" "${db_init_args[@]}" > "$render_dir/db-init.yaml"
-  for svc in "${services[@]}"; do
+  for svc in "${services[@]}" "${app_services[@]}"; do
     load_service_args "$svc"
     helm template "$svc" "$charts/service" -n "$namespace" "${args[@]}" > "$render_dir/$svc.yaml"
   done
-  echo "renderizado em $render_dir: db-init ${services[*]}"
+  echo "renderizado em $render_dir: db-init ${services[*]} ${app_services[*]}"
   exit 0
 fi
 
@@ -112,9 +119,9 @@ for name in $(jq -r '.secret_names.value | keys[]' "$outputs"); do
   echo "OK: Secret $name"
 done
 
-for svc in "${services[@]}"; do
+for svc in "${services[@]}" "${app_services[@]}"; do
   echo "== $svc"
   load_service_args "$svc"
   helm upgrade --install "$svc" "$charts/service" -n "$namespace" "${args[@]}" --wait --timeout 15m
 done
-echo "OK: db-init e ${services[*]} instalados em $namespace"
+echo "OK: db-init, ${services[*]} e ${app_services[*]} instalados em $namespace"

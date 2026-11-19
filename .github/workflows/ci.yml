@@ -72,6 +72,7 @@ jobs:
             images:
               - 'services/*/Dockerfile'
               - 'services/*/.dockerignore'
+              - 'frontend/**'
             shared:
               - 'libs/**'
               - 'build-logic/**'
@@ -366,9 +367,15 @@ jobs:
             cp "jars/$service.jar" "services/$service/bootstrap/build/libs/$service.jar"
             docker build -t "digitalbanking/$service:$IMAGE_TAG" "services/$service"
           done
+      # O app do cliente (etapa 9): o contexto e frontend/ (workspaces npm), sem jar. O compose sobe os dois sem perfil.
+      - name: Construir as imagens do web e do BFF
+        run: |
+          for app in web bff; do
+            docker build -f "frontend/$app/Dockerfile" -t "digitalbanking/$app:$IMAGE_TAG" frontend
+          done
       - name: Conferir que nenhuma imagem roda como root
         run: |
-          for service in customer accounts transfers notification statement; do
+          for service in customer accounts transfers notification statement web bff; do
             uid=$(docker run --rm --entrypoint id "digitalbanking/$service:$IMAGE_TAG" -u)
             echo "$service: uid $uid"
             if [ "$uid" = 0 ]; then
@@ -379,7 +386,7 @@ jobs:
       - name: Exportar as imagens
         run: |
           images=()
-          for service in customer accounts transfers notification statement; do
+          for service in customer accounts transfers notification statement web bff; do
             images+=("digitalbanking/$service:$IMAGE_TAG")
           done
           docker save "${images[@]}" | gzip -1 > images.tar.gz

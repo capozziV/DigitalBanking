@@ -6,7 +6,9 @@ metadata:
   labels:
     {{- include "service.labels" . | nindent 4 }}
 data:
+  {{- if .Values.springProfile }}
   SPRING_PROFILES_ACTIVE: {{ .Values.springProfile | quote }}
+  {{- end }}
   {{- range $key, $value := .Values.env }}
   {{ $key }}: {{ $value | toString | quote }}
   {{- end }}
