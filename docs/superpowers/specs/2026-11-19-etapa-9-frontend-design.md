@@ -1,7 +1,7 @@
 # Etapa 9: frontend do cliente (design)
 
 **Data:** 2026-11-19
-**Status:** em aprovação
+**Status:** aprovada pelo usuário (2026-11-19)
 **Cartão:** etapa 9 no [board](https://github.com/users/capozziV/projects/2)
 
 ## 1. Intenção
