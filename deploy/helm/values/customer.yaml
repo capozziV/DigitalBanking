@@ -1,0 +1,33 @@
+# Valores do customer para o chart deploy/helm/service.
+# Valores vazios ("") dependem do ambiente e entram na instalacao (--set ou -f), a partir dos outputs do Terraform:
+# image.repository/tag, targetGroupArn e os enderecos de banco, Redis, issuer e topico. Segredos nunca ficam aqui:
+# secretEnv so referencia Secrets do Kubernetes criados fora do chart (nome do Secret -> chaves).
+name: customer
+port: 8085
+
+image:
+  repository: ""
+  tag: ""
+
+targetGroupArn: ""
+
+# Obrigatorios: o chart recusa o render se algum estiver vazio ou ausente (sem eles o pod cairia no padrao local do application.yml).
+requiredEnv:
+  - CUSTOMER_DB_URL
+  - CUSTOMER_JWT_ISSUER_URI
+  - CUSTOMER_TOPIC_ARN
+
+env:
+  CUSTOMER_DB_URL: ""
+  CUSTOMER_DB_USER: customer_app
+  CUSTOMER_DB_OWNER_USER: customer_owner
+  CUSTOMER_JWT_ISSUER_URI: ""
+  CUSTOMER_JWT_GROUPS_CLAIM: "cognito:groups"
+  CUSTOMER_AWS_ENDPOINT: ""
+  CUSTOMER_AWS_REGION: sa-east-1
+  CUSTOMER_TOPIC_ARN: ""
+
+secretEnv:
+  customer-db:
+    - CUSTOMER_DB_PASSWORD
+    - CUSTOMER_DB_OWNER_PASSWORD

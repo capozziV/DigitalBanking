@@ -1,6 +1,6 @@
 # 0001 — Stack: Kotlin + Spring Boot 4 na AWS
 
-- **Status:** aceito (a parte do ECS Fargate foi substituída pelo [ADR 0019](0019-runtime-na-aws-com-eks.md))
+- **Status:** aceito; runtime (ECS Fargate) substituído pelo [ADR 0019](0019-runtime-na-aws-com-eks.md), com o deploy no [ADR 0021](0021-deploy-e-ambiente-efemero.md)
 - **Data:** 2026-10-21
 
 ## Contexto

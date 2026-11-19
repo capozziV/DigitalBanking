@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-init-scripts
+  labels:
+    {{- include "db-init.labels" . | nindent 4 }}
+data:
+  fetch-secrets.sh: |-
+    {{- .Files.Get "files/fetch-secrets.sh" | nindent 4 }}
+  create-service-databases.sh: |-
+    {{- .Files.Get "files/create-service-databases.sh" | nindent 4 }}

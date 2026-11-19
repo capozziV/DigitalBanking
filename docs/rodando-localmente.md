@@ -120,6 +120,25 @@ set -a; . infra/local/.env; set +a
 ```
 O `statement` sobe na porta 8084. O `statement` guarda no Redis do compose a primeira página do extrato (20 lançamentos, sem cursor) por cerca de 60 s; com o Redis fora, ele lê do DynamoDB. A tabela DynamoDB `statement` (chave `accountId` texto + `sequence` numérica, cobrança `PAY_PER_REQUEST`) e as filas são criadas pelo `infra/local/localstack/init/ready.d/04-statement.sh`, não pelo serviço. O nginx expõe `GET /accounts/{id}/statement` e `/statement/actuator/`. Use um sexto terminal para os passos seguintes.
 
+### Alternativa: os cinco serviços pelas imagens Docker (perfil `apps`)
+Em vez dos cinco `bootRun`, o perfil `apps` do compose sobe os serviços como contêineres, pelas imagens de `services/<serviço>/Dockerfile` (as mesmas do CI). A imagem não compila: ela usa o `bootJar` já gerado pelo Gradle, separado em camadas (dependências, carregador do Spring Boot, dependências snapshot e classes do serviço) e roda com usuário não root (uid 10001). Gere os jars e suba tudo (infra e serviços) de uma vez:
+```bash
+export JAVA_HOME=$(/usr/libexec/java_home -v 21)
+./gradlew :services:customer:bootstrap:bootJar :services:accounts:bootstrap:bootJar \
+  :services:transfers:bootstrap:bootJar :services:notification:bootstrap:bootJar :services:statement:bootstrap:bootJar
+docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml --profile apps build
+docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml --profile apps up --wait
+```
+As imagens se chamam `digitalbanking/<serviço>:<etiqueta>`, com a etiqueta de `IMAGE_TAG` (padrão `local`; no CI, o SHA do commit). Depois de mudar o código, gere o jar de novo e rode o `build` outra vez. Cada contêiner fica `healthy` quando o `/actuator/health` responde em `127.0.0.1` dentro dele; o `up --wait` espera os cinco. As portas 8081–8085 continuam publicadas no host, então o nginx não muda; não rode os `bootRun` ao mesmo tempo.
+
+Dentro do compose, os serviços falam entre si e com a infra pelo nome do serviço (`postgres`, `redis`, `localstack`, `customer:8085`, `accounts:8081`), com as mesmas variáveis do `.env.example` apontando para esses nomes (veja o perfil no `docker-compose.yml`). O emissor dos tokens muda: os contêineres validam o `iss` `http://mock-oauth2-server:8080/default`, e o mock monta o `iss` pelo Host pedido (veja [Identidade local](#identidade-local-mock-oauth2-server)). Por isso, com o perfil `apps`, peça os tokens do host com `MOCK_OAUTH2_HOST=mock-oauth2-server:8080`, que o `token.sh` manda como cabeçalho Host; o seed e o smoke usam o `token.sh` e herdam a variável:
+```bash
+export MOCK_OAUTH2_HOST=mock-oauth2-server:8080
+bash infra/local/seed-check.sh http://127.0.0.1 1000000
+bash infra/local/smoke.sh http://127.0.0.1
+```
+É assim que o CI roda o smoke: o job `images` constrói as cinco imagens a partir dos jars dos jobs de build, e o job `smoke` sobe o perfil `apps` com elas. Um token pedido sem `MOCK_OAUTH2_HOST` (inclusive pelas coleções Bruno) sai com o `iss` `http://localhost:8090/default` e leva `401` nos contêineres.
+
 ## 5. Conferir a API pelo nginx
 Primeiro o health, que deve responder `"status":"UP"` (aberto, sem token; os detalhes só para admin). Depois o seed do dono (abaixo) e o smoke. Os dois pegam tokens no `mock-oauth2-server` com `infra/local/auth/token.sh` e precisam dos cinco serviços no ar:
 ```bash
@@ -309,12 +328,12 @@ infra/local/auth/token.sh user 00000000-0000-7000-8000-000000000001 admin  # usu
 infra/local/auth/token.sh service                                          # serviço (client_id accounts); outro: service transfers
 curl -H "Authorization: Bearer $(infra/local/auth/token.sh user <uuid>)" http://localhost/...
 ```
-**Peça o token sempre em `localhost:8090`.** O mock monta o `iss` do token a partir do Host da requisição, e os serviços só aceitam `iss` igual a `http://localhost:8090/default`. Um token pedido em `http://127.0.0.1:8090/default/token` sai com `iss` `http://127.0.0.1:8090/default` e leva `401` em todos os serviços, mesmo válido. Por isso o `token.sh`, o `tokenUrl` das coleções Bruno e o seed usam `localhost`, e não `127.0.0.1` (a regra do `127.0.0.1` vale para healthchecks e curls dentro dos contêineres, não para o emissor). Se trocar `MOCK_OAUTH2_URL`, troque também os `*_JWT_ISSUER_URI` para o mesmo host.
+**Peça o token sempre em `localhost:8090`.** O mock monta o `iss` do token a partir do Host da requisição, e os serviços só aceitam `iss` igual a `http://localhost:8090/default`. Um token pedido em `http://127.0.0.1:8090/default/token` sai com `iss` `http://127.0.0.1:8090/default` e leva `401` em todos os serviços, mesmo válido. Por isso o `token.sh`, o `tokenUrl` das coleções Bruno e o seed usam `localhost`, e não `127.0.0.1` (a regra do `127.0.0.1` vale para healthchecks e curls dentro dos contêineres, não para o emissor). Se trocar `MOCK_OAUTH2_URL`, troque também os `*_JWT_ISSUER_URI` para o mesmo host. A exceção é o perfil `apps` do compose (serviços em contêineres), em que o emissor é `http://mock-oauth2-server:8080/default` e o `token.sh` pede os tokens com `MOCK_OAUTH2_HOST=mock-oauth2-server:8080`.
 
 O usuário de teste do dono tem `sub` `00000000-0000-7000-8000-000000000001`, nome `Owner Test`, e-mail `owner@example.test` e o grupo `admin`; o nome e o e-mail entram no cadastro do `customer` pelo seed local. Os tokens duram 1 hora.
 
 ## 8. Derrubar tudo
-Pare os cinco `bootRun` com Ctrl+C nos terminais deles. Depois derrube os contêineres; o `-v` apaga os dados:
+Pare os cinco `bootRun` com Ctrl+C nos terminais deles. Depois derrube os contêineres; o `-v` apaga os dados (com o perfil `apps`, acrescente `--profile apps` para derrubar também os serviços):
 ```bash
 docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml down -v
 ```

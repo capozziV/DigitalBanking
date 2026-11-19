@@ -19,6 +19,7 @@ include(
     ":libs:security-caller",
     ":libs:testing-architecture",
     ":libs:testing-localstack",
+    ":libs:testing-outbox-contract",
     ":libs:testing-redis",
     ":libs:testing-security",
     ":services:accounts:domain",

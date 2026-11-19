@@ -1,4 +1,7 @@
-plugins { id("digitalbanking.spring-module") }
+plugins {
+    id("digitalbanking.spring-module")
+    id("digitalbanking.contract-consumer")
+}
 
 dependencies {
     implementation(project(":services:notification:domain"))
@@ -24,4 +27,8 @@ dependencies {
     // Spring Cloud AWS only registers its SQS message converter when Jackson 3 (tools.jackson) is on the classpath.
     implementation("org.springframework.boot:spring-boot-starter-jackson")
     implementation("tools.jackson.module:jackson-module-kotlin")
+
+    // EventContractsTest delivers the messages of the contracts of accounts and transfers to the listener.
+    contractStubs(project(":services:accounts:bootstrap"))
+    contractStubs(project(":services:transfers:bootstrap"))
 }

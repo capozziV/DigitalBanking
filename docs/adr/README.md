@@ -4,7 +4,7 @@ Registros de decisões arquiteturais. Formato: `NNNN-titulo-em-kebab-case.md`.
 
 | Nº | Título | Status | Arquivo |
 |---|---|---|---|
-| 0001 | Stack: Kotlin + Spring Boot 4 na AWS | aceito | [0001](0001-stack-kotlin-spring-boot-aws.md) |
+| 0001 | Stack: Kotlin + Spring Boot 4 na AWS | aceito; runtime substituído pelo 0019 | [0001](0001-stack-kotlin-spring-boot-aws.md) |
 | 0002 | Clean Architecture por serviço | aceito | [0002](0002-clean-architecture-por-servico.md) |
 | 0003 | Transactional Outbox e mensageria SNS/SQS | aceito | [0003](0003-transactional-outbox-e-mensageria.md) |
 | 0004 | API Gateway HTTP API na borda | aceito | [0004](0004-api-gateway-http-api-na-borda.md) |
@@ -24,4 +24,6 @@ Registros de decisões arquiteturais. Formato: `NNNN-titulo-em-kebab-case.md`.
 | 0018 | Extrato ordenado pela sequência do ledger | aceito | [0018](0018-chave-do-extrato-pela-sequencia.md) |
 | 0019 | Runtime na AWS com EKS (substitui parcialmente o 0001 e o 0004) | aceito | [0019](0019-runtime-na-aws-com-eks.md) |
 | 0020 | Identidade e autorização | aceito | [0020](0020-identidade-e-autorizacao.md) |
+| 0021 | Deploy e ambiente efêmero na AWS | aceito | [0021](0021-deploy-e-ambiente-efemero.md) |
+| 0022 | Testes de contrato com Stubborn Contract | aceito | [0022](0022-testes-de-contrato.md) |
 | 0023 | Status da conta e encerramento | aceito | [0023](0023-status-da-conta-e-encerramento.md) |

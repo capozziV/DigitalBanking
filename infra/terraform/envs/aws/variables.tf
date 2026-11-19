@@ -1,11 +1,27 @@
 variable "region" {
   type    = string
-  default = "us-east-1"
+  default = "sa-east-1"
 }
 
 variable "name" {
   type    = string
   default = "digitalbanking"
+}
+
+variable "created_at" {
+  description = "Momento da subida do ambiente (RFC 3339), etiqueta created-at lida pelo reaper. Sem padrao: vem do workflow."
+  type        = string
+
+  validation {
+    condition     = can(formatdate("YYYY", var.created_at))
+    error_message = "created_at precisa estar em RFC 3339, por exemplo 2026-11-16T22:00:00Z."
+  }
+}
+
+variable "kubernetes_version" {
+  description = "Versao do Kubernetes do EKS; precisa estar em suporte padrao."
+  type        = string
+  default     = "1.36"
 }
 
 variable "web_callback_urls" {
@@ -16,22 +32,6 @@ variable "web_callback_urls" {
 variable "web_logout_urls" {
   type    = list(string)
   default = ["http://localhost:4200/"]
-}
-
-# Rede, EKS e ALB vem da etapa 8; aqui entram so como variaveis (sem valor padrao).
-variable "alb_listener_arn" {
-  description = "ARN do listener do ALB interno."
-  type        = string
-}
-
-variable "subnet_ids" {
-  description = "Subnets privadas do VPC Link."
-  type        = list(string)
-}
-
-variable "security_group_ids" {
-  description = "Security groups do VPC Link."
-  type        = list(string)
 }
 
 variable "cognito_domain_prefix" {
@@ -49,4 +49,15 @@ variable "throttling_burst_limit" {
   description = "Rajada maxima de requisicoes no stage."
   type        = number
   default     = 20
+}
+
+variable "kubernetes_namespace" {
+  description = "Namespace do release do Helm; o Pod Identity associa as ServiceAccounts deste namespace aos papeis. Fixo em digitalbanking: infra/aws/deploy-services.sh e o aws-down.yml usam o mesmo literal."
+  type        = string
+  default     = "digitalbanking"
+
+  validation {
+    condition     = var.kubernetes_namespace == "digitalbanking"
+    error_message = "O namespace e fixo em digitalbanking (deploy-services.sh e aws-down.yml); mude os tres juntos."
+  }
 }

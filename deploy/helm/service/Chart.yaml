@@ -1,0 +1,6 @@
+apiVersion: v2
+name: service
+description: Chart comum aos cinco servicos do banco digital (accounts, transfers, statement, notification, customer).
+type: application
+version: 0.1.0
+appVersion: "0.0.0"

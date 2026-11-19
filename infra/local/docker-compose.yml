@@ -88,5 +88,127 @@ services:
       timeout: 3s
       retries: 10
 
+  # Perfil apps: os cinco servicos pelas imagens (services/<servico>/Dockerfile), no lugar dos processos java -jar.
+  # Sobe com: docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml --profile apps up --wait
+  # Imagem digitalbanking/<servico>:${IMAGE_TAG:-local}; sem ela, o compose a constroi do bootJar ja gerado pelo Gradle.
+  # Entre si e com a infra, os servicos falam pelo nome do servico do compose. As portas 8081-8085 ficam publicadas
+  # no host porque o nginx encaminha para host.docker.internal, igual aos processos java -jar.
+  # Emissor: http://mock-oauth2-server:8080/default (o iss sai do Host pedido ao mock): tokens pedidos do host
+  # vao com MOCK_OAUTH2_HOST=mock-oauth2-server:8080 (auth/token.sh), senao levam 401.
+  customer:
+    profiles: [apps]
+    image: digitalbanking/customer:${IMAGE_TAG:-local}
+    build: ../../services/customer
+    environment:
+      CUSTOMER_DB_URL: jdbc:postgresql://postgres:5432/customer
+      CUSTOMER_DB_USER: customer_app
+      CUSTOMER_DB_PASSWORD: ${CUSTOMER_DB_PASSWORD:-customer_app}
+      CUSTOMER_DB_OWNER_USER: customer_owner
+      CUSTOMER_DB_OWNER_PASSWORD: ${CUSTOMER_DB_OWNER_PASSWORD:-customer_owner}
+      CUSTOMER_AWS_ENDPOINT: http://localstack:4566
+      CUSTOMER_JWT_ISSUER_URI: http://mock-oauth2-server:8080/default
+    ports:
+      - "8085:8085"
+    depends_on: &apps-infra
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+      mock-oauth2-server:
+        condition: service_healthy
+    healthcheck: &apps-health
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8085/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 120s
+
+  accounts:
+    profiles: [apps]
+    image: digitalbanking/accounts:${IMAGE_TAG:-local}
+    build: ../../services/accounts
+    environment:
+      ACCOUNTS_DB_URL: jdbc:postgresql://postgres:5432/accounts
+      ACCOUNTS_DB_USER: accounts_app
+      ACCOUNTS_DB_PASSWORD: ${ACCOUNTS_DB_PASSWORD:-accounts_app}
+      ACCOUNTS_DB_OWNER_USER: accounts_owner
+      ACCOUNTS_DB_OWNER_PASSWORD: ${ACCOUNTS_DB_OWNER_PASSWORD:-accounts_owner}
+      ACCOUNTS_AWS_ENDPOINT: http://localstack:4566
+      ACCOUNTS_JWT_ISSUER_URI: http://mock-oauth2-server:8080/default
+      ACCOUNTS_OAUTH_TOKEN_URI: http://mock-oauth2-server:8080/default/token
+      ACCOUNTS_OAUTH_CLIENT_ID: ${ACCOUNTS_OAUTH_CLIENT_ID:-accounts}
+      ACCOUNTS_OAUTH_CLIENT_SECRET: ${ACCOUNTS_OAUTH_CLIENT_SECRET:-local-secret}
+      ACCOUNTS_CUSTOMER_BASE_URL: http://customer:8085
+      ACCOUNTS_TRANSFERS_BASE_URL: http://transfers:8082
+    ports:
+      - "8081:8081"
+    depends_on: *apps-infra
+    healthcheck:
+      <<: *apps-health
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8081/actuator/health"]
+
+  transfers:
+    profiles: [apps]
+    image: digitalbanking/transfers:${IMAGE_TAG:-local}
+    build: ../../services/transfers
+    environment:
+      TRANSFERS_DB_URL: jdbc:postgresql://postgres:5432/transfers
+      TRANSFERS_DB_USER: transfers_app
+      TRANSFERS_DB_PASSWORD: ${TRANSFERS_DB_PASSWORD:-transfers_app}
+      TRANSFERS_DB_OWNER_USER: transfers_owner
+      TRANSFERS_DB_OWNER_PASSWORD: ${TRANSFERS_DB_OWNER_PASSWORD:-transfers_owner}
+      TRANSFERS_ACCOUNTS_URL: http://accounts:8081
+      TRANSFERS_AWS_ENDPOINT: http://localstack:4566
+      TRANSFERS_REDIS_HOST: redis
+      TRANSFERS_REDIS_PORT: "6379"
+      TRANSFERS_JWT_ISSUER_URI: http://mock-oauth2-server:8080/default
+      TRANSFERS_OAUTH_TOKEN_URI: http://mock-oauth2-server:8080/default/token
+      TRANSFERS_OAUTH_CLIENT_ID: ${TRANSFERS_OAUTH_CLIENT_ID:-transfers}
+      TRANSFERS_OAUTH_CLIENT_SECRET: ${TRANSFERS_OAUTH_CLIENT_SECRET:-local-secret}
+      TRANSFERS_CUSTOMER_BASE_URL: http://customer:8085
+    ports:
+      - "8082:8082"
+    depends_on: *apps-infra
+    healthcheck:
+      <<: *apps-health
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8082/actuator/health"]
+
+  notification:
+    profiles: [apps]
+    image: digitalbanking/notification:${IMAGE_TAG:-local}
+    build: ../../services/notification
+    environment:
+      NOTIFICATION_DB_URL: jdbc:postgresql://postgres:5432/notification
+      NOTIFICATION_DB_USER: notification_app
+      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:-notification_app}
+      NOTIFICATION_DB_OWNER_USER: notification_owner
+      NOTIFICATION_DB_OWNER_PASSWORD: ${NOTIFICATION_DB_OWNER_PASSWORD:-notification_owner}
+      NOTIFICATION_AWS_ENDPOINT: http://localstack:4566
+      NOTIFICATION_JWT_ISSUER_URI: http://mock-oauth2-server:8080/default
+    ports:
+      - "8083:8083"
+    depends_on: *apps-infra
+    healthcheck:
+      <<: *apps-health
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8083/actuator/health"]
+
+  statement:
+    profiles: [apps]
+    image: digitalbanking/statement:${IMAGE_TAG:-local}
+    build: ../../services/statement
+    environment:
+      STATEMENT_AWS_ENDPOINT: http://localstack:4566
+      STATEMENT_REDIS_HOST: redis
+      STATEMENT_REDIS_PORT: "6379"
+      STATEMENT_JWT_ISSUER_URI: http://mock-oauth2-server:8080/default
+    ports:
+      - "8084:8084"
+    depends_on: *apps-infra
+    healthcheck:
+      <<: *apps-health
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8084/actuator/health"]
+
 volumes:
   postgres-data:

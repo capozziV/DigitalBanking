@@ -1,4 +1,7 @@
-plugins { id("digitalbanking.spring-boot-app") }
+plugins {
+    id("digitalbanking.spring-boot-app")
+    id("digitalbanking.contract-producer")
+}
 
 dependencies {
     implementation(project(":services:accounts:adapters"))
@@ -19,7 +22,9 @@ dependencies {
     integrationTestImplementation("org.awaitility:awaitility") // version managed by the Spring Boot BOM
     integrationTestImplementation(libs.testcontainers.postgresql)
     integrationTestImplementation(libs.testcontainers.junit.jupiter)
-    integrationTestImplementation(libs.wiremock.standalone)
+    // WireMock with Jetty 12; the version comes from the Stubborn Contract BOM (wiremock-standalone is not used).
+    integrationTestImplementation(platform(libs.stubborn.contract.bom))
+    integrationTestImplementation("org.wiremock:wiremock-jetty12")
 }
 
 // OutboxRelayIntegrationTest runs LocalStack with the same init scripts as the local compose. The directory is a

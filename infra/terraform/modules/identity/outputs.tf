@@ -11,6 +11,11 @@ output "web_client_id" {
   value = aws_cognito_user_pool_client.web.id
 }
 
+output "ops_client_id" {
+  description = "App client do seed e do smoke (AdminInitiateAuth com ADMIN_USER_PASSWORD_AUTH)."
+  value       = aws_cognito_user_pool_client.ops.id
+}
+
 output "machine_client_id" {
   value = aws_cognito_user_pool_client.machine.id
 }

@@ -1,0 +1,68 @@
+# Padroes do chart. Cada servico tem o seu arquivo em ../values/<servico>.yaml.
+# Valores sem padrao (obrigatorios, o chart falha sem eles): name, port, image.tag e targetGroupArn.
+
+# Nome do servico: usado no Deployment, no Service (DNS interno), na ServiceAccount e nos rotulos.
+name: ""
+port: 0
+
+image:
+  # Repositorio ECR do servico (fica no stack bootstrap do Terraform).
+  repository: ""
+  # SHA do commit (nunca "latest"); informado na instalacao: --set image.tag=<sha>.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+replicas: 1
+
+# Perfil Spring ativo nos pods.
+springProfile: aws
+
+# ARN do target group do ALB interno (stack env do Terraform, output target_group_arns). A instalacao informa:
+# --set targetGroupArn=<arn>. targetGroupBinding.enabled=false desliga o TargetGroupBinding.
+targetGroupArn: ""
+targetGroupBinding:
+  enabled: true
+  targetType: ip
+
+# ServiceAccount: sempre com o nome do servico e sem anotacao IRSA. A associacao do Pod Identity (Terraform,
+# modules/access) liga a ServiceAccount, no namespace do release, ao papel do servico.
+
+# Chaves de env que nao podem ficar vazias nem ausentes (o render falha). Lista por servico.
+requiredEnv: []
+
+# Variaveis de ambiente nao secretas (vao para o ConfigMap). Valores sempre texto.
+env: {}
+
+# Variaveis que vem de Secrets do Kubernetes criados fora do chart (nunca versionados):
+# nome do Secret -> lista de chaves; cada chave vira a variavel de ambiente de mesmo nome.
+secretEnv: {}
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 384Mi
+  limits:
+    memory: 768Mi
+
+probes:
+  livenessPath: /actuator/health/liveness
+  readinessPath: /actuator/health/readiness
+  # Partida de JVM com Flyway pode levar minutos num t3.medium: 5 s x 60 = 5 min antes de a liveness assumir.
+  startup:
+    periodSeconds: 5
+    failureThreshold: 60
+  liveness:
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+  readiness:
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+podDisruptionBudget:
+  # Com 1 replica, minAvailable 1 impediria drenar o no; maxUnavailable 1 deixa o upgrade de nos andar.
+  maxUnavailable: 1
+
+# Usuario nao root da imagem (services/<servico>/Dockerfile: uid 10001).
+runAsUser: 10001

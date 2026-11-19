@@ -7,4 +7,5 @@ dependencies {
     implementation(libs.kotlin.allopen)
     implementation(libs.spring.boot.gradle.plugin)
     implementation(libs.ktlint.gradle)
+    implementation(libs.stubborn.contract.gradle.plugin)
 }

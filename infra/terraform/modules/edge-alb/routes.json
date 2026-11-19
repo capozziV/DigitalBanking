@@ -1,0 +1,19 @@
+{
+  "_comment": "Roteamento do ALB interno, espelho das location de infra/local/nginx/nginx.conf. Conferido por envs/aws/check-alb-routes.py. Prioridade menor avalia primeiro: as regex do daily-limit e do statement vencem o prefixo /accounts/, como no nginx.",
+  "services": {
+    "accounts": 8081,
+    "transfers": 8082,
+    "notification": 8083,
+    "statement": 8084,
+    "customer": 8085
+  },
+  "rules": [
+    { "priority": 10, "service": "transfers", "regex": ["^/accounts/[^/]+/daily-limit$"] },
+    { "priority": 20, "service": "statement", "regex": ["^/accounts/[^/]+/statement$"] },
+    { "priority": 100, "service": "accounts", "paths": ["/accounts", "/accounts/*", "/admin/account-types*"] },
+    { "priority": 110, "service": "accounts", "paths": ["/admin/accounts/*"] },
+    { "priority": 200, "service": "transfers", "paths": ["/transfers", "/transfers/*"] },
+    { "priority": 300, "service": "notification", "paths": ["/notifications", "/notifications/*"] },
+    { "priority": 500, "service": "customer", "paths": ["/customers", "/customers/*", "/admin/customers/*"] }
+  ]
+}

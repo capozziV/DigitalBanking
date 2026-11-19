@@ -19,20 +19,43 @@
 #    (o accounts consulta o transfers), o encerramento responde 200 e a conta fica CLOSED; depois, debito e credito
 #    sao recusados (422). A recusa por transferencia pendente (422 pending-transfers) fica nos testes do accounts e do
 #    transfers: a saga conclui rapido demais para o smoke prender uma transferencia em PENDING.
-# Uso: infra/local/smoke.sh [url-base]   (padrao http://127.0.0.1; exige o compose de pe)
+#    No --remote o admin e um usuario do grupo admin criado no Cognito (cognito-user.sh token <email> admin).
+# Modo --remote (ambiente na AWS, workflow aws-up): tokens do Cognito por AdminInitiateAuth (infra/aws/cognito-user.sh),
+# com usuarios smoke-*@example.test criados aqui e apagados na saida; sem filas de inspecao (o Terraform nao as cria),
+# os eventos sao conferidos pelos efeitos nas APIs: WELCOME do AccountOpened e o extrato do passo 4 no lugar da fila
+# de contas, TRANSFER_SENT e TRANSFER_RECEIVED do passo 3 no lugar da fila de transferencias.
+# Uso: infra/local/smoke.sh [--remote] [url-base]   (padrao http://127.0.0.1; exige o compose de pe)
+#      no --remote: COGNITO_USER_POOL_ID, COGNITO_CLIENT_ID, AWS_REGION e credenciais da AWS (ver cognito-user.sh).
 set -euo pipefail
 
-compose_file="$(cd "$(dirname "$0")" && pwd)/docker-compose.yml"
+here="$(cd "$(dirname "$0")" && pwd)"
+compose_file="$here/docker-compose.yml"
 queue_name=accounts-events-inspection.fifo
 transfers_queue_name=transfers-events-inspection.fifo
 
+remote=false
+if [ "${1:-}" = "--remote" ]; then
+  remote=true
+  shift
+fi
 base="${1:-http://127.0.0.1}"
-token_sh="$(cd "$(dirname "$0")" && pwd)/auth/token.sh"
+token_sh="$here/auth/token.sh"
+cognito_sh="$here/../aws/cognito-user.sh"
 # Usuario de teste do dono (grupo admin); so o papel de admin e usado aqui, sem depender do seed.
 admin_sub=00000000-0000-7000-8000-000000000001
 corr="smoke-$(date +%s)"
 out=$(mktemp)
-trap 'rm -f "$out"' EXIT
+# E-mails dos usuarios do Cognito criados no modo --remote, um por linha, apagados na saida.
+created_users=$(mktemp)
+cleanup() {
+  if [ "$remote" = true ]; then
+    while read -r email; do
+      [ -z "$email" ] || "$cognito_sh" delete "$email" || echo "AVISO: usuario $email nao apagado" >&2
+    done < "$created_users"
+  fi
+  rm -f "$out" "$created_users"
+}
+trap cleanup EXIT
 
 # UUID aleatorio em minusculas: /proc no Linux, uuidgen no macOS (que imprime em maiusculas).
 uuid() { { cat /proc/sys/kernel/random/uuid 2>/dev/null || uuidgen; } | tr '[:upper:]' '[:lower:]'; }
@@ -69,16 +92,53 @@ call() {
   cat "$out"
 }
 
-admin=$("$token_sh" user "$admin_sub" admin)
+# Usuario novo e o seu token; imprime "<sub> <token>". Local: sub aleatorio e token do mock-oauth2-server. Remoto:
+# usuario smoke-<uuid>@example.test no Cognito (o sub e o que o Cognito der), anotado para ser apagado na saida.
+# Uso: new_user [admin]
+new_user() {
+  local id sub token pair email
+  id=$(uuid)
+  if [ "$remote" = true ]; then
+    email="smoke-$id@example.test"
+    echo "$email" >> "$created_users"
+    pair=$("$cognito_sh" token "$email" ${1:+"$1"}) || exit 1
+    echo "$pair"
+  else
+    token=$("$token_sh" user "$id" ${1:+"$1"}) || exit 1
+    echo "$id $token"
+  fi
+}
 
-# Cliente novo: sub aleatorio, cadastro no customer com o proprio token. Imprime "<sub> <token>"; use com
+if [ "$remote" = true ]; then
+  pair=$(new_user admin)
+  read -r _ admin <<< "$pair"
+else
+  admin=$("$token_sh" user "$admin_sub" admin)
+fi
+
+# Cliente novo: usuario novo, cadastro no customer com o proprio token. Imprime "<sub> <token>"; use com
 # pair=$(new_customer), para o set -e valer (numa substituicao de processo a falha passaria em silencio).
 new_customer() {
-  local sub token
-  sub=$(uuid)
-  token=$("$token_sh" user "$sub") || exit 1
+  local pair sub token
+  pair=$(new_user) || exit 1
+  read -r sub token <<< "$pair"
   call 201 "$token" POST /customers "{\"name\":\"Smoke Customer\",\"email\":\"smoke-$sub@example.test\"}" > /dev/null
   echo "$sub $token"
+}
+
+# O notification consome as filas notification-accounts.fifo e notification-transfers.fifo; espera ate 45 s (se o evento chegar antes da conta conhecida, a mensagem so volta apos 30 s de visibilidade).
+# Uso: check_notification <customerId> <token-do-cliente> <kind-esperado>
+check_notification() {
+  local customer="$1" token="$2" expected="$3" kinds=""
+  for _ in $(seq 1 45); do
+    kinds=$(call 200 "$token" GET /notifications | jq -r '[.items[].kind] | join(" ")')
+    case " $kinds " in
+      *" $expected "*) echo "OK: cliente $customer recebeu $expected"; return 0 ;;
+    esac
+    sleep 1
+  done
+  echo "FALHA: notificacoes do cliente $customer: '$kinds' (esperado $expected)" >&2
+  exit 1
 }
 
 # --- identidade ---
@@ -151,8 +211,13 @@ check_events() {
   echo "OK: eventos de $aggregate na fila $queue: $events"
 }
 
-check_events "$queue_name" .aggregateId "$id" \
-  "AccountOpened LedgerEntryRecorded:1 LedgerEntryRecorded:2" 3
+if [ "$remote" = true ]; then
+  # Sem fila de inspecao na AWS: o AccountOpened aparece como WELCOME; os dois LedgerEntryRecorded, no extrato (passo 4).
+  check_notification "$customer" "$customer_token" WELCOME
+else
+  check_events "$queue_name" .aggregateId "$id" \
+    "AccountOpened LedgerEntryRecorded:1 LedgerEntryRecorded:2" 3
+fi
 
 # --- transfers ---
 pair=$(new_customer)
@@ -187,7 +252,8 @@ if [ "$source_balance" != "600" ] || [ "$destination_balance" != "400" ]; then
 fi
 echo "OK: transferencia $transfer_id concluida (origem $source_balance, destino $destination_balance)"
 
-check_events "$transfers_queue_name" .payload.transferId "$transfer_id" "TransferCompleted" 1
+# Na AWS, o TransferCompleted e conferido pelas notificacoes TRANSFER_SENT e TRANSFER_RECEIVED (passo 3).
+[ "$remote" = true ] || check_events "$transfers_queue_name" .payload.transferId "$transfer_id" "TransferCompleted" 1
 
 # O limite diario da origem (padrao 500000) mostra so a transferencia de 400. A rota e do transfers.
 daily_limit=$(call 200 "$source_token" GET "/accounts/$source_id/daily-limit" | jq -r '"\(.limitCents):\(.usedCents):\(.availableCents)"')
@@ -198,21 +264,6 @@ fi
 echo "OK: limite diario da conta $source_id (limite:usado:disponivel): $daily_limit"
 
 # --- notification ---
-# O notification consome as filas notification-accounts.fifo e notification-transfers.fifo; espera ate 45 s (se o evento chegar antes da conta conhecida, a mensagem so volta apos 30 s de visibilidade).
-# Uso: check_notification <customerId> <token-do-cliente> <kind-esperado>
-check_notification() {
-  local customer="$1" token="$2" expected="$3" kinds=""
-  for _ in $(seq 1 45); do
-    kinds=$(call 200 "$token" GET /notifications | jq -r '[.items[].kind] | join(" ")')
-    case " $kinds " in
-      *" $expected "*) echo "OK: cliente $customer recebeu $expected"; return 0 ;;
-    esac
-    sleep 1
-  done
-  echo "FALHA: notificacoes do cliente $customer: '$kinds' (esperado $expected)" >&2
-  exit 1
-}
-
 check_notification "$source_customer" "$source_token" TRANSFER_SENT
 check_notification "$destination_customer" "$destination_token" TRANSFER_RECEIVED
 
