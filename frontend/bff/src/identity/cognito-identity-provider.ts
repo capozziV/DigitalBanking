@@ -106,8 +106,14 @@ export class CognitoIdentityProvider extends IdentityProvider {
         refreshToken: auth.RefreshToken ?? refreshToken,
         expiresInSeconds: auth.ExpiresIn ?? 3600,
       };
-    } catch {
-      throw new IdentityError('refresh_failed');
+    } catch (error) {
+      if (error instanceof IdentityError) throw error;
+      // Only a refused token ends the session; network and service errors are retryable.
+      throw new IdentityError(
+        error instanceof Error && error.name === 'NotAuthorizedException'
+          ? 'refresh_failed'
+          : 'unavailable',
+      );
     }
   }
 }

@@ -83,6 +83,15 @@ describe('LocalIdentityProvider', () => {
     expect(usernames[1]).toBe(usernames[0]);
   });
 
+  it('reports unavailable (not refresh_failed) when the mock is down during a refresh', async () => {
+    await provider.signUp('ana@example.test', '123456');
+    const tokens = await provider.signIn('ana@example.test', '123456');
+    fetchMock.mockRejectedValueOnce(new TypeError('fetch failed'));
+    await expect(provider.refresh(tokens.refreshToken)).rejects.toMatchObject({
+      code: 'unavailable',
+    });
+  });
+
   it('fails the refresh for an unknown refresh token', async () => {
     await expect(provider.refresh('nope')).rejects.toMatchObject({ code: 'refresh_failed' });
   });

@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import {
   ForbiddenException,
   Inject,
@@ -19,6 +20,13 @@ import {
 import { SessionService, type Session } from './session.service.js';
 
 export type SessionRequest = Request & { bankSession?: Session };
+
+function safeEqual(a: string, b: string | undefined): boolean {
+  if (b === undefined) return false;
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  return left.length === right.length && timingSafeEqual(left, right);
+}
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
@@ -42,7 +50,11 @@ export class SessionGuard implements CanActivate {
     }
     if (!SAFE_METHODS.has(request.method)) {
       const header = request.header(CSRF_HEADER);
-      if (!header || header !== session.csrfToken || header !== readCookie(request, CSRF_COOKIE)) {
+      if (
+        !header ||
+        !safeEqual(header, session.csrfToken) ||
+        !safeEqual(header, readCookie(request, CSRF_COOKIE))
+      ) {
         throw new ForbiddenException({ code: 'csrf', message: 'Token CSRF inválido.' });
       }
     }

@@ -235,6 +235,25 @@ describe('AuthController', () => {
       expect(response.body.authenticated).toBe(false);
     });
 
+    it('rejects with 403 when the header matches the session but the bank_csrf cookie differs', async () => {
+      const { session, csrf } = await signIn();
+      await http()
+        .post('/bff/auth/sign-out')
+        .set('Cookie', `bank_session=${session}; bank_csrf=other`)
+        .set('X-CSRF-Token', csrf)
+        .expect(403);
+      expect(store.keys()).toHaveLength(1);
+    });
+
+    it('rejects with 403 a header of a different length than the session token', async () => {
+      const { header, csrf } = await signIn();
+      await http()
+        .post('/bff/auth/sign-out')
+        .set('Cookie', header)
+        .set('X-CSRF-Token', csrf + 'x')
+        .expect(403);
+    });
+
     it('answers 401 (not 403) on sign-out without a session', async () => {
       await http().post('/bff/auth/sign-out').set('X-CSRF-Token', 'x').expect(401);
     });
@@ -272,6 +291,49 @@ describe('AuthController', () => {
         .set('X-CSRF-Token', csrf)
         .expect(401);
       expect(store.keys()).toEqual([]);
+    });
+
+    it('keeps the session and answers 503 when the identity provider is unavailable', async () => {
+      identity.expiresInSeconds = 30;
+      const { header, csrf } = await signIn();
+      identity.refreshError = 'unavailable';
+      const response = await http()
+        .post('/bff/auth/sign-out')
+        .set('Cookie', header)
+        .set('X-CSRF-Token', csrf)
+        .expect(503);
+      expect(response.body.code).toBe('unavailable');
+      expect(store.keys()).toHaveLength(1);
+    });
+
+    it('keeps the session and answers 503 on an unexpected refresh error (network)', async () => {
+      identity.expiresInSeconds = 30;
+      const { header, csrf } = await signIn();
+      identity.refreshError = new TypeError('fetch failed');
+      await http()
+        .post('/bff/auth/sign-out')
+        .set('Cookie', header)
+        .set('X-CSRF-Token', csrf)
+        .expect(503);
+      expect(store.keys()).toHaveLength(1);
+    });
+  });
+
+  describe('malformed cookies', () => {
+    it('treats a bank_session that cannot be decoded as no session (401, not 500)', async () => {
+      await http()
+        .post('/bff/auth/sign-out')
+        .set('Cookie', 'bank_session=%; bank_csrf=x')
+        .set('X-CSRF-Token', 'x')
+        .expect(401);
+    });
+
+    it('reports unauthenticated on GET session with a malformed cookie', async () => {
+      const response = await http()
+        .get('/bff/auth/session')
+        .set('Cookie', 'bank_session=%E0%A4%A')
+        .expect(200);
+      expect(response.body.authenticated).toBe(false);
     });
   });
 

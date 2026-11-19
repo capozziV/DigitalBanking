@@ -1,10 +1,16 @@
-import { IdentityError, IdentityProvider, type Tokens } from '../identity/identity-provider.js';
+import {
+  IdentityError,
+  IdentityProvider,
+  type IdentityErrorCode,
+  type Tokens,
+} from '../identity/identity-provider.js';
 
 export class FakeIdentityProvider extends IdentityProvider {
   readonly calls: string[] = [];
   confirmationRequired = false;
   expiresInSeconds = 3600;
   failRefresh = false;
+  refreshError: IdentityErrorCode | Error | null = null;
   private issued = 0;
 
   async signUp(email: string): Promise<{ confirmationRequired: boolean }> {
@@ -24,6 +30,11 @@ export class FakeIdentityProvider extends IdentityProvider {
 
   async refresh(refreshToken: string): Promise<Tokens> {
     this.calls.push(`refresh:${refreshToken}`);
+    if (this.refreshError) {
+      throw typeof this.refreshError === 'string'
+        ? new IdentityError(this.refreshError)
+        : this.refreshError;
+    }
     if (this.failRefresh) throw new IdentityError('refresh_failed');
     return this.issue('access', refreshToken);
   }

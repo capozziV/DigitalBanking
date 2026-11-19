@@ -66,11 +66,7 @@ export class LocalIdentityProvider extends IdentityProvider {
   async refresh(refreshToken: string): Promise<Tokens> {
     const sub = await this.store.get(REFRESH_PREFIX + refreshToken);
     if (!sub) throw new IdentityError('refresh_failed');
-    try {
-      return await this.issue(sub, refreshToken);
-    } catch {
-      throw new IdentityError('refresh_failed');
-    }
+    return this.issue(sub, refreshToken);
   }
 
   private async issue(sub: string, refreshToken: string): Promise<Tokens> {

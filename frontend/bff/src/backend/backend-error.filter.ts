@@ -7,7 +7,14 @@ export class BackendErrorFilter implements ExceptionFilter {
   catch(error: BackendProblemError | BackendUnavailableError, host: ArgumentsHost): void {
     const response = host.switchToHttp().getResponse<Response>();
     if (error instanceof BackendProblemError) {
-      response.status(error.status).json(error.problem);
+      const { type, title, status, detail, errors } = error.problem;
+      response.status(error.status).json({
+        type,
+        title,
+        status,
+        detail,
+        ...(errors === undefined ? {} : { errors }),
+      });
       return;
     }
     response

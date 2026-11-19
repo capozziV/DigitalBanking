@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
-import { Inject, Injectable } from '@nestjs/common';
-import { IdentityProvider, type Tokens } from '../identity/identity-provider.js';
+import { Inject, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { IdentityError, IdentityProvider, type Tokens } from '../identity/identity-provider.js';
 import { KEY_VALUE_STORE, type KeyValueStore } from '../redis/key-value-store.js';
 
 export const CLOCK = Symbol('CLOCK');
@@ -40,7 +40,7 @@ export class SessionService {
     return session;
   }
 
-  /** Returns the session (refreshing its token when close to expiry) or null when it does not exist or cannot be kept. */
+  /** Returns the session (refreshing its token when close to expiry) or null when it does not exist or its refresh token was refused; throws 503 when the identity provider is unreachable (session kept). */
   async resolve(id: string | undefined): Promise<Session | null> {
     if (!id) return null;
     const raw = await this.store.get(SESSION_PREFIX + id);
@@ -54,9 +54,15 @@ export class SessionService {
       session.expiresAt = this.now() + tokens.expiresInSeconds * 1000;
       await this.save(session);
       return session;
-    } catch {
-      await this.destroy(id);
-      return null;
+    } catch (error) {
+      if (error instanceof IdentityError && error.code === 'refresh_failed') {
+        await this.destroy(id);
+        return null;
+      }
+      throw new ServiceUnavailableException({
+        code: 'unavailable',
+        message: 'Serviço indisponível. Tente novamente.',
+      });
     }
   }
 
