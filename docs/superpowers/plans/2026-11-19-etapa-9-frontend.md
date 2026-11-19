@@ -175,6 +175,7 @@
 
 **Interfaces:**
 - Consumes: endpoints da Task 7; componentes da Task 8.
+- Produces: rodapé `AppFooterComponent` com "© 2026 capzz.labs" em todas as páginas (casca e telas de entrada), discreto, em `#86868b`, centralizado (pedido do usuário, 2026-11-19; cartão #220).
 - Produces: polling do status da transferência a cada 1 s, por até 30 s (RxJS `timer` + `switchMap`, para em `COMPLETED`, `FAILED` ou `COMPENSATED`); textos de status: Concluída, Recusada (motivo), Devolvida (motivo), "Ainda processando" ao estourar o prazo.
 - [ ] **Step 1: testes que falham:** Transferir em três passos (telefone → nome + valor → confirmar); a `Idempotency-Key` nasce ao abrir o formulário e se repete no duplo clique (Review Focus 4); polling para no status terminal e mostra o motivo; "Bônus de boas-vindas" aparece no extrato com ↓; extrato carrega a próxima página pelo cursor ("Carregar mais"); Início sem conta mostra "Abrir conta"; encerrar conta pede confirmação.
 - [ ] **Step 2:** FAIL. **Step 3:** implementar. **Step 4:** `npm run lint && npm test -w web && npm run build -w web` verdes. **Step 5:** commit `feat(web): início, extrato, transferir, avisos e minha conta`.

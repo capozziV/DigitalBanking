@@ -36,3 +36,29 @@ npm run e2e      # Playwright (primeira vez: npx playwright install chromium)
 ```
 
 O BFF escuta na porta 3000 com prefixo global `/bff`; `GET /bff/health` devolve `{ "status": "UP" }`.
+
+## Variáveis do BFF
+
+| Variável            | Obrigatória   | Padrão                          | Uso                                                                                                  |
+| ------------------- | ------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `IDENTITY_PROVIDER` | sim           | -                               | `cognito` (AWS) ou `local` (adaptador sobre o `mock-oauth2-server`)                                  |
+| `COGNITO_REGION`    | com `cognito` | -                               | região do user pool                                                                                  |
+| `COGNITO_CLIENT_ID` | com `cognito` | -                               | app client do BFF (sem segredo, `USER_PASSWORD_AUTH`)                                                |
+| `REDIS_URL`         | não           | `redis://localhost:6379`        | sessões (`bff:session:`) e, no modo local, usuários (`bff:local-user:`)                              |
+| `COOKIE_SECURE`     | não           | `true`                          | `false` só no local sem HTTPS                                                                        |
+| `MOCK_OAUTH2_URL`   | modo `local`  | `http://localhost:8090/default` | emissor do mock; em contêiner, `http://mock-oauth2-server:8080/default` (o `iss` sai do host pedido) |
+| `ACCOUNTS_URL`      | não           | `http://localhost:8081`         | serviço `accounts`                                                                                   |
+| `TRANSFERS_URL`     | não           | `http://localhost:8082`         | serviço `transfers`                                                                                  |
+| `NOTIFICATION_URL`  | não           | `http://localhost:8083`         | serviço `notification`                                                                               |
+| `STATEMENT_URL`     | não           | `http://localhost:8084`         | serviço `statement`                                                                                  |
+| `CUSTOMER_URL`      | não           | `http://localhost:8085`         | serviço `customer`                                                                                   |
+| `PORT`, `LOG_LEVEL` | não           | `3000`, `info`                  | porta e nível do pino                                                                                |
+
+Sessão e CSRF: cookie `bank_session` (`HttpOnly`, `SameSite=Strict`, `Secure` por `COOKIE_SECURE`) e cookie legível `bank_csrf`; todo método diferente de `GET` numa rota autenticada exige o cabeçalho `X-CSRF-Token` igual ao cookie. O token do Cognito nunca sai do BFF.
+
+Teste de integração do adaptador local (precisa do Redis e do mock do compose):
+
+```
+docker compose -f infra/local/docker-compose.yml up -d --wait redis mock-oauth2-server
+npm run test:integration -w bff
+```
