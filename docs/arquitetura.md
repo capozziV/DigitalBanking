@@ -19,6 +19,14 @@
 | statement | Extrato para leitura (CQRS) | DynamoDB + Redis (cache da 1ª página) |
 | notification | Consome eventos e grava notificações dentro do aplicativo (sininho) | PostgreSQL |
 
+### Componentes do app do cliente (etapa 9)
+| Componente | Responsabilidade | Dados |
+|---|---|---|
+| web | App Angular compilado, servido por nginx na rota `/` | sem estado |
+| bff | NestJS: endpoints por tela, login pela API do Cognito, sessão e CSRF; rota `/bff` | sessão no Redis |
+
+`web` e `bff` ficam na mesma origem (`/` e `/bff`). Login, senha de 6 dígitos e telefone: [ADR 0024](adr/0024-login-e-telefone-do-app.md).
+
 ## Fluxo de entrada
 ```
 Navegador (Angular)
@@ -120,7 +128,7 @@ Até a etapa 9 não existe BFF: testes manuais usam a coleção Bruno versionada
 
 ### Frontend (etapa 9, detalhar depois)
 - Angular (standalone components, signals); Angular Material como biblioteca de componentes.
-- BFF em NestJS: login OAuth2 com Cognito (`openid-client`), sessão no Redis, cookie `HttpOnly`, CSRF, refresh de token, correlation ID via `AsyncLocalStorage`, logs JSON com pino.
+- BFF em NestJS: login e cadastro pela API do Cognito (`SignUp`, `ConfirmSignUp`, `InitiateAuth` com `USER_PASSWORD_AUTH`), com app client próprio e sem hosted UI ([ADR 0024](adr/0024-login-e-telefone-do-app.md)), sessão no Redis, cookie `HttpOnly`, CSRF, refresh de token, correlation ID via `AsyncLocalStorage`, logs JSON com pino.
 - BFF expõe endpoints por tela (agregação), não proxy genérico.
 - `Idempotency-Key` gerada no Angular ao abrir o formulário de transferência; o BFF só repassa.
 - Status da saga por polling (RxJS).

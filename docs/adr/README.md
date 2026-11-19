@@ -27,3 +27,4 @@ Registros de decisões arquiteturais. Formato: `NNNN-titulo-em-kebab-case.md`.
 | 0021 | Deploy e ambiente efêmero na AWS | aceito | [0021](0021-deploy-e-ambiente-efemero.md) |
 | 0022 | Testes de contrato com Stubborn Contract | aceito | [0022](0022-testes-de-contrato.md) |
 | 0023 | Status da conta e encerramento | aceito | [0023](0023-status-da-conta-e-encerramento.md) |
+| 0024 | Login e telefone do app | aceito; ajusta o login do 0005 | [0024](0024-login-e-telefone-do-app.md) |

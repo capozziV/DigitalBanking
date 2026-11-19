@@ -1,6 +1,6 @@
 # 0005 — Frontend Angular e BFF em NestJS
 
-- **Status:** aceito
+- **Status:** aceito; o login OAuth2 com `openid-client` foi trocado pelo login pela API do Cognito no [ADR 0024](0024-login-e-telefone-do-app.md)
 - **Data:** 2026-10-21
 
 ## Contexto

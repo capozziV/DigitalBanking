@@ -1,6 +1,6 @@
 # Banco digital em microsserviços
 
-Backend de um banco digital **simulado**, feito para portfólio: sem dinheiro real e sem dados pessoais reais. São cinco serviços em Kotlin + Spring Boot 4.1 (JDK 21), em monorepo com Gradle, Clean Architecture por serviço e infraestrutura na AWS com Terraform. O foco está em consistência, idempotência, mensageria confiável, cache e observabilidade.
+Backend de um banco digital **simulado**, feito para portfólio: sem dinheiro real e sem dados pessoais reais. São cinco serviços em Kotlin + Spring Boot 4.1 (JDK 21), mais o app do cliente (Angular + BFF em NestJS),, em monorepo com Gradle, Clean Architecture por serviço e infraestrutura na AWS com Terraform. O foco está em consistência, idempotência, mensageria confiável, cache e observabilidade.
 
 | Serviço | Responsabilidade | Dados |
 |---|---|---|
@@ -9,6 +9,8 @@ Backend de um banco digital **simulado**, feito para portfólio: sem dinheiro re
 | `transfers` | Saga de transferência e limite diário | PostgreSQL + Redis |
 | `statement` | Extrato para leitura (CQRS) | DynamoDB + Redis |
 | `notification` | Notificações dentro do aplicativo, a partir de eventos | PostgreSQL |
+| `web` | App do cliente em Angular, servido por nginx | — |
+| `bff` | BFF em NestJS: login, sessão e endpoints por tela | Redis |
 
 Glossário em [`CONTEXT.md`](CONTEXT.md); arquitetura em [`docs/arquitetura.md`](docs/arquitetura.md); etapas em [`docs/roadmap.md`](docs/roadmap.md).
 
@@ -16,6 +18,7 @@ Glossário em [`CONTEXT.md`](CONTEXT.md); arquitetura em [`docs/arquitetura.md`]
 
 ```mermaid
 flowchart LR
+    browser["Navegador<br/>(app do cliente)"]
     client["Cliente HTTP<br/>(Bruno, smoke)"]
     idp["Cognito<br/>(local: mock-oauth2-server)"]
     edge["API Gateway HTTP API<br/>autorizador JWT<br/>(local: nginx)"]
@@ -23,9 +26,12 @@ flowchart LR
 
     client -- "token" --> idp
     client -- "Bearer + X-Correlation-Id" --> edge
+    browser -- "cookie de sessão + CSRF<br/>/ e /bff" --> edge
     edge -- "VPC Link" --> alb
 
     subgraph eks["EKS (local: docker-compose)"]
+        web["web<br/>(Angular + nginx)"]
+        bff["bff<br/>(NestJS)"]
         customer["customer"]
         accounts["accounts"]
         transfers["transfers"]
@@ -33,7 +39,9 @@ flowchart LR
         notification["notification"]
     end
 
-    alb --> customer & accounts & transfers & statement & notification
+    alb --> web & bff & customer & accounts & transfers & statement & notification
+    bff -- "Bearer do cliente" --> customer & accounts & transfers & statement & notification
+    bff -- "API do Cognito" --> idp
 
     transfers -- "HTTP, token de máquina" --> accounts
     transfers -- "HTTP" --> customer
@@ -50,6 +58,7 @@ flowchart LR
     notification --- pg
     transfers -- "limite diário" --- redis
     statement -- "cache da 1ª página" --- redis
+    bff -- "sessão" --- redis
     statement --- ddb
 
     subgraph msg["SNS FIFO / SQS FIFO + DLQ"]
@@ -101,6 +110,13 @@ infra/local/smoke.sh http://localhost
 
 Os cinco serviços também sobem pelas imagens Docker (perfil `apps` do compose). Coleções Bruno em [`api/bruno/`](api/bruno/).
 
+## App do cliente
+Telas em português (Angular servido por nginx) com um BFF em NestJS, na mesma origem: `/` é o app e `/bff` é o BFF ([ADR 0024](docs/adr/0024-login-e-telefone-do-app.md)).
+- **Local:** abra `http://127.0.0.1/` com o compose de pé. O cadastro local pula o código por e-mail.
+- **AWS:** abra a URL `execute-api` que o `aws-up` mostra no resumo do job.
+- **Usuário de demonstração:** o seed o cria com saldo, extrato, uma transferência recusada pelo limite e notificações. O e-mail e a senha vêm das variáveis do seed; na AWS, a senha vem de um segredo, nunca versionada.
+- **Cadastro na AWS:** o Cognito usa o e-mail padrão (sem SES), com limite diário baixo de envios: serve a uma demonstração, mas muitos cadastros no mesmo dia esgotam o limite.
+
 ## Como subir na AWS
 Região `sa-east-1`. **Ainda não houve subida real:** o código é validado no CI sem credenciais (`terraform validate`, `tflint`, `helm lint`, `kubeconform`, `actionlint` e testes dos scripts). Detalhes em [`infra/terraform/README.md`](infra/terraform/README.md) e [`deploy/helm/README.md`](deploy/helm/README.md).
 
@@ -142,3 +158,4 @@ Confira as tarifas atuais na calculadora de preços da AWS. O `bootstrap` fica d
 | Identidade e autorização | [0020](docs/adr/0020-identidade-e-autorizacao.md) |
 | EKS e ambiente efêmero na AWS | [0019](docs/adr/0019-runtime-na-aws-com-eks.md), [0021](docs/adr/0021-deploy-e-ambiente-efemero.md) |
 | Testes de contrato com Stubborn Contract | [0022](docs/adr/0022-testes-de-contrato.md) |
+| Login pela API do Cognito, senha de 6 dígitos e telefone como chave de transferência | [0024](docs/adr/0024-login-e-telefone-do-app.md) |

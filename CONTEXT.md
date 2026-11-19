@@ -22,6 +22,11 @@ _Código_: `CustomerStatus.ACTIVE`
 O cliente não pode abrir conta nem transferir; valor de Status do cliente.
 _Código_: `CustomerStatus.BLOCKED`
 
+**Telefone**:
+Celular brasileiro do cliente, único entre clientes, usado para achar o destino da transferência.
+_Código_: `PhoneNumber`
+_Evite_: contato, número
+
 **Usuário**:
 Identidade de login usada para autenticar um cliente; o cliente tem o mesmo id do seu usuário.
 _Código_: `User`
@@ -84,6 +89,11 @@ _Código_: `EntryKind.CREDIT`
 **Débito**:
 Lançamento que diminui o saldo da conta; valor de Tipo de lançamento.
 _Código_: `EntryKind.DEBIT`
+
+**Bônus de boas-vindas**:
+Crédito de R$ 100 lançado uma única vez ao abrir a conta.
+_Código_: `WelcomeBonus`
+_Evite_: cashback, promoção, depósito inicial
 
 **Ledger**:
 Sequência imutável de lançamentos de uma conta; a fonte da verdade do saldo.
