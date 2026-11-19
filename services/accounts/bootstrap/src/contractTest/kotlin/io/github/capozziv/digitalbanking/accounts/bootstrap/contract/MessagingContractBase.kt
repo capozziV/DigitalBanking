@@ -3,10 +3,13 @@ package io.github.capozziv.digitalbanking.accounts.bootstrap.contract
 import io.github.capozziv.digitalbanking.accounts.adapters.persistence.OutboxEventAppender
 import io.github.capozziv.digitalbanking.accounts.adapters.persistence.OutboxWriterConfiguration
 import io.github.capozziv.digitalbanking.accounts.application.port.EventOutbox
+import io.github.capozziv.digitalbanking.accounts.domain.AccountBlocked
+import io.github.capozziv.digitalbanking.accounts.domain.AccountClosed
 import io.github.capozziv.digitalbanking.accounts.domain.AccountEvent
 import io.github.capozziv.digitalbanking.accounts.domain.AccountOpened
 import io.github.capozziv.digitalbanking.accounts.domain.AccountType
 import io.github.capozziv.digitalbanking.accounts.domain.AccountTypeChanged
+import io.github.capozziv.digitalbanking.accounts.domain.AccountUnblocked
 import io.github.capozziv.digitalbanking.accounts.domain.Balance
 import io.github.capozziv.digitalbanking.accounts.domain.EntryKind
 import io.github.capozziv.digitalbanking.accounts.domain.LedgerEntry
@@ -97,12 +100,19 @@ abstract class MessagingContractBase {
 
     fun accountTypeChanged() = append(AccountTypeChanged(ACCOUNT_ID, AccountType.FREE, AccountType.GOLD, OverdraftLimit(200000)))
 
+    fun accountBlocked() = append(AccountBlocked(ACCOUNT_ID, CUSTOMER_ID, STATUS_CHANGED_AT))
+
+    fun accountUnblocked() = append(AccountUnblocked(ACCOUNT_ID, CUSTOMER_ID, STATUS_CHANGED_AT))
+
+    fun accountClosed() = append(AccountClosed(ACCOUNT_ID, CUSTOMER_ID, STATUS_CHANGED_AT))
+
     private fun append(event: AccountEvent) = outbox.append(event)
 
     private companion object {
         const val CORRELATION_ID = "contract-correlation-id"
         val ACCOUNT_ID: UUID = UUID.fromString("0198a1b2-0000-7000-8000-000000000001")
         val CUSTOMER_ID: UUID = UUID.fromString("0198a1b2-0000-7000-8000-0000000000c1")
+        val STATUS_CHANGED_AT: Instant = Instant.parse("2026-11-18T12:20:00Z")
         val CREDIT_ENTRY_ID: UUID = UUID.fromString("0198a1b2-0000-7000-8000-0000000e1002")
         val DEBIT_ENTRY_ID: UUID = UUID.fromString("0198a1b2-0000-7000-8000-0000000e1003")
     }

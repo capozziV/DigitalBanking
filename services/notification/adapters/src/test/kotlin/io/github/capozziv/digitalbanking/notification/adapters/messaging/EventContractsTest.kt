@@ -122,6 +122,36 @@ class EventContractsTest {
     }
 
     @Test
+    fun `a blocked account tells the owner`() {
+        assertStatusNotification("accountBlocked", "0198a1b2-0000-7000-8000-0000000e0005", NotificationKind.ACCOUNT_BLOCKED)
+    }
+
+    @Test
+    fun `an unblocked account tells the owner`() {
+        assertStatusNotification("accountUnblocked", "0198a1b2-0000-7000-8000-0000000e0006", NotificationKind.ACCOUNT_UNBLOCKED)
+    }
+
+    @Test
+    fun `a closed account tells the owner`() {
+        assertStatusNotification("accountClosed", "0198a1b2-0000-7000-8000-0000000e0007", NotificationKind.ACCOUNT_CLOSED)
+    }
+
+    private fun assertStatusNotification(
+        label: String,
+        eventId: String,
+        kind: NotificationKind,
+    ) {
+        assertThat(stubs.trigger(label)).isTrue()
+
+        assertThat(processed).containsExactly(UUID.fromString(eventId))
+        assertThat(saved).singleElement().satisfies({
+            assertThat(it.customerId).isEqualTo(SENDER)
+            assertThat(it.kind).isEqualTo(kind)
+            assertThat(it.data).isEqualTo(mapOf("accountId" to SOURCE_ACCOUNT.toString()))
+        })
+    }
+
+    @Test
     fun `a ledger entry is acknowledged without notifications`() {
         assertThat(stubs.trigger("creditRecorded")).isTrue()
 
