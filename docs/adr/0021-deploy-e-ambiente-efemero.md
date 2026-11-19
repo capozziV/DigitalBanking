@@ -32,6 +32,7 @@ O [ADR 0019](0019-runtime-na-aws-com-eks.md) pôs os serviços no EKS e proibiu 
 - O `bootstrap` fica de pé entre as subidas, com custo pequeno (S3 e ECR).
 
 ## Alternativas consideradas
+- **EKS com Fargate** no lugar dos nós EC2: descartado por custo (dois `t3.medium` fixos saem mais baratos que o preço por pod com sete pods, mais o db-init e o controller do ALB) e por compatibilidade (o Fargate não roda DaemonSets e restringe o controller do ALB). Decisão do usuário (cartão #145, 2026-11-19).
 - **Derrubada por Lambda + EventBridge:** duplica o Terraform e a lógica, e um `destroy` de dentro da AWS não tem o estado na mão.
 - **Só o alarme de orçamento:** avisa, não derruba.
 - **Estado local do Terraform:** o workflow agendado não teria o estado para destruir.
