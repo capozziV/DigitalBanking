@@ -68,8 +68,10 @@ Arquivos compartilhados entre as frentes (`settings.gradle.kts`, `gradle/libs.ve
 | `AccountTypeChanged` (v2) | `ACCOUNT_TYPE_CHANGED` para o dono da conta, com tipo e limite |
 | `TransferCompleted` | `TRANSFER_SENT` para o dono da origem; `TRANSFER_RECEIVED` para o dono do destino |
 | `TransferFailed` | `TRANSFER_FAILED` para o dono da origem, com o motivo |
-| `TransferCompensated` | `TRANSFER_COMPENSATED` para o dono da origem |
+| `TransferCompensated` (v1 e v2) | `TRANSFER_COMPENSATED` para o dono da origem |
 | outro tipo | nenhuma (log e confirmação) |
+
+Nota (desde o #196): `TransferCompensated` v2 traz `reason` (pode ser nulo; na v1 é nulo) e o texto de "transferência devolvida" usa o motivo. Deploy: `notification` antes do `transfers`.
 
 - Texto de boas-vindas (provisório): "Bem-vindo ao banco! Sua conta {tipo} está aberta. Você pode receber transferências pelo número {conta} e acompanhar tudo por aqui no sininho."
 - Valores aparecem formatados em reais a partir dos centavos, sem `Double`.
