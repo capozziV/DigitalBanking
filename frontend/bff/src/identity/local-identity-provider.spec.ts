@@ -1,3 +1,6 @@
+import { createServer as createNetServer } from 'node:net';
+import type { AddressInfo } from 'node:net';
+import { httpFetch } from './http-fetch.js';
 import { IdentityError } from './identity-provider.js';
 import { LocalIdentityProvider } from './local-identity-provider.js';
 import { InMemoryKeyValueStore } from '../testing/in-memory-key-value-store.js';
@@ -8,6 +11,30 @@ function tokenResponse(accessToken: string): Response {
     headers: { 'content-type': 'application/json' },
   });
 }
+
+describe('LocalIdentityProvider timeout', () => {
+  it('maps a mock that never answers to unavailable', async () => {
+    const hanging = createNetServer(() => undefined);
+    await new Promise<void>((resolve) => hanging.listen(0, '127.0.0.1', resolve));
+    const port = (hanging.address() as AddressInfo).port;
+    const store = new InMemoryKeyValueStore();
+    const provider = new LocalIdentityProvider(
+      store,
+      `http://127.0.0.1:${port}/default`,
+      undefined,
+      ((url: string, init: object) =>
+        httpFetch(url, { ...init, timeoutMs: 50 })) as unknown as typeof fetch,
+    );
+    try {
+      await provider.signUp('ana@example.test', '123456');
+      await expect(provider.signIn('ana@example.test', '123456')).rejects.toMatchObject({
+        code: 'unavailable',
+      });
+    } finally {
+      hanging.close();
+    }
+  });
+});
 
 describe('LocalIdentityProvider', () => {
   let store: InMemoryKeyValueStore;

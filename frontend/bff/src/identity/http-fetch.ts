@@ -1,13 +1,20 @@
 import { request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 
+const DEFAULT_TIMEOUT_MS = 5000;
+
 /**
  * Minimal fetch over node:http(s). The global fetch (undici) drops a custom `Host` header, and the local adapter
  * needs it: the mock-oauth2-server builds the token `iss` from the Host it receives.
  */
 export function httpFetch(
   url: string,
-  init: { method?: string; headers?: Record<string, string>; body?: string } = {},
+  init: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string;
+    timeoutMs?: number;
+  } = {},
 ): Promise<Response> {
   const target = new URL(url);
   const request = target.protocol === 'https:' ? httpsRequest : httpRequest;
@@ -22,6 +29,7 @@ export function httpFetch(
       });
       res.on('error', reject);
     });
+    req.setTimeout(init.timeoutMs ?? DEFAULT_TIMEOUT_MS, () => req.destroy(new Error('timeout')));
     req.on('error', reject);
     req.end(init.body);
   });

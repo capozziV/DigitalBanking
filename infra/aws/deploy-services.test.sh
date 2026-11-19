@@ -53,6 +53,7 @@ for svc in bff web; do
   has "$svc" "targetGroupARN: \"$(jq -r --arg s "$svc" '.target_group_arns.value[$s]' "$fixture")\""
 done
 has bff '"bffclientid0123456789"'
+has bff '"sa-east-1"'
 has bff '"redis://digitalbanking-redis.abc123.0001.sae1.cache.amazonaws.com:6379"'
 has bff '"http://accounts:8081"'
 echo "ok: valores de cada servico vieram das saidas certas"
