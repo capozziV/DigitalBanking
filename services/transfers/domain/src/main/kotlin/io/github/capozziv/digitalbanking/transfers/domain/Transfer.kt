@@ -47,30 +47,16 @@ data class Transfer(
         val reason =
             when {
                 // The credit did not happen: keep why, so the compensated transfer can say it.
-                next == TransferStep.Compensate && outcome is StepOutcome.Refused && step == TransferStep.Credit -> {
-                    outcome.reason
-                }
+                next == TransferStep.Compensate && outcome is StepOutcome.Refused -> compensationReason(outcome)
 
-                next == TransferStep.Compensate && outcome is StepOutcome.Refused && step == TransferStep.ResolveCredit -> {
-                    StepOutcome.CREDIT_NOT_CONFIRMED
-                }
+                next != TransferStep.Failed -> failureReason
 
-                next != TransferStep.Failed -> {
-                    failureReason
-                }
-
-                outcome is StepOutcome.Refused -> {
-                    publicReason(outcome.reason)
-                }
+                outcome is StepOutcome.Refused -> publicReason(outcome.reason)
 
                 // Only ReserveLimit fails on a transient failure (past the deadline): the limit could not be checked.
-                step == TransferStep.ReserveLimit -> {
-                    StepOutcome.DAILY_LIMIT_UNAVAILABLE
-                }
+                step == TransferStep.ReserveLimit -> StepOutcome.DAILY_LIMIT_UNAVAILABLE
 
-                else -> {
-                    failureReason
-                }
+                else -> failureReason
             }
         return copy(
             step = next,
@@ -80,6 +66,13 @@ data class Transfer(
             updatedAt = now,
         )
     }
+
+    private fun compensationReason(outcome: StepOutcome.Refused): String? =
+        when (step) {
+            TransferStep.Credit -> outcome.reason
+            TransferStep.ResolveCredit -> StepOutcome.CREDIT_NOT_CONFIRMED
+            else -> failureReason
+        }
 
     /**
      * Why [key] cannot name the compensation credit, or `null` when it can. A key in the saga's pattern

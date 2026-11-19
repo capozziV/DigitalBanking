@@ -86,6 +86,21 @@ class EventEnvelopeReaderTest {
             .isEqualTo(ReceivedEvent.TransferCompensated(eventId, transferId, source, destination, 12_345, null))
     }
 
+    @Test
+    fun `TransferCompensated version 2 accepts an absent reason`() {
+        val body = envelope("TransferCompensated", 2, transferPayload())
+
+        assertThat(reader.read(body))
+            .isEqualTo(ReceivedEvent.TransferCompensated(eventId, transferId, source, destination, 12_345, null))
+    }
+
+    @Test
+    fun `TransferCompensated version 2 with a reason that is not a string is malformed`() {
+        val body = envelope("TransferCompensated", 2, transferPayload(extra = ""","reason":42"""))
+
+        assertThatThrownBy { reader.read(body) }.isInstanceOf(MalformedEventException::class.java)
+    }
+
     @ParameterizedTest
     @ValueSource(strings = ["insufficient-available-balance", "debit-not-confirmed"])
     fun `TransferFailed keeps the reason the transfers service writes`(reason: String) {

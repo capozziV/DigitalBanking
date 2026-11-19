@@ -82,6 +82,7 @@ class StuckTransferAdminUseCasesTest {
     private fun givenTransfer(
         step: TransferStep = TransferStep.Compensate,
         limitReserved: Boolean = true,
+        failureReason: String? = null,
     ): Transfer {
         val transfer =
             Transfer
@@ -96,7 +97,7 @@ class StuckTransferAdminUseCasesTest {
                     correlationId = "corr-1",
                     now = start,
                     deadlineAfter = Duration.ofMinutes(2),
-                ).copy(step = step, attempts = 4, limitReserved = limitReserved)
+                ).copy(step = step, attempts = 4, limitReserved = limitReserved, failureReason = failureReason)
         repository.insert(transfer)
         accounts.entries[source to creditKey] = RecordedEntry(source, EntryKind.CREDIT, Money(500))
         if (limitReserved) dailyLimits.reserve(id, source, transfer.limitDay, transfer.amount)
@@ -202,6 +203,17 @@ class StuckTransferAdminUseCasesTest {
         assertThat(dailyLimits.releaseCalls).containsExactly(id)
         assertThat(accounts.calls).isEmpty()
         assertThat(accounts.entryLookups).containsExactly(source to creditKey)
+    }
+
+    @Test
+    fun `compensating by hand keeps the reason of the refused credit in the event`() {
+        givenTransfer(failureReason = "account-closed")
+
+        compensate.execute(id, admin, "credited back by the back office, ticket 42", creditKey)
+
+        assertThat(repository.findById(id)!!.failureReason).isEqualTo("account-closed")
+        assertThat(outbox.events)
+            .containsExactly(TransferEvent.TransferCompensated(id, source, destination, Money(500), "rent", "account-closed"))
     }
 
     @Test
