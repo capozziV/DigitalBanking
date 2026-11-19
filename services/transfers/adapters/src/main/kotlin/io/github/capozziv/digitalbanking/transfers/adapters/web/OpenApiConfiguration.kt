@@ -47,7 +47,8 @@ class OpenApiConfiguration {
 
             - Amounts are whole cents (integers); `amount` > 0.
             - A transfer is `PENDING` while the saga runs, then `COMPLETED`, `COMPENSATED` (the debit was given back)
-              or `FAILED` (refused by accounts; `failureReason` says why).
+              or `FAILED` (refused by accounts). `failureReason` says why: for `FAILED`, the refusal; for `COMPENSATED`,
+              the refusal of the credit (null when the credit simply could not be confirmed).
             - Errors are Problem Details (RFC 9457, `application/problem+json`). Errors of this API have a relative
               `type` `/problems/<slug>`; `400 /problems/validation-error` lists the invalid fields in `errors`.
             - Errors raised by the framework itself (404 unknown route, 405 method not allowed, 415 unsupported

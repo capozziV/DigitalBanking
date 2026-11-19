@@ -125,8 +125,9 @@ class ConsumeEventUseCase(
                     Draft(
                         ownerOf(event.sourceAccountId),
                         NotificationKind.TRANSFER_COMPENSATED,
-                        NotificationText.transferCompensated(event.amountCents, event.destinationAccountId),
-                        transferData(event.transferId, event.sourceAccountId, event.destinationAccountId, event.amountCents),
+                        NotificationText.transferCompensated(event.amountCents, event.destinationAccountId, event.reason),
+                        transferData(event.transferId, event.sourceAccountId, event.destinationAccountId, event.amountCents) +
+                            listOfNotNull(event.reason?.let { "reason" to it }),
                     ),
                 )
             }

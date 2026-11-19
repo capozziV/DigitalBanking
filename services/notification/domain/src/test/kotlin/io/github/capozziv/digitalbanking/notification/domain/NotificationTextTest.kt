@@ -96,6 +96,18 @@ class NotificationTextTest {
     }
 
     @Test
+    fun `transfer compensated says why the credit was refused`() {
+        assertThat(NotificationText.transferCompensated(1000, other, "account-closed").body).isEqualTo(
+            "Sua transferência de R$ 10,00 para a conta $other não pôde ser concluída: " +
+                "uma das contas está encerrada. O valor voltou para a sua conta.",
+        )
+        assertThat(NotificationText.transferCompensated(1000, other, "credit-not-confirmed").body).isEqualTo(
+            "Sua transferência de R$ 10,00 para a conta $other não pôde ser concluída: " +
+                "não foi possível confirmar o crédito na conta de destino. O valor voltou para a sua conta.",
+        )
+    }
+
+    @Test
     fun `account blocked says the account still receives but cannot send`() {
         val content = NotificationText.accountBlocked(account)
         assertThat(content.title).isEqualTo("Conta bloqueada")

@@ -102,7 +102,7 @@ class TransferEventsIntegrationTest : TransfersIntegrationTest() {
             assertThat(event.eventType).isEqualTo(eventType)
             assertThat(event.correlationId).isEqualTo(sent.correlationId)
             assertThat(event.body.get("eventType").asString()).isEqualTo(eventType)
-            assertThat(event.body.get("eventVersion").asInt()).isEqualTo(1)
+            assertThat(event.body.get("eventVersion").asInt()).isEqualTo(if (sent === compensated) 2 else 1)
             assertThat(event.body.get("aggregateId").asString()).isEqualTo(sent.id)
             assertThat(event.body.get("correlationId").asString()).isEqualTo(sent.correlationId)
             val payload = event.body.get("payload")
@@ -120,6 +120,14 @@ class TransferEventsIntegrationTest : TransfersIntegrationTest() {
                 .get("reason")
                 .asString(),
         ).isEqualTo("insufficient-available-balance")
+        assertThat(
+            received
+                .getValue(compensated.id)
+                .body
+                .get("payload")
+                .get("reason")
+                .asString(),
+        ).isEqualTo("account-not-found")
     }
 
     private data class SentTransfer(

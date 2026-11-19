@@ -46,6 +46,9 @@ data class Transfer(
             }
         val reason =
             when {
+                // The credit did not happen: keep why, so the compensated transfer can say it.
+                next == TransferStep.Compensate && outcome is StepOutcome.Refused -> compensationReason(outcome)
+
                 next != TransferStep.Failed -> failureReason
 
                 outcome is StepOutcome.Refused -> publicReason(outcome.reason)
@@ -63,6 +66,13 @@ data class Transfer(
             updatedAt = now,
         )
     }
+
+    private fun compensationReason(outcome: StepOutcome.Refused): String? =
+        when (step) {
+            TransferStep.Credit -> outcome.reason
+            TransferStep.ResolveCredit -> StepOutcome.CREDIT_NOT_CONFIRMED
+            else -> failureReason
+        }
 
     /**
      * Why [key] cannot name the compensation credit, or `null` when it can. A key in the saga's pattern
@@ -142,7 +152,7 @@ data class Transfer(
             }
 
             TransferStep.Compensated -> {
-                TransferEvent.TransferCompensated(id, sourceAccountId, destinationAccountId, amount, description)
+                TransferEvent.TransferCompensated(id, sourceAccountId, destinationAccountId, amount, description, failureReason)
             }
 
             else -> {

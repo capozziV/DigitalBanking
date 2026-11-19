@@ -107,6 +107,7 @@ api/bruno/transfers/        # coleção Bruno
 | `Completed`, `Failed`, `Compensated` | — (terminais) | — | — | — | — |
 
 - **Compensação recusada:** o crédito na origem não tem regra de recusa; uma recusa aqui (por exemplo, `400`) indica bug. O passo continua `Compensate`, a nova tentativa segue a espera máxima e cada recusa gera log `ERROR` com o ID da transferência. A transferência não termina sozinha nesse caso (registrado em Riscos).
+- **Motivo na compensação (nota, desde o #196):** o motivo da recusa do crédito (passo `Credit`) vai para `failure_reason` e aparece em `failureReason` também em `COMPENSATED`; se o crédito não for confirmado (`ResolveCredit` com `ENTRY_NOT_FOUND`), o motivo é `credit-not-confirmed`. Compensação sem recusa (por exemplo, débito achado depois do prazo em `ResolveDebit`) deixa o motivo nulo.
 - **Prazo:** só afeta `Debit` e `Credit`. `ResolveDebit`, `ResolveCredit` e `Compensate` tentam até conseguir.
 - **Descrições no ledger:** débito `Transfer to <destinationAccountId>`, crédito `Transfer from <sourceAccountId>`, compensação `Transfer <id> compensation`. A descrição do cliente fica na transferência e nos eventos, não no ledger (o limite de 140 caracteres do `accounts` não comporta as duas).
 - **Eventos de domínio:** `TransferCompleted`, `TransferFailed` (com `reason`), `TransferCompensated`.
@@ -170,6 +171,7 @@ Corpo da transferência: `{id, sourceAccountId, destinationAccountId, amount, de
 ## 6. Eventos
 - Envelope de `libs/outbox`, `eventVersion` 1, `aggregateId` = `transferId`.
 - Payloads: `TransferCompleted` e `TransferCompensated`: `transferId`, `sourceAccountId`, `destinationAccountId`, `amount`, `description`; `TransferFailed`: os mesmos + `reason`.
+- **Nota (desde o #196):** `TransferCompensated` subiu para `eventVersion` 2 e ganhou `reason` (pode ser nulo; ver motivo na compensação, seção 3). O `notification` aceita a v1 (`reason` nulo) e a v2. Ordem de deploy: `notification` antes do `transfers`.
 - Tópico `transfers-events.fifo` (`MessageGroupId` = `transferId`, `MessageDeduplicationId` = `eventId`) e fila `transfers-events-inspection.fifo` (`RawMessageDelivery=true`), criados no init do LocalStack.
 - Relay do `transfers` com chave de trava consultiva própria (banco próprio, mas a chave é distinta da do `accounts` por convenção).
 

@@ -86,7 +86,9 @@ class BlockedOrClosedAccountSagaIntegrationTest : TransfersIntegrationTest() {
         assertThat(response.status).describedAs(response.rawBody).isEqualTo(200)
         assertThat(response.body!!.get("status").asString()).isEqualTo("COMPENSATED")
         val id = UUID.fromString(response.body.get("id").asString())
-        assertThat(statusAndReason(id).first).isEqualTo("COMPENSATED")
+        assertThat(statusAndReason(id)).isEqualTo("COMPENSATED" to "account-closed")
+        assertThat(response.body.get("failureReason").asString()).isEqualTo("account-closed")
+        assertThat(compensatedEventReason(id)).isEqualTo("account-closed")
         accountsServer.verify(1, postRequestedFor(urlEqualTo("/accounts/$destination/credits")))
         accountsServer.verify(
             1,
@@ -128,6 +130,13 @@ class BlockedOrClosedAccountSagaIntegrationTest : TransfersIntegrationTest() {
             .sql("select limit_day from transfer where id = :id")
             .param("id", id)
             .query(LocalDate::class.java)
+            .single()
+
+    private fun compensatedEventReason(id: UUID): String =
+        ownerJdbc
+            .sql("select payload->>'reason' from outbox where aggregate_id = :id and event_type = 'TransferCompensated'")
+            .param("id", id.toString())
+            .query(String::class.java)
             .single()
 
     private fun outboxEventTypes(id: UUID): List<String> =
