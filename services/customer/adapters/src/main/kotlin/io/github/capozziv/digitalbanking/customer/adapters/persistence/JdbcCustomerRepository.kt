@@ -1,8 +1,11 @@
 package io.github.capozziv.digitalbanking.customer.adapters.persistence
 
+import io.github.capozziv.digitalbanking.customer.application.PhoneAlreadyInUseException
 import io.github.capozziv.digitalbanking.customer.application.port.CustomerRepository
 import io.github.capozziv.digitalbanking.customer.domain.Customer
 import io.github.capozziv.digitalbanking.customer.domain.CustomerStatus
+import io.github.capozziv.digitalbanking.customer.domain.PhoneNumber
+import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Repository
@@ -18,35 +21,60 @@ class JdbcCustomerRepository(
      * A concurrent uncommitted insert of the same id makes this statement wait for its outcome.
      */
     override fun insertIfAbsent(customer: Customer): Boolean =
-        jdbcClient
-            .sql(
-                """
-                insert into customer (id, name, email, status, created_at, updated_at)
-                values (:id, :name, :email, :status, :createdAt, :updatedAt)
-                on conflict (id) do nothing
-                """.trimIndent(),
-            ).param("id", customer.id)
-            .param("name", customer.name)
-            .param("email", customer.email)
-            .param("status", customer.status.name)
-            .param("createdAt", customer.createdAt.atOffset(java.time.ZoneOffset.UTC))
-            .param("updatedAt", customer.updatedAt.atOffset(java.time.ZoneOffset.UTC))
-            .update() == 1
+        refusingDuplicatePhone(customer.phone) {
+            jdbcClient
+                .sql(
+                    """
+                    insert into customer (id, name, email, phone, status, created_at, updated_at)
+                    values (:id, :name, :email, :phone, :status, :createdAt, :updatedAt)
+                    on conflict (id) do nothing
+                    """.trimIndent(),
+                ).param("id", customer.id)
+                .param("name", customer.name)
+                .param("email", customer.email)
+                .param("phone", customer.phone.value)
+                .param("status", customer.status.name)
+                .param("createdAt", customer.createdAt.atOffset(java.time.ZoneOffset.UTC))
+                .param("updatedAt", customer.updatedAt.atOffset(java.time.ZoneOffset.UTC))
+                .update() == 1
+        }
 
     override fun findById(id: UUID): Customer? = select("select $COLUMNS from customer where id = :id", id)
 
     override fun lockById(id: UUID): Customer? = select("select $COLUMNS from customer where id = :id for update", id)
 
+    override fun findByPhone(phone: PhoneNumber): Customer? =
+        jdbcClient
+            .sql("select $COLUMNS from customer where phone = :phone")
+            .param("phone", phone.value)
+            .query(CUSTOMER_ROW_MAPPER)
+            .optional()
+            .orElse(null)
+
     override fun update(customer: Customer) {
         val updated =
-            jdbcClient
-                .sql("update customer set status = :status, updated_at = :updatedAt where id = :id")
-                .param("status", customer.status.name)
-                .param("updatedAt", customer.updatedAt.atOffset(java.time.ZoneOffset.UTC))
-                .param("id", customer.id)
-                .update()
+            refusingDuplicatePhone(customer.phone) {
+                jdbcClient
+                    .sql("update customer set status = :status, phone = :phone, updated_at = :updatedAt where id = :id")
+                    .param("status", customer.status.name)
+                    .param("phone", customer.phone.value)
+                    .param("updatedAt", customer.updatedAt.atOffset(java.time.ZoneOffset.UTC))
+                    .param("id", customer.id)
+                    .update()
+            }
         check(updated == 1) { "customer ${customer.id} was not updated" }
     }
+
+    /** The unique index on the phone is what refuses a number another customer has, also for two concurrent writes. */
+    private fun <T> refusingDuplicatePhone(
+        phone: PhoneNumber,
+        write: () -> T,
+    ): T =
+        try {
+            write()
+        } catch (e: DuplicateKeyException) {
+            throw PhoneAlreadyInUseException(phone).also { it.initCause(e) }
+        }
 
     private fun select(
         sql: String,
@@ -60,7 +88,7 @@ class JdbcCustomerRepository(
             .orElse(null)
 
     private companion object {
-        const val COLUMNS = "id, name, email, status, created_at, updated_at"
+        const val COLUMNS = "id, name, email, phone, status, created_at, updated_at"
 
         val CUSTOMER_ROW_MAPPER =
             RowMapper { rs, _ ->
@@ -68,6 +96,7 @@ class JdbcCustomerRepository(
                     id = rs.getObject("id", UUID::class.java),
                     name = rs.getString("name"),
                     email = rs.getString("email"),
+                    phone = PhoneNumber(rs.getString("phone")),
                     status = CustomerStatus.valueOf(rs.getString("status")),
                     createdAt = rs.getObject("created_at", java.time.OffsetDateTime::class.java).toInstant(),
                     updatedAt = rs.getObject("updated_at", java.time.OffsetDateTime::class.java).toInstant(),

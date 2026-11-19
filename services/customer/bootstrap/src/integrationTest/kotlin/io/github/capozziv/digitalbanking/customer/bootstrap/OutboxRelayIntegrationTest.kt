@@ -55,7 +55,12 @@ class OutboxRelayIntegrationTest : CustomerIntegrationTest() {
         val sub = UUID.randomUUID()
         val admin = JwtTestSupport.adminToken(UUID.randomUUID())
         val headers = mapOf("X-Correlation-Id" to "relay-customer")
-        api.post("/customers", """{"name":"Ana Souza","email":"ana@example.test"}""", JwtTestSupport.customerToken(sub), headers)
+        api.post(
+            "/customers",
+            """{"name":"Ana Souza","email":"ana@example.test","phone":"${nextPhone()}"}""",
+            JwtTestSupport.customerToken(sub),
+            headers,
+        )
         api.put("/admin/customers/$sub/status", """{"status":"BLOCKED"}""", admin, headers)
         api.put("/admin/customers/$sub/status", """{"status":"ACTIVE"}""", admin, headers)
 

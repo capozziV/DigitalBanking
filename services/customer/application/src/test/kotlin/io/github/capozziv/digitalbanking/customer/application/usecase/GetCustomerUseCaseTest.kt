@@ -5,6 +5,7 @@ import io.github.capozziv.digitalbanking.customer.application.CustomerNotFoundEx
 import io.github.capozziv.digitalbanking.customer.application.fake.DirectTransactionRunner
 import io.github.capozziv.digitalbanking.customer.application.fake.InMemoryCustomerRepository
 import io.github.capozziv.digitalbanking.customer.domain.Customer
+import io.github.capozziv.digitalbanking.customer.domain.PhoneNumber
 import io.github.capozziv.digitalbanking.security.Caller
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -20,9 +21,17 @@ class GetCustomerUseCaseTest {
     private val id = UUID.randomUUID()
 
     private fun existingCustomer(): Customer =
-        Customer.register(id, "Ana Souza", "ana@example.test", Instant.parse("2026-11-13T10:00:00Z")).first.also {
-            customers.insertIfAbsent(it)
-        }
+        Customer
+            .register(
+                id,
+                "Ana Souza",
+                "ana@example.test",
+                PhoneNumber("+5511987654321"),
+                Instant.parse("2026-11-13T10:00:00Z"),
+            ).first
+            .also {
+                customers.insertIfAbsent(it)
+            }
 
     @Test
     fun `finds a customer by id`() {

@@ -1,10 +1,12 @@
 package io.github.capozziv.digitalbanking.customer.application.fake
 
+import io.github.capozziv.digitalbanking.customer.application.PhoneAlreadyInUseException
 import io.github.capozziv.digitalbanking.customer.application.port.CustomerRepository
 import io.github.capozziv.digitalbanking.customer.application.port.EventOutbox
 import io.github.capozziv.digitalbanking.customer.application.port.TransactionRunner
 import io.github.capozziv.digitalbanking.customer.domain.Customer
 import io.github.capozziv.digitalbanking.customer.domain.CustomerEvent
+import io.github.capozziv.digitalbanking.customer.domain.PhoneNumber
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -16,7 +18,12 @@ class InMemoryCustomerRepository : CustomerRepository {
     var locks = 0
         private set
 
-    override fun insertIfAbsent(customer: Customer): Boolean = customers.putIfAbsent(customer.id, customer) == null
+    override fun insertIfAbsent(customer: Customer): Boolean {
+        if (customer.id in customers) return false
+        if (customers.values.any { it.phone == customer.phone }) throw PhoneAlreadyInUseException(customer.phone)
+        customers[customer.id] = customer
+        return true
+    }
 
     override fun findById(id: UUID): Customer? = customers[id]
 
@@ -25,8 +32,11 @@ class InMemoryCustomerRepository : CustomerRepository {
         return customers[id]
     }
 
+    override fun findByPhone(phone: PhoneNumber): Customer? = customers.values.firstOrNull { it.phone == phone }
+
     override fun update(customer: Customer) {
         check(customer.id in customers) { "customer ${customer.id} does not exist" }
+        if (customers.values.any { it.id != customer.id && it.phone == customer.phone }) throw PhoneAlreadyInUseException(customer.phone)
         customers[customer.id] = customer
     }
 

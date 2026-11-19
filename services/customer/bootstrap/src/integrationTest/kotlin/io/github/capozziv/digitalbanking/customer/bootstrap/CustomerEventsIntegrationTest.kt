@@ -17,7 +17,9 @@ class CustomerEventsIntegrationTest : CustomerIntegrationTest() {
 
     private val api by lazy { ApiClient(port) }
     private val mapper = JsonMapper.builder().build()
-    private val body = """{"name":"Ana Souza","email":"ana@example.test"}"""
+
+    private fun body(phone: String = nextPhone()) = """{"name":"Ana Souza","email":"ana@example.test","phone":"$phone"}"""
+
     private val admin = JwtTestSupport.adminToken(UUID.randomUUID())
 
     private data class OutboxRow(
@@ -35,20 +37,81 @@ class CustomerEventsIntegrationTest : CustomerIntegrationTest() {
             .list()
 
     @Test
-    fun `registering writes CustomerRegistered v1 with the correlation id of the request`() {
+    fun `registering writes CustomerRegistered v2 with the phone and the correlation id of the request`() {
         val sub = UUID.randomUUID()
+        val phone = nextPhone()
 
-        api.post("/customers", body, JwtTestSupport.customerToken(sub), mapOf("X-Correlation-Id" to "corr-register"))
+        api.post("/customers", body(phone), JwtTestSupport.customerToken(sub), mapOf("X-Correlation-Id" to "corr-register"))
 
         val rows = outboxOf(sub)
         assertThat(rows).hasSize(1)
         assertThat(rows[0].eventType).isEqualTo("CustomerRegistered")
-        assertThat(rows[0].eventVersion).isEqualTo(1)
+        assertThat(rows[0].eventVersion).isEqualTo(2)
         assertThat(rows[0].correlationId).isEqualTo("corr-register")
         val payload = mapper.readTree(rows[0].payload)
         assertThat(payload.get("customerId").asString()).isEqualTo(sub.toString())
         assertThat(payload.get("name").asString()).isEqualTo("Ana Souza")
         assertThat(payload.get("email").asString()).isEqualTo("ana@example.test")
+        assertThat(payload.get("phone").asString()).isEqualTo(phone)
+    }
+
+    @Test
+    fun `changing the phone writes CustomerPhoneChanged v1 with both numbers and the same number again writes none`() {
+        val sub = UUID.randomUUID()
+        val token = JwtTestSupport.customerToken(sub)
+        val phone = nextPhone()
+        val newPhone = nextPhone()
+        api.post("/customers", body(phone), token)
+
+        api.put("/customers/me/phone", """{"phone":"$newPhone"}""", token, mapOf("X-Correlation-Id" to "corr-phone"))
+        api.put("/customers/me/phone", """{"phone":"$newPhone"}""", token)
+
+        val rows = outboxOf(sub)
+        assertThat(rows.map { it.eventType }).containsExactly("CustomerRegistered", "CustomerPhoneChanged")
+        assertThat(rows[1].eventVersion).isEqualTo(1)
+        assertThat(rows[1].correlationId).isEqualTo("corr-phone")
+        val payload = mapper.readTree(rows[1].payload)
+        assertThat(payload.get("customerId").asString()).isEqualTo(sub.toString())
+        assertThat(payload.get("previousPhone").asString()).isEqualTo(phone)
+        assertThat(payload.get("newPhone").asString()).isEqualTo(newPhone)
+    }
+
+    @Test
+    fun `a refused phone change writes nothing`() {
+        val sub = UUID.randomUUID()
+        val other = UUID.randomUUID()
+        val taken = nextPhone()
+        api.post("/customers", body(taken), JwtTestSupport.customerToken(other))
+        api.post("/customers", body(), JwtTestSupport.customerToken(sub))
+
+        val response = api.put("/customers/me/phone", """{"phone":"$taken"}""", JwtTestSupport.customerToken(sub))
+
+        assertThat(response.status).isEqualTo(409)
+        assertThat(outboxOf(sub).map { it.eventType }).containsExactly("CustomerRegistered")
+    }
+
+    @Test
+    fun `parallel registrations of different users with the same phone create one customer and refuse the others`() {
+        val phone = nextPhone()
+        val parallel = 10
+
+        val statuses =
+            Executors.newVirtualThreadPerTaskExecutor().use { executor ->
+                (1..parallel)
+                    .map {
+                        executor.submit<Int> { api.post("/customers", body(phone), JwtTestSupport.customerToken(UUID.randomUUID())).status }
+                    }.map { it.get(30, TimeUnit.SECONDS) }
+            }
+
+        assertThat(statuses.count { it == 201 }).describedAs("statuses: $statuses").isEqualTo(1)
+        assertThat(statuses.count { it == 409 }).describedAs("statuses: $statuses").isEqualTo(parallel - 1)
+        assertThat(
+            ownerJdbc
+                .sql("select count(*) from customer where phone = :phone")
+                .param("phone", phone)
+                .query(Long::class.java)
+                .single(),
+        ).isEqualTo(1L)
     }
 
     @Test
@@ -56,8 +119,8 @@ class CustomerEventsIntegrationTest : CustomerIntegrationTest() {
         val sub = UUID.randomUUID()
         val token = JwtTestSupport.customerToken(sub)
 
-        api.post("/customers", body, token)
-        api.post("/customers", body, token)
+        api.post("/customers", body(), token)
+        api.post("/customers", body(), token)
 
         assertThat(outboxOf(sub).map { it.eventType }).containsExactly("CustomerRegistered")
     }
@@ -65,7 +128,7 @@ class CustomerEventsIntegrationTest : CustomerIntegrationTest() {
     @Test
     fun `blocking and unblocking write one event each and the same status again writes none`() {
         val sub = UUID.randomUUID()
-        api.post("/customers", body, JwtTestSupport.customerToken(sub))
+        api.post("/customers", body(), JwtTestSupport.customerToken(sub))
 
         api.put("/admin/customers/$sub/status", """{"status":"BLOCKED"}""", admin, mapOf("X-Correlation-Id" to "corr-block"))
         api.put("/admin/customers/$sub/status", """{"status":"BLOCKED"}""", admin)
@@ -83,7 +146,7 @@ class CustomerEventsIntegrationTest : CustomerIntegrationTest() {
     fun `a refused request writes nothing`() {
         val sub = UUID.randomUUID()
 
-        api.post("/customers", """{"name":"","email":"x"}""", JwtTestSupport.customerToken(sub))
+        api.post("/customers", """{"name":"","email":"x","phone":"1"}""", JwtTestSupport.customerToken(sub))
         api.put("/admin/customers/$sub/status", """{"status":"BLOCKED"}""", admin)
 
         assertThat(outboxOf(sub)).isEmpty()
@@ -103,7 +166,7 @@ class CustomerEventsIntegrationTest : CustomerIntegrationTest() {
                             api
                                 .post(
                                     "/customers",
-                                    body,
+                                    body(),
                                     token,
                                 ).status
                         }
@@ -125,7 +188,7 @@ class CustomerEventsIntegrationTest : CustomerIntegrationTest() {
     @Test
     fun `parallel status changes leave one coherent history`() {
         val sub = UUID.randomUUID()
-        api.post("/customers", body, JwtTestSupport.customerToken(sub))
+        api.post("/customers", body(), JwtTestSupport.customerToken(sub))
         val parallel = 10
 
         val statuses =

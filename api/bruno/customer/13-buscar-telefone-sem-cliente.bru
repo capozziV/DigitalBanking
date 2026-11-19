@@ -1,0 +1,18 @@
+meta {
+  name: Buscar telefone sem cliente
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{baseUrl}}/customers/lookup?phone=%2B5511900000000
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("404 customer-not-found", function () {
+    expect(res.status).to.equal(404);
+    expect(res.body.type).to.contain("customer-not-found");
+  });
+}

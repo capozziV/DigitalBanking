@@ -4,6 +4,8 @@ import io.github.capozziv.digitalbanking.customer.application.port.CustomerRepos
 import io.github.capozziv.digitalbanking.customer.application.port.EventOutbox
 import io.github.capozziv.digitalbanking.customer.application.port.TransactionRunner
 import io.github.capozziv.digitalbanking.customer.application.usecase.ChangeCustomerStatusUseCase
+import io.github.capozziv.digitalbanking.customer.application.usecase.ChangePhoneUseCase
+import io.github.capozziv.digitalbanking.customer.application.usecase.FindCustomerByPhoneUseCase
 import io.github.capozziv.digitalbanking.customer.application.usecase.GetCustomerUseCase
 import io.github.capozziv.digitalbanking.customer.application.usecase.GetOwnCustomerUseCase
 import io.github.capozziv.digitalbanking.customer.application.usecase.RegisterCustomerUseCase
@@ -29,6 +31,20 @@ class UseCaseConfiguration {
         tx: TransactionRunner,
         clock: Clock,
     ) = RegisterCustomerUseCase(customers, outbox, tx, clock)
+
+    @Bean
+    fun changePhoneUseCase(
+        customers: CustomerRepository,
+        outbox: EventOutbox,
+        tx: TransactionRunner,
+        clock: Clock,
+    ) = ChangePhoneUseCase(customers, outbox, tx, clock)
+
+    @Bean
+    fun findCustomerByPhoneUseCase(
+        customers: CustomerRepository,
+        tx: TransactionRunner,
+    ) = FindCustomerByPhoneUseCase(customers, tx)
 
     @Bean
     fun getCustomerUseCase(

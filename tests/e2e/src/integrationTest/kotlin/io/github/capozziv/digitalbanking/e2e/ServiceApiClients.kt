@@ -386,10 +386,13 @@ class CustomerApiClient(
                 "POST",
                 "$baseUrl/customers",
                 tokens.customer(customerId),
-                """{"name":"E2E Customer","email":"e2e-$customerId@example.test"}""",
+                """{"name":"E2E Customer","email":"e2e-$customerId@example.test","phone":"${phoneOf(customerId)}"}""",
             )
         check(result.status == 201 || result.status == 200) { "register customer: ${result.status} ${result.body}" }
     }
+
+    /** Fictitious, unique mobile phone derived from the id: +55 11 9 and eight digits taken from the uuid. */
+    private fun phoneOf(customerId: UUID): String = "+55119" + (customerId.toString().filter { it.isDigit() } + "00000000").take(8)
 
     /** `ACTIVE` or `BLOCKED`, set by an admin. */
     fun changeStatus(

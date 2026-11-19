@@ -65,7 +65,8 @@ else
   token=$("$token_sh" user "$owner" admin)
 fi
 
-call "201|200" POST /customers "{\"name\":\"Owner Test\",\"email\":\"$owner_email\"}" > /dev/null
+# Telefone fixo do dono (fictício, único); troque por OWNER_PHONE se ele já estiver em uso.
+call "201|200" POST /customers "{\"name\":\"Owner Test\",\"email\":\"$owner_email\",\"phone\":\"${OWNER_PHONE:-+5511999990000}\"}" > /dev/null
 call 200 PUT "/admin/customers/$owner/status" '{"status":"ACTIVE"}' > /dev/null
 echo "OK: cliente $owner (Owner Test) cadastrado e ACTIVE"
 
