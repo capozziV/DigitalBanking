@@ -1,7 +1,8 @@
 plugins {
     id("digitalbanking.spring-boot-app")
     id("digitalbanking.contract-consumer")
-    // Message contracts of the transfer events (contracts/messaging), consumed by notification.
+    // Message contracts of the transfer events (contracts/messaging), consumed by notification, and the HTTP contract of
+    // the pending-transfers count (contracts/http), consumed by accounts.
     id("digitalbanking.contract-producer")
 }
 

@@ -44,6 +44,7 @@ jobs:
             accounts:
               - 'services/accounts/**'
               - 'services/customer/bootstrap/src/contractTest/**'
+              - 'services/transfers/bootstrap/src/contractTest/resources/contracts/http/**'
             transfers:
               - 'services/transfers/**'
               - 'services/accounts/bootstrap/src/contractTest/**'
