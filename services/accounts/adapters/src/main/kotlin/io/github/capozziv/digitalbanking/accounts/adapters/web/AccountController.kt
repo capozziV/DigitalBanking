@@ -89,7 +89,7 @@ class AccountController(
         ),
         ApiResponse(
             responseCode = "409",
-            description = "/problems/customer-already-has-account: the customer already has an account (opened with another key)",
+            description = "/problems/customer-already-has-account: the customer already has a non-closed account (opened with another key)",
         ),
         ApiResponse(
             responseCode = "422",

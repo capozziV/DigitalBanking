@@ -80,9 +80,12 @@ class AccountClosingApiIntegrationTest : AccountsIntegrationTest() {
     @Test
     fun `a pending outgoing transfer is 422 pending-transfers`() {
         val (customerId, accountId) = openAccount()
-        transfersService.answer(UUID.fromString(accountId), Behavior.Pending(1))
+        transfersService.answer(UUID.fromString(accountId), Behavior.Pending(3))
 
-        assertProblem(close(accountId, asCustomer(customerId)), 422, "pending-transfers")
+        val response = close(accountId, asCustomer(customerId))
+
+        assertProblem(response, 422, "pending-transfers")
+        assertThat(response.body!!.get("count").asInt()).isEqualTo(3)
         assertThat(statusOf(accountId)).isEqualTo("ACTIVE")
         assertThat(outboxRows(accountId, "AccountClosed")).isEmpty()
     }

@@ -70,6 +70,16 @@ class NotificationTextTest {
     }
 
     @Test
+    fun `transfer failed explains a blocked or closed account`() {
+        assertThat(NotificationText.transferFailed(1000, other, "account-blocked").body).isEqualTo(
+            "Sua transferência de R$ 10,00 para a conta $other foi recusada: uma das contas está bloqueada. Nenhum valor saiu da sua conta.",
+        )
+        assertThat(NotificationText.transferFailed(1000, other, "account-closed").body).isEqualTo(
+            "Sua transferência de R$ 10,00 para a conta $other foi recusada: uma das contas está encerrada. Nenhum valor saiu da sua conta.",
+        )
+    }
+
+    @Test
     fun `transfer failed falls back for unknown reasons`() {
         assertThat(NotificationText.transferFailed(1000, other, "anything-else").body).isEqualTo(
             "Sua transferência de R$ 10,00 para a conta $other foi recusada: não foi possível processar a transferência. Nenhum valor saiu da sua conta.",

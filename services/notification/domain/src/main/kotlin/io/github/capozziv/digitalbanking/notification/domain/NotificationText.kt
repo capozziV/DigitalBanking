@@ -98,6 +98,8 @@ object NotificationText {
             "insufficient-available-balance" -> "saldo disponível insuficiente"
             "debit-not-confirmed" -> "não foi possível confirmar o débito"
             "daily-limit-exceeded" -> "o limite diário de transferências da conta seria ultrapassado"
+            "account-blocked" -> "uma das contas está bloqueada"
+            "account-closed" -> "uma das contas está encerrada"
             "daily-limit-unavailable" -> "não foi possível conferir o limite diário agora, tente novamente"
             else -> "não foi possível processar a transferência"
         }

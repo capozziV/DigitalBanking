@@ -93,7 +93,12 @@ class IdentityEndToEndIntegrationTest {
         val notEmpty = accounts.close(account)
         assertThat(notEmpty.status).describedAs(notEmpty.body).isEqualTo(422)
         assertThat(notEmpty.json().get("type").asString()).endsWith("/problems/balance-not-zero")
-        // Closing at zero balance asks the real transfers; that part waits for Task 2 (GET /internal/accounts/{id}/pending-transfers).
+
+        // Closing at zero balance asks the real transfers service (no pending transfers) and succeeds.
+        val empty = accounts.openAccount()
+        val closed = accounts.close(empty)
+        assertThat(closed.status).describedAs(closed.body).isEqualTo(200)
+        assertThat(closed.json().get("status").asString()).isEqualTo("CLOSED")
     }
 
     private companion object {
