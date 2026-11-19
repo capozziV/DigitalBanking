@@ -137,8 +137,9 @@ class CompensateTransferManuallyUseCase(
     private fun checkCredit(
         transfer: Transfer,
         key: String,
-    ): CreditCheck =
-        when (val lookup = accounts.findEntry(transfer.sourceAccountId, key)) {
+    ): CreditCheck {
+        transfer.manualCreditKeyMismatch(key)?.let { return CreditCheck.Rejected(CompensateManuallyOutcome.CreditMismatch(it)) }
+        return when (val lookup = accounts.findEntry(transfer.sourceAccountId, key)) {
             EntryLookup.NotFound -> {
                 CreditCheck.Rejected(CompensateManuallyOutcome.CreditNotFound(key))
             }
@@ -152,6 +153,7 @@ class CompensateTransferManuallyUseCase(
                     ?: CreditCheck.Accepted(lookup.entry)
             }
         }
+    }
 
     /** Under the transfer's correlation ID, like a saga run: its log lines and its event belong to the transfer. */
     private fun compensate(

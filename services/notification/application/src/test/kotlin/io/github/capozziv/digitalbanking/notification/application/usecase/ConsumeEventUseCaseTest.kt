@@ -139,6 +139,19 @@ class ConsumeEventUseCaseTest {
     }
 
     @Test
+    fun `transfer compensated with a reason says it in the text and keeps it in the data`() {
+        openAccounts()
+        val event = ReceivedEvent.TransferCompensated(UUID.randomUUID(), UUID.randomUUID(), aliceAccount, bobAccount, 900, "account-closed")
+
+        useCase.execute(event)
+
+        val compensated = notifications.all.single { it.sourceEventId == event.eventId }
+        assertThat(compensated.body).isEqualTo(NotificationText.transferCompensated(900, bobAccount, "account-closed").body)
+        assertThat(compensated.body).contains("encerrada")
+        assertThat(compensated.data).containsEntry("reason", "account-closed")
+    }
+
+    @Test
     fun `account type changed with the overdraft limit mentions it`() {
         openAccounts()
         val event = ReceivedEvent.AccountTypeChanged(UUID.randomUUID(), aliceAccount, "BLACK", 500_000)

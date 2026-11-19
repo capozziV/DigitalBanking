@@ -85,6 +85,8 @@ class EventEnvelopeReader {
                     sourceAccountId = payload.uuid("sourceAccountId"),
                     destinationAccountId = payload.uuid("destinationAccountId"),
                     amountCents = payload.cents("amount"),
+                    // Version 1 did not carry the reason; from version 2 on it is present, null without a refusal.
+                    reason = if (envelope.version() >= 2) payload.optionalText("reason") else null,
                 )
             }
 
@@ -119,6 +121,15 @@ class EventEnvelopeReader {
     private fun JsonNode.text(field: String): String =
         get(field)?.takeIf { it.isString && it.asString().isNotBlank() }?.asString()
             ?: throw MalformedEventException("field '$field' is missing or not a string")
+
+    private fun JsonNode.optionalText(field: String): String? {
+        val node = get(field)
+        return when {
+            node == null || node.isNull -> null
+            node.isString && node.asString().isNotBlank() -> node.asString()
+            else -> throw MalformedEventException("field '$field' is not a string")
+        }
+    }
 
     private fun JsonNode.uuid(field: String): UUID {
         val value = text(field)

@@ -59,12 +59,24 @@ class OutboxEventAppenderIntegrationTest : TransfersIntegrationTest() {
 
     @Test
     fun `TransferCompensated is written with the spec payload`() {
-        eventOutbox.append(TransferEvent.TransferCompensated(transferId, source, destination, Money(9), "x"))
+        eventOutbox.append(TransferEvent.TransferCompensated(transferId, source, destination, Money(9), "x", "account-closed"))
 
         val row = onlyRow()
         assertThat(row.eventType).isEqualTo("TransferCompensated")
+        assertThat(row.eventVersion).isEqualTo(2)
         assertThat(row.aggregateId).isEqualTo(transferId.toString())
-        assertThat(objectMapper.readTree(row.payload).get("amount").asLong()).isEqualTo(9L)
+        assertThat(objectMapper.readTree(row.payload)).isEqualTo(
+            objectMapper.readTree(
+                """{"transferId":"$transferId","sourceAccountId":"$source","destinationAccountId":"$destination","amount":9,"description":"x","reason":"account-closed"}""",
+            ),
+        )
+    }
+
+    @Test
+    fun `TransferCompensated without a refusal carries a null reason`() {
+        eventOutbox.append(TransferEvent.TransferCompensated(transferId, source, destination, Money(9), null, null))
+
+        assertThat(objectMapper.readTree(onlyRow().payload).get("reason").isNull).isTrue()
     }
 
     @Test

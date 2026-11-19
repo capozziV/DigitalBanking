@@ -17,6 +17,9 @@ sealed interface StepOutcome {
         /** Failure reason exposed when the debit could not be confirmed (not the internal [ENTRY_NOT_FOUND]). */
         const val DEBIT_NOT_CONFIRMED = "debit-not-confirmed"
 
+        /** Compensation reason when the credit on the destination could not be confirmed (not the internal [ENTRY_NOT_FOUND]). */
+        const val CREDIT_NOT_CONFIRMED = "credit-not-confirmed"
+
         /** The transfer would take the source account over its daily limit. */
         const val DAILY_LIMIT_EXCEEDED = "daily-limit-exceeded"
 

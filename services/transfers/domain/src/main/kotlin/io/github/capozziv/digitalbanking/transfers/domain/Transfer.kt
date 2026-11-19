@@ -46,6 +46,9 @@ data class Transfer(
             }
         val reason =
             when {
+                // The credit did not happen: keep why, so the compensated transfer can say it.
+                next == TransferStep.Compensate && outcome is StepOutcome.Refused -> compensationReason(outcome)
+
                 next != TransferStep.Failed -> failureReason
 
                 outcome is StepOutcome.Refused -> publicReason(outcome.reason)
@@ -62,6 +65,31 @@ data class Transfer(
             attempts = if (next == step) attempts + 1 else 0,
             updatedAt = now,
         )
+    }
+
+    private fun compensationReason(outcome: StepOutcome.Refused): String? =
+        when (step) {
+            TransferStep.Credit -> outcome.reason
+            TransferStep.ResolveCredit -> StepOutcome.CREDIT_NOT_CONFIRMED
+            else -> failureReason
+        }
+
+    /**
+     * Why [key] cannot name the compensation credit, or `null` when it can. A key in the saga's pattern
+     * (`transfer-<id>-debit|credit|compensation`) belongs to the transfer in its `<id>`: the credit of another saga
+     * (its compensation, or its destination credit) never proves this one was put back. Among the saga keys only this
+     * transfer's own compensation key is accepted, being the credit the saga itself would write; the `<id>` is
+     * compared as a UUID, so letter case does not matter.
+     */
+    fun manualCreditKeyMismatch(key: String): String? {
+        val match = SAGA_KEY.matchEntire(key) ?: return null
+        val (owner, step) = match.destructured
+        val own = runCatching { UUID.fromString(owner) }.getOrNull() == id
+        return when {
+            !own -> "the key is a saga key of another transfer"
+            step != "compensation" -> "the key is the $step key of this transfer, not its compensation credit"
+            else -> null
+        }
     }
 
     /**
@@ -124,7 +152,7 @@ data class Transfer(
             }
 
             TransferStep.Compensated -> {
-                TransferEvent.TransferCompensated(id, sourceAccountId, destinationAccountId, amount, description)
+                TransferEvent.TransferCompensated(id, sourceAccountId, destinationAccountId, amount, description, failureReason)
             }
 
             else -> {
@@ -133,6 +161,8 @@ data class Transfer(
         }
 
     companion object {
+        private val SAGA_KEY = Regex("transfer-(.+)-(debit|credit|compensation)")
+
         fun request(
             id: UUID,
             sourceAccountId: UUID,

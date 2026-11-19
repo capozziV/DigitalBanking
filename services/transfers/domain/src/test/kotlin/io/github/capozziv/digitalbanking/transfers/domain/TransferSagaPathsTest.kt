@@ -35,6 +35,37 @@ class TransferSagaPathsTest {
     }
 
     @Test
+    fun `credit refused so the compensated transfer keeps the refusal reason from the compensating step on`() {
+        val compensating = run(ok to beforeDeadline, StepOutcome.Refused("account-closed") to beforeDeadline)
+        assertThat(compensating.step).isEqualTo(TransferStep.Compensate)
+        assertThat(compensating.failureReason).isEqualTo("account-closed")
+
+        val compensated = compensating.advance(ok, beforeDeadline)
+        assertThat(compensated.failureReason).isEqualTo("account-closed")
+        assertThat((compensated.terminalEvent() as TransferEvent.TransferCompensated).reason).isEqualTo("account-closed")
+    }
+
+    @Test
+    fun `credit that could not be confirmed so compensated with credit-not-confirmed`() {
+        val t =
+            run(
+                ok to beforeDeadline,
+                timeout to beforeDeadline,
+                timeout to afterDeadline,
+                notFound to afterDeadline,
+                ok to afterDeadline,
+            )
+        assertThat(t.failureReason).isEqualTo(StepOutcome.CREDIT_NOT_CONFIRMED)
+    }
+
+    @Test
+    fun `debit that took a while but was found so compensated without a reason`() {
+        val t = run(timeout to beforeDeadline, timeout to afterDeadline, ok to afterDeadline, ok to afterDeadline)
+        assertThat(t.failureReason).isNull()
+        assertThat((t.terminalEvent() as TransferEvent.TransferCompensated).reason).isNull()
+    }
+
+    @Test
     fun `debit times out until the deadline and the entry exists so compensated`() {
         val t = run(timeout to beforeDeadline, timeout to afterDeadline, ok to afterDeadline, ok to afterDeadline)
         assertThat(t.status).isEqualTo(TransferStatus.COMPENSATED)

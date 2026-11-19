@@ -10,7 +10,7 @@ import tools.jackson.databind.ObjectMapper
 import java.util.UUID
 
 /**
- * Maps each TransferEvent to its eventVersion 1 payload (spec, section 6) and writes it to the outbox in the
+ * Maps each TransferEvent to its payload (spec, section 6); `TransferCompensated` is eventVersion 2, which added `reason` and writes it to the outbox in the
  * caller's transaction. The aggregate is the transfer; amounts are numbers of cents.
  */
 @Component
@@ -22,7 +22,7 @@ class OutboxEventAppender(
         writer.write(
             OutboxMessage(
                 eventType = event.eventType(),
-                eventVersion = EVENT_VERSION,
+                eventVersion = event.eventVersion(),
                 aggregateId = event.transferId.toString(),
                 payloadJson = objectMapper.writeValueAsString(event.payload()),
             ),
@@ -36,6 +36,12 @@ class OutboxEventAppender(
             is TransferEvent.TransferCompensated -> "TransferCompensated"
         }
 
+    private fun TransferEvent.eventVersion(): Int =
+        when (this) {
+            is TransferEvent.TransferCompensated -> COMPENSATED_EVENT_VERSION
+            else -> EVENT_VERSION
+        }
+
     private fun TransferEvent.payload(): Map<String, Any?> =
         when (this) {
             is TransferEvent.TransferCompleted -> {
@@ -43,7 +49,7 @@ class OutboxEventAppender(
             }
 
             is TransferEvent.TransferCompensated -> {
-                payload(sourceAccountId, destinationAccountId, amount, description)
+                payload(sourceAccountId, destinationAccountId, amount, description) + ("reason" to reason)
             }
 
             is TransferEvent.TransferFailed -> {
@@ -67,5 +73,8 @@ class OutboxEventAppender(
 
     private companion object {
         const val EVENT_VERSION = 1
+
+        /** Version 1 had no `reason`; from version 2 on it is always present, null when the saga compensated without a refusal. */
+        const val COMPENSATED_EVENT_VERSION = 2
     }
 }

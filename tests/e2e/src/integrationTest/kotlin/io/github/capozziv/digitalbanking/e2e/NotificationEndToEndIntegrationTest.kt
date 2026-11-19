@@ -170,7 +170,8 @@ class NotificationEndToEndIntegrationTest {
         val compensated = notifications.awaitKinds(sender, listOf("WELCOME", "TRANSFER_COMPENSATED"), NOTIFICATION_TIMEOUT)
         assertThat(compensated.single { it.get("kind").asString() == "TRANSFER_COMPENSATED" }.get("body").asString())
             .isEqualTo(
-                "Sua transferência de R$ 3,00 para a conta $destination não pôde ser concluída e o valor voltou para a sua conta.",
+                "Sua transferência de R$ 3,00 para a conta $destination não pôde ser concluída: " +
+                    "não foi possível confirmar o crédito na conta de destino. O valor voltou para a sua conta.",
             )
         assertThat(notifications.all(receiver).map { it.get("kind").asString() }).containsExactly("WELCOME")
     }
