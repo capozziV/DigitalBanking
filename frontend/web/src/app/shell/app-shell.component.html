@@ -1,0 +1,48 @@
+<div class="shell">
+  @if (!wide()) {
+    <header class="topbar">
+      <button
+        class="hamburger"
+        type="button"
+        aria-label="Abrir o menu"
+        [attr.aria-expanded]="open()"
+        (click)="toggle()"
+      >
+        ☰
+      </button>
+      <strong>banco</strong>
+    </header>
+    @if (open()) {
+      <div class="backdrop" (click)="close()" aria-hidden="true"></div>
+    }
+  }
+
+  <aside class="menu" [class.fixed]="wide()" [class.open]="open()">
+    <strong class="brand">banco</strong>
+    <nav aria-label="Principal">
+      <a routerLink="/inicio" routerLinkActive="active" (click)="close()">
+        <span class="glyph" aria-hidden="true">⌂</span> Início
+      </a>
+      <a routerLink="/extrato" routerLinkActive="active" (click)="close()">
+        <span class="glyph" aria-hidden="true">≡</span> Extrato
+      </a>
+      <a routerLink="/transferir" routerLinkActive="active" (click)="close()">
+        <span class="glyph" aria-hidden="true">↗</span> Transferir
+      </a>
+      <a routerLink="/avisos" routerLinkActive="active" (click)="close()">
+        <span class="glyph" aria-hidden="true">●</span> Avisos
+        @if (session.unreadCount() > 0) {
+          <span class="badge" aria-label="avisos não lidos">{{ session.unreadCount() }}</span>
+        }
+      </a>
+      <a routerLink="/minha-conta" routerLinkActive="active" (click)="close()">
+        <span class="glyph" aria-hidden="true">◎</span> Minha conta
+      </a>
+    </nav>
+    <button class="sign-out" type="button" (click)="signOut()">Sair</button>
+  </aside>
+
+  <main class="content">
+    <router-outlet />
+  </main>
+</div>
