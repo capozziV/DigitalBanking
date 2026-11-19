@@ -23,6 +23,10 @@ spec:
         runAsGroup: {{ .Values.runAsUser }}
         seccompProfile:
           type: RuntimeDefault
+        {{- with .Values.sysctls }}
+        sysctls:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
       containers:
         - name: {{ include "service.name" . }}
           image: "{{ required "image.repository e obrigatorio" .Values.image.repository }}:{{ required "image.tag e obrigatorio (SHA do commit)" .Values.image.tag }}"

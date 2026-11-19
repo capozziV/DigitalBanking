@@ -26,7 +26,14 @@ import java.util.UUID
  * `transfers` service is the [TransfersServiceStub], where no account has a pending transfer by default.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@TestPropertySource(properties = ["accounts.outbox.relay-enabled=false", "accounts.welcome-bonus.amount=0"])
+// transfers.timeout is 2s (production: 500ms): the first call of each Spring context hits a cold HTTP client and stub.
+@TestPropertySource(
+    properties = [
+        "accounts.outbox.relay-enabled=false",
+        "accounts.transfers.timeout=2s",
+        "accounts.welcome-bonus.amount=0",
+    ],
+)
 @Import(JwtTestSupport.DecoderConfiguration::class)
 abstract class AccountsIntegrationTest {
     /** JdbcClient connected as the owner user, for setup and inspection outside the application's grants. */

@@ -1,4 +1,4 @@
-# Rodando o projeto localmente (macOS)
+# Rodando o capzzPay localmente (macOS)
 
 Guia para subir a infraestrutura local, os serviços `accounts`, `transfers`, `notification` e `statement` e conferir as APIs pelo nginx.
 Todos os comandos rodam na raiz do repositório e valem tanto para o zsh (o shell padrão do macOS) quanto para o bash. Os blocos de comando não têm comentários: as explicações ficam no texto antes e depois de cada bloco, porque o zsh do macOS, por padrão, não aceita `# comentário` na linha de comando.
@@ -273,13 +273,13 @@ docker compose -f infra/local/docker-compose.yml exec -T \
 São cinco coleções em `api/bruno/` (`accounts`, `transfers`, `notification`, `statement` e `customer`), cada uma com o ambiente `local` (`baseUrl`, `tokenUrl` do `mock-oauth2-server` e `adminSub`, o usuário de teste do dono). O script da coleção (`collection.bru`) pega os tokens no mock uma vez por execução: `customerToken` (um cliente novo, já cadastrado no `customer`; nas quatro primeiras coleções é o token padrão das requisições, por herança), `otherCustomerToken` (outro cliente cadastrado, para o `404` do recurso alheio) e `adminToken`. As requisições de admin (créditos, débitos, troca de tipo, `/admin/**`) usam o `adminToken`. Precisa do compose e dos cinco serviços no ar. O script de `accounts`, `notification`, `statement` e `transfers` é uma cópia idêntica (o Bruno não compartilha scripts entre coleções): mude as quatro juntas, porque o job `lint` do CI compara as cópias e falha se divergirem; o do `customer` é uma variante (cliente ainda sem cadastro) com o mesmo pedido de token.
 
 ### Coleção do `accounts`
-A coleção fica em `api/bruno/accounts/`, com uma requisição por endpoint e `Idempotency-Key` nova a cada envio (`{{$guid}}`, ou uma chave gerada no script da requisição). A consulta de lançamento por chave (`08`) usa a chave do crédito (`03`): rode o `03` antes do `08`. Depois vêm `09` (conta de outro cliente, `404`), `10` (sem token, `401`) e `11` (crédito com o token do cliente, `403`).
+A coleção fica em `api/bruno/accounts/`, com uma requisição por endpoint e `Idempotency-Key` nova a cada envio (`{{$guid}}`, ou uma chave gerada no script da requisição). A consulta de lançamento por chave (`08`) usa a chave do crédito (`03`): rode o `03` antes do `08`. Depois vêm `09` (conta de outro cliente, `404`), `10` (sem token, `401`) `11` (crédito com o token do cliente, `403`), `12` e `13` (o admin bloqueia e desbloqueia a conta), `14` (esvazia a conta), `15` (`GET /accounts/me`, a própria conta), `16` (`GET /accounts/recipient`, só o `accountId` do destino), `17` (encerra a conta de saldo zero) e `18` (a conta encerrada some de `/accounts/me`, `404`).
 - **App do Bruno:** "Open Collection" → `api/bruno/accounts`, escolha o ambiente `local` e rode "Abrir conta" primeiro (ela guarda o `accountId` para as outras).
 - **Terminal** (precisa da CLI dos pré-requisitos opcionais):
   ```bash
   (cd api/bruno/accounts && bru run --env local)
   ```
-  Esperado: `Requests 11 (11 Passed)`. A requisição de limite grava o valor da migration (`GOLD` = 200000), sem alterar o ambiente.
+  Esperado: `Requests 18 (18 Passed)`. A requisição de limite grava o valor da migration (`GOLD` = 200000), sem alterar o ambiente.
 
 ### Coleção do `notification`
 A coleção `api/bruno/notification/` também roda sozinha: o script da requisição `01` abre uma conta para o cliente e outra para o outro cliente, credita a origem pelo admin, transfere com o token do cliente e espera até 45 s pela notificação (acima da visibilidade de 30 s da fila: o evento da transferência pode chegar antes do da conta e voltar à fila só depois de 30 s). O token diz de quem são as notificações. As requisições seguem a ordem: `01` lista as notificações do remetente (`TRANSFER_SENT`), `02` as do destinatário com o token dele (`TRANSFER_RECEIVED`), `03` marca como lidas até a mais recente, `04` confere `unreadCount` zero, `05` mostra o `400` de um `customerId` que não é UUID e `06` o `404` de um cliente que pede as notificações de outro.

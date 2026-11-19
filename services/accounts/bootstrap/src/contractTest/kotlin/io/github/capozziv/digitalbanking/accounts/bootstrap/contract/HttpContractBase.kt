@@ -5,11 +5,14 @@ import io.github.capozziv.digitalbanking.accounts.adapters.web.AccountsSecurityC
 import io.github.capozziv.digitalbanking.accounts.application.AccountBusyException
 import io.github.capozziv.digitalbanking.accounts.application.AccountNotFoundException
 import io.github.capozziv.digitalbanking.accounts.application.IdempotencyKeyReusedException
+import io.github.capozziv.digitalbanking.accounts.application.NoOpenAccountException
 import io.github.capozziv.digitalbanking.accounts.application.usecase.AccountView
 import io.github.capozziv.digitalbanking.accounts.application.usecase.ChangeAccountTypeUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.DebitOutcome
 import io.github.capozziv.digitalbanking.accounts.application.usecase.FindEntryByIdempotencyKeyUseCase
+import io.github.capozziv.digitalbanking.accounts.application.usecase.FindRecipientAccountUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.GetAccountUseCase
+import io.github.capozziv.digitalbanking.accounts.application.usecase.GetOwnAccountUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.OpenAccountUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.RecordCreditUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.RecordDebitUseCase
@@ -67,6 +70,12 @@ abstract class HttpContractBase {
     private lateinit var getAccount: GetAccountUseCase
 
     @MockitoBean
+    private lateinit var getOwnAccount: GetOwnAccountUseCase
+
+    @MockitoBean
+    private lateinit var findRecipientAccount: FindRecipientAccountUseCase
+
+    @MockitoBean
     private lateinit var recordCredit: RecordCreditUseCase
 
     @MockitoBean
@@ -89,6 +98,8 @@ abstract class HttpContractBase {
         RestAssuredMockMvc.mockMvc(mockMvc)
 
         doAnswer { view(it.getArgument(0)) }.`when`(getAccount).execute(anyUuid(), anyCaller())
+        doAnswer { ownView(it.getArgument(0)) }.`when`(getOwnAccount).execute(anyCaller())
+        doAnswer { recipient(it.getArgument(0)) }.`when`(findRecipientAccount).execute(anyUuid())
         doAnswer { recorded(it.getArgument(0), EntryKind.CREDIT) }.`when`(recordCredit).execute(anyCommand())
         doAnswer { debit(it.getArgument(0)) }.`when`(recordDebit).execute(anyCommand())
         doAnswer { foundEntry(it.getArgument(0), it.getArgument(1)) }
@@ -101,12 +112,29 @@ abstract class HttpContractBase {
         RestAssuredMockMvc.reset()
     }
 
+    /** Value of the Authorization header of a call by the BFF: the token of the customer that owns the account. */
+    fun customerAuthorization(): String = "Bearer ${JwtTestSupport.customerToken(OWNER_ID)}"
+
+    /** Same, for a customer that has no account that is not closed. */
+    fun customerWithoutAccountAuthorization(): String = "Bearer ${JwtTestSupport.customerToken(CLOSED_OWNER_ID)}"
+
     /** Value of the Authorization header of a call by transfers: a machine token with the internal scope. */
     fun serviceAuthorization(): String = "Bearer ${JwtTestSupport.serviceToken("transfers")}"
 
     private fun view(accountId: UUID): AccountView {
         requireAccount(accountId)
         return AccountView.of(Account(ACCOUNT_ID, OWNER_ID, AccountType.FREE), BALANCE, OverdraftLimit(0))
+    }
+
+    private fun ownView(caller: Caller): AccountView {
+        val customerId = caller.ownCustomerId()
+        if (customerId != OWNER_ID) throw NoOpenAccountException(customerId ?: CLOSED_OWNER_ID)
+        return view(ACCOUNT_ID)
+    }
+
+    private fun recipient(customerId: UUID): UUID {
+        if (customerId != OWNER_ID) throw NoOpenAccountException(customerId)
+        return ACCOUNT_ID
     }
 
     private fun debit(command: RecordEntryCommand): DebitOutcome {
@@ -165,6 +193,10 @@ abstract class HttpContractBase {
         /** The account of the contracts; any other id is an account that does not exist. */
         val ACCOUNT_ID: UUID = UUID.fromString("0198a1b2-0000-7000-8000-000000000001")
         val OWNER_ID: UUID = UUID.fromString("0198a1b2-0000-7000-8000-0000000000c1")
+
+        /** A customer whose only account is closed: it has no account that is not closed. */
+        val CLOSED_OWNER_ID: UUID = UUID.fromString("0198a1b2-0000-7000-8000-0000000000c2")
+
         val ENTRY_ID: UUID = UUID.fromString("0198a1b2-0000-7000-8000-0000000000aa")
         val BALANCE = Balance(1_000)
         val CREATED_AT: Instant = Instant.parse("2026-10-27T10:00:00Z")

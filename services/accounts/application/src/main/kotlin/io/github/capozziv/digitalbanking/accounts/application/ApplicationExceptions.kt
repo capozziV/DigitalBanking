@@ -6,6 +6,11 @@ class AccountNotFoundException(
     val accountId: UUID,
 ) : RuntimeException("account $accountId not found")
 
+/** The customer has no account that is not closed. */
+class NoOpenAccountException(
+    val customerId: UUID,
+) : RuntimeException("customer $customerId has no open account")
+
 class AccountBusyException(
     val accountId: UUID,
 ) : RuntimeException("account $accountId is busy")

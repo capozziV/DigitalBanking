@@ -8,7 +8,7 @@ Cada `location` que faz proxy para um servico vira um casador canonico:
   `location ~ re`   -> regex re        (ALB: regex_values)
 O servico sai da porta do proxy_pass. As `location` do actuator (proxy_pass com caminho /actuator/) sao so
 locais: o ALB checa a saude direto no pod e nao expoe o actuator na borda, entao elas nao podem aparecer no ALB.
-Tambem confere as portas dos servicos e que toda regex avalia antes das regras de prefixo (prioridade menor),
+Tambem confere que todo servico tem caminho de health em routes.json e as portas dos servicos e que toda regex avalia antes das regras de prefixo (prioridade menor),
 como no nginx, onde a regex vence o prefixo sem ^~, e que prefixo de um servico contido no de outro
 tenha prioridade maior (o nginx escolhe o mais longo, o ALB a menor prioridade). `^~` e `~*` sao recusados.
 
@@ -22,6 +22,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[4]
 NGINX = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "infra/local/nginx/nginx.conf"
 ROUTES = Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "infra/terraform/modules/edge-alb/routes.json"
+
+# Rotas do app (etapa 9): `/` vai ao web (80) e `/bff` ao BFF (3000). O ALB tem de te-las sempre, alem da
+# igualdade total com o nginx local.
+EDGE_REQUIRED = {
+    (("prefix", "/"), 80),
+    (("exact", "/bff"), 3000),
+    (("prefix", "/bff/"), 3000),
+}
 
 LOCATION = re.compile(r"\blocation\s+(=|~\*|~|\^~)?\s*(\S+)\s*\{(.*?)\}", re.S)
 LOCATION_WORD = re.compile(r"\blocation\b")
@@ -90,6 +98,16 @@ def main():
     config = json.loads(ROUTES.read_text())
     alb, priorities = alb_routes(config)
     errors = []
+
+    health = config.get("health", {})
+    for name in config["services"]:
+        if not str(health.get(name, "")).startswith("/"):
+            errors.append(f"servico {name} sem caminho de health em routes.json (\"health\"); o target group ficaria unhealthy")
+    for name in sorted(set(health) - set(config["services"])):
+        errors.append(f"health de servico inexistente em routes.json: {name}")
+
+    for missing in sorted(EDGE_REQUIRED - alb):
+        errors.append(f"rota do app ausente no ALB: {missing}")
 
     for missing in sorted(nginx - alb):
         errors.append(f"no nginx e fora do ALB: {missing}")

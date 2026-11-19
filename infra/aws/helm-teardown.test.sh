@@ -56,16 +56,16 @@ check_count() {
 }
 
 expect 0 "tudo certo"
-check_count 6 "tudo certo desinstala os seis"
+check_count 8 "tudo certo desinstala os oito"
 expect 0 "cluster inexistente" FAKE_NO_CLUSTER=1
 check_count 0 "cluster inexistente nao desinstala"
 expect 0 "release ausente e ignorado" FAKE_ABSENT=customer
-check_count 5 "release ausente pula so ele"
+check_count 7 "release ausente pula so ele"
 expect 1 "uninstall que falha da exit 1" FAKE_UNINSTALL_FAIL=transfers
-check_count 6 "uninstall que falha nao impede os seguintes"
+check_count 8 "uninstall que falha nao impede os seguintes"
 grep -q "delete job db-init" "$tmp/log" || { echo "FALHOU: delete job db-init nao rodou depois da falha"; failures=$((failures + 1)); }
 expect 1 "erro de acesso no helm status nao vira release ausente" FAKE_STATUS_ERROR=accounts
-check_count 5 "erro no status pula so o release"
+check_count 7 "erro no status pula so o release"
 expect 1 "sem acesso ao cluster" FAKE_NO_ACCESS=1
 expect 1 "TargetGroupBinding que nao sai" FAKE_TGB_LEFT=1
 expect 1 "erro ao listar TargetGroupBinding" FAKE_TGB_ERROR=1

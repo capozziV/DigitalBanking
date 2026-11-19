@@ -1,0 +1,20 @@
+meta {
+  name: Consultar a propria conta
+  type: http
+  seq: 15
+}
+
+get {
+  url: {{baseUrl}}/accounts/me
+  body: none
+  auth: inherit
+}
+
+tests {
+  // O BFF nao conhece o id da conta: acha a do cliente do token que nao esta encerrada.
+  test("200 com a conta do cliente do token", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.id).to.equal(bru.getVar("accountId"));
+    expect(res.body.customerId).to.equal(bru.getVar("customerId"));
+  });
+}

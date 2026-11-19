@@ -1,11 +1,22 @@
 {
-  "_comment": "Roteamento do ALB interno, espelho das location de infra/local/nginx/nginx.conf. Conferido por envs/aws/check-alb-routes.py. Prioridade menor avalia primeiro: as regex do daily-limit e do statement vencem o prefixo /accounts/, como no nginx.",
+  "_comment": "Roteamento do ALB interno, espelho das location de infra/local/nginx/nginx.conf. Conferido por envs/aws/check-alb-routes.py. Prioridade menor avalia primeiro: as regex do daily-limit e do statement vencem o prefixo /accounts/, como no nginx. O web (/) e o bff (/bff) fecham a lista: o catch-all do web tem a maior prioridade.",
   "services": {
     "accounts": 8081,
     "transfers": 8082,
     "notification": 8083,
     "statement": 8084,
-    "customer": 8085
+    "customer": 8085,
+    "web": 80,
+    "bff": 3000
+  },
+  "health": {
+    "accounts": "/actuator/health/readiness",
+    "transfers": "/actuator/health/readiness",
+    "notification": "/actuator/health/readiness",
+    "statement": "/actuator/health/readiness",
+    "customer": "/actuator/health/readiness",
+    "web": "/",
+    "bff": "/bff/health"
   },
   "rules": [
     { "priority": 10, "service": "transfers", "regex": ["^/accounts/[^/]+/daily-limit$"] },
@@ -14,6 +25,8 @@
     { "priority": 110, "service": "accounts", "paths": ["/admin/accounts/*"] },
     { "priority": 200, "service": "transfers", "paths": ["/transfers", "/transfers/*"] },
     { "priority": 300, "service": "notification", "paths": ["/notifications", "/notifications/*"] },
-    { "priority": 500, "service": "customer", "paths": ["/customers", "/customers/*", "/admin/customers/*"] }
+    { "priority": 500, "service": "customer", "paths": ["/customers", "/customers/*", "/admin/customers/*"] },
+    { "priority": 400, "service": "bff", "paths": ["/bff", "/bff/*"] },
+    { "priority": 900, "service": "web", "paths": ["/*"] }
   ]
 }
