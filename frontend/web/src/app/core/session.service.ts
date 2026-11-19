@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -32,6 +32,8 @@ export class SessionService {
   readonly loaded = signal(false);
   readonly profileLoaded = signal(false);
   readonly unreadCount = signal(0);
+  /** The last load failed for a reason other than a lost session (BFF down, network). */
+  readonly loadFailed = signal(false);
 
   private loading: Promise<void> | null = null;
 
@@ -106,6 +108,7 @@ export class SessionService {
     try {
       const session = await firstValueFrom(this.http.get<SessionDTO>('/bff/auth/session'));
       if (!session.authenticated) {
+        this.loadFailed.set(false);
         this.clear();
         return;
       }
@@ -113,8 +116,15 @@ export class SessionService {
       this.email.set(session.email ?? null);
       await this.loadMe();
       this.loaded.set(true);
-    } catch {
-      this.clear();
+      this.loadFailed.set(false);
+    } catch (error) {
+      if (error instanceof HttpErrorResponse && error.status === 401) {
+        this.loadFailed.set(false);
+        this.clear();
+        return;
+      }
+      // Transient failure (503, network): keep the state, so it does not look like a sign out.
+      this.loadFailed.set(true);
     }
   }
 }

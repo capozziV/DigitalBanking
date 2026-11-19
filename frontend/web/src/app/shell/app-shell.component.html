@@ -2,6 +2,7 @@
   @if (!wide()) {
     <header class="topbar">
       <button
+        #hamburger
         class="hamburger"
         type="button"
         aria-label="Abrir o menu"
@@ -19,7 +20,7 @@
 
   <aside class="menu" [class.fixed]="wide()" [class.open]="open()">
     <strong class="brand">banco</strong>
-    <nav aria-label="Principal">
+    <nav #nav aria-label="Principal">
       <a routerLink="/inicio" routerLinkActive="active" (click)="close()">
         <span class="glyph" aria-hidden="true">⌂</span> Início
       </a>
@@ -32,7 +33,10 @@
       <a routerLink="/avisos" routerLinkActive="active" (click)="close()">
         <span class="glyph" aria-hidden="true">●</span> Avisos
         @if (session.unreadCount() > 0) {
-          <span class="badge" aria-label="avisos não lidos">{{ session.unreadCount() }}</span>
+          <span class="badge"
+            ><span class="count">{{ session.unreadCount() }}</span
+            ><span class="visually-hidden"> avisos não lidos</span></span
+          >
         }
       </a>
       <a routerLink="/minha-conta" routerLinkActive="active" (click)="close()">

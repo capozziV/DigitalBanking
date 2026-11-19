@@ -60,7 +60,7 @@ describe('AppShellComponent', () => {
 
   it('shows the unread counter next to Avisos', async () => {
     await create(true);
-    expect(el().querySelector('.badge')?.textContent?.trim()).toBe('2');
+    expect(el().querySelector('.badge .count')?.textContent?.trim()).toBe('2');
   });
 
   it('uses the 960 px breakpoint', async () => {
@@ -85,6 +85,30 @@ describe('AppShellComponent', () => {
     (el().querySelector('.backdrop') as HTMLElement).click();
     await fixture.whenStable();
     expect(menu.classList).not.toContain('open');
+  });
+
+  it('moves the focus to the first item when the menu opens and back to the hamburger on Escape', async () => {
+    await create(false);
+    document.body.appendChild(el());
+    const hamburger = el().querySelector('button.hamburger') as HTMLButtonElement;
+    hamburger.click();
+    await fixture.whenStable();
+    await tick();
+    expect(document.activeElement).toBe(el().querySelector('nav a'));
+    el()
+      .querySelector('.menu')
+      ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await fixture.whenStable();
+    expect(el().querySelector('.menu')?.classList).not.toContain('open');
+    expect(document.activeElement).toBe(hamburger);
+    el().remove();
+  });
+
+  it('reads the unread counter to screen readers as text', async () => {
+    await create(true);
+    const badge = el().querySelector('.badge') as HTMLElement;
+    expect(badge.hasAttribute('aria-label')).toBe(false);
+    expect(badge.querySelector('.visually-hidden')?.textContent).toContain('não lidos');
   });
 
   it('closes the collapsed menu after choosing an item', async () => {

@@ -68,6 +68,23 @@ describe('CompleteProfileComponent', () => {
     expect(navigate).toHaveBeenCalledWith('/inicio');
   });
 
+  it('shows the BFF message when the customer already exists', async () => {
+    setInput(fixture, 'name', 'Ana Souza');
+    setInput(fixture, 'phone', '11987654321');
+    await fixture.whenStable();
+    submit(fixture);
+    http
+      .expectOne('/bff/customers')
+      .flush(
+        { code: 'user_exists', message: 'Já existe uma conta com este e-mail' },
+        { status: 409, statusText: 'Conflict' },
+      );
+    await tick();
+    await fixture.whenStable();
+    const alert = (fixture.nativeElement as HTMLElement).querySelector('[role="alert"]');
+    expect(alert?.textContent).toContain('Já existe uma conta com este e-mail');
+  });
+
   it('shows the problem detail when the phone is already used', async () => {
     setInput(fixture, 'name', 'Ana Souza');
     setInput(fixture, 'phone', '11987654321');

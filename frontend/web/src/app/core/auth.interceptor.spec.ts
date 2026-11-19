@@ -55,6 +55,7 @@ describe('authInterceptor', () => {
 
   it('clears the session and goes to Entrar on 401', () => {
     const session = TestBed.inject(SessionService);
+    session.authenticated.set(true);
     http.get('/bff/home').subscribe({ error: () => undefined });
     controller.expectOne('/bff/home').flush({}, { status: 401, statusText: 'Unauthorized' });
     expect(session.authenticated()).toBe(false);

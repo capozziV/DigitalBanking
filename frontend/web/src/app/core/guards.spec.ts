@@ -7,7 +7,7 @@ import {
   RouterStateSnapshot,
   UrlTree,
 } from '@angular/router';
-import { authGuard, guestGuard, profileGuard } from './guards';
+import { authGuard, guestGuard, profileGuard, unregisteredGuard } from './guards';
 
 describe('guards', () => {
   let http: HttpTestingController;
@@ -62,6 +62,31 @@ describe('guards', () => {
       account: null,
     });
     expect(await result).toBe(true);
+  });
+
+  it('unregisteredGuard sends a registered customer to Início', async () => {
+    const result = run(unregisteredGuard);
+    http.expectOne('/bff/auth/session').flush({ authenticated: true, email: 'a@b.com' });
+    await tick();
+    http.expectOne('/bff/me').flush({
+      customer: { name: 'Ana', email: 'a@b.com', phone: '+5511987654321' },
+      account: null,
+    });
+    expect(urlOf(await result)).toBe('/inicio');
+  });
+
+  it('unregisteredGuard lets a user without customer through', async () => {
+    const result = run(unregisteredGuard);
+    http.expectOne('/bff/auth/session').flush({ authenticated: true, email: 'a@b.com' });
+    await tick();
+    http.expectOne('/bff/me').flush({ customer: null, account: null });
+    expect(await result).toBe(true);
+  });
+
+  it('unregisteredGuard sends an anonymous visitor to Entrar', async () => {
+    const result = run(unregisteredGuard);
+    http.expectOne('/bff/auth/session').flush({ authenticated: false });
+    expect(urlOf(await result)).toBe('/entrar');
   });
 
   it('profileGuard sends an anonymous visitor to Entrar', async () => {

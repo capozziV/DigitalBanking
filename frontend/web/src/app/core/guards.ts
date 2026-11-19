@@ -19,6 +19,15 @@ export const profileGuard: CanActivateFn = async () => {
   return session.customer() ? true : router.createUrlTree(['/completar-cadastro']);
 };
 
+/** Completar cadastro is for signed-in users who are not customers yet. */
+export const unregisteredGuard: CanActivateFn = async () => {
+  const session = inject(SessionService);
+  const router = inject(Router);
+  await session.ensureLoaded();
+  if (!session.authenticated()) return router.createUrlTree(['/entrar']);
+  return session.customer() ? router.createUrlTree(['/inicio']) : true;
+};
+
 /** Entrar and Criar conta are for visitors; a signed-in user goes into the app. */
 export const guestGuard: CanActivateFn = async () => {
   const session = inject(SessionService);

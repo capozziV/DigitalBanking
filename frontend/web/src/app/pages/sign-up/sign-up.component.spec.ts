@@ -93,6 +93,37 @@ describe('SignUpComponent', () => {
     expect(navigate).toHaveBeenCalledWith('/inicio');
   });
 
+  it('shows the BFF message when the e-mail is already taken', async () => {
+    await fill('123456', '123456');
+    submit(fixture);
+    http
+      .expectOne('/bff/auth/sign-up')
+      .flush(
+        { code: 'user_exists', message: 'Já existe uma conta com este e-mail' },
+        { status: 409, statusText: 'Conflict' },
+      );
+    await tick();
+    await fixture.whenStable();
+    const alert = (fixture.nativeElement as HTMLElement).querySelector('[role="alert"]');
+    expect(alert?.textContent).toContain('Já existe uma conta com este e-mail');
+  });
+
+  it('accepts only a 6 digit e-mail code', async () => {
+    await fill('123456', '123456');
+    submit(fixture);
+    http.expectOne('/bff/auth/sign-up').flush({ confirmationRequired: true });
+    await tick();
+    await fixture.whenStable();
+    for (const code of ['1234', '12345', '1234567', '12345678']) {
+      setInput(fixture, 'code', code);
+      await fixture.whenStable();
+      expect(submitButton(fixture).disabled).toBe(true);
+    }
+    setInput(fixture, 'code', '123456');
+    await fixture.whenStable();
+    expect(submitButton(fixture).disabled).toBe(false);
+  });
+
   it('shows the problem detail when the e-mail is already taken', async () => {
     await fill('123456', '123456');
     submit(fixture);

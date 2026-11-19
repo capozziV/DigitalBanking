@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, guestGuard, profileGuard } from './core/guards';
+import { guestGuard, profileGuard, unregisteredGuard } from './core/guards';
 import { CompleteProfileComponent } from './pages/complete-profile/complete-profile.component';
 import { SignInComponent } from './pages/sign-in/sign-in.component';
 import { SignUpComponent } from './pages/sign-up/sign-up.component';
@@ -13,7 +13,11 @@ const placeholder = () =>
 export const routes: Routes = [
   { path: 'entrar', component: SignInComponent, canActivate: [guestGuard] },
   { path: 'criar-conta', component: SignUpComponent, canActivate: [guestGuard] },
-  { path: 'completar-cadastro', component: CompleteProfileComponent, canActivate: [authGuard] },
+  {
+    path: 'completar-cadastro',
+    component: CompleteProfileComponent,
+    canActivate: [unregisteredGuard],
+  },
   {
     path: '',
     component: AppShellComponent,

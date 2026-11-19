@@ -99,7 +99,7 @@ export class SignUpComponent {
   );
 
   protected readonly codeForm = this.builder.group({
-    code: ['', [Validators.required, Validators.pattern(/^\d{4,8}$/)]],
+    code: ['', [Validators.required, Validators.pattern(/^\d{6}$/)]],
   });
 
   protected async submitDetails(): Promise<void> {

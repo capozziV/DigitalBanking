@@ -47,6 +47,28 @@ describe('SessionService', () => {
     expect(service.authenticated()).toBe(false);
   });
 
+  it('keeps the session when the BFF is unavailable (503)', async () => {
+    service.authenticated.set(true);
+    service.email.set('a@b.com');
+    const promise = service.reload();
+    http
+      .expectOne('/bff/auth/session')
+      .flush({}, { status: 503, statusText: 'Service Unavailable' });
+    await promise;
+    expect(service.authenticated()).toBe(true);
+    expect(service.email()).toBe('a@b.com');
+    expect(service.loadFailed()).toBe(true);
+  });
+
+  it('clears the session when the BFF answers 401', async () => {
+    service.authenticated.set(true);
+    const promise = service.reload();
+    http.expectOne('/bff/auth/session').flush({}, { status: 401, statusText: 'Unauthorized' });
+    await promise;
+    expect(service.authenticated()).toBe(false);
+    expect(service.loadFailed()).toBe(false);
+  });
+
   it('does not reload a loaded session', async () => {
     const first = service.ensureLoaded();
     http.expectOne('/bff/auth/session').flush({ authenticated: false });
