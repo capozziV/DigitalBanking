@@ -13,7 +13,9 @@ import io.github.capozziv.digitalbanking.accounts.application.usecase.ChangeAcco
 import io.github.capozziv.digitalbanking.accounts.application.usecase.ChangeOverdraftLimitUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.CloseAccountUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.FindEntryByIdempotencyKeyUseCase
+import io.github.capozziv.digitalbanking.accounts.application.usecase.FindRecipientAccountUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.GetAccountUseCase
+import io.github.capozziv.digitalbanking.accounts.application.usecase.GetOwnAccountUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.ListAccountTypesUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.OpenAccountUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.RecordCreditUseCase
@@ -51,6 +53,20 @@ class UseCaseConfiguration {
         types: AccountTypeRepository,
         tx: TransactionRunner,
     ) = GetAccountUseCase(accounts, entries, types, tx)
+
+    @Bean
+    fun getOwnAccountUseCase(
+        accounts: AccountRepository,
+        entries: LedgerEntryRepository,
+        types: AccountTypeRepository,
+        tx: TransactionRunner,
+    ) = GetOwnAccountUseCase(accounts, entries, types, tx)
+
+    @Bean
+    fun findRecipientAccountUseCase(
+        accounts: AccountRepository,
+        tx: TransactionRunner,
+    ) = FindRecipientAccountUseCase(accounts, tx)
 
     @Bean
     fun findEntryByIdempotencyKeyUseCase(

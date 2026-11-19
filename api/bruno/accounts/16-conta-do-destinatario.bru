@@ -1,0 +1,20 @@
+meta {
+  name: Conta do destinatario
+  type: http
+  seq: 16
+}
+
+get {
+  url: {{baseUrl}}/accounts/recipient?customerId={{customerId}}
+  body: none
+  auth: inherit
+}
+
+tests {
+  // So o id da conta: nada de saldo, tipo ou status.
+  test("200 so com o accountId da conta nao encerrada do cliente", function () {
+    expect(res.status).to.equal(200);
+    expect(Object.keys(res.body)).to.deep.equal(["accountId"]);
+    expect(res.body.accountId).to.equal(bru.getVar("accountId"));
+  });
+}

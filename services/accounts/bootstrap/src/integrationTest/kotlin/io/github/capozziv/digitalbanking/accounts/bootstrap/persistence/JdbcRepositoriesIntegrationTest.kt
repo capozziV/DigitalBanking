@@ -280,6 +280,24 @@ class JdbcRepositoriesIntegrationTest : AccountsIntegrationTest() {
     }
 
     @Test
+    fun `findNotClosedByCustomerId finds the active or blocked account and ignores closed ones`() {
+        val first = openAccount()
+        assertThat(accounts.findNotClosedByCustomerId(first.customerId)).isEqualTo(first)
+        assertThat(accounts.findNotClosedByCustomerId(UUID.randomUUID())).isNull()
+
+        val blocked = first.copy(status = AccountStatus.BLOCKED)
+        tx.inTransaction { accounts.updateStatus(blocked) }
+        assertThat(accounts.findNotClosedByCustomerId(first.customerId)).isEqualTo(blocked)
+
+        tx.inTransaction { accounts.updateStatus(first.copy(status = AccountStatus.CLOSED)) }
+        assertThat(accounts.findNotClosedByCustomerId(first.customerId)).isNull()
+
+        val second = Account(ids.newId(), first.customerId, AccountType.FREE)
+        tx.inTransaction { accounts.insert(second, "open-${second.id}") }
+        assertThat(accounts.findNotClosedByCustomerId(first.customerId)).isEqualTo(second)
+    }
+
+    @Test
     fun `the database refuses an unknown status`() {
         val account = openAccount()
 

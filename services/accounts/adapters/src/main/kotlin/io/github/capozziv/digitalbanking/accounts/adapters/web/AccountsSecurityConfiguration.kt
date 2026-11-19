@@ -21,6 +21,10 @@ class AccountsSecurityConfiguration {
     fun accountsSecurityRules() =
         SecurityRules {
             authorize(HttpMethod.POST, "/accounts", hasAnyRole(CUSTOMER, ADMIN))
+            // Literal routes: Spring matches them before `/accounts/{id}`. `me` is the caller's own account; `recipient`
+            // answers only the account id of a customer, so a customer can address a transfer by customer id.
+            authorize(HttpMethod.GET, "/accounts/me", hasAnyRole(CUSTOMER, ADMIN))
+            authorize(HttpMethod.GET, "/accounts/recipient", hasAnyRole(CUSTOMER, ADMIN))
             authorize(HttpMethod.GET, "/accounts/{id}", hasAnyRole(CUSTOMER, ADMIN, SERVICE))
             authorize(HttpMethod.GET, "/accounts/{id}/entries", hasAnyRole(CUSTOMER, ADMIN, SERVICE))
             authorize(HttpMethod.POST, "/accounts/{id}/credits", hasAnyRole(SERVICE, ADMIN))

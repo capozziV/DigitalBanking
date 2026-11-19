@@ -20,6 +20,9 @@ interface AccountRepository {
 
     fun findById(id: UUID): Account?
 
+    /** The account of the customer that is ACTIVE or BLOCKED (at most one exists), or null when none or all closed. */
+    fun findNotClosedByCustomerId(customerId: UUID): Account?
+
     /**
      * Locks the account row until the end of the current transaction (SELECT ... FOR UPDATE with the
      * configured lock_timeout). Returns null when the account does not exist. Throws AccountBusyException
