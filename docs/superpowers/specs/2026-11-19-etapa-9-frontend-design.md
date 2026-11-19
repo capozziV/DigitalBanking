@@ -73,7 +73,7 @@ As telas aprovadas como referência estão em `.superpowers/brainstorm/2215-1795
 | Completar cadastro | Nome e telefone celular no primeiro acesso, se `GET /customers/me` responder 404 | `POST /customers` |
 | Início | Cartão do saldo (saldo disponível, tipo de conta, cheque especial, Transferir e Extrato), limite diário usado e disponível, últimos lançamentos; sem conta, botão "Abrir conta" | `GET /accounts/...`, `GET /accounts/{id}/daily-limit`, `GET /accounts/{id}/statement` |
 | Extrato | Lançamentos paginados com o ícone de entrada e saída; o bônus aparece como "Bônus de boas-vindas" | `GET /accounts/{id}/statement` (cursor) |
-| Transferir | Telefone do destinatário e valor; o app mostra o nome mascarado ("Ana S.") para confirmar; depois o status até `COMPLETED`, `FAILED` ou `COMPENSATED`, com o motivo em português | busca por telefone (nova), `POST /transfers`, `GET /transfers/{id}` |
+| Transferir | Em passos: (1) o cliente digita o telefone do destinatário e aperta "Próximo"; (2) o app mostra o nome do destinatário ("Ana S.") e pede o valor; (3) "Confirmar" envia; depois o status até `COMPLETED`, `FAILED` ou `COMPENSATED`, com o motivo em português | busca por telefone (nova), `POST /transfers`, `GET /transfers/{id}` |
 | Avisos | Lista de notificações, marcar como lidas, contador no menu | `GET /notifications`, `POST /notifications/read` |
 | Minha conta | Dados do cliente e da conta; trocar o telefone; encerrar conta (saldo zero, sem pendentes) | `GET /customers/me`, troca do telefone (nova), `POST /accounts/{id}/close` |
 
