@@ -74,4 +74,25 @@ class ManualCompensationTest {
                 .isInstanceOf(IllegalStateException::class.java)
         }
     }
+
+    @Test
+    fun `a saga key of another transfer is refused for any step`() {
+        val other = UUID.randomUUID()
+        for (suffix in listOf("debit", "credit", "compensation")) {
+            assertThat(stuck.manualCreditKeyMismatch("transfer-$other-$suffix")).describedAs(suffix).isNotNull()
+        }
+    }
+
+    @Test
+    fun `only the own compensation key is accepted among the saga keys, in any letter case`() {
+        assertThat(stuck.manualCreditKeyMismatch("transfer-${stuck.id}-compensation")).isNull()
+        assertThat(stuck.manualCreditKeyMismatch("transfer-${stuck.id.toString().uppercase()}-compensation")).isNull()
+        assertThat(stuck.manualCreditKeyMismatch("transfer-${stuck.id}-debit")).isNotNull()
+        assertThat(stuck.manualCreditKeyMismatch("transfer-${stuck.id}-credit")).isNotNull()
+    }
+
+    @Test
+    fun `a key outside the saga pattern is not refused by the key rule`() {
+        assertThat(stuck.manualCreditKeyMismatch("manual-fix-1")).isNull()
+    }
 }

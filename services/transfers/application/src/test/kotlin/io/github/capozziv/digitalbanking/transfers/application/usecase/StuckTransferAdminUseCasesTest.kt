@@ -280,6 +280,32 @@ class StuckTransferAdminUseCasesTest {
     }
 
     @Test
+    fun `the saga compensation key of another transfer is not accepted, even when accounts has that credit`() {
+        givenTransfer()
+        val otherKey = "transfer-${UUID.randomUUID()}-compensation"
+        accounts.entries[source to otherKey] = RecordedEntry(source, EntryKind.CREDIT, Money(500))
+
+        val outcome = compensate.execute(id, admin, "why", otherKey)
+
+        assertThat(outcome).isInstanceOf(CompensateManuallyOutcome.CreditMismatch::class.java)
+        assertThat((outcome as CompensateManuallyOutcome.CreditMismatch).reason).contains("another transfer")
+        assertThat(accounts.entryLookups).isEmpty()
+        assertNothingWritten()
+    }
+
+    @Test
+    fun `the saga compensation key of the transfer itself is accepted, since it is the credit that puts the value back`() {
+        givenTransfer()
+        val ownKey = "transfer-$id-compensation"
+        accounts.entries[source to ownKey] = RecordedEntry(source, EntryKind.CREDIT, Money(500))
+
+        val outcome = compensate.execute(id, admin, "why", ownKey)
+
+        assertThat(outcome).isInstanceOf(CompensateManuallyOutcome.Compensated::class.java)
+        assertThat(repository.findById(id)!!.step).isEqualTo(TransferStep.Compensated)
+    }
+
+    @Test
     fun `accounts not answering leaves the transfer stuck and writes nothing`() {
         givenTransfer()
         accounts.entriesUnavailable = true
