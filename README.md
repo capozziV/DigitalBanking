@@ -1,6 +1,6 @@
-# Banco digital em microsserviços
+# capzzPay
 
-Backend de um banco digital **simulado**, feito para portfólio: sem dinheiro real e sem dados pessoais reais. São cinco serviços em Kotlin + Spring Boot 4.1 (JDK 21), mais o app do cliente (Angular + BFF em NestJS),, em monorepo com Gradle, Clean Architecture por serviço e infraestrutura na AWS com Terraform. O foco está em consistência, idempotência, mensageria confiável, cache e observabilidade.
+O capzzPay é um banco digital **simulado**, feito para portfólio, em microsserviços: sem dinheiro real e sem dados pessoais reais. São cinco serviços em Kotlin + Spring Boot 4.1 (JDK 21), mais o app do cliente (Angular + BFF em NestJS), em monorepo com Gradle, Clean Architecture por serviço e infraestrutura na AWS com Terraform. O foco está em consistência, idempotência, mensageria confiável, cache e observabilidade.
 
 | Serviço | Responsabilidade | Dados |
 |---|---|---|

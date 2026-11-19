@@ -1,4 +1,4 @@
-# Rodando o projeto localmente (macOS)
+# Rodando o capzzPay localmente (macOS)
 
 Guia para subir a infraestrutura local, os serviços `accounts`, `transfers`, `notification` e `statement` e conferir as APIs pelo nginx.
 Todos os comandos rodam na raiz do repositório e valem tanto para o zsh (o shell padrão do macOS) quanto para o bash. Os blocos de comando não têm comentários: as explicações ficam no texto antes e depois de cada bloco, porque o zsh do macOS, por padrão, não aceita `# comentário` na linha de comando.

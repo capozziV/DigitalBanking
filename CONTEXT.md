@@ -1,6 +1,6 @@
-# Banco digital
+# capzzPay
 
-Linguagem do domínio do banco digital simulado. Use o termo em português em docs, ADRs e conversas, e o nome de código (em inglês) no código, testes e eventos. Glossário apenas: decisões técnicas ficam em `docs/arquitetura.md` e nos ADRs.
+Banco digital simulado. Linguagem do domínio do capzzPay. Use o termo em português em docs, ADRs e conversas, e o nome de código (em inglês) no código, testes e eventos. Glossário apenas: decisões técnicas ficam em `docs/arquitetura.md` e nos ADRs.
 
 ## Clientes e contas
 
