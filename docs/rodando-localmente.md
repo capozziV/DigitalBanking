@@ -80,7 +80,7 @@ O `accounts` também consulta o `transfers` ao encerrar uma conta (`POST /accoun
 
 Localmente os serviços sobem com o perfil padrão (LocalStack, swagger-ui ligado). O perfil `aws` é só do deploy na AWS; veja [arquitetura](arquitetura.md#borda-e-segurança).
 
-O `customer` lê `CUSTOMER_DB_*`, `CUSTOMER_AWS_ENDPOINT` (LocalStack) e `CUSTOMER_JWT_ISSUER_URI`, e publica `CustomerRegistered`, `CustomerBlocked` e `CustomerUnblocked` no tópico `customer-events.fifo` pelo outbox. Num terminal novo:
+O `customer` lê `CUSTOMER_DB_*`, `CUSTOMER_AWS_ENDPOINT` (LocalStack) e `CUSTOMER_JWT_ISSUER_URI`, e publica `CustomerRegistered` (v2, com o telefone), `CustomerPhoneChanged`, `CustomerBlocked` e `CustomerUnblocked` no tópico `customer-events.fifo` pelo outbox. Num terminal novo:
 ```bash
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 set -a; . infra/local/.env; set +a
