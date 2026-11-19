@@ -14,6 +14,9 @@ import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.test.context.TestPropertySource
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /** Opening an account credits the welcome bonus (the default amount, 10000 cents) in the same transaction as the opening. */
 @TestPropertySource(properties = ["accounts.welcome-bonus.amount=10000"])
@@ -74,6 +77,38 @@ class WelcomeBonusIntegrationTest : AccountsIntegrationTest() {
         assertThat(retry.body!!.get("balance").asLong()).isEqualTo(10_000)
         assertThat(entryCountOf(accountId)).isEqualTo(1)
         assertThat(eventTypesOf(accountId)).containsExactly("AccountOpened", "LedgerEntryRecorded")
+    }
+
+    @Test
+    fun `two concurrent openings with the same key write one account and one bonus entry`() {
+        val customerId = UUID.randomUUID()
+        val key = UUID.randomUUID().toString()
+        val start = CountDownLatch(1)
+        val pool = Executors.newFixedThreadPool(2)
+        try {
+            val calls =
+                List(2) {
+                    pool.submit<Int> {
+                        start.await()
+                        api.openAccount(customerId, key).status
+                    }
+                }
+            start.countDown()
+            val statuses = calls.map { it.get(30, TimeUnit.SECONDS) }
+
+            assertThat(statuses).describedAs("statuses").allMatch { it == 200 || it == 201 }
+        } finally {
+            pool.shutdownNow()
+        }
+        val accountIds =
+            ownerJdbc
+                .sql("select id from account where customer_id = :id")
+                .param("id", customerId)
+                .query(UUID::class.java)
+                .list()
+        assertThat(accountIds).hasSize(1)
+        assertThat(entryCountOf(accountIds.single().toString())).isEqualTo(1)
+        assertThat(eventTypesOf(accountIds.single().toString())).containsExactly("AccountOpened", "LedgerEntryRecorded")
     }
 
     @Test

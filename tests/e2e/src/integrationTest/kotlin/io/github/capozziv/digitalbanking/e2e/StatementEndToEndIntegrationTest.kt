@@ -57,6 +57,7 @@ class StatementEndToEndIntegrationTest {
         assertThat(sourceEntries.map { it.get("amount").asLong() }).containsExactly(2_000L, 1_500L, 10_000L, WELCOME_BONUS)
         assertThat(sourceEntries.map { it.get("balanceAfter").asLong() }).containsExactly(16_500L, 18_500L, 20_000L, WELCOME_BONUS)
         assertThat(sourceEntries[0].get("description").asString()).isEqualTo("Transfer to $destination")
+        assertThat(sourceEntries.last().get("description").asString()).isEqualTo("Bônus de boas-vindas")
         val received = statement.awaitEntries(destination, 2, STATEMENT_TIMEOUT).first()
         assertThat(received.get("sequence").asLong()).isEqualTo(2L)
         assertThat(received.get("kind").asString()).isEqualTo("CREDIT")
