@@ -79,7 +79,7 @@ class ProblemDetailsExceptionHandler : ResponseEntityExceptionHandler() {
     /** Same type and title as the 403 of the security library: the caller may not do this. */
     @ExceptionHandler
     fun handle(e: CallerNotCustomerException) =
-        problem(HttpStatus.FORBIDDEN, "forbidden", "Forbidden", "Only a customer can open its own account")
+        problem(HttpStatus.FORBIDDEN, "forbidden", "Forbidden", "Only a customer can access its own account")
 
     @ExceptionHandler
     fun handle(e: IdempotencyKeyReusedException) =

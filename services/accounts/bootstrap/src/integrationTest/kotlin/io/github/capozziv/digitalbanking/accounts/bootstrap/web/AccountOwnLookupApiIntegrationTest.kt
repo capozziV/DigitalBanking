@@ -26,12 +26,26 @@ class AccountOwnLookupApiIntegrationTest : AccountsIntegrationTest() {
         assertThat(response.status).describedAs(response.rawBody).isEqualTo(200)
         assertThat(response.body!!.get("id").asString()).isEqualTo(accountId)
         assertThat(response.body.get("customerId").asString()).isEqualTo(customerId.toString())
-        assertThat(response.body.get("balance").asLong()).isGreaterThanOrEqualTo(0)
+        assertThat(response.body.get("balance").asLong()).isEqualTo(0L)
     }
 
     @Test
     fun `me returns 404 when the caller has no account`() {
         assertProblem(api.get("/accounts/me", asCustomer(UUID.randomUUID())), 404, "account-not-found")
+    }
+
+    @Test
+    fun `an admin reads its own account through me, or gets 404 without one`() {
+        val adminWithAccount = UUID.randomUUID()
+        val accountId = openAccountOf(adminWithAccount)
+
+        val response = api.get("/accounts/me", bearer(JwtTestSupport.adminToken(adminWithAccount)))
+
+        assertThat(response.status).describedAs(response.rawBody).isEqualTo(200)
+        assertThat(response.body!!.get("id").asString()).isEqualTo(accountId)
+        assertThat(response.body.get("customerId").asString()).isEqualTo(adminWithAccount.toString())
+
+        assertProblem(api.get("/accounts/me", bearer(JwtTestSupport.adminToken(UUID.randomUUID()))), 404, "account-not-found")
     }
 
     @Test
@@ -57,6 +71,19 @@ class AccountOwnLookupApiIntegrationTest : AccountsIntegrationTest() {
         assertThat(response.status).describedAs(response.rawBody).isEqualTo(200)
         assertThat(response.body!!.propertyNames()).containsExactly("accountId")
         assertThat(response.body.get("accountId").asString()).isEqualTo(accountId)
+    }
+
+    @Test
+    fun `recipient returns the account id of a blocked account`() {
+        val customerId = UUID.randomUUID()
+        val accountId = openAccountOf(customerId)
+        val blocked = api.put("/admin/accounts/$accountId/status", """{"status":"BLOCKED"}""")
+        assertThat(blocked.status).describedAs(blocked.rawBody).isEqualTo(200)
+
+        val response = api.get("/accounts/recipient?customerId=$customerId", asCustomer(UUID.randomUUID()))
+
+        assertThat(response.status).describedAs(response.rawBody).isEqualTo(200)
+        assertThat(response.body!!.get("accountId").asString()).isEqualTo(accountId)
     }
 
     @Test
