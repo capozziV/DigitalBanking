@@ -24,4 +24,9 @@ dependencies {
 
     // HttpCustomerGatewayTest runs against the stubs generated from the contracts of customer.
     contractStubs(project(":services:customer:bootstrap"))
+
+    // The test reads the requests the stub server did not match. WireMock (with Jetty 12) comes with the Stub Runner;
+    // wiremock-standalone shades the Handlebars the Stub Runner needs, so it cannot be used here. The version comes
+    // from the Stubborn Contract BOM.
+    testImplementation("org.wiremock:wiremock-jetty12")
 }

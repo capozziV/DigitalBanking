@@ -35,6 +35,9 @@ dependencies {
     // the Stub Runner registers its helpers with, and the two cannot share a classpath.
     contractStubs(project(":services:accounts:bootstrap"))
     contractStubs(project(":services:customer:bootstrap"))
+    // The hand-written stubs and the checks on the stub servers use WireMock directly. The version comes from the
+    // Stubborn Contract BOM; wiremock-standalone must not be used, for the reason above.
+    integrationTestImplementation("org.wiremock:wiremock-jetty12")
 }
 
 // TransferEventsIntegrationTest runs LocalStack with the same init scripts as the local compose. The directory is a

@@ -10,7 +10,7 @@ Contract.make {
         headers {
             header('Authorization', $(consumer(regex('Bearer .+')), producer(execute('serviceAuthorization()'))))
             header('X-Correlation-Id', $(consumer(regex('.+')), producer('contract-correlation-id')))
-            header('Idempotency-Key', $(consumer(regex('.+')), producer('transfer-1-debit')))
+            header('Idempotency-Key', $(consumer('transfer-1-debit'), producer('transfer-1-debit')))
             contentType(applicationJson())
         }
         body(

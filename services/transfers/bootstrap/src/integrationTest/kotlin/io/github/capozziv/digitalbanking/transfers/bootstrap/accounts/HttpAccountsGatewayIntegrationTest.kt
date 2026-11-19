@@ -95,23 +95,6 @@ class HttpAccountsGatewayIntegrationTest {
         .withBody("""{"type":"/problems/$slug","title":"t","status":$status}""")
 
     @Test
-    fun `credit goes to the credits path and 200 (repetition) is success`() {
-        server.stubFor(
-            post(urlEqualTo("/accounts/$accountId/credits"))
-                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json").withBody(entryJson())),
-        )
-
-        val result = gateway.perform(StepCall.Credit(accountId, Money(1_000), "transfer-1-credit", "Transfer from x"))
-
-        assertThat(result.outcome).isEqualTo(StepOutcome.Success)
-        assertThat(result.httpStatus).isEqualTo(200)
-        server.verify(
-            postRequestedFor(urlEqualTo("/accounts/$accountId/credits"))
-                .withHeader("Idempotency-Key", equalTo("transfer-1-credit")),
-        )
-    }
-
-    @Test
     fun `a call without correlation id in the MDC sends no X-Correlation-Id header`() {
         server.stubFor(
             post(urlEqualTo("/accounts/$accountId/debits")).willReturn(aResponse().withStatus(201).withBody(entryJson())),
@@ -123,28 +106,6 @@ class HttpAccountsGatewayIntegrationTest {
             postRequestedFor(urlEqualTo("/accounts/$accountId/debits"))
                 .withoutHeader("X-Correlation-Id"),
         )
-    }
-
-    @Test
-    fun `422 idempotency-key-reused is a definitive refusal with the problem type`() {
-        server.stubFor(
-            post(urlEqualTo("/accounts/$accountId/debits")).willReturn(problem(422, "idempotency-key-reused")),
-        )
-
-        assertThat(gateway.perform(debit()).outcome).isEqualTo(StepOutcome.Refused("idempotency-key-reused"))
-    }
-
-    @Test
-    fun `503 account-busy is transient`() {
-        server.stubFor(
-            post(urlEqualTo("/accounts/$accountId/debits"))
-                .willReturn(problem(503, "account-busy").withHeader("Retry-After", "1")),
-        )
-
-        val result = gateway.perform(debit())
-
-        assertThat(result.outcome).isEqualTo(StepOutcome.TransientFailure)
-        assertThat(result.httpStatus).isEqualTo(503)
     }
 
     @Test

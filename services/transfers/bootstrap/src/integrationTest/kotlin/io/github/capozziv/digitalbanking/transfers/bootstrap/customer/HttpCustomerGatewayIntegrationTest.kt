@@ -2,8 +2,11 @@ package io.github.capozziv.digitalbanking.transfers.bootstrap.customer
 
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
+import com.github.tomakehurst.wiremock.client.WireMock
 import com.github.tomakehurst.wiremock.client.WireMock.aResponse
+import com.github.tomakehurst.wiremock.client.WireMock.equalTo
 import com.github.tomakehurst.wiremock.client.WireMock.get
+import com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor
 import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration.options
 import com.github.tomakehurst.wiremock.http.Fault
@@ -34,6 +37,9 @@ class HttpCustomerGatewayIntegrationTest {
     private val tokenServer = WireMockServer(options().dynamicPort())
     private lateinit var gateway: CustomerGateway
 
+    /** Admin client of the stub server of the contracts, once a test asked for it. */
+    private var contractStubServer: WireMock? = null
+
     private val customerId = ACTIVE_ID
     private val path = "/internal/customers/$customerId"
 
@@ -48,9 +54,12 @@ class HttpCustomerGatewayIntegrationTest {
 
     @AfterEach
     fun stopServers() {
+        // A request no stub matched is answered 404 by WireMock, which would pass for a real customer-not-found.
+        val unmatched = contractStubServer?.findAllUnmatchedRequests().orEmpty()
         MDC.clear()
         server.stop()
         tokenServer.stop()
+        assertThat(unmatched).describedAs("requests that matched no contract").isEmpty()
     }
 
     @Test
@@ -58,6 +67,11 @@ class HttpCustomerGatewayIntegrationTest {
         MDC.put("correlationId", "corr-c-1")
 
         assertThat(contractGateway().lookupCustomer(ACTIVE_ID)).isEqualTo(CustomerLookup.ACTIVE)
+        contractStubServer!!.verifyThat(
+            getRequestedFor(urlEqualTo("/internal/customers/$ACTIVE_ID"))
+                .withHeader("Authorization", equalTo("Bearer ${ServiceTokenServers.SERVICE_TOKEN}"))
+                .withHeader("X-Correlation-Id", equalTo("corr-c-1")),
+        )
     }
 
     @Test
@@ -76,7 +90,9 @@ class HttpCustomerGatewayIntegrationTest {
 
     /** The gateway against the stubs generated from the contracts of customer (contracts/http). */
     private fun contractGateway(): CustomerGateway {
-        val url = customerStubs.findStubUrl(CUSTOMER_STUBS_GROUP, CUSTOMER_STUBS_ARTIFACT).toString()
+        val stubUrl = customerStubs.findStubUrl(CUSTOMER_STUBS_GROUP, CUSTOMER_STUBS_ARTIFACT)
+        contractStubServer = WireMock(stubUrl.host, stubUrl.port).also { it.resetRequests() }
+        val url = stubUrl.toString()
         val properties = CustomerClientProperties(url = url, timeout = Duration.ofMillis(500))
         return CustomerClientConfiguration().customerGateway(properties, ServiceTokenServers.clientOf(tokenServer))
     }

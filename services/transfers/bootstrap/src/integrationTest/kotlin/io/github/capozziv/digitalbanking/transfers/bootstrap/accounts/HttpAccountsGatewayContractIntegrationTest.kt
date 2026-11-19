@@ -67,8 +67,11 @@ class HttpAccountsGatewayContractIntegrationTest {
 
     @AfterEach
     fun tearDown() {
+        // A request no stub matched is answered 404 by WireMock, which would pass for a real 404 of accounts.
+        val unmatched = stubServer.findAllUnmatchedRequests()
         MDC.clear()
         tokenServer.stop()
+        assertThat(unmatched).describedAs("requests that matched no contract").isEmpty()
     }
 
     @Test
@@ -101,8 +104,35 @@ class HttpAccountsGatewayContractIntegrationTest {
         assertThat(result.outcome).isEqualTo(StepOutcome.Success)
         assertThat(result.httpStatus).isEqualTo(201)
         stubServer.verifyThat(
-            postRequestedFor(urlEqualTo("/accounts/$ACCOUNT_ID/credits")).withHeader("Idempotency-Key", equalTo("transfer-1-credit")),
+            postRequestedFor(urlEqualTo("/accounts/$ACCOUNT_ID/credits"))
+                .withHeader("Idempotency-Key", equalTo("transfer-1-credit"))
+                .withHeader("Authorization", equalTo("Bearer ${ServiceTokenServers.SERVICE_TOKEN}"))
+                .withHeader("X-Correlation-Id", equalTo("corr-contract")),
         )
+    }
+
+    @Test
+    fun `a credit repeated with a recorded key answers 200 and is success`() {
+        val result = gateway.perform(StepCall.Credit(ACCOUNT_ID, Money(1_000), "transfer-9-credit", "Transfer from someone"))
+
+        assertThat(result.outcome).isEqualTo(StepOutcome.Success)
+        assertThat(result.httpStatus).isEqualTo(200)
+    }
+
+    @Test
+    fun `422 idempotency-key-reused is a definitive refusal with the problem type`() {
+        val result = gateway.perform(StepCall.Debit(ACCOUNT_ID, Money(1_000), "transfer-5-debit", "Transfer to someone"))
+
+        assertThat(result.outcome).isEqualTo(StepOutcome.Refused("idempotency-key-reused"))
+        assertThat(result.httpStatus).isEqualTo(422)
+    }
+
+    @Test
+    fun `503 account-busy is transient`() {
+        val result = gateway.perform(StepCall.Debit(BUSY_ACCOUNT_ID, Money(1_000), "transfer-6-debit", "Transfer to someone"))
+
+        assertThat(result.outcome).isEqualTo(StepOutcome.TransientFailure)
+        assertThat(result.httpStatus).isEqualTo(503)
     }
 
     @Test
@@ -120,7 +150,9 @@ class HttpAccountsGatewayContractIntegrationTest {
         assertThat(result.outcome).isEqualTo(StepOutcome.Success)
         stubServer.verifyThat(
             getRequestedFor(urlPathEqualTo("/accounts/$ACCOUNT_ID/entries"))
-                .withQueryParam("idempotencyKey", equalTo("transfer-1-debit")),
+                .withQueryParam("idempotencyKey", equalTo("transfer-1-debit"))
+                .withHeader("Authorization", equalTo("Bearer ${ServiceTokenServers.SERVICE_TOKEN}"))
+                .withHeader("X-Correlation-Id", equalTo("corr-contract")),
         )
     }
 
@@ -139,6 +171,12 @@ class HttpAccountsGatewayContractIntegrationTest {
     }
 
     @Test
+    fun `find entry for the manual compensation reads a CREDIT entry too`() {
+        assertThat(gateway.findEntry(ACCOUNT_ID, "transfer-1-credit"))
+            .isEqualTo(EntryLookup.Found(RecordedEntry(ACCOUNT_ID, EntryKind.CREDIT, Money(1_000))))
+    }
+
+    @Test
     fun `find entry for the manual compensation is NotFound for entry-not-found and account-not-found`() {
         assertThat(gateway.findEntry(ACCOUNT_ID, "never-used")).isEqualTo(EntryLookup.NotFound)
         assertThat(gateway.findEntry(MISSING_ACCOUNT_ID, "transfer-1-debit")).isEqualTo(EntryLookup.NotFound)
@@ -147,6 +185,11 @@ class HttpAccountsGatewayContractIntegrationTest {
     @Test
     fun `lookup account returns the owner for 200`() {
         assertThat(gateway.lookupAccount(ACCOUNT_ID)).isEqualTo(AccountLookup.Found(OWNER_ID))
+        stubServer.verifyThat(
+            getRequestedFor(urlEqualTo("/accounts/$ACCOUNT_ID"))
+                .withHeader("Authorization", equalTo("Bearer ${ServiceTokenServers.SERVICE_TOKEN}"))
+                .withHeader("X-Correlation-Id", equalTo("corr-contract")),
+        )
     }
 
     @Test
@@ -162,6 +205,7 @@ class HttpAccountsGatewayContractIntegrationTest {
         val ACCOUNT_ID: UUID = UUID.fromString("0198a1b2-0000-7000-8000-000000000001")
         val OWNER_ID: UUID = UUID.fromString("0198a1b2-0000-7000-8000-0000000000c1")
         val MISSING_ACCOUNT_ID: UUID = UUID.fromString("0198a1b2-0000-7000-8000-000000000404")
+        val BUSY_ACCOUNT_ID: UUID = UUID.fromString("0198a1b2-0000-7000-8000-000000000503")
 
         @JvmField
         @RegisterExtension

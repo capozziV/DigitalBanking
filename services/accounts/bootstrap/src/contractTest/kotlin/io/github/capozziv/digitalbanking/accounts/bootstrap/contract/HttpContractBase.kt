@@ -2,7 +2,9 @@ package io.github.capozziv.digitalbanking.accounts.bootstrap.contract
 
 import io.github.capozziv.digitalbanking.accounts.adapters.web.AccountController
 import io.github.capozziv.digitalbanking.accounts.adapters.web.AccountsSecurityConfiguration
+import io.github.capozziv.digitalbanking.accounts.application.AccountBusyException
 import io.github.capozziv.digitalbanking.accounts.application.AccountNotFoundException
+import io.github.capozziv.digitalbanking.accounts.application.IdempotencyKeyReusedException
 import io.github.capozziv.digitalbanking.accounts.application.usecase.AccountView
 import io.github.capozziv.digitalbanking.accounts.application.usecase.ChangeAccountTypeUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.DebitOutcome
@@ -108,6 +110,7 @@ abstract class HttpContractBase {
     }
 
     private fun debit(command: RecordEntryCommand): DebitOutcome {
+        if (command.accountId == BUSY_ACCOUNT_ID) throw AccountBusyException(command.accountId)
         requireAccount(command.accountId)
         if (command.amount.cents > BALANCE.cents) return DebitOutcome.Refused(AvailableBalance(BALANCE.cents))
         return DebitOutcome.Recorded(recorded(command, EntryKind.DEBIT))
@@ -118,8 +121,10 @@ abstract class HttpContractBase {
         kind: EntryKind,
     ): RecordEntryResult {
         requireAccount(command.accountId)
+        if (command.idempotencyKey == REUSED_KEY) throw IdempotencyKeyReusedException(command.idempotencyKey)
         val balanceAfter = if (kind == EntryKind.CREDIT) BALANCE + command.amount else BALANCE - command.amount
-        return RecordEntryResult(entry(kind, command.amount.cents, balanceAfter, command.description, command.idempotencyKey), true)
+        val entry = entry(kind, command.amount.cents, balanceAfter, command.description, command.idempotencyKey)
+        return RecordEntryResult(entry, command.idempotencyKey != REPLAYED_CREDIT_KEY)
     }
 
     private fun foundEntry(
@@ -127,6 +132,9 @@ abstract class HttpContractBase {
         idempotencyKey: String,
     ): LedgerEntry? {
         requireAccount(accountId)
+        if (idempotencyKey == RECORDED_CREDIT_KEY) {
+            return entry(EntryKind.CREDIT, 1_000, Balance(2_000), "Transfer from someone", RECORDED_CREDIT_KEY)
+        }
         if (idempotencyKey != RECORDED_DEBIT_KEY) return null
         return entry(EntryKind.DEBIT, BALANCE.cents, Balance(0), "Transfer to someone", RECORDED_DEBIT_KEY)
     }
@@ -163,6 +171,18 @@ abstract class HttpContractBase {
 
         /** The only key with an entry on the account (a debit of the whole balance). */
         const val RECORDED_DEBIT_KEY = "transfer-1-debit"
+
+        /** The credit of 1000 recorded with this key, found by the lookup of the manual compensation. */
+        const val RECORDED_CREDIT_KEY = "transfer-1-credit"
+
+        /** A credit sent again with this key is a repetition: answered as already recorded (200, not 201). */
+        const val REPLAYED_CREDIT_KEY = "transfer-9-credit"
+
+        /** A key that was used for another operation. */
+        const val REUSED_KEY = "transfer-5-debit"
+
+        /** An account whose lock another operation holds. */
+        val BUSY_ACCOUNT_ID: UUID = UUID.fromString("0198a1b2-0000-7000-8000-000000000503")
 
         // Mockito matchers return null, which Kotlin refuses for a non-null parameter: register the matcher and hand
         // Kotlin a placeholder instead.
