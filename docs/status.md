@@ -2,28 +2,14 @@
 
 > Resumo do projeto, atualizado pela coordenadora ao fim de cada tarefa. Tasks, débito técnico, decisões pendentes e tarefas do usuário ficam no board.
 
-**Última atualização:** 2026-11-16
+**Última atualização:** 2026-11-19
 **Board:** [Digital Banking no GitHub Projects](https://github.com/users/capozziV/projects/2)
-**Fase atual:** etapa 8 (acabamento) em andamento na branch `etapa-8-acabamento`, em paralelo com débitos técnicos e o bloqueio e encerramento de conta (#27). Detalhe em "Em andamento" abaixo.
-**Próximo passo:** retomar as revisões e correções interrompidas pelo limite de uso (lista em "Em andamento"), em lotes de até 6 agentes.
+**Fase atual:** etapa 8 (acabamento) concluída na branch `etapa-8-acabamento`, com revisão final aprovada; PR para a `main`. Spec da etapa 9 (frontend) escrita, aguardando aprovação do usuário.
+**Próximo passo:** merge da etapa 8 com o `ci-ok` verde; aprovação da spec da etapa 9 ([spec](superpowers/specs/2026-11-19-etapa-9-frontend-design.md)) e, depois, o plano. A subida real na AWS (Task 10, cartão #182) é do usuário.
 
-## Em andamento (handoff de 2026-11-16)
-Worktrees em `.claude/worktrees/`. Agentes commitam a cada parte verde; retome lendo `git log`/`git status` do worktree.
-- **Débitos técnicos** (base `main`):
-  - `debito-infra-borda-ci` (#35, #41, #45): **mergeado** (PR #186).
-  - `debito-sqs-correlation` (#137): aprovado; **PR #187** aberto, faltava o `e2e` do CI; merge com o `ci-ok` verde.
-  - `debito-limite-diario` (#159, #160): pronto (414 testes); **revisão da Beatriz interrompida**, refazer.
-  - `debito-outbox-unlock` (#23): pronto (`86da2e8`); **revisão interrompida** (build verde, faltava o mutante). Pontos: descarte deixa buraco no extrato? falta ação "tentar de novo"? espera de 30 s na requisição.
-  - `debito-saga-manual` (#170, #56): **bloqueante em correção**, interrompida com 4 arquivos sujos: a compensação manual tem de exigir `creditIdempotencyKey` e conferir no `accounts` (conta de origem, `CREDIT`, valor) antes de `COMPENSATED`; chave única; mais N+1 no `ListStuckTransfersUseCase`. Revisão em `/private/tmp/claude-501/-Users-capzz-Dev-DigitalBanking/88a412cd-58b6-4fe8-aec5-9db8130318f6/scratchpad/review-saga-manual.md`. Docs (ADR 0016, spec da etapa 2) já commitados.
-  - `debito-perfis-openapi` (#33, #40, #44, S1/S2 do #171): pronto (5 commits; 1230 testes somando reexecuções sob carga); **falta revisão**. Possível débito: `DailyLimitEndToEndIntegrationTest` com 503 sob carga (timeout de 500 ms do `customer`).
-- **Etapa 8** ([spec](superpowers/specs/2026-11-16-etapa-8-acabamento-design.md), [plano](superpowers/plans/2026-11-16-etapa-8-acabamento.md); tasks #173–#182):
-  - Task 1 (`etapa-8-t1`, imagens Docker): pronta (`0a9b200`); **revisão interrompida**, refazer.
-  - Tasks 2, 3, 4 (`etapa-8-t2`, `-t3`, `-t4`): worktrees criados, **nada feito**; despachar.
-  - Tasks 5–9 esperam (ordem no plano). Task 10 espera a conta AWS do usuário.
-- **Bloqueio e encerramento de conta** (#27; branch `feature/conta-status`, spec, plano e glossário commitados; tasks #183–#185):
-  - Tasks 1 e 3 (`conta-status-t1`, `-t3`): **nada feito** (t3 com 4 arquivos sujos); despachar. Task 2 espera as frentes do `transfers` na `main`.
-- **Depois de mergear os débitos:** corrigir "uma conta por cliente" em `infra/local/seed.sh` e `docs/rodando-localmente.md`; regenerar o grafo (`graphify update .`).
-- **Checkout principal** (`/Users/capzz/Dev/DigitalBanking`) parado em `9e8db84`: `git pull` bloqueado por memórias de agente locais (`.claude/agent-memory/...`, `graphify-out/manifest.json`).
+## Em andamento
+- **PR #203** (#194, timeout do customer no e2e): aprovado pela Beatriz; merge quando o `ci-ok` passar.
+- **Etapa 9:** decisões do usuário registradas na spec (cliente só, visual off-white preto e branco, menu lateral, login e cadastro próprios com senha de 6 dígitos, bônus de R$ 100, usuário de demonstração, telefone verificado como chave de transferência com SMS simulado). Backlog: telas de admin (#201), observabilidade (#202), SMS real (#204).
 
 ## Como usar o board
 - Colunas: **Backlog** (pendência sem resposta, ou etapa anterior fora de Done), **Ready** (sem pendência e etapa anterior em Done), **In progress**, **In review** (revisão da Beatriz) e **Done** (revisado, build, testes e lint verdes, merge feito).
@@ -43,6 +29,9 @@ Detalhes de cada etapa na spec, no plano e nos PRs.
 - **Etapa 5, cache do extrato** ([spec](superpowers/specs/2026-11-12-etapa-5-cache-do-extrato-design.md), [plano](superpowers/plans/2026-11-12-etapa-5-cache-do-extrato.md), [ADR 0009](adr/0009-cache-do-extrato.md)): cache-aside em Redis da 1ª página (`limit` 20, sem cursor), chave `statement:first-page:v1:{accountId}`, TTL de 60 s ± 10 s, invalidação ao consumir o lançamento, timeout de 100 ms com fallback para o DynamoDB, métricas `statement.cache.requests`, `writes` e `evictions`. PR #153. Revisão final: 854 testes, 0 falhas, 0 pulados; correções finais com leitura consistente da 1ª página no DynamoDB.
 - **Etapa 6, limite diário** ([spec](superpowers/specs/2026-11-12-etapa-6-limite-diario-design.md), [plano](superpowers/plans/2026-11-12-etapa-6-limite-diario.md), [ADR 0010](adr/0010-limite-diario-redis-lua.md)): passo `ReserveLimit` na saga antes do débito; R$ 5.000 por conta por dia de São Paulo; contador em Redis + Lua com reserva idempotente por transferência; fonte da verdade em `transfer.limit_day`/`limit_reserved`; trava única `pg_advisory_xact_lock` por conta e dia nas duas vias; epoch que força a reconstrução depois de reservas pelo PostgreSQL; fallback no PostgreSQL com o Redis fora; `GET /accounts/{id}/daily-limit`; `libs/testing-redis`. Revisão final: 917 testes, 0 falhas, 0 pulados. PR #161. Débitos técnicos #159 e #160 no board.
 - **Etapa 7, borda e identidade** ([spec](superpowers/specs/2026-11-13-etapa-7-borda-e-identidade-design.md), [plano](superpowers/plans/2026-11-13-etapa-7-borda-e-identidade.md), ADR 0020): JWT nos cinco serviços com `libs/security` (`Caller` em `libs/security-caller`, rotas negadas por padrão, `401`/`403` em Problem Details, token de máquina com cache) e `libs/observabilidade` (correlation ID); regra de dono (recurso alheio → `404`) e grupo `admin`; serviço `customer` (porta 8085, eventos no `customer-events.fifo`) consultado na hora pelo `accounts` e pelo `transfers` (bloqueado → `422`, fora → `503`); `call-budget` da saga em 6 s; `mock-oauth2-server` local, `seed.sh` do dono, smoke e cinco coleções Bruno com token; Terraform do Cognito e do API Gateway validado sem aplicar. Revisão final: 1200 testes, 0 falhas, 0 pulados.
+- **Bloqueio e encerramento de conta** (#27; [spec](superpowers/specs/2026-11-16-bloqueio-e-encerramento-de-conta-design.md), [plano](superpowers/plans/2026-11-16-bloqueio-e-encerramento-de-conta.md), ADR 0023; PR #197): status da conta (Ativa, Bloqueada, Encerrada) conferido sob a trava; rotas de admin; encerramento com saldo zero e sem pendentes, consultando o `transfers` (`GET /internal/accounts/{id}/pending-transfers`); saga trata conta bloqueada ou encerrada devolvendo o limite; notificações de status. Revisão final: 1441 testes, 0 falhas; smoke, Bruno 15/15 e e2e 21/21.
+- **Débitos técnicos de 2026-11-16 a 19:** PRs #188 (#170, #56), #190 (#23), #191 (#33, #40, #44), #193 (#159, #160), #199 (#189), #200 (#196, `TransferCompensated` v2 com `reason`).
+- **Etapa 8, acabamento** ([spec](superpowers/specs/2026-11-16-etapa-8-acabamento-design.md), [plano](superpowers/plans/2026-11-16-etapa-8-acabamento.md), ADRs 0021 e 0022): imagens Docker em camadas; chart Helm comum e `db-init`; Terraform `bootstrap` (estado, OIDC, ECR, Budget) e `envs/aws` (VPC, EKS 1.36 com nós EC2, ALB interno, borda, RDS, ElastiCache, DynamoDB, SNS/SQS, Pod Identity), tudo validado sem aplicar; workflows `aws-up`, `aws-down` e `aws-reaper` (8 h, falha segura); contratos HTTP e de mensagem com o Stubborn Contract 0.2.2; README com diagrama. Revisão final: 1504 testes verdes, validações de infra e mutantes vermelhos.
 - **Board** no GitHub Projects (2026-10-26) e **guia local no Mac** (PR #6).
 
 ## Como rodar localmente
