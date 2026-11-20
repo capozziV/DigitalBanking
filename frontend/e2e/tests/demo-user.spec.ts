@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { DEMO, eventually, signIn } from './support';
 
-test('the demo user signs in and sees balance, statement entries and notices', async ({ page }) => {
+test('the demo user signs in and sees balance, statement entries and notifications', async ({
+  page,
+}) => {
   await signIn(page, DEMO.email, DEMO.password);
 
   await expect(page.getByText(`Olá, ${DEMO.fullName.split(' ')[0]}`)).toBeVisible();
@@ -14,7 +16,7 @@ test('the demo user signs in and sees balance, statement entries and notices', a
   });
 
   await page
-    .getByRole('link', { name: /^Avisos/ })
+    .getByRole('link', { name: /^Notificações/ })
     .first()
     .click();
   await eventually(page, async () => {
@@ -23,4 +25,11 @@ test('the demo user signs in and sees balance, statement entries and notices', a
       timeout: 2_000,
     });
   });
+
+  await page.getByRole('button', { name: 'Sair' }).click();
+  await expect(page).toHaveURL(/\/entrar$/);
+  await page.goto('/inicio');
+  await expect(page).toHaveURL(/\/entrar$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/entrar$/);
 });

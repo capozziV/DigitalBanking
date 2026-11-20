@@ -90,7 +90,7 @@ describe('NotificationsComponent', () => {
     await create();
     http.expectOne('/bff/notifications').flush({ items: [], unreadCount: 0, nextCursor: null });
     await settle();
-    expect(el().textContent).toContain('Nenhum aviso');
+    expect(el().textContent).toContain('Nenhuma notificação');
   });
 
   it('shows the retry notice when the load fails', async () => {

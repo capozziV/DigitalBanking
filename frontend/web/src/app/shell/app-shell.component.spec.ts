@@ -3,7 +3,7 @@ import { BreakpointObserver } from '@angular/cdk/layout';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
 import { SessionService } from '../core/session.service';
 import { tick } from '../testing/dom';
@@ -71,12 +71,12 @@ describe('AppShellComponent', () => {
     await create(true);
     const labels = Array.from(el().querySelectorAll('nav a')).map((a) => a.textContent ?? '');
     expect(labels).toHaveLength(5);
-    for (const label of ['Início', 'Extrato', 'Transferir', 'Avisos', 'Minha conta']) {
+    for (const label of ['Início', 'Extrato', 'Transferir', 'Notificações', 'Minha conta']) {
       expect(labels.some((text) => text.includes(label))).toBe(true);
     }
   });
 
-  it('shows the unread counter next to Avisos', async () => {
+  it('shows the unread counter next to Notificações', async () => {
     await create(true);
     expect(el().querySelector('.badge .count')?.textContent?.trim()).toBe('2');
   });
@@ -126,7 +126,7 @@ describe('AppShellComponent', () => {
     await create(true);
     const badge = el().querySelector('.badge') as HTMLElement;
     expect(badge.hasAttribute('aria-label')).toBe(false);
-    expect(badge.querySelector('.visually-hidden')?.textContent).toContain('não lidos');
+    expect(badge.querySelector('.visually-hidden')?.textContent).toContain('não lidas');
   });
 
   it('closes the collapsed menu after choosing an item', async () => {
@@ -138,10 +138,28 @@ describe('AppShellComponent', () => {
     expect(el().querySelector('.menu')?.classList).not.toContain('open');
   });
 
-  it('signs out from the menu', async () => {
+  it('shows Sair as a visible menu item with an icon, below 960 px too', async () => {
+    for (const matches of [true, false]) {
+      TestBed.resetTestingModule();
+      await create(matches);
+      const button = el().querySelector('button.sign-out') as HTMLButtonElement;
+      expect(button.textContent).toContain('Sair');
+      expect(button.querySelector('.glyph')).not.toBeNull();
+      expect(el().querySelector('aside.menu')?.contains(button)).toBe(true);
+    }
+  });
+
+  it('signs out from the menu: calls the BFF, clears the session and goes to Entrar', async () => {
     await create(true);
+    const session = TestBed.inject(SessionService);
+    session.authenticated.set(true);
+    session.customer.set({ name: 'Ana', email: 'a@b.com', phone: '+5511987654321' });
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
     (el().querySelector('button.sign-out') as HTMLButtonElement).click();
     http.expectOne('/bff/auth/sign-out').flush({});
     await tick();
+    expect(session.authenticated()).toBe(false);
+    expect(session.customer()).toBeNull();
+    expect(navigate).toHaveBeenCalledWith('/entrar');
   });
 });

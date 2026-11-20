@@ -41,11 +41,15 @@ export const routes: Routes = [
       },
       {
         path: 'avisos',
+        redirectTo: 'notificacoes',
+      },
+      {
+        path: 'notificacoes',
         loadComponent: () =>
           import('./pages/notifications/notifications.component').then(
             (module) => module.NotificationsComponent,
           ),
-        title: 'Avisos',
+        title: 'Notificações',
       },
       {
         path: 'minha-conta',

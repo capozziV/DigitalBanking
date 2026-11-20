@@ -60,6 +60,13 @@ import { problemMessage } from '../../shared/problem';
     }
 
     <section class="card panel">
+      <h2>Sessão</h2>
+      <button class="btn btn-outline btn-auto sign-out" type="button" (click)="signOut()">
+        Sair
+      </button>
+    </section>
+
+    <section class="card panel">
       <h2>Conta</h2>
       @if (session.account(); as account) {
         <dl>
@@ -143,6 +150,10 @@ export class AccountComponent {
 
   protected typeLabel = accountTypeLabel;
   protected phoneText = displayPhone;
+
+  protected signOut(): void {
+    void this.session.signOut();
+  }
 
   protected async changePhone(): Promise<void> {
     if (this.phoneForm.invalid || this.phoneBusy()) return;

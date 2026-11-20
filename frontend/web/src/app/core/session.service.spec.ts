@@ -110,10 +110,15 @@ describe('SessionService', () => {
 
   it('signs out, clears the state and goes to Entrar', async () => {
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    service.authenticated.set(true);
+    service.email.set('a@b.com');
+    service.customer.set({ name: 'Ana', email: 'a@b.com', phone: '+5511987654321' });
     const promise = service.signOut();
     http.expectOne('/bff/auth/sign-out').flush({});
     await promise;
     expect(service.authenticated()).toBe(false);
+    expect(service.email()).toBeNull();
+    expect(service.customer()).toBeNull();
     expect(service.loaded()).toBe(true);
     expect(navigate).toHaveBeenCalledWith('/entrar');
   });

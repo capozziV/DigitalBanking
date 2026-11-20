@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { SessionService } from '../../core/session.service';
 import { setInput, submit, tick } from '../../testing/dom';
 import { AccountComponent } from './account.component';
@@ -49,6 +49,18 @@ describe('AccountComponent', () => {
   }
 
   afterEach(() => http.verify());
+
+  it('signs out from Minha conta', async () => {
+    await create();
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    session.authenticated.set(true);
+    (el().querySelector('button.sign-out') as HTMLButtonElement).click();
+    http.expectOne('/bff/auth/sign-out').flush({});
+    await settle();
+    expect(session.authenticated()).toBe(false);
+    expect(session.customer()).toBeNull();
+    expect(navigate).toHaveBeenCalledWith('/entrar');
+  });
 
   it('shows the customer and the account data', async () => {
     await create();

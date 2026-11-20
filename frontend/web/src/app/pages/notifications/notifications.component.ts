@@ -33,7 +33,7 @@ interface NotificationPageDTO {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [DatePipe, LoadErrorComponent],
   template: `
-    <h1 class="page-title">Avisos</h1>
+    <h1 class="page-title">Notificações</h1>
     @if (failed()) {
       <app-load-error (retry)="load()" />
     }
@@ -65,7 +65,7 @@ interface NotificationPageDTO {
             }
           </ul>
         } @else {
-          <p class="muted">Nenhum aviso por enquanto.</p>
+          <p class="muted">Nenhuma notificação por enquanto.</p>
         }
       </section>
     }
