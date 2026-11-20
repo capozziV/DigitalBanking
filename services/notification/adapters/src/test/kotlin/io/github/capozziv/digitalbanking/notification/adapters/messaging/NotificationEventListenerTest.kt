@@ -5,6 +5,7 @@ import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import io.github.capozziv.digitalbanking.notification.application.UnknownAccountException
+import io.github.capozziv.digitalbanking.notification.application.port.CustomerNameRepository
 import io.github.capozziv.digitalbanking.notification.application.port.IdGenerator
 import io.github.capozziv.digitalbanking.notification.application.port.KnownAccountRepository
 import io.github.capozziv.digitalbanking.notification.application.port.NotificationCursor
@@ -29,6 +30,7 @@ class NotificationEventListenerTest {
     private val processed = mutableSetOf<UUID>()
     private val accounts = mutableMapOf<UUID, UUID>()
     private val saved = mutableListOf<Notification>()
+    private val names = mutableMapOf<UUID, String>()
 
     private val transactions =
         object : TransactionRunner {
@@ -53,6 +55,16 @@ class NotificationEventListenerTest {
                 }
 
                 override fun customerOf(accountId: UUID) = accounts[accountId]
+            },
+            object : CustomerNameRepository {
+                override fun save(
+                    customerId: UUID,
+                    name: String,
+                ) {
+                    names[customerId] = name
+                }
+
+                override fun namesOfAccountOwners(accountIds: Set<UUID>) = error("not used")
             },
             object : NotificationRepository {
                 override fun saveAll(notifications: List<Notification>) {

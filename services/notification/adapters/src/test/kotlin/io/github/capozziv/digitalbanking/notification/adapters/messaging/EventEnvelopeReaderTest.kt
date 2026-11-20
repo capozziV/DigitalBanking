@@ -55,6 +55,32 @@ class EventEnvelopeReaderTest {
     }
 
     @Test
+    fun `CustomerRegistered version 2 is read with the full name only`() {
+        val body =
+            envelope(
+                "CustomerRegistered",
+                2,
+                """{"customerId":"$customerId","name":"Ana Souza","email":"ana@example.test","phone":"+5511987654321"}""",
+            )
+
+        assertThat(reader.read(body)).isEqualTo(ReceivedEvent.CustomerRegistered(eventId, customerId, "Ana Souza"))
+    }
+
+    @Test
+    fun `CustomerRegistered version 1, without the phone, is read too`() {
+        val body = envelope("CustomerRegistered", 1, """{"customerId":"$customerId","name":"Ana Souza","email":"ana@example.test"}""")
+
+        assertThat(reader.read(body)).isEqualTo(ReceivedEvent.CustomerRegistered(eventId, customerId, "Ana Souza"))
+    }
+
+    @Test
+    fun `CustomerRegistered without a name is malformed`() {
+        val body = envelope("CustomerRegistered", 2, """{"customerId":"$customerId","email":"ana@example.test"}""")
+
+        assertThatThrownBy { reader.read(body) }.isInstanceOf(MalformedEventException::class.java)
+    }
+
+    @Test
     fun `TransferCompleted is read from the transfers payload`() {
         val body = envelope("TransferCompleted", 1, transferPayload())
 
@@ -115,9 +141,9 @@ class EventEnvelopeReaderTest {
     @ValueSource(strings = ["insufficient-available-balance", "debit-not-confirmed"])
     fun `each reason the transfers service writes has a specific text`(reason: String) {
         val event = reader.read(envelope("TransferFailed", 1, transferPayload(extra = ""","reason":"$reason"""")))
-        val fallback = NotificationText.transferFailed(12_345, destination, "some-unknown-reason").body
+        val fallback = NotificationText.transferFailed(12_345, null, "some-unknown-reason").body
 
-        val body = NotificationText.transferFailed(12_345, destination, (event as ReceivedEvent.TransferFailed).reason).body
+        val body = NotificationText.transferFailed(12_345, null, (event as ReceivedEvent.TransferFailed).reason).body
 
         assertThat(body).isNotEqualTo(fallback)
     }

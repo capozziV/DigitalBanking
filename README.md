@@ -67,6 +67,7 @@ flowchart LR
         cusEv{{"customer-events.fifo"}}
         qNA["notification-accounts.fifo"]
         qNT["notification-transfers.fifo"]
+        qNC["notification-customer.fifo"]
         qSA["statement-accounts.fifo"]
     end
 
@@ -75,8 +76,10 @@ flowchart LR
     customer -- "outbox + relay" --> cusEv
     accEv --> qNA & qSA
     trfEv --> qNT
+    cusEv --> qNC
     qNA --> notification
     qNT --> notification
+    qNC --> notification
     qSA --> statement
 ```
 

@@ -26,8 +26,10 @@ env:
   NOTIFICATION_AWS_REGION: sa-east-1
   NOTIFICATION_ACCOUNTS_QUEUE: notification-accounts.fifo
   NOTIFICATION_TRANSFERS_QUEUE: notification-transfers.fifo
+  NOTIFICATION_CUSTOMER_QUEUE: notification-customer.fifo
   NOTIFICATION_ACCOUNTS_DLQ: notification-accounts-dlq.fifo
   NOTIFICATION_TRANSFERS_DLQ: notification-transfers-dlq.fifo
+  NOTIFICATION_CUSTOMER_DLQ: notification-customer-dlq.fifo
   NOTIFICATION_DLQ_METRICS_REFRESH_INTERVAL: 30s
 
 secretEnv:

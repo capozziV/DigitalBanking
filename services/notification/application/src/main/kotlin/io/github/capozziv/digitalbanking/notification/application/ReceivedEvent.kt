@@ -85,6 +85,15 @@ sealed interface ReceivedEvent {
         override val eventType: String get() = "AccountClosed"
     }
 
+    /** From the customer service; only the full name is kept, to tell transfers with the name of the other party. */
+    data class CustomerRegistered(
+        override val eventId: UUID,
+        val customerId: UUID,
+        val name: String,
+    ) : ReceivedEvent {
+        override val eventType: String get() = "CustomerRegistered"
+    }
+
     /** Any event type this service does not notify about. */
     data class Unsupported(
         override val eventId: UUID,

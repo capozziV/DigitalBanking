@@ -2,6 +2,7 @@ package io.github.capozziv.digitalbanking.notification.application.usecase
 
 import io.github.capozziv.digitalbanking.notification.application.ReceivedEvent
 import io.github.capozziv.digitalbanking.notification.application.UnknownAccountException
+import io.github.capozziv.digitalbanking.notification.application.port.CustomerNameRepository
 import io.github.capozziv.digitalbanking.notification.application.port.IdGenerator
 import io.github.capozziv.digitalbanking.notification.application.port.KnownAccountRepository
 import io.github.capozziv.digitalbanking.notification.application.port.NotificationRepository
@@ -18,12 +19,16 @@ import java.util.UUID
 enum class ConsumeOutcome { PROCESSED, DUPLICATE, IGNORED }
 
 /**
- * Applies each event exactly once: the `processed_events` row, the account → customer copy
+ * Applies each event exactly once: the `processed_events` row, the account → customer and customer → name copies
  * and the notifications are written in one transaction, so a redelivery after the commit is a no-op.
+ *
+ * The text of a transfer is stored without the name of the other party ("outro cliente"): the name is looked up
+ * when the notification is read (ListNotificationsUseCase), so a transfer never waits for `CustomerRegistered`.
  */
 class ConsumeEventUseCase(
     private val processedEvents: ProcessedEventRepository,
     private val knownAccounts: KnownAccountRepository,
+    private val customerNames: CustomerNameRepository,
     private val notifications: NotificationRepository,
     private val transactions: TransactionRunner,
     private val ids: IdGenerator,
@@ -39,6 +44,7 @@ class ConsumeEventUseCase(
             }
             if (event is ReceivedEvent.Unsupported) return@inTransaction ConsumeOutcome.IGNORED
             if (event is ReceivedEvent.AccountOpened) knownAccounts.save(event.accountId, event.customerId)
+            if (event is ReceivedEvent.CustomerRegistered) customerNames.save(event.customerId, event.name)
             notifications.saveAll(drafts.map { it.toNotification(event.eventId, now) })
             ConsumeOutcome.PROCESSED
         }
@@ -113,7 +119,7 @@ class ConsumeEventUseCase(
                     Draft(
                         ownerOf(event.sourceAccountId),
                         NotificationKind.TRANSFER_FAILED,
-                        NotificationText.transferFailed(event.amountCents, event.destinationAccountId, event.reason),
+                        NotificationText.transferFailed(event.amountCents, null, event.reason),
                         transferData(event.transferId, event.sourceAccountId, event.destinationAccountId, event.amountCents) +
                             ("reason" to event.reason),
                     ),
@@ -125,14 +131,14 @@ class ConsumeEventUseCase(
                     Draft(
                         ownerOf(event.sourceAccountId),
                         NotificationKind.TRANSFER_COMPENSATED,
-                        NotificationText.transferCompensated(event.amountCents, event.destinationAccountId, event.reason),
+                        NotificationText.transferCompensated(event.amountCents, null, event.reason),
                         transferData(event.transferId, event.sourceAccountId, event.destinationAccountId, event.amountCents) +
                             listOfNotNull(event.reason?.let { "reason" to it }),
                     ),
                 )
             }
 
-            is ReceivedEvent.Unsupported -> {
+            is ReceivedEvent.CustomerRegistered, is ReceivedEvent.Unsupported -> {
                 emptyList()
             }
         }
@@ -146,13 +152,13 @@ class ConsumeEventUseCase(
             Draft(
                 sender,
                 NotificationKind.TRANSFER_SENT,
-                NotificationText.transferSent(event.amountCents, event.destinationAccountId),
+                NotificationText.transferSent(event.amountCents, null),
                 data,
             ),
             Draft(
                 receiver,
                 NotificationKind.TRANSFER_RECEIVED,
-                NotificationText.transferReceived(event.amountCents, event.sourceAccountId),
+                NotificationText.transferReceived(event.amountCents, null),
                 data,
             ),
         )

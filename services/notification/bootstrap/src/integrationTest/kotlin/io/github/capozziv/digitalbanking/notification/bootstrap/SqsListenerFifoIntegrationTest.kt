@@ -172,6 +172,7 @@ class SqsListenerFifoIntegrationTest {
                 BLOCKING_QUEUE,
                 "notification-accounts.fifo",
                 "notification-transfers.fifo",
+                "notification-customer.fifo",
             ).forEach { queue ->
                 sqs.createQueue {
                     it.queueName(queue).attributes(

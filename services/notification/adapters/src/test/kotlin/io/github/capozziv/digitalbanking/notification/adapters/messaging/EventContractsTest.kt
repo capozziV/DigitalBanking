@@ -1,5 +1,6 @@
 package io.github.capozziv.digitalbanking.notification.adapters.messaging
 
+import io.github.capozziv.digitalbanking.notification.application.port.CustomerNameRepository
 import io.github.capozziv.digitalbanking.notification.application.port.IdGenerator
 import io.github.capozziv.digitalbanking.notification.application.port.KnownAccountRepository
 import io.github.capozziv.digitalbanking.notification.application.port.NotificationCursor
@@ -24,14 +25,15 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * Consumer side of the message contracts of accounts and transfers: the Stub Runner triggers each contract, and its
- * message (the outbox envelope, as the relay publishes it) goes straight to the handler of NotificationEventListener
- * for the topic it was sent to, with no SQS.
+ * Consumer side of the message contracts of accounts, transfers and customer: the Stub Runner triggers each
+ * contract, and its message (the outbox envelope, as the relay publishes it) goes straight to the handler of
+ * NotificationEventListener for the topic it was sent to, with no SQS.
  */
 class EventContractsTest {
     private val processed = mutableListOf<UUID>()
     private val accounts = mutableMapOf<UUID, UUID>()
     private val saved = mutableListOf<Notification>()
+    private val names = mutableMapOf<UUID, String>()
 
     private val useCase =
         ConsumeEventUseCase(
@@ -51,6 +53,16 @@ class EventContractsTest {
                 }
 
                 override fun customerOf(accountId: UUID) = accounts[accountId]
+            },
+            object : CustomerNameRepository {
+                override fun save(
+                    customerId: UUID,
+                    name: String,
+                ) {
+                    names[customerId] = name
+                }
+
+                override fun namesOfAccountOwners(accountIds: Set<UUID>) = error("not used")
             },
             object : NotificationRepository {
                 override fun saveAll(notifications: List<Notification>) {
@@ -220,6 +232,15 @@ class EventContractsTest {
         assertThat(saved.single().body).contains("não pôde ser concluída e o valor voltou para a sua conta")
     }
 
+    @Test
+    fun `a registered customer leaves the full name for the transfers of their accounts`() {
+        assertThat(stubs.trigger("customerRegistered")).isTrue()
+
+        assertThat(processed).containsExactly(UUID.fromString("0198a1b2-0000-7000-8000-0000000e0011"))
+        assertThat(names).isEqualTo(mapOf(SENDER to "Ana Souza"))
+        assertThat(saved).isEmpty()
+    }
+
     private fun knowBothAccounts() {
         accounts[SOURCE_ACCOUNT] = SENDER
         accounts[DESTINATION_ACCOUNT] = RECEIVER
@@ -259,6 +280,7 @@ class EventContractsTest {
             when (destination) {
                 ACCOUNTS_TOPIC -> target.onAccountEvent(payload as String)
                 TRANSFERS_TOPIC -> target.onTransferEvent(payload as String)
+                CUSTOMER_TOPIC -> target.onCustomerEvent(payload as String)
                 else -> error("notification does not subscribe to $destination")
             }
         }
@@ -267,6 +289,7 @@ class EventContractsTest {
     companion object {
         private const val ACCOUNTS_TOPIC = "accounts-events.fifo"
         private const val TRANSFERS_TOPIC = "transfers-events.fifo"
+        private const val CUSTOMER_TOPIC = "customer-events.fifo"
         private val SOURCE_ACCOUNT: UUID = UUID.fromString("0198a1b2-0000-7000-8000-000000000001")
         private val DESTINATION_ACCOUNT: UUID = UUID.fromString("0198a1b2-0000-7000-8000-000000000002")
         private val SENDER: UUID = UUID.fromString("0198a1b2-0000-7000-8000-0000000000c1")
@@ -283,6 +306,7 @@ class EventContractsTest {
                 .downloadStubs(
                     "io.github.capozziv.digitalbanking.accounts:bootstrap",
                     "io.github.capozziv.digitalbanking.transfers:bootstrap",
+                    "io.github.capozziv.digitalbanking.customer:bootstrap",
                 )
     }
 }

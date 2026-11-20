@@ -3,6 +3,7 @@ package io.github.capozziv.digitalbanking.notification.bootstrap.web
 import io.github.capozziv.digitalbanking.notification.application.port.NotificationRepository
 import io.github.capozziv.digitalbanking.notification.bootstrap.persistence.aNotification
 import io.github.capozziv.digitalbanking.notification.domain.Notification
+import io.github.capozziv.digitalbanking.notification.domain.NotificationKind
 import io.github.capozziv.digitalbanking.testing.security.JwtTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -43,6 +44,8 @@ class NotificationApiIntegrationTest : NotificationWebIntegrationTest() {
     @BeforeEach
     fun cleanTables() {
         ownerJdbc.sql("delete from notifications").update()
+        ownerJdbc.sql("delete from customer_names").update()
+        ownerJdbc.sql("delete from known_accounts").update()
     }
 
     @Test
@@ -107,6 +110,49 @@ class NotificationApiIntegrationTest : NotificationWebIntegrationTest() {
         assertThat(data.get("amountCents").isIntegralNumber).isTrue()
         assertThat(data.get("amountCents").asLong()).isEqualTo(250_000L)
     }
+
+    @Test
+    fun `a received transfer is told with the full name of the sender, never the account`() {
+        val (sender, senderAccount) = UUID.randomUUID() to UUID.randomUUID()
+        ownerJdbc.sql("insert into known_accounts (account_id, customer_id) values (?, ?)").params(senderAccount, sender).update()
+        ownerJdbc.sql("insert into customer_names (customer_id, name) values (?, ?)").params(sender, "Ana Souza").update()
+        repository.saveAll(listOf(receivedTransfer(senderAccount)))
+
+        val item = get("/notifications").body!!.get("items").get(0)
+
+        assertThat(item.get("title").asString()).isEqualTo("Você recebeu uma transferência")
+        assertThat(item.get("body").asString()).isEqualTo("Você recebeu R$ 25,00 de Ana Souza.")
+    }
+
+    @Test
+    fun `a transfer stored with the account in its text, before the names, says another customer while the name is unknown`() {
+        val senderAccount = UUID.randomUUID()
+        repository.saveAll(listOf(receivedTransfer(senderAccount)))
+
+        val body =
+            get("/notifications")
+                .body!!
+                .get("items")
+                .get(0)
+                .get("body")
+                .asString()
+
+        assertThat(body).isEqualTo("Você recebeu R$ 25,00 de outro cliente.").doesNotContain(senderAccount.toString())
+    }
+
+    /** As the service wrote it before the names existed: the account of the sender in the stored text. */
+    private fun receivedTransfer(senderAccount: UUID) =
+        aNotification(
+            customerId = customer,
+            kind = NotificationKind.TRANSFER_RECEIVED,
+            data =
+                mapOf(
+                    "transferId" to UUID.randomUUID().toString(),
+                    "sourceAccountId" to senderAccount.toString(),
+                    "destinationAccountId" to UUID.randomUUID().toString(),
+                    "amountCents" to 2500L,
+                ),
+        ).copy(body = "Você recebeu R$ 25,00 da conta $senderAccount.")
 
     @Test
     fun `marking up to a notification reads it and the older ones, and repeating changes nothing`() {
