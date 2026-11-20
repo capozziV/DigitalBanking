@@ -26,7 +26,7 @@ test('the demo user signs in and sees balance, statement entries and notificatio
     });
   });
 
-  await page.getByRole('button', { name: 'Sair' }).click();
+  await page.locator('aside.menu').getByRole('button', { name: 'Sair' }).click();
   await expect(page).toHaveURL(/\/entrar$/);
   await page.goto('/inicio');
   await expect(page).toHaveURL(/\/entrar$/);

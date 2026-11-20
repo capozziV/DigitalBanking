@@ -491,7 +491,7 @@ jobs:
   # identidade local pelo mock-oauth2-server), o seed e o Chromium contra o nginx. Roda quando muda o frontend ou
   # qualquer servico (o job images roda nesses casos).
   frontend-e2e:
-    needs: [changes, images]
+    needs: [images]
     if: >-
       ${{ !failure() && !cancelled() && needs.images.result == 'success' }}
     runs-on: ubuntu-latest

@@ -31,6 +31,11 @@ const REASONS: Record<string, string> = {
   'credit-not-confirmed':
     'A transferência não pôde ser concluída e o valor voltou para a sua conta.',
 };
+/** 422 problems of the transfers service that carry the id of the FAILED transfer. */
+const REFUSAL_TYPES = new Set([
+  '/problems/transfer-failed',
+  '/problems/insufficient-available-balance',
+]);
 const GENERIC_REASON = 'A transferência não pôde ser concluída.';
 
 interface RecipientLookupDTO {
@@ -149,7 +154,7 @@ export class TransfersController {
       if (
         error instanceof BackendProblemError &&
         error.status === 422 &&
-        error.problem.type === '/problems/transfer-failed' &&
+        REFUSAL_TYPES.has(error.problem.type ?? '') &&
         typeof error.problem['transferId'] === 'string' &&
         UUID.test(error.problem['transferId'])
       ) {
