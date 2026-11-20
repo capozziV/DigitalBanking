@@ -34,7 +34,7 @@ test('a new customer signs up, opens the account, sees the bonus and sends the f
     expect(page.getByText(/−\s*R\$\s*10,00/)).toBeVisible({ timeout: 2_000 }),
   );
   await page
-    .getByRole('link', { name: /^Avisos/ })
+    .getByRole('link', { name: /^Notificações/ })
     .first()
     .click();
   await eventually(page, () =>
