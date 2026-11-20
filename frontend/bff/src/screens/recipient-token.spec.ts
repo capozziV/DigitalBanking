@@ -1,59 +1,59 @@
-import { RecipientTokenService } from './recipient-token.js';
+import { InMemoryKeyValueStore } from '../testing/in-memory-key-value-store.js';
+import { RECIPIENT_TOKEN_TTL_SECONDS, RecipientTokenService } from './recipient-token.js';
 
 const ACCOUNT = '0b6f3f0e-1c53-4f6d-9a77-2f0a9a3f1a10';
 
 describe('RecipientTokenService', () => {
   let now: number;
-  const service = (secret = 'a-secret-with-enough-length') =>
-    new RecipientTokenService(
-      { recipientTokenSecret: secret } as ConstructorParameters<typeof RecipientTokenService>[0],
-      () => now,
-    );
+  let store: InMemoryKeyValueStore;
+  let service: RecipientTokenService;
 
   beforeEach(() => {
     now = 1_000_000;
+    store = new InMemoryKeyValueStore(() => now);
+    service = new RecipientTokenService(store);
   });
 
-  it('round-trips the account for the same session', () => {
-    const token = service().issue(ACCOUNT, 'session-1');
-    expect(service().verify(token, 'session-1')).toBe(ACCOUNT);
+  it('round-trips the account for the same session', async () => {
+    const token = await service.issue(ACCOUNT, 'Bruno Lima', 'session-1');
+    expect(await service.resolve(token, 'session-1')).toBe(ACCOUNT);
   });
 
-  it('does not show the account id in clear text', () => {
-    expect(service().issue(ACCOUNT, 'session-1')).not.toContain(ACCOUNT);
+  it('is opaque: random, and does not carry the account id', async () => {
+    const first = await service.issue(ACCOUNT, 'Bruno Lima', 'session-1');
+    const second = await service.issue(ACCOUNT, 'Bruno Lima', 'session-1');
+    expect(first).not.toBe(second);
+    expect(first).not.toContain(ACCOUNT);
+    expect(Buffer.from(first, 'base64url').toString()).not.toContain(ACCOUNT);
   });
 
-  it('refuses a token whose payload was changed', () => {
-    const [payload, signature] = service().issue(ACCOUNT, 'session-1').split('.');
-    const forged = Buffer.from(
-      JSON.stringify({ ...JSON.parse(Buffer.from(payload!, 'base64url').toString()), a: 'other' }),
-    ).toString('base64url');
-    expect(service().verify(`${forged}.${signature}`, 'session-1')).toBeNull();
+  it('keeps the entry under bff:recipient:{token}', async () => {
+    const token = await service.issue(ACCOUNT, 'Bruno Lima', 'session-1');
+    expect(store.keys()).toEqual([`bff:recipient:${token}`]);
   });
 
-  it('refuses a token whose signature was changed', () => {
-    const [payload, signature] = service().issue(ACCOUNT, 'session-1').split('.');
-    const flipped = (signature![0] === 'A' ? 'B' : 'A') + signature!.slice(1);
-    expect(service().verify(`${payload}.${flipped}`, 'session-1')).toBeNull();
+  it('refuses an unknown token', async () => {
+    expect(await service.resolve('does-not-exist', 'session-1')).toBeNull();
   });
 
-  it('refuses a token signed with another key', () => {
-    const token = service('another-secret-with-enough-length').issue(ACCOUNT, 'session-1');
-    expect(service().verify(token, 'session-1')).toBeNull();
+  it('refuses a token issued to another session', async () => {
+    const token = await service.issue(ACCOUNT, 'Bruno Lima', 'session-1');
+    expect(await service.resolve(token, 'session-2')).toBeNull();
   });
 
-  it('refuses a token issued to another session', () => {
-    const token = service().issue(ACCOUNT, 'session-1');
-    expect(service().verify(token, 'session-2')).toBeNull();
+  it('refuses an expired token', async () => {
+    const token = await service.issue(ACCOUNT, 'Bruno Lima', 'session-1');
+    now += RECIPIENT_TOKEN_TTL_SECONDS * 1000 + 1;
+    expect(await service.resolve(token, 'session-1')).toBeNull();
   });
 
-  it('refuses an expired token', () => {
-    const token = service().issue(ACCOUNT, 'session-1');
-    now += 10 * 60_000 + 1;
-    expect(service().verify(token, 'session-1')).toBeNull();
+  it('does not consume the token: resolves again', async () => {
+    const token = await service.issue(ACCOUNT, 'Bruno Lima', 'session-1');
+    await service.resolve(token, 'session-1');
+    expect(await service.resolve(token, 'session-1')).toBe(ACCOUNT);
   });
 
-  it.each(['', 'abc', 'a.b.c', '.', 'x.y'])('refuses the garbage %j', (token) => {
-    expect(service().verify(token, 'session-1')).toBeNull();
+  it.each([undefined, null, 42, '', {}])('refuses the garbage %j', async (token) => {
+    expect(await service.resolve(token, 'session-1')).toBeNull();
   });
 });

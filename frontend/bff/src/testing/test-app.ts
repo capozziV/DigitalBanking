@@ -17,7 +17,6 @@ export const TEST_ENV = {
   REDIS_URL: 'redis://127.0.0.1:1',
   COOKIE_SECURE: 'true',
   LOG_LEVEL: 'silent',
-  RECIPIENT_TOKEN_SECRET: 'test-recipient-secret-0123456789',
 };
 
 export interface SignedIn {
@@ -46,7 +45,7 @@ export async function createTestApp(): Promise<TestApp> {
     .overrideProvider(IdentityProvider)
     .useValue(new FakeIdentityProvider())
     .overrideProvider(KEY_VALUE_STORE)
-    .useValue(new InMemoryKeyValueStore())
+    .useValue(new InMemoryKeyValueStore(() => clock.now))
     .overrideProvider(FETCH)
     .useValue(backend.fetch)
     .overrideProvider(CLOCK)

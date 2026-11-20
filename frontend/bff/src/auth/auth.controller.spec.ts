@@ -17,7 +17,6 @@ const TEST_ENV = {
   REDIS_URL: 'redis://127.0.0.1:1',
   COOKIE_SECURE: 'true',
   LOG_LEVEL: 'silent',
-  RECIPIENT_TOKEN_SECRET: 'test-recipient-secret-0123456789',
 };
 
 describe('AuthController', () => {

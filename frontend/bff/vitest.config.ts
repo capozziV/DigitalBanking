@@ -11,7 +11,6 @@ export default defineConfig({
       IDENTITY_PROVIDER: 'local',
       REDIS_URL: 'redis://127.0.0.1:1',
       LOG_LEVEL: 'silent',
-      RECIPIENT_TOKEN_SECRET: 'test-recipient-secret-0123456789',
     },
   },
   // Nest relies on decorator metadata, which esbuild does not emit; SWC does.

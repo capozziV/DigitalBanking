@@ -448,22 +448,23 @@ describe('screens', () => {
       expect(keys).toEqual([KEY, KEY]);
     });
 
-    it('answers 400 for a tampered recipientToken, without calling the backend', async () => {
-      const recipientTokenValue = await recipientToken();
-      const [payload, signature] = recipientTokenValue.split('.');
-      const forgedPayload = Buffer.from(
-        JSON.stringify({
-          ...JSON.parse(Buffer.from(payload!, 'base64url').toString()),
-          a: ACCOUNT_ID,
-        }),
-      ).toString('base64url');
+    it('answers 400 for an unknown recipientToken, without calling the backend', async () => {
       const response = await user
         .post('/bff/transfers')
         .set('Idempotency-Key', KEY)
-        .send({ recipientToken: `${forgedPayload}.${signature}`, amount: 2500 });
+        .send({ recipientToken: 'not-issued-by-the-bff', amount: 2500 });
       expect(response.status).toBe(400);
       expect(response.body.code).toBe('invalid_recipient');
+      expect(response.body.message).toBe('Destinatário expirado. Busque o telefone de novo.');
       expect(t.backend.callsTo('POST', `${TRANSFERS}/transfers`)).toEqual([]);
+    });
+
+    it('issues a recipientToken that does not carry the account id', async () => {
+      const recipientTokenValue = await recipientToken();
+      expect(recipientTokenValue).not.toContain(OTHER_ACCOUNT_ID);
+      expect(Buffer.from(recipientTokenValue, 'base64url').toString()).not.toContain(
+        OTHER_ACCOUNT_ID,
+      );
     });
 
     it('answers 400 for an expired recipientToken', async () => {

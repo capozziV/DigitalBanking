@@ -93,7 +93,7 @@ export class TransfersController {
       });
     return {
       recipientName: found.fullName,
-      recipientToken: this.tokens.issue(account.accountId, session.id),
+      recipientToken: await this.tokens.issue(account.accountId, found.fullName, session.id),
     };
   }
 
@@ -120,11 +120,11 @@ export class TransfersController {
         message: 'Informe um valor maior que zero.',
       });
     }
-    const destinationAccountId = this.tokens.verify(body?.['recipientToken'], session.id);
+    const destinationAccountId = await this.tokens.resolve(body?.['recipientToken'], session.id);
     if (!destinationAccountId) {
       throw new BadRequestException({
         code: 'invalid_recipient',
-        message: 'Destinatário inválido ou expirado. Busque o telefone de novo.',
+        message: 'Destinatário expirado. Busque o telefone de novo.',
       });
     }
     const options = { token: session.accessToken };

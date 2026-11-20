@@ -2,7 +2,7 @@
 # Valores vazios ("") dependem do ambiente e entram na instalacao (--set ou -f), a partir dos outputs do Terraform:
 # image.repository/tag, targetGroupArn, COGNITO_CLIENT_ID (cognito_bff_client_id) e REDIS_URL (redis_endpoint).
 # Nao e um servico Spring: sem perfil e sem acesso a AWS por papel (o login chama a API publica do Cognito com o
-# app client do BFF, que nao tem segredo). Nenhum segredo aqui: RECIPIENT_TOKEN_SECRET vem do Secret bff-recipient-token, criado fora do chart.
+# app client do BFF, que nao tem segredo). Nenhum segredo aqui (o recipientToken e um id aleatorio guardado no Redis).
 name: bff
 port: 3000
 
@@ -34,11 +34,6 @@ env:
   NOTIFICATION_URL: http://notification:8083
   STATEMENT_URL: http://statement:8084
   CUSTOMER_URL: http://customer:8085
-
-# Secret do Kubernetes criado fora do chart (nome -> chaves); chave HMAC dos recipientToken, sem valor versionado.
-secretEnv:
-  bff-recipient-token:
-    - RECIPIENT_TOKEN_SECRET
 
 resources:
   requests:

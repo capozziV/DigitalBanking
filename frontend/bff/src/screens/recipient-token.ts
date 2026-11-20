@@ -1,62 +1,43 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import { APP_CONFIG, type AppConfig } from '../config/config.js';
-import { CLOCK } from '../session/session.service.js';
+import { KEY_VALUE_STORE, type KeyValueStore } from '../redis/key-value-store.js';
 
-export const RECIPIENT_TOKEN_TTL_MS = 10 * 60_000;
+export const RECIPIENT_TOKEN_TTL_SECONDS = 600;
+const PREFIX = 'bff:recipient:';
 
-interface Payload {
-  /** account that receives the transfer */
-  a: string;
-  /** session the token was issued to */
-  s: string;
-  /** expiry, epoch millis */
-  e: number;
+interface Stored {
+  accountId: string;
+  recipientName: string;
+  sessionId: string;
 }
 
 /**
- * The browser never sees the destination account id: it gets a token that carries it, signed with HMAC-SHA256,
- * bound to the session and valid for ten minutes. A token the BFF did not sign is refused.
+ * The browser never sees the destination account id: it gets an opaque random token, and the BFF keeps
+ * the account behind it in Redis for ten minutes, bound to the session. The token is not consumed on use,
+ * so a repeated request with the same Idempotency-Key still works.
  */
 @Injectable()
 export class RecipientTokenService {
-  constructor(
-    @Inject(APP_CONFIG) private readonly config: Pick<AppConfig, 'recipientTokenSecret'>,
-    @Inject(CLOCK) private readonly now: () => number,
-  ) {}
+  constructor(@Inject(KEY_VALUE_STORE) private readonly store: KeyValueStore) {}
 
-  issue(accountId: string, sessionId: string): string {
-    const payload: Payload = { a: accountId, s: sessionId, e: this.now() + RECIPIENT_TOKEN_TTL_MS };
-    const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
-    return `${body}.${this.sign(body)}`;
+  async issue(accountId: string, recipientName: string, sessionId: string): Promise<string> {
+    const token = randomBytes(32).toString('base64url');
+    const stored: Stored = { accountId, recipientName, sessionId };
+    await this.store.set(PREFIX + token, JSON.stringify(stored), RECIPIENT_TOKEN_TTL_SECONDS);
+    return token;
   }
 
-  /** The account id, or null when the token is malformed, forged, expired or of another session. */
-  verify(token: unknown, sessionId: string): string | null {
-    if (typeof token !== 'string') return null;
-    const parts = token.split('.');
-    if (parts.length !== 2) return null;
-    const [body, signature] = parts as [string, string];
-    const expected = Buffer.from(this.sign(body));
-    const given = Buffer.from(signature);
-    if (expected.length !== given.length || !timingSafeEqual(expected, given)) return null;
+  /** The account id, or null when the token is unknown, expired or of another session. */
+  async resolve(token: unknown, sessionId: string): Promise<string | null> {
+    if (typeof token !== 'string' || token === '') return null;
+    const raw = await this.store.get(PREFIX + token);
+    if (raw === null) return null;
     try {
-      const payload = JSON.parse(Buffer.from(body, 'base64url').toString()) as Partial<Payload>;
-      if (
-        typeof payload.a !== 'string' ||
-        payload.s !== sessionId ||
-        typeof payload.e !== 'number' ||
-        payload.e < this.now()
-      ) {
-        return null;
-      }
-      return payload.a;
+      const stored = JSON.parse(raw) as Partial<Stored>;
+      if (typeof stored.accountId !== 'string' || stored.sessionId !== sessionId) return null;
+      return stored.accountId;
     } catch {
       return null;
     }
-  }
-
-  private sign(body: string): string {
-    return createHmac('sha256', this.config.recipientTokenSecret).update(body).digest('base64url');
   }
 }
