@@ -62,7 +62,7 @@ describe('NotificationsComponent', () => {
     const session = TestBed.inject(SessionService);
     session.unreadCount.set(1);
     http.expectOne('/bff/notifications').flush({
-      items: [notification('1', null)],
+      items: [notification('1', null), notification('0', '2026-11-19T13:00:00Z')],
       unreadCount: 1,
       nextCursor: null,
     });
@@ -70,7 +70,7 @@ describe('NotificationsComponent', () => {
     markAll()?.click();
     const read = http.expectOne('/bff/notifications/read');
     expect(read.request.method).toBe('POST');
-    expect(read.request.body).toEqual({ upTo: '2026-11-19T12:00:00Z' });
+    expect(read.request.body).toEqual({ upTo: '1' });
     read.flush({ marked: 1 });
     await settle();
     http.expectOne('/bff/notifications').flush({

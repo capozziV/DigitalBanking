@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -26,6 +26,8 @@ interface HomeDTO {
   dailyLimit: DailyLimit | null;
   latestEntries: Entry[];
 }
+
+const NO_ACCOUNT: HomeDTO = { account: null, dailyLimit: null, latestEntries: [] };
 
 @Component({
   selector: 'app-home',
@@ -155,10 +157,15 @@ export class HomeComponent implements OnInit {
 
   protected async load(): Promise<void> {
     this.failed.set(false);
+    if (!this.session.account()) {
+      this.home.set(NO_ACCOUNT);
+      return;
+    }
     try {
       this.home.set(await firstValueFrom(this.http.get<HomeDTO>('/bff/home')));
-    } catch {
-      this.failed.set(true);
+    } catch (error) {
+      if (error instanceof HttpErrorResponse && error.status === 404) this.home.set(NO_ACCOUNT);
+      else this.failed.set(true);
     }
   }
 
@@ -168,7 +175,8 @@ export class HomeComponent implements OnInit {
     this.error.set(null);
     try {
       await firstValueFrom(this.http.post('/bff/accounts', {}));
-      await Promise.all([this.load(), this.session.loadMe()]);
+      await this.session.loadMe();
+      await this.load();
     } catch (error) {
       this.error.set(problemMessage(error, 'Não foi possível abrir a conta.'));
     } finally {

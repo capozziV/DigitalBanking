@@ -148,6 +148,56 @@ describe('TransferComponent', () => {
     const second = http.expectOne('/bff/transfers');
     expect(second.request.headers.get('Idempotency-Key')).toBe(key);
     second.flush({ id: 't1', status: 'COMPLETED' });
+    await settle();
+    http.expectOne('/bff/transfers/t1').flush({ id: 't1', status: 'COMPLETED' });
+  });
+
+  it('uses a new Idempotency-Key when the amount changes after going back', async () => {
+    await reachConfirmation();
+    button('Confirmar').click();
+    const first = http.expectOne('/bff/transfers');
+    const key = first.request.headers.get('Idempotency-Key');
+    first.flush({}, { status: 503, statusText: 'Unavailable' });
+    await settle();
+    button('Voltar').click();
+    await settle();
+    await enterAmount('30,00');
+    button('Confirmar').click();
+    const second = http.expectOne('/bff/transfers');
+    expect(second.request.body).toEqual({ recipientToken: 'token-1', amount: 3000 });
+    expect(second.request.headers.get('Idempotency-Key')).not.toBe(key);
+    second.flush({ id: 't1', status: 'PENDING' });
+  });
+
+  it('keeps the Idempotency-Key when going back and confirming the same amount', async () => {
+    await reachConfirmation();
+    button('Confirmar').click();
+    const first = http.expectOne('/bff/transfers');
+    const key = first.request.headers.get('Idempotency-Key');
+    first.flush({}, { status: 503, statusText: 'Unavailable' });
+    await settle();
+    button('Voltar').click();
+    await settle();
+    await enterAmount('25,00');
+    button('Confirmar').click();
+    const second = http.expectOne('/bff/transfers');
+    expect(second.request.headers.get('Idempotency-Key')).toBe(key);
+    second.flush({ id: 't1', status: 'PENDING' });
+  });
+
+  it('fetches the reason right away when the POST already answers a final status', async () => {
+    await reachConfirmation();
+    button('Confirmar').click();
+    http.expectOne('/bff/transfers').flush({ id: 't1', status: 'FAILED' });
+    await settle();
+    http
+      .expectOne('/bff/transfers/t1')
+      .flush({ id: 't1', status: 'FAILED', reason: 'Limite diário excedido' });
+    await settle();
+    expect(el().textContent).toContain('Recusada');
+    expect(el().textContent).toContain('Limite diário excedido');
+    vi.advanceTimersByTime(5000);
+    http.expectNone('/bff/transfers/t1');
   });
 
   describe('status polling', () => {
@@ -232,7 +282,7 @@ describe('TransferComponent', () => {
       const req = http.expectOne('/bff/transfers');
       expect(req.request.headers.get('Idempotency-Key')).toMatch(/^[0-9a-f-]{36}$/);
       expect(req.request.headers.get('Idempotency-Key')).not.toBe(firstKey);
-      req.flush({ id: 't2', status: 'COMPLETED' });
+      req.flush({ id: 't2', status: 'PENDING' });
       await settle();
     });
   });

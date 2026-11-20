@@ -128,12 +128,9 @@ export class NotificationsComponent implements OnInit {
     }
   }
 
-  /** Marks as read everything up to the newest notification on screen. */
+  /** Marks as read everything up to the newest notification (first in the list, by id). */
   protected async markAllRead(): Promise<void> {
-    const newest = this.items()
-      .map((item) => item.createdAt)
-      .sort()
-      .at(-1);
+    const newest = this.items()[0]?.id;
     if (!newest || this.busy()) return;
     this.busy.set(true);
     this.error.set(null);

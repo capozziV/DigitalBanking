@@ -5,7 +5,7 @@ export interface Entry {
   id: string;
   kind: EntryKind;
   amount: number;
-  description: string;
+  description: string | null;
   balanceAfter: number;
   createdAt: string;
 }

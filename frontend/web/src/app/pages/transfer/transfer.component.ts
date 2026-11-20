@@ -191,6 +191,8 @@ export class TransferComponent {
   private recipientToken = '';
   /** Born when the form opens and kept on every retry and double click of "Confirmar". */
   private idempotencyKey = crypto.randomUUID();
+  /** Recipient and amount of the last attempt: a different body needs a different key. */
+  private attempt: string | null = null;
   private polling: Subscription | null = null;
 
   constructor() {
@@ -243,6 +245,11 @@ export class TransferComponent {
   protected async confirm(): Promise<void> {
     this.busy.set(true);
     this.error.set(null);
+    const attempt = `${this.recipientToken}:${this.amountCents()}`;
+    if (this.attempt !== null && this.attempt !== attempt) {
+      this.idempotencyKey = crypto.randomUUID();
+    }
+    this.attempt = attempt;
     try {
       const created = await firstValueFrom(
         this.http.post<TransferStatusDTO>(
@@ -263,6 +270,7 @@ export class TransferComponent {
   protected reset(): void {
     this.polling?.unsubscribe();
     this.idempotencyKey = crypto.randomUUID();
+    this.attempt = null;
     this.recipientToken = '';
     this.phoneForm.reset();
     this.amountForm.reset();
@@ -277,6 +285,14 @@ export class TransferComponent {
     this.polling?.unsubscribe();
     this.timedOut.set(false);
     this.result.set(created);
+    if (this.isFinal(created.status)) {
+      // The POST carries no reason: read it once now instead of waiting for a poll.
+      this.polling = this.http
+        .get<TransferStatusDTO>(`/bff/transfers/${created.id}`)
+        .pipe(catchError(() => EMPTY))
+        .subscribe((transfer) => this.result.set(transfer));
+      return;
+    }
     const deadline = timer(POLL_DEADLINE_MS).pipe(tap(() => this.timedOut.set(true)));
     this.polling = timer(POLL_EVERY_MS, POLL_EVERY_MS)
       .pipe(

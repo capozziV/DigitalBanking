@@ -30,7 +30,7 @@ describe('HomeComponent', () => {
   let http: HttpTestingController;
   const el = () => fixture.nativeElement as HTMLElement;
 
-  async function create(): Promise<void> {
+  async function create(withAccount = true): Promise<void> {
     TestBed.configureTestingModule({
       imports: [HomeComponent],
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
@@ -41,6 +41,7 @@ describe('HomeComponent', () => {
       email: 'v@example.com',
       phone: '+5511987654321',
     });
+    TestBed.inject(SessionService).account.set(withAccount ? account : null);
     fixture = TestBed.createComponent(HomeComponent);
     await fixture.whenStable();
   }
@@ -85,14 +86,16 @@ describe('HomeComponent', () => {
     expect(fill.style.width).toBe('25%');
   });
 
-  it('offers "Abrir conta" when the customer has no account and opens it', async () => {
-    await create();
-    await flushHome({ account: null, dailyLimit: null, latestEntries: [] });
+  it('offers "Abrir conta" without calling /bff/home when the session has no account, and opens it', async () => {
+    await create(false);
+    await tick();
+    await fixture.whenStable();
     const open = Array.from(el().querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Abrir conta'),
     ) as HTMLButtonElement;
     expect(open).toBeTruthy();
     expect(el().querySelector('.balance')).toBeNull();
+    http.expectNone('/bff/home');
     open.click();
     const req = http.expectOne('/bff/accounts');
     expect(req.request.method).toBe('POST');
@@ -100,8 +103,9 @@ describe('HomeComponent', () => {
     await tick();
     http.expectOne('/bff/me').flush({
       customer: { name: 'Vitor Capozzi', email: 'v@example.com', phone: '+5511987654321' },
-      account: null,
+      account,
     });
+    await tick();
     await flushHome({
       account: { ...account, balance: 10000, availableBalance: 10000, overdraftLimit: 0 },
       dailyLimit: { limit: 500000, used: 0, available: 500000 },
@@ -111,9 +115,19 @@ describe('HomeComponent', () => {
     expect(el().querySelector('.balance')?.textContent).toContain('R$ 100,00');
   });
 
-  it('shows the message of a failed account opening', async () => {
+  it('falls back to "Abrir conta" when /bff/home answers 404', async () => {
     await create();
-    await flushHome({ account: null, dailyLimit: null, latestEntries: [] });
+    http.expectOne('/bff/home').flush({}, { status: 404, statusText: 'Not Found' });
+    await tick();
+    await fixture.whenStable();
+    expect(el().textContent).toContain('Você ainda não tem conta');
+    expect(el().textContent).not.toContain('Não foi possível carregar');
+  });
+
+  it('shows the message of a failed account opening', async () => {
+    await create(false);
+    await tick();
+    await fixture.whenStable();
     (
       Array.from(el().querySelectorAll('button')).find((b) =>
         b.textContent?.includes('Abrir conta'),

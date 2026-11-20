@@ -45,4 +45,13 @@ describe('EntryListComponent', () => {
     expect(row.querySelector('.amount')?.classList).toContain('out');
     expect(row.querySelector('.amount')?.textContent).toContain('R$ 25,00');
   });
+
+  it('falls back to the entry kind when the description is null', async () => {
+    const fixture = TestBed.createComponent(EntryListComponent);
+    fixture.componentRef.setInput('entries', [{ ...entries[1], description: null }]);
+    await fixture.whenStable();
+    expect((fixture.nativeElement as HTMLElement).querySelector('li')?.textContent).toContain(
+      'Débito',
+    );
+  });
 });

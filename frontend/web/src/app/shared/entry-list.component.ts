@@ -15,7 +15,9 @@ import { MoneyPipe } from './money.pipe';
         <li>
           <app-entry-icon [kind]="entry.kind" />
           <span class="text">
-            <span class="description">{{ entry.description }}</span>
+            <span class="description">{{
+              entry.description ?? (entry.kind === 'CREDIT' ? 'Crédito' : 'Débito')
+            }}</span>
             <span class="date">{{ entry.createdAt | date: "dd/MM/yyyy 'às' HH:mm" }}</span>
           </span>
           <span

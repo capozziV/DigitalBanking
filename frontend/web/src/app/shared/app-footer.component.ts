@@ -8,7 +8,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
   styles: `
     footer {
       padding: 20px 0 8px;
-      color: #86868b;
+      color: var(--bank-muted);
       font-size: 12px;
       text-align: center;
     }
