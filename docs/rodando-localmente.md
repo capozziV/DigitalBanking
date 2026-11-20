@@ -231,11 +231,11 @@ docker compose -f infra/local/docker-compose.yml exec -T \
 O consumo é idempotente (`processed_events`), então devolver uma mensagem já processada não duplica a notificação.
 
 ### Cache do extrato
-A primeira página do extrato fica no Redis na chave `statement:first-page:v1:{accountId}`, com TTL de 50 a 70 s, e o consumo de um lançamento da conta apaga a chave. Para ver o que está guardado:
+A primeira página do extrato fica no Redis na chave `statement:first-page:v1:{accountId}`, com TTL de 50 a 70 s, e o consumo de um lançamento da conta apaga a chave e incrementa a versão da conta em `statement:first-page-version:v1:{accountId}` (TTL de 1 dia); a leitura só grava a página se a versão não mudou. Para ver o que está guardado:
 ```bash
-docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml exec redis redis-cli --scan --pattern 'statement:first-page:v1:*'
+docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml exec redis redis-cli --scan --pattern 'statement:first-page*:v1:*'
 ```
-As métricas do cache saem pelo actuator, direto no serviço ou pelo nginx (`statement.cache.requests` com a tag `result` = `hit`, `miss` ou `error`, só para leituras; `statement.cache.writes` com `result` = `ok` ou `error`, para a gravação da página; `statement.cache.evictions` com `result` = `ok` ou `error`):
+As métricas do cache saem pelo actuator, direto no serviço ou pelo nginx (`statement.cache.requests` com a tag `result` = `hit`, `miss` ou `error`, só para leituras; `statement.cache.writes` com `result` = `ok`, `stale` (gravação descartada porque a versão mudou) ou `error`, para a gravação da página; `statement.cache.evictions` com `result` = `ok` ou `error`):
 ```bash
 curl http://localhost:8084/actuator/metrics/statement.cache.requests
 curl http://localhost/statement/actuator/metrics/statement.cache.evictions

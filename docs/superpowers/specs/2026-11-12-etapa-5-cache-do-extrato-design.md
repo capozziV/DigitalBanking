@@ -116,3 +116,5 @@ A primeira página do extrato é a consulta mais comum, e o cache tira essa leit
 ## Riscos
 - **Serialização da página:** uma mudança no formato do lançamento quebra a leitura de páginas já guardadas. Mitigação: um JSON inválido conta como falta, e a versão no prefixo da chave muda junto com o formato.
 - **Timeout de 100 ms no runner do CI:** pode ser apertado sob carga. Os testes de integração usam o mesmo valor, e o de fallback mede o limite com folga (1 s).
+
+> **Atualização 2026-11-20:** a corrida descrita em "Corrida conhecida" foi corrigida no bug #226; ver [ADR 0009](../../adr/0009-cache-do-extrato.md).
