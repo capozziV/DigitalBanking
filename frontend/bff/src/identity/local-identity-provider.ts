@@ -13,7 +13,8 @@ interface StoredUser {
   hash: string;
 }
 
-/** The customer id is the token `sub`, so it must be stable per e-mail: a UUID (version 7 layout) from a hash. */
+/** The customer id is the token `sub`, so it must be stable per e-mail: a UUID (version 7 layout) from a hash.
+ * Same calculation as local_sub_for in infra/local/seed.sh; fixed vectors in both tests must change together. */
 function subFor(email: string): string {
   const bytes = createHash('sha256').update(`local-user:${email}`).digest().subarray(0, 16);
   bytes[6] = (bytes[6]! & 0x0f) | 0x70;

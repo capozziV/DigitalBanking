@@ -141,4 +141,16 @@ describe('LocalIdentityProvider', () => {
   it('fails the refresh for an unknown refresh token', async () => {
     await expect(provider.refresh('nope')).rejects.toMatchObject({ code: 'refresh_failed' });
   });
+
+  // Fixed vectors, mirrored in infra/local/seed-sub-test.sh (bash copy of subFor in the seed): they must change together.
+  it.each([
+    ['demo@example.test', 'da612c56-258a-7bb2-8660-0d2735a3e580'],
+    ['Demo@Example.TEST', 'da612c56-258a-7bb2-8660-0d2735a3e580'],
+    ['partner@example.test', '64d6b971-ac6e-76e9-a84e-2cbf71a7a591'],
+  ])('derives the stable sub for %s as %s', async (email, expectedSub) => {
+    await provider.signUp(email, '123456');
+    await provider.signIn(email, '123456');
+    const body = new URLSearchParams(fetchMock.mock.calls[0]![1].body);
+    expect(body.get('username')).toBe(expectedSub);
+  });
 });

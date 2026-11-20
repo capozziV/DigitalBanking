@@ -9,6 +9,8 @@ name: aws-up
 #   vars.COGNITO_DOMAIN_PREFIX   prefixo do dominio do Cognito, unico na regiao
 #   vars.OWNER_EMAIL             e-mail do usuario do dono no Cognito (opcional; padrao owner@example.test)
 #   secrets.OWNER_PASSWORD       senha do dono no Cognito (12+ caracteres, maiuscula, minuscula, numero e simbolo)
+#   secrets.DEMO_PASSWORD        senha do usuario de demonstracao (exatamente 6 digitos, ADR 0024)
+#   vars.DEMO_EMAIL, vars.DEMO_PHONE  e-mail e telefone E.164 do usuario de demonstracao (opcionais; padroes do seed)
 on:
   workflow_dispatch:
 
@@ -41,9 +43,10 @@ jobs:
           TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
           COGNITO_DOMAIN_PREFIX: ${{ vars.COGNITO_DOMAIN_PREFIX }}
           OWNER_PASSWORD: ${{ secrets.OWNER_PASSWORD }}
+          DEMO_PASSWORD: ${{ secrets.DEMO_PASSWORD }}
         run: |
           missing=()
-          for name in AWS_ROLE_ARN TF_STATE_BUCKET COGNITO_DOMAIN_PREFIX OWNER_PASSWORD; do
+          for name in AWS_ROLE_ARN TF_STATE_BUCKET COGNITO_DOMAIN_PREFIX OWNER_PASSWORD DEMO_PASSWORD; do
             [ -n "${!name}" ] || missing+=("$name")
           done
           if [ "${#missing[@]}" -gt 0 ]; then
@@ -168,11 +171,15 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           role-session-name: aws-up-smoke-${{ github.run_id }}
 
-      # Dono no grupo admin do Cognito, token por AdminInitiateAuth; duas execucoes comparadas (idempotencia).
-      - name: Seed do dono pela borda
+      # Dono no grupo admin do Cognito, token por AdminInitiateAuth; depois o usuario de demonstracao (AdminCreateUser e
+      # AdminSetUserPassword com a senha do segredo). Duas execucoes comparadas (idempotencia).
+      - name: Seed do dono e do usuario de demonstracao pela borda
         env:
           OWNER_PASSWORD: ${{ secrets.OWNER_PASSWORD }}
           OWNER_EMAIL: ${{ vars.OWNER_EMAIL }}
+          DEMO_PASSWORD: ${{ secrets.DEMO_PASSWORD }}
+          DEMO_EMAIL: ${{ vars.DEMO_EMAIL }}
+          DEMO_PHONE: ${{ vars.DEMO_PHONE }}
         run: bash infra/local/seed-check.sh --remote "$EDGE_URL"
 
       - name: Smoke pela borda
