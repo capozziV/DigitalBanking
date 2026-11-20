@@ -7,8 +7,8 @@ const onCi = !!process.env['CI'];
 
 export default defineConfig({
   testDir: './tests',
-  // Sign-up, the saga and the event projections run for real: more room than the default 30 s (a stale cached statement page can take ~70 s to refresh).
-  timeout: 150_000,
+  // Sign-up, the saga and the event projections run for real: more room than the default 30 s; each `eventually` waits up to 15 s and a spec chains a few.
+  timeout: 60_000,
   // Every spec creates its own customer (unique e-mail and phone), so files run in parallel.
   fullyParallel: true,
   forbidOnly: onCi,

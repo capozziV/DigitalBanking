@@ -483,6 +483,26 @@ describe('screens', () => {
       expect(response.body).toEqual({ id: TRANSFER_ID, status: 'FAILED' });
     });
 
+    it('turns the refusal for insufficient available balance (422 with transferId) into a FAILED transfer to follow', async () => {
+      t.backend.on('POST', `${TRANSFERS}/transfers`, {
+        status: 422,
+        body: {
+          type: '/problems/insufficient-available-balance',
+          title: 'Insufficient available balance',
+          status: 422,
+          detail: 'The available balance of the source account does not cover the transfer',
+          transferId: TRANSFER_ID,
+        },
+      });
+      const recipientTokenValue = await recipientToken();
+      const response = await user
+        .post('/bff/transfers')
+        .set('Idempotency-Key', KEY)
+        .send({ recipientToken: recipientTokenValue, amount: 2500 })
+        .expect(201);
+      expect(response.body).toEqual({ id: TRANSFER_ID, status: 'FAILED' });
+    });
+
     it('keeps passing other 422 problems through', async () => {
       t.backend.on('POST', `${TRANSFERS}/transfers`, problem(422, 'customer-blocked'));
       const recipientTokenValue = await recipientToken();

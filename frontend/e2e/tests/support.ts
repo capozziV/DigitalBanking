@@ -68,8 +68,7 @@ export async function openAccount(page: Page): Promise<void> {
 
 /**
  * Statement and notices are projected from events, so they may lag the screen that caused them: reloads the page until
- * the check passes. The wait covers the worst case the design accepts (ADR 0009): an empty first page cached just before
- * the entry arrives lives until its TTL (60 s +- 10 s).
+ * the check passes.
  */
 export async function eventually(page: Page, check: () => Promise<void>): Promise<void> {
   let attempts = 0;
@@ -77,7 +76,7 @@ export async function eventually(page: Page, check: () => Promise<void>): Promis
     // The first attempt looks at the page as it is; a reload before it would cut a pending navigation short.
     if (attempts++ > 0) await page.reload();
     await check();
-  }).toPass({ timeout: 80_000, intervals: [500, 1_000, 2_000, 5_000] });
+  }).toPass({ timeout: 15_000, intervals: [500, 1_000, 2_000, 5_000] });
 }
 
 /** Runs the first three steps of "Transferir" (phone, amount, confirm); the caller asserts the status step. */
