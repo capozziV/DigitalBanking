@@ -287,6 +287,23 @@ describe('screens', () => {
       t.backend.on('GET', `${ACCOUNTS}/accounts/me`, problem(404, 'account-not-found'));
       await user.get('/bff/home').expect(404);
     });
+
+    it('shows an empty list while the statement has not projected the new account yet', async () => {
+      // The projection is event-driven: right after "Abrir conta" the statement answers 404 for the account.
+      t.backend
+        .on('GET', `${ACCOUNTS}/accounts/me`, { body: accountDto })
+        .on('GET', `${TRANSFERS}/accounts/${ACCOUNT_ID}/daily-limit`, {
+          body: { day: 'd', limitCents: 500000, usedCents: 0, availableCents: 500000 },
+        })
+        .on(
+          'GET',
+          `${STATEMENT}/accounts/${ACCOUNT_ID}/statement`,
+          problem(404, 'account-not-found'),
+        );
+      const response = await user.get('/bff/home').expect(200);
+      expect(response.body.account.id).toBe(ACCOUNT_ID);
+      expect(response.body.latestEntries).toEqual([]);
+    });
   });
 
   describe('GET /bff/statement', () => {
@@ -315,6 +332,18 @@ describe('screens', () => {
         .on('GET', `${STATEMENT}/accounts/${ACCOUNT_ID}/statement`, {
           body: { accountId: ACCOUNT_ID, entries: [], nextCursor: null },
         });
+      const response = await user.get('/bff/statement').expect(200);
+      expect(response.body).toEqual({ entries: [], nextCursor: null });
+    });
+
+    it('answers an empty page while the statement has not projected the new account yet', async () => {
+      t.backend
+        .on('GET', `${ACCOUNTS}/accounts/me`, { body: accountDto })
+        .on(
+          'GET',
+          `${STATEMENT}/accounts/${ACCOUNT_ID}/statement`,
+          problem(404, 'account-not-found'),
+        );
       const response = await user.get('/bff/statement').expect(200);
       expect(response.body).toEqual({ entries: [], nextCursor: null });
     });
@@ -430,6 +459,38 @@ describe('screens', () => {
         amount: 2500,
       });
       expect(call.headers['idempotency-key']).toBe(KEY);
+    });
+
+    it('turns the refusal of the saga (422 transfer-failed) into a FAILED transfer to follow', async () => {
+      // The transfers service answers 422 with the id of the refused transfer; the screen shows it as "Recusada".
+      t.backend.on('POST', `${TRANSFERS}/transfers`, {
+        status: 422,
+        body: {
+          type: '/problems/transfer-failed',
+          title: 'Transfer failed',
+          status: 422,
+          detail: 'The transfer could not be completed',
+          reason: 'daily-limit-exceeded',
+          transferId: TRANSFER_ID,
+        },
+      });
+      const recipientTokenValue = await recipientToken();
+      const response = await user
+        .post('/bff/transfers')
+        .set('Idempotency-Key', KEY)
+        .send({ recipientToken: recipientTokenValue, amount: 500001 })
+        .expect(201);
+      expect(response.body).toEqual({ id: TRANSFER_ID, status: 'FAILED' });
+    });
+
+    it('keeps passing other 422 problems through', async () => {
+      t.backend.on('POST', `${TRANSFERS}/transfers`, problem(422, 'customer-blocked'));
+      const recipientTokenValue = await recipientToken();
+      await user
+        .post('/bff/transfers')
+        .set('Idempotency-Key', KEY)
+        .send({ recipientToken: recipientTokenValue, amount: 2500 })
+        .expect(422);
     });
 
     it('a double click sends the same Idempotency-Key twice and gets the same transfer', async () => {

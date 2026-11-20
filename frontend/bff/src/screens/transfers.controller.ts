@@ -11,7 +11,7 @@ import {
   UnprocessableEntityException,
   UseGuards,
 } from '@nestjs/common';
-import { BackendClient } from '../backend/backend-client.js';
+import { BackendClient, BackendProblemError } from '../backend/backend-client.js';
 import { CurrentSession, SessionGuard } from '../session/session.guard.js';
 import type { Session } from '../session/session.service.js';
 import { normalizePhone } from './phone.js';
@@ -135,13 +135,28 @@ export class TransfersController {
         message: 'Não é possível transferir para você mesmo.',
       });
     }
-    const transfer = await this.backend.post<TransferDTO>(
-      'transfers',
-      '/transfers',
-      { sourceAccountId: source.id, destinationAccountId, amount },
-      { ...options, idempotencyKey },
-    );
-    return { id: transfer.id, status: transfer.status };
+    try {
+      const transfer = await this.backend.post<TransferDTO>(
+        'transfers',
+        '/transfers',
+        { sourceAccountId: source.id, destinationAccountId, amount },
+        { ...options, idempotencyKey },
+      );
+      return { id: transfer.id, status: transfer.status };
+    } catch (error) {
+      // The saga refused it before taking any money (e.g. daily limit): the service answers 422 with the id of the
+      // FAILED transfer. The screen follows it like any other, and shows the reason of the status.
+      if (
+        error instanceof BackendProblemError &&
+        error.status === 422 &&
+        error.problem.type === '/problems/transfer-failed' &&
+        typeof error.problem['transferId'] === 'string' &&
+        UUID.test(error.problem['transferId'])
+      ) {
+        return { id: error.problem['transferId'], status: 'FAILED' };
+      }
+      throw error;
+    }
   }
 
   @Get(':id')

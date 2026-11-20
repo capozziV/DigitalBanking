@@ -2,10 +2,15 @@ import { BadRequestException, Controller, Get, Query, UseGuards } from '@nestjs/
 import { BackendClient } from '../backend/backend-client.js';
 import { CurrentSession, SessionGuard } from '../session/session.guard.js';
 import type { Session } from '../session/session.service.js';
-import { toAccountView, toEntryView, type AccountDTO, type StatementDTO } from './views.js';
+import { orNull, toAccountView, toEntryView, type AccountDTO, type StatementDTO } from './views.js';
 
 const LATEST_ENTRIES = 5;
 const MAX_CURSOR_LENGTH = 1024;
+/**
+ * The statement is a projection fed by events: right after the account opens it may not know it yet (404). That is an
+ * empty statement, not a missing account.
+ */
+const EMPTY_STATEMENT: StatementDTO = { entries: [], nextCursor: null };
 
 interface DailyLimitDTO {
   limitCents: number;
@@ -26,7 +31,9 @@ export class HomeController {
     // Statement default page (the cached one); the screen shows its first entries.
     const [limit, statement] = await Promise.all([
       this.backend.get<DailyLimitDTO>('transfers', `/accounts/${account.id}/daily-limit`, options),
-      this.backend.get<StatementDTO>('statement', `/accounts/${account.id}/statement`, options),
+      orNull(
+        this.backend.get<StatementDTO>('statement', `/accounts/${account.id}/statement`, options),
+      ),
     ]);
     return {
       account: toAccountView(account),
@@ -35,7 +42,9 @@ export class HomeController {
         used: limit.usedCents,
         available: limit.availableCents,
       },
-      latestEntries: statement.entries.slice(0, LATEST_ENTRIES).map(toEntryView),
+      latestEntries: (statement ?? EMPTY_STATEMENT).entries
+        .slice(0, LATEST_ENTRIES)
+        .map(toEntryView),
     };
   }
 
@@ -50,11 +59,14 @@ export class HomeController {
       }
       query = `?cursor=${encodeURIComponent(cursor)}`;
     }
-    const page = await this.backend.get<StatementDTO>(
-      'statement',
-      `/accounts/${account.id}/statement${query}`,
-      options,
-    );
+    const page =
+      (await orNull(
+        this.backend.get<StatementDTO>(
+          'statement',
+          `/accounts/${account.id}/statement${query}`,
+          options,
+        ),
+      )) ?? EMPTY_STATEMENT;
     return { entries: page.entries.map(toEntryView), nextCursor: page.nextCursor ?? null };
   }
 }

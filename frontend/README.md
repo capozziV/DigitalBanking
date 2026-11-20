@@ -19,7 +19,7 @@ Escolhemos o Node 24 (já instalado no ambiente) e não o 26: ambos são LTS e a
 - Teste de unidade do `web`: Vitest pelo `ng test` (padrão do Angular 22, com jsdom).
 - Teste de unidade do `bff`: Vitest com SWC (`unplugin-swc`) para emitir os metadados dos decorators do Nest; HTTP com `supertest`.
 - Lint: ESLint (flat config na raiz, `typescript-eslint` e `angular-eslint`) e Prettier (`npm run format` formata).
-- E2E: Playwright (Chromium). Sem `BASE_URL`, sobe o `ng serve` em `127.0.0.1:4200`; com `BASE_URL`, testa a pilha indicada.
+- E2E: Playwright (Chromium). Sem `BASE_URL`, sobe o `ng serve` em `127.0.0.1:4200`; com `BASE_URL`, testa a pilha indicada. Os specs em `e2e/tests/` rodam contra a pilha real (nginx, BFF, cinco serviços; sem `page.route`), cada um com e-mail e telefone próprios; o usuário de demonstração vem do `infra/local/seed.sh` (rode o seed antes). No CI, o job `frontend-e2e` sobe o perfil `apps` do compose com as imagens do job `images`, roda o seed e o Playwright com `BASE_URL=http://127.0.0.1`; o relatório e os traces saem como artefato `playwright-report` em falha.
 
 ## Tema
 
