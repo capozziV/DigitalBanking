@@ -1,5 +1,6 @@
 package io.github.capozziv.digitalbanking.notification.bootstrap
 
+import io.github.capozziv.digitalbanking.notification.application.port.CustomerNameRepository
 import io.github.capozziv.digitalbanking.notification.application.port.IdGenerator
 import io.github.capozziv.digitalbanking.notification.application.port.KnownAccountRepository
 import io.github.capozziv.digitalbanking.notification.application.port.NotificationRepository
@@ -24,14 +25,18 @@ class UseCaseConfiguration {
     fun consumeEventUseCase(
         processedEvents: ProcessedEventRepository,
         knownAccounts: KnownAccountRepository,
+        customerNames: CustomerNameRepository,
         notifications: NotificationRepository,
         transactions: TransactionRunner,
         ids: IdGenerator,
         clock: Clock,
-    ) = ConsumeEventUseCase(processedEvents, knownAccounts, notifications, transactions, ids, clock)
+    ) = ConsumeEventUseCase(processedEvents, knownAccounts, customerNames, notifications, transactions, ids, clock)
 
     @Bean
-    fun listNotificationsUseCase(notifications: NotificationRepository) = ListNotificationsUseCase(notifications)
+    fun listNotificationsUseCase(
+        notifications: NotificationRepository,
+        customerNames: CustomerNameRepository,
+    ) = ListNotificationsUseCase(notifications, customerNames)
 
     @Bean
     fun markNotificationsReadUseCase(

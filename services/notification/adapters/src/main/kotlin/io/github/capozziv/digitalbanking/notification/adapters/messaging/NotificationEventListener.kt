@@ -31,6 +31,11 @@ class NotificationEventListener(
         @Payload body: String,
     ) = consume(body)
 
+    @SqsListener(queueNames = [CUSTOMER_QUEUE], acknowledgementMode = ON_SUCCESS)
+    fun onCustomerEvent(
+        @Payload body: String,
+    ) = consume(body)
+
     private fun consume(body: String) {
         try {
             val event = reader.read(body)
@@ -49,6 +54,7 @@ class NotificationEventListener(
     private companion object {
         const val ACCOUNTS_QUEUE = "\${notification.queues.accounts}"
         const val TRANSFERS_QUEUE = "\${notification.queues.transfers}"
+        const val CUSTOMER_QUEUE = "\${notification.queues.customer}"
         const val ON_SUCCESS = "ON_SUCCESS"
 
         val log = LoggerFactory.getLogger(NotificationEventListener::class.java)

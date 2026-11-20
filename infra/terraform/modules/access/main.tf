@@ -17,8 +17,16 @@ locals {
       sns_publish = [var.topic_arns["customer-events.fifo"]]
     }
     notification = {
-      sqs_consume = [var.queue_arns["notification-accounts.fifo"], var.queue_arns["notification-transfers.fifo"]]
-      sqs_inspect = [var.queue_arns["notification-accounts-dlq.fifo"], var.queue_arns["notification-transfers-dlq.fifo"]]
+      sqs_consume = [
+        var.queue_arns["notification-accounts.fifo"],
+        var.queue_arns["notification-transfers.fifo"],
+        var.queue_arns["notification-customer.fifo"],
+      ]
+      sqs_inspect = [
+        var.queue_arns["notification-accounts-dlq.fifo"],
+        var.queue_arns["notification-transfers-dlq.fifo"],
+        var.queue_arns["notification-customer-dlq.fifo"],
+      ]
     }
     statement = {
       sqs_consume = [var.queue_arns["statement-accounts.fifo"]]

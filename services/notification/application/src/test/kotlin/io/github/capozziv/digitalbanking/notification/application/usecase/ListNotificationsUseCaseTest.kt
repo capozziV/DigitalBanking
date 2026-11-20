@@ -1,6 +1,9 @@
 package io.github.capozziv.digitalbanking.notification.application.usecase
 
 import io.github.capozziv.digitalbanking.notification.application.ForeignCustomerException
+import io.github.capozziv.digitalbanking.notification.application.fake.ImmediateTransactionRunner
+import io.github.capozziv.digitalbanking.notification.application.fake.InMemoryCustomerNameRepository
+import io.github.capozziv.digitalbanking.notification.application.fake.InMemoryKnownAccountRepository
 import io.github.capozziv.digitalbanking.notification.application.fake.InMemoryNotificationRepository
 import io.github.capozziv.digitalbanking.notification.application.port.NotificationCursor
 import io.github.capozziv.digitalbanking.notification.domain.Notification
@@ -14,7 +17,10 @@ import java.util.UUID
 
 class ListNotificationsUseCaseTest {
     private val repository = InMemoryNotificationRepository()
-    private val useCase = ListNotificationsUseCase(repository)
+    private val transactions = ImmediateTransactionRunner()
+    private val accounts = InMemoryKnownAccountRepository(transactions)
+    private val names = InMemoryCustomerNameRepository(transactions, accounts)
+    private val useCase = ListNotificationsUseCase(repository, names)
     private val customer = UUID.randomUUID()
     private val start = Instant.parse("2026-10-28T12:00:00Z")
 
@@ -133,9 +139,61 @@ class ListNotificationsUseCaseTest {
     }
 
     @Test
+    fun `a transfer is told with the name of the other party`() {
+        val sender = UUID.randomUUID()
+        val senderAccount = UUID.randomUUID()
+        val myAccount = UUID.randomUUID()
+        accounts.owners[senderAccount] = sender
+        names.names[sender] = "Ana Souza"
+        repository.saveAll(listOf(received(senderAccount, myAccount)))
+
+        val item = useCase.execute(Caller.Customer(customer), null, null).items.single()
+
+        assertThat(item.title).isEqualTo("Você recebeu uma transferência")
+        assertThat(item.body).isEqualTo("Você recebeu R$ 25,00 de Ana Souza.")
+    }
+
+    @Test
+    fun `a transfer whose other party has no name yet says another customer`() {
+        val senderAccount = UUID.randomUUID()
+        repository.saveAll(listOf(received(senderAccount, UUID.randomUUID())))
+
+        val item = useCase.execute(Caller.Customer(customer), null, null).items.single()
+
+        assertThat(item.body).isEqualTo("Você recebeu R$ 25,00 de outro cliente.")
+        assertThat(item.body).doesNotContain(senderAccount.toString())
+    }
+
+    @Test
+    fun `a notification about the customer's own account keeps its stored text`() {
+        store(1)
+
+        val item = useCase.execute(Caller.Customer(customer), null, null).items.single()
+
+        assertThat(item.title).isEqualTo("t0")
+        assertThat(item.body).isEqualTo("b0")
+    }
+
+    @Test
     fun `a service caller has no notifications`() {
         assertThatThrownBy { useCase.execute(Caller.Service, null, null) }.isInstanceOf(ForeignCustomerException::class.java)
     }
+
+    private fun received(
+        sourceAccount: UUID,
+        destinationAccount: UUID,
+    ) = notification(customer, 500).copy(
+        kind = NotificationKind.TRANSFER_RECEIVED,
+        title = "stored",
+        body = "Você recebeu R$ 25,00 da conta $sourceAccount.",
+        data =
+            mapOf(
+                "transferId" to UUID.randomUUID().toString(),
+                "sourceAccountId" to sourceAccount.toString(),
+                "destinationAccountId" to destinationAccount.toString(),
+                "amountCents" to 2500L,
+            ),
+    )
 
     private fun tied(index: Int) = notification(customer, 100 + index).copy(createdAt = start.plusSeconds(1000))
 

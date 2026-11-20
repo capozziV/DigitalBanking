@@ -1,6 +1,7 @@
 #!/bin/bash
 # Recursos do notification no LocalStack: uma fila FIFO por produtor (com DLQ FIFO), assinadas nos topicos
-# accounts-events.fifo e transfers-events.fifo (criados pelos scripts 01 e 02, que rodam antes deste).
+# accounts-events.fifo e transfers-events.fifo (criados pelos scripts 01 e 02, que rodam antes deste) e
+# customer-events.fifo (criado aqui com os mesmos atributos do script 05, que o recria sem efeito).
 # Idempotente: create-queue e subscribe com os mesmos parametros devolvem o recurso existente.
 # Raw message delivery: o corpo e o envelope do evento e eventType/correlationId chegam como atributos SQS.
 # Configuravel por variavel de ambiente do conteiner: NOTIFICATION_MAX_RECEIVE_COUNT (padrao 5) e
@@ -56,3 +57,4 @@ create_consumer_queue() {
 
 create_consumer_queue notification-accounts.fifo notification-accounts-dlq.fifo accounts-events.fifo
 create_consumer_queue notification-transfers.fifo notification-transfers-dlq.fifo transfers-events.fifo
+create_consumer_queue notification-customer.fifo notification-customer-dlq.fifo customer-events.fifo

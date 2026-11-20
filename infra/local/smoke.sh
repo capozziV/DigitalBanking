@@ -133,7 +133,7 @@ new_customer() {
   echo "$sub $token"
 }
 
-# O notification consome as filas notification-accounts.fifo e notification-transfers.fifo; espera ate 45 s (se o evento chegar antes da conta conhecida, a mensagem so volta apos 30 s de visibilidade).
+# O notification consome as filas notification-accounts.fifo, notification-transfers.fifo e notification-customer.fifo; espera ate 45 s (se o evento chegar antes da conta conhecida, a mensagem so volta apos 30 s de visibilidade).
 # Uso: check_notification <customerId> <token-do-cliente> <kind-esperado>
 check_notification() {
   local customer="$1" token="$2" expected="$3" kinds=""
