@@ -2,8 +2,8 @@ package contracts.messaging
 
 import sh.stubborn.contract.spec.Contract
 
-// CustomerRegistered v2 (v1 plus the phone, E.164) from customer-events.fifo. No service consumes it yet; the contract
-// pins the payload for the first consumer. A reader of v1 ignores the extra field.
+// CustomerRegistered v2 (v1 plus the phone, E.164) from customer-events.fifo. The notification service consumes it from
+// notification-customer.fifo (ADR 0025); the contract pins the payload it reads. A reader of v1 ignores the extra field.
 Contract.make {
     description 'customer registers a customer'
     label 'customerRegistered'
