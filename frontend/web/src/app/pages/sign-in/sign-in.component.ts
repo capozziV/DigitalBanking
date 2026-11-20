@@ -1,3 +1,4 @@
+import { AppFooterComponent } from '../../shared/app-footer.component';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -9,11 +10,11 @@ import { problemMessage } from '../../shared/problem';
 @Component({
   selector: 'app-sign-in',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [AppFooterComponent, ReactiveFormsModule, RouterLink],
   template: `
     <main class="auth-page">
       <section class="card auth-card">
-        <p class="muted">Banco Digital</p>
+        <p class="muted">capzzPay</p>
         <h1>Entrar</h1>
         @if (error()) {
           <p class="form-error" role="alert">{{ error() }}</p>
@@ -45,6 +46,7 @@ import { problemMessage } from '../../shared/problem';
           Ainda não tem conta? <a class="link" routerLink="/criar-conta">Criar conta</a>
         </p>
       </section>
+      <app-footer />
     </main>
   `,
 })

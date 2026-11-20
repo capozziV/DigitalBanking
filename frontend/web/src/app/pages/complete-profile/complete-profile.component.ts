@@ -1,3 +1,4 @@
+import { AppFooterComponent } from '../../shared/app-footer.component';
 import { HttpClient } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -11,11 +12,11 @@ import { problemMessage } from '../../shared/problem';
 @Component({
   selector: 'app-complete-profile',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, PhoneMaskDirective],
+  imports: [AppFooterComponent, ReactiveFormsModule, PhoneMaskDirective],
   template: `
     <main class="auth-page">
       <section class="card auth-card">
-        <p class="muted">Banco Digital</p>
+        <p class="muted">capzzPay</p>
         <h1>Completar cadastro</h1>
         <p class="muted">
           Diga seu nome completo e seu celular. É pelo celular que outros clientes enviam
@@ -49,6 +50,7 @@ import { problemMessage } from '../../shared/problem';
           </button>
         </form>
       </section>
+      <app-footer />
     </main>
   `,
 })

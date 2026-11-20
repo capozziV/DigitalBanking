@@ -2,6 +2,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
+import type { AccountSummary } from '../shared/api';
 
 export interface Customer {
   name: string;
@@ -11,7 +12,7 @@ export interface Customer {
 
 export interface Me {
   customer: Customer | null;
-  account: unknown | null;
+  account: AccountSummary | null;
 }
 
 interface SessionDTO {
@@ -28,7 +29,7 @@ export class SessionService {
   readonly authenticated = signal(false);
   readonly email = signal<string | null>(null);
   readonly customer = signal<Customer | null>(null);
-  readonly account = signal<unknown | null>(null);
+  readonly account = signal<AccountSummary | null>(null);
   readonly loaded = signal(false);
   readonly profileLoaded = signal(false);
   readonly unreadCount = signal(0);
