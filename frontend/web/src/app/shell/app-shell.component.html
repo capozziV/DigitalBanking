@@ -11,7 +11,7 @@
       >
         ☰
       </button>
-      <strong>banco</strong>
+      <strong>capzzPay</strong>
     </header>
     @if (open()) {
       <div class="backdrop" (click)="close()" aria-hidden="true"></div>
@@ -19,7 +19,7 @@
   }
 
   <aside class="menu" [class.fixed]="wide()" [class.open]="open()">
-    <strong class="brand">banco</strong>
+    <strong class="brand">capzzPay</strong>
     <nav #nav aria-label="Principal">
       <a routerLink="/inicio" routerLinkActive="active" (click)="close()">
         <span class="glyph" aria-hidden="true">⌂</span> Início
@@ -47,6 +47,10 @@
   </aside>
 
   <main class="content">
+    @if (session.loadFailed()) {
+      <app-load-error (retry)="retry()" />
+    }
     <router-outlet />
+    <app-footer />
   </main>
 </div>

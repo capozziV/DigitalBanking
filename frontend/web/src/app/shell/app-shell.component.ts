@@ -11,6 +11,8 @@ import {
 import { toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { map } from 'rxjs';
+import { AppFooterComponent } from '../shared/app-footer.component';
+import { LoadErrorComponent } from '../shared/load-error.component';
 import { SessionService } from '../core/session.service';
 
 /** Side menu: fixed from 960 px up, a sliding drawer (hamburger) below. */
@@ -18,7 +20,7 @@ import { SessionService } from '../core/session.service';
   selector: 'app-shell',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown.escape)': 'escape()' },
-  imports: [RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [AppFooterComponent, LoadErrorComponent, RouterLink, RouterLinkActive, RouterOutlet],
   templateUrl: './app-shell.component.html',
   styleUrl: './app-shell.component.scss',
 })
@@ -37,6 +39,10 @@ export class AppShellComponent implements OnInit {
 
   ngOnInit(): void {
     void this.session.refreshUnread();
+  }
+
+  protected retry(): void {
+    void this.session.reload();
   }
 
   protected close(): void {

@@ -5,6 +5,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
+import { SessionService } from '../core/session.service';
 import { tick } from '../testing/dom';
 import { AppShellComponent } from './app-shell.component';
 
@@ -48,6 +49,23 @@ describe('AppShellComponent', () => {
   }
 
   afterEach(() => http.verify());
+
+  it('shows the footer', async () => {
+    await create(true);
+    expect(el().querySelector('footer')?.textContent).toContain('© 2026 capzz.labs');
+  });
+
+  it('shows a discreet notice with a retry button only when the session load failed', async () => {
+    await create(true);
+    expect(el().textContent).not.toContain('Não foi possível carregar');
+    const session = TestBed.inject(SessionService);
+    session.loadFailed.set(true);
+    fixture.detectChanges();
+    expect(el().textContent).toContain('Não foi possível carregar. Tente de novo.');
+    const reload = vi.spyOn(session, 'reload').mockResolvedValue();
+    (el().querySelector('app-load-error button') as HTMLButtonElement).click();
+    expect(reload).toHaveBeenCalled();
+  });
 
   it('lists the five menu items', async () => {
     await create(true);
