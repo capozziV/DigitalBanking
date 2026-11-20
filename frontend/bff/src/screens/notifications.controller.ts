@@ -15,8 +15,17 @@ import { UUID } from './views.js';
 
 const MAX_CURSOR_LENGTH = 1024;
 
+interface NotificationDTO {
+  id: string;
+  kind: string;
+  title: string;
+  body: string;
+  createdAt: string;
+  readAt: string | null;
+}
+
 interface NotificationPageDTO {
-  items: { id: string }[];
+  items: NotificationDTO[];
   unreadCount: number;
   nextCursor: string | null;
 }
@@ -28,7 +37,7 @@ export class NotificationsController {
   constructor(private readonly backend: BackendClient) {}
 
   @Get()
-  list(@CurrentSession() session: Session, @Query('cursor') cursor?: unknown) {
+  async list(@CurrentSession() session: Session, @Query('cursor') cursor?: unknown) {
     let query = '';
     if (cursor !== undefined && cursor !== '') {
       if (typeof cursor !== 'string' || cursor.length > MAX_CURSOR_LENGTH) {
@@ -36,9 +45,24 @@ export class NotificationsController {
       }
       query = `?cursor=${encodeURIComponent(cursor)}`;
     }
-    return this.backend.get<NotificationPageDTO>('notification', `/notifications${query}`, {
-      token: session.accessToken,
-    });
+    const page = await this.backend.get<NotificationPageDTO>(
+      'notification',
+      `/notifications${query}`,
+      { token: session.accessToken },
+    );
+    // Whitelist: the event `data` carries account ids, which the browser must never see.
+    return {
+      items: page.items.map(({ id, kind, title, body, createdAt, readAt }) => ({
+        id,
+        kind,
+        title,
+        body,
+        createdAt,
+        readAt,
+      })),
+      unreadCount: page.unreadCount,
+      nextCursor: page.nextCursor,
+    };
   }
 
   @Get('unread-count')

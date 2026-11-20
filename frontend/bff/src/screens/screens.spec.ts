@@ -671,16 +671,20 @@ describe('screens', () => {
       kind: 'TRANSFER_RECEIVED',
       title: 'Transferência recebida',
       body: 'Você recebeu R$ 25,00',
-      data: {},
+      data: { sourceAccountId: ACCOUNT_ID, destinationAccountId: OTHER_ACCOUNT_ID },
       createdAt: '2026-11-19T10:00:00Z',
       readAt,
     });
     const page = { items: [item(NOTIFICATION_ID, null)], unreadCount: 3, nextCursor: 'c2' };
 
-    it('lists the page', async () => {
+    it('lists the page without the event data (no account ids reach the browser)', async () => {
       t.backend.on('GET', `${NOTIFICATION}/notifications`, { body: page });
       const response = await user.get('/bff/notifications').expect(200);
-      expect(response.body).toEqual(page);
+      const visible: Record<string, unknown> = { ...item(NOTIFICATION_ID, null) };
+      delete visible['data'];
+      expect(response.body).toEqual({ ...page, items: [visible] });
+      expect(JSON.stringify(response.body)).not.toContain(ACCOUNT_ID);
+      expect(JSON.stringify(response.body)).not.toContain(OTHER_ACCOUNT_ID);
     });
 
     it('forwards the cursor', async () => {

@@ -7,7 +7,7 @@ const onCi = !!process.env['CI'];
 
 export default defineConfig({
   testDir: './tests',
-  // Pior caso do cadastro até a primeira transferência: 3 × 15 s de `eventually` + 30 s de espera do status da transferência + passos de tela (cadastro, perfil, abertura de conta).
+  // Worst case from sign-up to the first transfer: 3 x 15 s of `eventually` + 30 s waiting for the transfer status + UI steps (sign-up, profile, account opening).
   timeout: 90_000,
   // Every spec creates its own customer (unique e-mail and phone), so files run in parallel.
   fullyParallel: true,
