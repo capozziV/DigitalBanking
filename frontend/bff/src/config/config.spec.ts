@@ -1,4 +1,6 @@
-import { loadConfig } from './config.js';
+import { loadConfig as load } from './config.js';
+
+const loadConfig = (env: Record<string, string>) => load(env);
 
 describe('loadConfig', () => {
   it('reads the optional MOCK_OAUTH2_HOST and leaves it undefined when empty or absent', () => {

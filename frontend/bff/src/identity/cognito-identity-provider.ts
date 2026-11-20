@@ -20,6 +20,8 @@ const ERROR_CODES: Record<string, IdentityErrorCode> = {
   UserNotConfirmedException: 'not_confirmed',
 };
 
+const REFRESH_REFUSED = new Set(['NotAuthorizedException', 'UserNotFoundException']);
+
 function translate(error: unknown): IdentityError {
   if (error instanceof IdentityError) return error;
   const name = error instanceof Error ? error.name : '';
@@ -108,9 +110,9 @@ export class CognitoIdentityProvider extends IdentityProvider {
       };
     } catch (error) {
       if (error instanceof IdentityError) throw error;
-      // Only a refused token ends the session; network and service errors are retryable.
+      // Only a refused token (or a user that no longer exists) ends the session; network and service errors are retryable.
       throw new IdentityError(
-        error instanceof Error && error.name === 'NotAuthorizedException'
+        error instanceof Error && REFRESH_REFUSED.has(error.name)
           ? 'refresh_failed'
           : 'unavailable',
       );
