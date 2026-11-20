@@ -14,7 +14,7 @@ As notificações de transferência devem mostrar o nome completo da outra parte
 
 ## Consequências
 - Positivas: a disponibilidade das notificações não depende de outros serviços; sem latência extra por item; sem token de máquina nem regra de acesso novos; sem migração de dados.
-- Negativas: o nome é cópia eventual. O cliente não troca o nome hoje; se um dia trocar, será preciso um evento de troca. O nome do cliente passa a existir também no banco do `notification` (dado fictício, banco simulado). Uma fila, um consumidor e duas tabelas novos para manter.
+- Negativas: o nome é cópia eventual. O cliente não troca o nome hoje; se um dia trocar, será preciso um evento de troca. O nome do cliente passa a existir também no banco do `notification` (dado fictício, banco simulado). Uma fila, um consumidor e uma tabela nova (`customer_names`) para manter; a `known_accounts` já existia e foi reaproveitada.
 
 ## Alternativas consideradas
 - **Consultar o `customer` ou o `accounts` de forma síncrona, ao consumir ou ao listar:** acoplaria a disponibilidade das notificações à de outros dois serviços, somaria latência por item e exigiria um token de máquina e regras de acesso novas.

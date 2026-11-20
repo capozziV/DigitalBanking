@@ -2,6 +2,7 @@
 
 - **Status:** aceito
 - **Data:** 2026-10-28
+- **Atualização 2026-11-20:** terceira fila, `notification-customer.fifo`, no [ADR 0025](0025-nome-da-contraparte-nas-notificacoes.md).
 
 ## Contexto
 O `notification` é o primeiro consumidor de eventos. Ele lê o `accounts` e o `transfers` em filas SQS FIFO e grava notificações dentro do aplicativo, que o cliente consulta pela API. A arquitetura previa o serviço "sem banco", mas ele precisa guardar as notificações, saber de quem é cada conta e não aplicar o mesmo evento duas vezes (a SQS entrega pelo menos uma vez). Detalhes na [spec da etapa 3](../superpowers/specs/2026-10-28-etapa-3-mensageria-design.md).
