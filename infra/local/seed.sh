@@ -121,7 +121,8 @@ if ! [[ "$DEMO_PASSWORD" =~ ^[0-9]{6}$ ]]; then
   exit 1
 fi
 
-# O mesmo calculo do BFF local: sha256("local-user:<email>"), 16 bytes, versao 7 e variante RFC 4122.
+# O mesmo calculo do BFF local (frontend/bff/src/identity/local-identity-provider.ts, subFor); os vetores fixos estao em
+# infra/local/seed-sub-test.sh e no spec do BFF e devem mudar juntos: sha256("local-user:<email>"), 16 bytes, versao 7 e variante RFC 4122.
 local_sub_for() {
   local hex
   hex=$(printf 'local-user:%s' "$1" | openssl dgst -sha256 -binary | xxd -p -c 64 | cut -c1-32)
@@ -134,7 +135,7 @@ bff_post() {
   local path="$1" expected="$2" status
   : > "$out"
   status=$(curl -sS -o "$out" -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
-    -d "{\"email\":\"$demo_email\",\"password\":\"$DEMO_PASSWORD\"}" "${BFF_URL:-$base}$path") || status=000
+    --data-binary @- "${BFF_URL:-$base}$path" <<< "{\"email\":\"$demo_email\",\"password\":\"$DEMO_PASSWORD\"}") || status=000
   case "|$expected|" in
     *"|$status|"*) echo "POST $path -> $status" >&2 ;;
     *)
