@@ -2,6 +2,9 @@
 # Prova a idempotencia do seed.sh: roda o seed duas vezes seguidas e compara as linhas OWNER_ACCOUNT e OWNER_BALANCE
 # das duas execucoes. Um credito em dobro (saldo diferente) ou uma conta nova falham aqui.
 # Com o 2o argumento, confere tambem o saldo da 1a execucao (num ambiente novo, o saldo inicial do seed: 1000000).
+# Confere tambem o usuario de demonstracao (linhas DEMO_* do seed): conta e saldo estaveis entre as duas execucoes,
+# saldo de 228000 (bonus 10000 + credito 200000 + 30000 recebidos - 12000 enviados), 2 transferencias concluidas,
+# 1 recusada pelo limite diario e as notificacoes WELCOME, TRANSFER_SENT, TRANSFER_RECEIVED e TRANSFER_FAILED.
 # Com --remote, repassa o modo ao seed.sh (ambiente na AWS, workflow aws-up).
 # Uso: infra/local/seed-check.sh [--remote] [url-base] [saldo-esperado]   (padrao http://127.0.0.1; usado pelo CI)
 set -euo pipefail
@@ -44,3 +47,28 @@ if [ -n "$expected_balance" ] && ! grep -qx "OWNER_BALANCE=$expected_balance" <<
   exit 1
 fi
 echo "OK: seed idempotente ($(tr '\n' ' ' <<< "$first_owner"))"
+
+# --- usuario de demonstracao ---
+demo_lines() {
+  grep -E '^DEMO_(ACCOUNT|BALANCE|COMPLETED|REFUSED|NOTIFICATIONS)=' <<< "$1" || true
+}
+first_demo=$(demo_lines "$first")
+second_demo=$(demo_lines "$second")
+if [ "$(wc -l <<< "$first_demo" | tr -d ' ')" != 5 ] || ! grep -q '^DEMO_ACCOUNT=.' <<< "$first_demo"; then
+  echo "FALHA: o seed nao imprimiu as linhas DEMO_* do usuario de demonstracao" >&2
+  exit 1
+fi
+if [ "$first_demo" != "$second_demo" ]; then
+  echo "FALHA: o seed do usuario de demonstracao nao e idempotente" >&2
+  echo "primeira: $(tr '\n' ' ' <<< "$first_demo")" >&2
+  echo "segunda:  $(tr '\n' ' ' <<< "$second_demo")" >&2
+  exit 1
+fi
+for expected in DEMO_BALANCE=228000 DEMO_COMPLETED=2 DEMO_REFUSED=1 \
+  'DEMO_NOTIFICATIONS=TRANSFER_FAILED TRANSFER_RECEIVED TRANSFER_SENT WELCOME'; do
+  if ! grep -qxF "$expected" <<< "$first_demo"; then
+    echo "FALHA: demo sem $expected (veio: $(tr '\n' ' ' <<< "$first_demo"))" >&2
+    exit 1
+  fi
+done
+echo "OK: usuario de demonstracao conferido ($(tr '\n' ' ' <<< "$first_demo"))"
