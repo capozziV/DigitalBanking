@@ -4,6 +4,7 @@ import { BackendClient, BackendProblemError, BackendUnavailableError } from './b
 
 const config = loadConfig({
   IDENTITY_PROVIDER: 'local',
+  RECIPIENT_TOKEN_SECRET: 'test-recipient-secret-0123456789',
   ACCOUNTS_URL: 'http://accounts.test:8081',
   TRANSFERS_URL: 'http://transfers.test:8082',
   CUSTOMER_URL: 'http://customer.test:8085',

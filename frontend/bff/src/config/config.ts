@@ -12,6 +12,8 @@ export interface AppConfig {
   mockOauth2Url: string;
   mockOauth2Host?: string;
   services: Record<BackendService, string>;
+  /** HMAC key of the recipient tokens (RECIPIENT_TOKEN_SECRET); never versioned. */
+  recipientTokenSecret: string;
   logLevel: string;
 }
 
@@ -29,6 +31,10 @@ export function loadConfig(env: Env): AppConfig {
       'COGNITO_REGION and COGNITO_CLIENT_ID are required with IDENTITY_PROVIDER=cognito',
     );
   }
+  const recipientTokenSecret = env['RECIPIENT_TOKEN_SECRET'] ?? '';
+  if (recipientTokenSecret.length < 16) {
+    throw new Error('RECIPIENT_TOKEN_SECRET is required and must have at least 16 characters');
+  }
   return {
     identityProvider: kind,
     cognitoRegion,
@@ -44,6 +50,7 @@ export function loadConfig(env: Env): AppConfig {
       statement: env['STATEMENT_URL'] ?? 'http://localhost:8084',
       customer: env['CUSTOMER_URL'] ?? 'http://localhost:8085',
     },
+    recipientTokenSecret,
     logLevel: env['LOG_LEVEL'] ?? 'info',
   };
 }

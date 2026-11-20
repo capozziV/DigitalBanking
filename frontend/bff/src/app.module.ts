@@ -11,11 +11,23 @@ import { LocalIdentityProvider } from './identity/local-identity-provider.js';
 import { LOGGER, createLogger } from './observability/logger.js';
 import { KEY_VALUE_STORE, type KeyValueStore } from './redis/key-value-store.js';
 import { RedisKeyValueStore } from './redis/redis-key-value-store.js';
+import { HomeController } from './screens/home.controller.js';
+import { NotificationsController } from './screens/notifications.controller.js';
+import { ProfileController } from './screens/profile.controller.js';
+import { RecipientTokenService } from './screens/recipient-token.js';
+import { TransfersController } from './screens/transfers.controller.js';
 import { SessionGuard } from './session/session.guard.js';
 import { CLOCK, SessionService } from './session/session.service.js';
 
 @Module({
-  controllers: [HealthController, AuthController],
+  controllers: [
+    HealthController,
+    AuthController,
+    ProfileController,
+    HomeController,
+    TransfersController,
+    NotificationsController,
+  ],
   providers: [
     { provide: APP_CONFIG, useFactory: () => loadConfig(process.env) },
     {
@@ -42,6 +54,7 @@ import { CLOCK, SessionService } from './session/session.service.js';
     SessionService,
     SessionGuard,
     BackendClient,
+    RecipientTokenService,
   ],
   exports: [SessionGuard, SessionService, BackendClient, APP_CONFIG, LOGGER],
 })
