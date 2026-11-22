@@ -1,5 +1,5 @@
 import { createServer as createNetServer } from 'node:net';
-import type { AddressInfo } from 'node:net';
+import type { AddressInfo, Socket } from 'node:net';
 import { httpFetch } from './http-fetch.js';
 import { IdentityError } from './identity-provider.js';
 import { LocalIdentityProvider } from './local-identity-provider.js';
@@ -14,7 +14,10 @@ function tokenResponse(accessToken: string): Response {
 
 describe('LocalIdentityProvider timeout', () => {
   it('maps a mock that never answers to unavailable', async () => {
-    const hanging = createNetServer(() => undefined);
+    const sockets: Socket[] = [];
+    const hanging = createNetServer((socket) => {
+      sockets.push(socket);
+    });
     await new Promise<void>((resolve) => hanging.listen(0, '127.0.0.1', resolve));
     const port = (hanging.address() as AddressInfo).port;
     const store = new InMemoryKeyValueStore();
@@ -31,7 +34,8 @@ describe('LocalIdentityProvider timeout', () => {
         code: 'unavailable',
       });
     } finally {
-      hanging.close();
+      sockets.forEach((socket) => socket.destroy());
+      await new Promise((resolve) => hanging.close(resolve));
     }
   });
 });
