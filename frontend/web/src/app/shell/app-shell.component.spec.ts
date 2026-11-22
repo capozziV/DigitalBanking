@@ -186,4 +186,27 @@ describe('AppShellComponent', () => {
     expect(session.customer()).toBeNull();
     expect(navigate).toHaveBeenCalledWith('/entrar');
   });
+
+  it('says that the sign-out failed and leaves only after a retry works', async () => {
+    await create(true);
+    const session = TestBed.inject(SessionService);
+    session.authenticated.set(true);
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    (el().querySelector('button.sign-out') as HTMLButtonElement).click();
+    http
+      .expectOne('/bff/auth/sign-out')
+      .flush({}, { status: 503, statusText: 'Service Unavailable' });
+    await tick();
+    await fixture.whenStable();
+    const alert = el().querySelector('main [role="alert"]') as HTMLElement;
+    expect(alert?.textContent).toContain('Não foi possível confirmar a saída');
+    expect(navigate).not.toHaveBeenCalled();
+    const retry = alert.querySelector('button') as HTMLButtonElement;
+    expect(retry.textContent).toContain('Tentar de novo');
+    retry.click();
+    http.expectOne('/bff/auth/sign-out').flush(null, { status: 204, statusText: 'No Content' });
+    await tick();
+    expect(session.authenticated()).toBe(false);
+    expect(navigate).toHaveBeenCalledWith('/entrar');
+  });
 });

@@ -73,7 +73,9 @@ const NO_ACCOUNT: HomeDTO = { account: null, dailyLimit: null, latestEntries: []
       } @else {
         <section class="card panel">
           <h2>Você ainda não tem conta</h2>
-          <p class="muted">Abra a conta para receber o bônus de boas-vindas e transferir.</p>
+          <p class="muted">
+            Abra uma conta para transferir. O bônus de boas-vindas vale só para a primeira conta.
+          </p>
           @if (error()) {
             <p class="form-error" role="alert">{{ error() }}</p>
           }

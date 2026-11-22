@@ -3,12 +3,12 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { SessionService } from '../../core/session.service';
+import type { AccountSummary } from '../../shared/api';
 import { setInput, submit, tick } from '../../testing/dom';
 import { AccountComponent } from './account.component';
 
-const account = {
-  id: 'a1',
-  customerId: 'c1',
+// No id: the browser never gets an account id from the BFF.
+const account: AccountSummary = {
   type: 'GOLD',
   status: 'OPEN',
   balance: 0,

@@ -13,11 +13,13 @@ import {
   tap,
   timer,
 } from 'rxjs';
+import { SessionService } from '../../core/session.service';
 import { parseAmountToCents } from '../../shared/amount';
 import { MoneyPipe } from '../../shared/money.pipe';
 import { mobilePhone, phoneDigits } from '../../shared/phone';
 import { PhoneMaskDirective } from '../../shared/phone-mask.directive';
 import { problemMessage } from '../../shared/problem';
+import { TransferAttempt, TransferAttemptStore } from './transfer-attempt.store';
 
 type Step = 'phone' | 'amount' | 'confirm' | 'status';
 
@@ -108,7 +110,14 @@ const STATUS_TITLES: Record<string, string> = {
           <span class="small-label">para</span>
           <strong class="recipient">{{ recipientName() }}</strong>
           <div class="row">
-            <button class="btn btn-outline btn-auto" type="button" (click)="back()">Voltar</button>
+            <button
+              class="btn btn-outline btn-auto"
+              type="button"
+              [disabled]="busy()"
+              (click)="back()"
+            >
+              Voltar
+            </button>
             <button
               class="btn btn-primary btn-auto"
               type="button"
@@ -123,6 +132,13 @@ const STATUS_TITLES: Record<string, string> = {
           @let current = result();
           <span class="small-label">Transferência para {{ recipientName() }}</span>
           <strong class="value">{{ amountCents() | money }}</strong>
+          @if (resumed()) {
+            <p class="status" role="status" data-testid="resumed-notice">
+              Você já tinha confirmado uma transferência igual sem ver o resultado. Este é o
+              resultado dela: não houve um segundo envio. Para enviar mais uma, use Nova
+              transferência.
+            </p>
+          }
           <p class="status" role="status">
             @if (timedOut()) {
               Ainda processando. Veja o resultado no extrato em instantes.
@@ -173,6 +189,8 @@ const STATUS_TITLES: Record<string, string> = {
 })
 export class TransferComponent {
   private readonly http = inject(HttpClient);
+  private readonly session = inject(SessionService);
+  private readonly attempts = inject(TransferAttemptStore);
 
   protected readonly step = signal<Step>('phone');
   protected readonly busy = signal(false);
@@ -182,6 +200,7 @@ export class TransferComponent {
   protected readonly amountInvalid = signal(false);
   protected readonly result = signal<TransferStatusDTO>({ id: '', status: 'PENDING' });
   protected readonly timedOut = signal(false);
+  protected readonly resumed = signal(false);
 
   protected readonly phoneForm = inject(FormBuilder).nonNullable.group({
     phone: ['', [Validators.required, mobilePhone]],
@@ -189,14 +208,15 @@ export class TransferComponent {
   protected readonly amountForm = inject(FormBuilder).nonNullable.group({ amount: [''] });
 
   private recipientToken = '';
-  /** Born when the form opens and kept on every retry and double click of "Confirmar". */
-  private idempotencyKey = crypto.randomUUID();
-  /** Recipient and amount of the last attempt: a different body needs a different key. */
-  private attempt: string | null = null;
+  private recipientPhone = '';
   private polling: Subscription | null = null;
+  private destroyed = false;
 
   constructor() {
-    inject(DestroyRef).onDestroy(() => this.polling?.unsubscribe());
+    inject(DestroyRef).onDestroy(() => {
+      this.destroyed = true;
+      this.polling?.unsubscribe();
+    });
   }
 
   protected isFinal(status: string): boolean {
@@ -220,6 +240,7 @@ export class TransferComponent {
       );
       this.recipientName.set(recipient.recipientName);
       this.recipientToken = recipient.recipientToken;
+      this.recipientPhone = phone;
       this.step.set('amount');
     } catch (error) {
       this.error.set(problemMessage(error, 'Não foi possível encontrar o destinatário.'));
@@ -238,30 +259,41 @@ export class TransferComponent {
   }
 
   protected back(): void {
+    if (this.busy()) return;
     this.error.set(null);
     this.step.set(this.step() === 'confirm' ? 'amount' : 'phone');
   }
 
   protected async confirm(): Promise<void> {
+    if (this.busy()) return;
     this.busy.set(true);
     this.error.set(null);
-    const attempt = `${this.recipientToken}:${this.amountCents()}`;
-    if (this.attempt !== null && this.attempt !== attempt) {
-      this.idempotencyKey = crypto.randomUUID();
-    }
-    this.attempt = attempt;
+    // Read before the first await, so that the key and the body are of the same transfer.
+    const body = { recipientToken: this.recipientToken, amount: this.amountCents() };
+    const intent = {
+      owner: this.session.email(),
+      phone: this.recipientPhone,
+      amount: body.amount,
+    };
     try {
+      const attempt = await this.attempts.open(intent);
+      this.resumed.set(attempt.resumed);
       const created = await firstValueFrom(
-        this.http.post<TransferStatusDTO>(
-          '/bff/transfers',
-          { recipientToken: this.recipientToken, amount: this.amountCents() },
-          { headers: { 'Idempotency-Key': this.idempotencyKey } },
+        this.http.post<TransferStatusDTO>('/bff/transfers', body, {
+          headers: { 'Idempotency-Key': attempt.idempotencyKey },
+        }),
+      );
+      // Nobody saw this result: the attempt stays open for when the user comes back.
+      if (this.destroyed) return;
+      this.step.set('status');
+      this.startPolling(created, attempt);
+    } catch (error) {
+      this.error.set(
+        problemMessage(
+          error,
+          'Não foi possível confirmar o envio. Tente de novo aqui ou confira o extrato.',
         ),
       );
-      this.step.set('status');
-      this.startPolling(created);
-    } catch (error) {
-      this.error.set(problemMessage(error, 'Não foi possível enviar a transferência.'));
     } finally {
       this.busy.set(false);
     }
@@ -269,9 +301,8 @@ export class TransferComponent {
 
   protected reset(): void {
     this.polling?.unsubscribe();
-    this.idempotencyKey = crypto.randomUUID();
-    this.attempt = null;
     this.recipientToken = '';
+    this.recipientPhone = '';
     this.phoneForm.reset();
     this.amountForm.reset();
     this.amountInvalid.set(false);
@@ -281,10 +312,10 @@ export class TransferComponent {
   }
 
   /** Asks for the status every second until it is final, for at most 30 s. */
-  private startPolling(created: TransferStatusDTO): void {
+  private startPolling(created: TransferStatusDTO, attempt: TransferAttempt): void {
     this.polling?.unsubscribe();
     this.timedOut.set(false);
-    this.result.set(created);
+    this.showStatus(created, attempt);
     if (this.isFinal(created.status)) {
       // The POST carries no reason: read it once now instead of waiting for a poll.
       this.polling = this.http
@@ -304,6 +335,11 @@ export class TransferComponent {
         takeWhile((transfer) => !this.isFinal(transfer.status), true),
         takeUntil(deadline),
       )
-      .subscribe((transfer) => this.result.set(transfer));
+      .subscribe((transfer) => this.showStatus(transfer, attempt));
+  }
+
+  private showStatus(transfer: TransferStatusDTO, attempt: TransferAttempt): void {
+    this.result.set(transfer);
+    if (this.isFinal(transfer.status)) this.attempts.settle(attempt);
   }
 }

@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import {
   ActivatedRouteSnapshot,
   provideRouter,
+  RedirectCommand,
   RouterStateSnapshot,
   UrlTree,
 } from '@angular/router';
@@ -30,6 +31,29 @@ describe('guards', () => {
 
   const urlOf = (result: boolean | UrlTree) =>
     result instanceof UrlTree ? result.toString() : result;
+
+  const guards = { authGuard, profileGuard, unregisteredGuard, guestGuard };
+  for (const [name, guard] of Object.entries(guards)) {
+    for (const failing of ['/bff/auth/session', '/bff/me']) {
+      it(`${name} sends a 503 of ${failing} to the error screen`, async () => {
+        const result = run(guard);
+        const session = http.expectOne('/bff/auth/session');
+        if (failing === '/bff/me') {
+          session.flush({ authenticated: true, email: 'a@b.com' });
+          await tick();
+        }
+        (failing === '/bff/me' ? http.expectOne(failing) : session).flush(
+          {},
+          { status: 503, statusText: 'Service Unavailable' },
+        );
+        const redirect = (await result) as unknown as RedirectCommand;
+        expect(redirect).toBeInstanceOf(RedirectCommand);
+        expect(redirect.redirectTo.toString()).toBe('/indisponivel');
+        // The address stays, so that a reload of the tab tries the same page again.
+        expect(redirect.navigationBehaviorOptions?.skipLocationChange).toBe(true);
+      });
+    }
+  }
 
   it('authGuard sends an anonymous visitor to Entrar', async () => {
     const result = run(authGuard);

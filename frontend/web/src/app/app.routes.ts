@@ -3,9 +3,11 @@ import { guestGuard, profileGuard, unregisteredGuard } from './core/guards';
 import { CompleteProfileComponent } from './pages/complete-profile/complete-profile.component';
 import { SignInComponent } from './pages/sign-in/sign-in.component';
 import { SignUpComponent } from './pages/sign-up/sign-up.component';
+import { UnavailableComponent } from './pages/unavailable/unavailable.component';
 import { AppShellComponent } from './shell/app-shell.component';
 
 export const routes: Routes = [
+  { path: 'indisponivel', component: UnavailableComponent },
   { path: 'entrar', component: SignInComponent, canActivate: [guestGuard] },
   { path: 'criar-conta', component: SignUpComponent, canActivate: [guestGuard] },
   {

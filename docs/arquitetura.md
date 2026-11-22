@@ -136,7 +136,7 @@ O BFF não passa pelo API Gateway: chama os Services do cluster direto. Testes m
 - Angular (standalone components, signals); Angular Material como biblioteca de componentes.
 - BFF em NestJS: login e cadastro pela API do Cognito (`SignUp`, `ConfirmSignUp`, `InitiateAuth` com `USER_PASSWORD_AUTH`), com app client próprio e sem hosted UI ([ADR 0024](adr/0024-login-e-telefone-do-app.md)), sessão no Redis, cookie `HttpOnly`, CSRF, refresh de token, correlation ID via `AsyncLocalStorage`, logs JSON com pino.
 - BFF expõe endpoints por tela (agregação), não proxy genérico.
-- `Idempotency-Key` gerada no Angular ao abrir o formulário de transferência; o BFF só repassa.
+- `Idempotency-Key` gerada no Angular por tentativa (usuário + telefone + valor), guardada no `sessionStorage` da aba até o estado final aparecer; o BFF só repassa. Limite: outra aba gera chave nova (#241).
 - Status da saga por polling (RxJS).
 - Front e BFF na mesma origem (API Gateway -> ALB interno roteando `/` e `/bff`), sem CORS; o BFF chama os Services do cluster direto.
 - Organização: `frontend/web` (Angular), `frontend/bff` (NestJS), `frontend/e2e` (Playwright), com workspaces npm e job próprio no CI.

@@ -90,7 +90,7 @@ O builder confere os caminhos exatos de cada rota no OpenAPI de cada serviço.
 
   O builder define o desenho exato e o registra.
 - **Validação da senha** de 6 dígitos também no BFF, não só na tela.
-- **`Idempotency-Key`** gerada no Angular ao abrir o formulário de transferência; o BFF só repassa.
+- **`Idempotency-Key`** gerada no Angular ao abrir o formulário de transferência; o BFF só repassa. *(Superado em 2026-11-22: uma chave por tentativa, ver a emenda do ADR 0005.)*
 - **Status da transferência** por polling (RxJS) a partir do Angular, com intervalo e prazo definidos pelo builder.
 
 ### 6.4 Mudanças no backend e na infraestrutura

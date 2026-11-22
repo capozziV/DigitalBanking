@@ -3,6 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
+import { SessionService } from '../../core/session.service';
 import { setInput, submit, submitButton, tick } from '../../testing/dom';
 import { CompleteProfileComponent } from './complete-profile.component';
 
@@ -60,11 +61,29 @@ describe('CompleteProfileComponent', () => {
     expect(req.request.body).toEqual({ name: 'Ana Souza', phone: '11987654321' });
     req.flush({});
     await tick();
+    http.expectOne('/bff/auth/session').flush({ authenticated: true, email: 'ana@example.com' });
+    await tick();
     http.expectOne('/bff/me').flush({
       customer: { name: 'Ana Souza', email: 'ana@example.com', phone: '+5511987654321' },
       account: null,
     });
     await tick();
+    expect(navigate).toHaveBeenCalledWith('/inicio');
+  });
+
+  it('leaves the registration when it worked and only the profile load failed', async () => {
+    setInput(fixture, 'name', 'Ana Souza');
+    setInput(fixture, 'phone', '11987654321');
+    await fixture.whenStable();
+    submit(fixture);
+    http.expectOne('/bff/customers').flush({});
+    await tick();
+    http.expectOne('/bff/auth/session').flush({ authenticated: true, email: 'ana@example.com' });
+    await tick();
+    http.expectOne('/bff/me').flush({}, { status: 503, statusText: 'Service Unavailable' });
+    await tick();
+    // The guard of Início then shows the error screen, instead of asking for the registration again.
+    expect(TestBed.inject(SessionService).loadFailed()).toBe(true);
     expect(navigate).toHaveBeenCalledWith('/inicio');
   });
 
