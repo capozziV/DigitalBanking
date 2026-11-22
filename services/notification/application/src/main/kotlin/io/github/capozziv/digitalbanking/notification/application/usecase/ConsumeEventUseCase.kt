@@ -56,7 +56,7 @@ class ConsumeEventUseCase(
                     Draft(
                         event.customerId,
                         NotificationKind.WELCOME,
-                        NotificationText.welcome(event.accountType, event.accountId),
+                        NotificationText.welcome(event.accountType),
                         mapOf("accountId" to event.accountId.toString(), "accountType" to event.accountType),
                     ),
                 )
@@ -83,7 +83,7 @@ class ConsumeEventUseCase(
                         event.customerId,
                         event.accountId,
                         NotificationKind.ACCOUNT_BLOCKED,
-                        NotificationText.accountBlocked(event.accountId),
+                        NotificationText.accountBlocked(),
                     ),
                 )
             }
@@ -94,7 +94,7 @@ class ConsumeEventUseCase(
                         event.customerId,
                         event.accountId,
                         NotificationKind.ACCOUNT_UNBLOCKED,
-                        NotificationText.accountUnblocked(event.accountId),
+                        NotificationText.accountUnblocked(),
                     ),
                 )
             }
@@ -105,7 +105,7 @@ class ConsumeEventUseCase(
                         event.customerId,
                         event.accountId,
                         NotificationKind.ACCOUNT_CLOSED,
-                        NotificationText.accountClosed(event.accountId),
+                        NotificationText.accountClosed(),
                     ),
                 )
             }

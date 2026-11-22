@@ -89,8 +89,8 @@ class NotificationApiIntegrationTest : NotificationWebIntegrationTest() {
 
         assertThat(item.get("id").asString()).isEqualTo(notification.id.toString())
         assertThat(item.get("kind").asString()).isEqualTo("WELCOME")
-        assertThat(item.get("title").asString()).isEqualTo(notification.title)
-        assertThat(item.get("body").asString()).isEqualTo(notification.body)
+        assertThat(item.get("title").asString()).isEqualTo("Bem-vindo ao capzzPay!")
+        assertThat(item.get("body").asString()).doesNotContain(notification.data.getValue("accountId").toString())
         assertThat(item.get("data").get("accountId").asString()).isEqualTo(notification.data.getValue("accountId"))
         assertThat(item.get("createdAt").asString()).isNotBlank()
         assertThat(item.get("readAt").isNull).isTrue()
@@ -139,6 +139,41 @@ class NotificationApiIntegrationTest : NotificationWebIntegrationTest() {
 
         assertThat(body).isEqualTo("Você recebeu R$ 25,00 de outro cliente.").doesNotContain(senderAccount.toString())
     }
+
+    @Test
+    fun `account notifications stored with the old text and the account number are read with the new text`() {
+        val account = UUID.randomUUID()
+        val data = mapOf<String, Any>("accountId" to account.toString(), "accountType" to "GOLD")
+        repository.saveAll(
+            listOf(
+                stored(NotificationKind.WELCOME, data, "Bem-vindo ao banco!", "Pelo número $account no sininho", 4),
+                stored(NotificationKind.ACCOUNT_BLOCKED, data, "Conta bloqueada", "Sua conta $account foi bloqueada.", 3),
+                stored(NotificationKind.ACCOUNT_UNBLOCKED, data, "Conta desbloqueada", "Sua conta $account foi desbloqueada.", 2),
+                stored(NotificationKind.ACCOUNT_CLOSED, data, "Conta encerrada", "Sua conta $account foi encerrada.", 1),
+            ),
+        )
+
+        val items = get("/notifications").body!!.get("items")
+
+        val byKind = (0 until items.size()).associate { items.get(it).get("kind").asString() to items.get(it) }
+        assertThat(byKind.getValue("WELCOME").get("title").asString()).isEqualTo("Bem-vindo ao capzzPay!")
+        assertThat(byKind.getValue("WELCOME").get("body").asString()).startsWith("Sua conta Gold está aberta.")
+        assertThat(byKind.getValue("ACCOUNT_BLOCKED").get("body").asString()).startsWith("Sua conta foi bloqueada.")
+        assertThat(byKind.getValue("ACCOUNT_UNBLOCKED").get("body").asString()).startsWith("Sua conta foi desbloqueada")
+        assertThat(byKind.getValue("ACCOUNT_CLOSED").get("body").asString()).startsWith("Sua conta foi encerrada.")
+        byKind.values.forEach {
+            assertThat(it.get("title").asString() + it.get("body").asString()).doesNotContain(account.toString())
+        }
+    }
+
+    private fun stored(
+        kind: NotificationKind,
+        data: Map<String, Any>,
+        title: String,
+        body: String,
+        minutesAgo: Long,
+    ) = aNotification(customerId = customer, kind = kind, data = data, createdAt = Instant.now().minus(minutesAgo, ChronoUnit.MINUTES))
+        .copy(title = title, body = body)
 
     /** As the service wrote it before the names existed: the account of the sender in the stored text. */
     private fun receivedTransfer(senderAccount: UUID) =

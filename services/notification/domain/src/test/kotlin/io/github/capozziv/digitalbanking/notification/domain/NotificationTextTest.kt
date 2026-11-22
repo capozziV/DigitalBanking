@@ -2,17 +2,33 @@ package io.github.capozziv.digitalbanking.notification.domain
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import java.util.UUID
 
 class NotificationTextTest {
-    private val account = UUID.fromString("0190f7a0-0000-7000-8000-000000000001")
+    @Test
+    fun `welcome names the account type and never the account number`() {
+        val content = NotificationText.welcome("GOLD")
+        assertThat(content.title).isEqualTo("Bem-vindo ao capzzPay!")
+        assertThat(content.body).isEqualTo(
+            "Sua conta Gold está aberta. Você pode receber transferências pelo seu celular cadastrado e acompanhar tudo em Notificações.",
+        )
+    }
 
     @Test
-    fun `welcome names the account type and number`() {
-        val content = NotificationText.welcome("GOLD", account)
-        assertThat(content.title).isEqualTo("Bem-vindo ao banco!")
-        assertThat(content.body).isEqualTo(
-            "Sua conta Gold está aberta. Você pode receber transferências pelo número $account e acompanhar tudo por aqui no sininho.",
+    fun `account status texts never carry an account number`() {
+        assertThat(NotificationText.accountBlocked()).isEqualTo(
+            NotificationContent(
+                "Conta bloqueada",
+                "Sua conta foi bloqueada. Ela continua recebendo transferências, mas não pode enviar valores enquanto estiver bloqueada.",
+            ),
+        )
+        assertThat(NotificationText.accountUnblocked()).isEqualTo(
+            NotificationContent("Conta desbloqueada", "Sua conta foi desbloqueada e já pode enviar transferências de novo."),
+        )
+        assertThat(NotificationText.accountClosed()).isEqualTo(
+            NotificationContent(
+                "Conta encerrada",
+                "Sua conta foi encerrada. O extrato continua disponível para consulta, e você pode abrir uma conta nova quando quiser.",
+            ),
         )
     }
 
@@ -103,31 +119,6 @@ class NotificationTextTest {
         assertThat(NotificationText.transferCompensated(1000, "Ana Souza", "credit-not-confirmed").body).isEqualTo(
             "Sua transferência de R$ 10,00 para Ana Souza não pôde ser concluída: " +
                 "não foi possível confirmar o crédito na conta de destino. O valor voltou para a sua conta.",
-        )
-    }
-
-    @Test
-    fun `account blocked says the account still receives but cannot send`() {
-        val content = NotificationText.accountBlocked(account)
-        assertThat(content.title).isEqualTo("Conta bloqueada")
-        assertThat(content.body).isEqualTo(
-            "Sua conta $account foi bloqueada. Ela continua recebendo transferências, mas não pode enviar valores enquanto estiver bloqueada.",
-        )
-    }
-
-    @Test
-    fun `account unblocked says the account can send again`() {
-        val content = NotificationText.accountUnblocked(account)
-        assertThat(content.title).isEqualTo("Conta desbloqueada")
-        assertThat(content.body).isEqualTo("Sua conta $account foi desbloqueada e já pode enviar transferências de novo.")
-    }
-
-    @Test
-    fun `account closed says the statement stays available`() {
-        val content = NotificationText.accountClosed(account)
-        assertThat(content.title).isEqualTo("Conta encerrada")
-        assertThat(content.body).isEqualTo(
-            "Sua conta $account foi encerrada. O extrato continua disponível para consulta, e você pode abrir uma conta nova quando quiser.",
         )
     }
 }

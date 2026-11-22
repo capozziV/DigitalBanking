@@ -69,11 +69,70 @@ class NotificationRenderingTest {
     }
 
     @Test
-    fun `a notification about the customer's own account has no other party and keeps its stored text`() {
+    fun `a notification about the customer's own account has no other party`() {
         val welcome = notification(NotificationKind.WELCOME, mapOf("accountId" to source.toString()))
 
         assertThat(welcome.counterpartAccountId()).isNull()
-        assertThat(NotificationText.render(welcome, "Ana Souza")).isEqualTo(NotificationContent("stored title", "stored body"))
+    }
+
+    @Test
+    fun `a stored welcome with the old text is rendered with the new one, from the account type`() {
+        val stored = notification(NotificationKind.WELCOME, mapOf("accountId" to source.toString(), "accountType" to "GOLD"))
+
+        assertThat(NotificationText.render(stored, null)).isEqualTo(NotificationText.welcome("GOLD"))
+    }
+
+    @Test
+    fun `a stored welcome without the account type is rendered without breaking and without an id`() {
+        val stored = notification(NotificationKind.WELCOME, mapOf("accountId" to source.toString()))
+
+        val content = NotificationText.render(stored, null)
+
+        assertThat(content.title).isEqualTo("Bem-vindo ao capzzPay!")
+        assertThat(content.body).doesNotContain(source.toString()).startsWith("Sua conta está aberta.")
+    }
+
+    @Test
+    fun `stored account status notifications are rendered with the new text`() {
+        val data = mapOf<String, Any>("accountId" to source.toString())
+
+        assertThat(NotificationText.render(notification(NotificationKind.ACCOUNT_BLOCKED, data), null))
+            .isEqualTo(NotificationText.accountBlocked())
+        assertThat(NotificationText.render(notification(NotificationKind.ACCOUNT_UNBLOCKED, data), null))
+            .isEqualTo(NotificationText.accountUnblocked())
+        assertThat(NotificationText.render(notification(NotificationKind.ACCOUNT_CLOSED, data), null))
+            .isEqualTo(NotificationText.accountClosed())
+    }
+
+    @Test
+    fun `an account type change is rendered from its data`() {
+        val stored = notification(NotificationKind.ACCOUNT_TYPE_CHANGED, mapOf("accountType" to "BLACK", "overdraftLimitCents" to 500_000L))
+
+        assertThat(NotificationText.render(stored, null)).isEqualTo(NotificationText.accountTypeChanged("BLACK", 500_000))
+    }
+
+    @Test
+    fun `no kind renders an id in its title or body, even when the stored text has one`() {
+        val uuid = Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+
+        NotificationKind.entries.forEach { kind ->
+            val stored =
+                notification(
+                    kind,
+                    mapOf(
+                        "accountId" to source.toString(),
+                        "sourceAccountId" to source.toString(),
+                        "destinationAccountId" to destination.toString(),
+                        "amountCents" to 12345L,
+                        "accountType" to "GOLD",
+                    ),
+                ).copy(title = "old $source", body = "old $source")
+
+            val content = NotificationText.render(stored, null)
+
+            assertThat(content.title).describedAs("$kind title").doesNotContainPattern(uuid.pattern)
+            assertThat(content.body).describedAs("$kind body").doesNotContainPattern(uuid.pattern)
+        }
     }
 
     private fun transfer(

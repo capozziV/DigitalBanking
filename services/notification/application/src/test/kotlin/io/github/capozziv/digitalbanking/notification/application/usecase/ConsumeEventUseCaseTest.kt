@@ -46,7 +46,7 @@ class ConsumeEventUseCaseTest {
         assertThat(outcome).isEqualTo(ConsumeOutcome.PROCESSED)
         assertThat(accounts.customerOf(aliceAccount)).isEqualTo(alice)
         val welcome = notifications.all.single()
-        val expected = NotificationText.welcome("GOLD", aliceAccount)
+        val expected = NotificationText.welcome("GOLD")
         assertThat(welcome.customerId).isEqualTo(alice)
         assertThat(welcome.kind).isEqualTo(NotificationKind.WELCOME)
         assertThat(welcome.title).isEqualTo(expected.title)
@@ -278,7 +278,7 @@ class ConsumeEventUseCaseTest {
         eventType: String,
         newEvent: (UUID, UUID, UUID) -> ReceivedEvent,
         kind: NotificationKind,
-        text: (UUID) -> NotificationContent,
+        text: () -> NotificationContent,
     ) {
         // The customer comes from the payload: the account does not need to be known here.
         val event = newEvent(UUID.randomUUID(), aliceAccount, alice)
@@ -289,8 +289,8 @@ class ConsumeEventUseCaseTest {
         val notification = notifications.all.single()
         assertThat(notification.customerId).isEqualTo(alice)
         assertThat(notification.kind).isEqualTo(kind)
-        assertThat(notification.title).isEqualTo(text(aliceAccount).title)
-        assertThat(notification.body).isEqualTo(text(aliceAccount).body)
+        assertThat(notification.title).isEqualTo(text().title)
+        assertThat(notification.body).isEqualTo(text().body)
         assertThat(notification.sourceEventId).isEqualTo(event.eventId)
         assertThat(notification.data).containsEntry("accountId", aliceAccount.toString())
         assertThat(processed.processed).containsEntry(event.eventId, eventType)
@@ -332,19 +332,19 @@ class ConsumeEventUseCaseTest {
                     "AccountBlocked",
                     { e: UUID, a: UUID, c: UUID -> ReceivedEvent.AccountBlocked(e, a, c) },
                     NotificationKind.ACCOUNT_BLOCKED,
-                    { a: UUID -> NotificationText.accountBlocked(a) },
+                    { NotificationText.accountBlocked() },
                 ),
                 Arguments.of(
                     "AccountUnblocked",
                     { e: UUID, a: UUID, c: UUID -> ReceivedEvent.AccountUnblocked(e, a, c) },
                     NotificationKind.ACCOUNT_UNBLOCKED,
-                    { a: UUID -> NotificationText.accountUnblocked(a) },
+                    { NotificationText.accountUnblocked() },
                 ),
                 Arguments.of(
                     "AccountClosed",
                     { e: UUID, a: UUID, c: UUID -> ReceivedEvent.AccountClosed(e, a, c) },
                     NotificationKind.ACCOUNT_CLOSED,
-                    { a: UUID -> NotificationText.accountClosed(a) },
+                    { NotificationText.accountClosed() },
                 ),
             )
     }
