@@ -5,14 +5,19 @@
 **Última atualização:** 2026-11-22
 **Board:** [Digital Banking no GitHub Projects](https://github.com/users/capozziV/projects/2)
 **Fase atual:** etapa 9 (frontend do capzzPay) na branch `etapa-9-frontend`, worktree `.claude/worktrees/etapa-9`, ainda sem PR e sem CI. As 13 tasks do plano e os pedidos #220, #221, #226, #227 e #228 estão juntados. Etapa 8 na `main` (PR #205).
-**Próximo passo:** corrigir os bugs #232 e #233 (prioridade alta) e, depois, a rodada final abaixo.
+**Próximo passo:** em andamento #232, #233, #229 e #102 (branches `etapa-9/fix-232`, `fix-233`, `fix-229`, `sininho-102`); depois, a rodada final abaixo.
 
 ## Handoff da etapa 9 (2026-11-22)
-O checkout principal está na `main` 132 commits atrás e com um `docs/status.md` antigo: vale este arquivo, no worktree da etapa. Há mudanças não commitadas no checkout principal (memória de agentes, grafo) e em sete worktrees de agentes: não descarte sem olhar.
+O checkout principal está na `main` 132 commits atrás e com um `docs/status.md` antigo: vale este arquivo, no worktree da etapa. Há mudanças não commitadas no checkout principal (memória de agentes, grafo) e em cerca de 35 worktrees: não descarte sem olhar.
+
+### Decisões do usuário em 2026-11-22
+- Tarefa: #232, #233, #229 e o sininho (#102) neste PR, depois a rodada final até o merge. Tudo em paralelo, sem validar com ele o que não tiver dúvida.
+- **#231:** os commits novos seguem com o e-mail atual por enquanto; o cartão fica aberto. Não ligar o bloqueio de push com e-mail no GitHub enquanto isso.
+- Stack `capzzpay`: pode atualizar com backup (em `.superpowers/backups/`), recriando só os serviços alterados com `--no-deps`, sem tocar em volumes nem no LocalStack, que não tem `PERSISTENCE`.
 
 ### Bugs achados com o app de pé
 - **#232:** o nome da contraparte (#228) não aparece para cliente cadastrado antes da fila `notification-customer.fifo`: os eventos saíram antes de ela existir, `customer_names` ficou vazia e tudo mostra "outro cliente". Falta backfill, teste do upgrade e o `seed-check` conferindo o nome. O ADR 0025 afirma o contrário ("sem migração de dados") e precisa de correção. Apagar os volumes só esconde o bug.
-- **#233:** a notificação de boas-vindas mostra o id da conta, "banco" e "sininho" (`NotificationText.kt:15-18`). O texto é gravado, então as já existentes também precisam de correção. O id ainda chega ao navegador dentro do `body`.
+- **#233:** a notificação de boas-vindas mostra o id da conta, "banco" e "sininho" (`NotificationText.kt:15-18`), e os textos de bloqueio, desbloqueio e encerramento também levam o id. O texto é gravado, então as já existentes também precisam de correção. O id ainda chega ao navegador dentro do `body`.
 
 ### Rodada final
 1. Com a máquina livre, uma verificação pesada por vez: `./gradlew build` completo, e2e completo (estourou o limite de 20 min do Gradle sob carga), `smoke.sh`, as cinco coleções Bruno, `npm ci`, lint, testes e build de `frontend/`, e o Playwright contra imagens novas. Nada disso rodou inteiro na branch juntada.
@@ -24,7 +29,6 @@ O checkout principal está na `main` 132 commits atrás e com um `docs/status.md
 
 ### Pendências
 - Débito: #222, #223, #225, #229 (teste instável do `transfers`, pode derrubar o CI do PR) e #230.
-- Perguntas sem resposta do usuário: as três "Open questions" do #102 (sininho de notificações).
 - Tarefas do usuário: #219 (reaplicar o `bootstrap`) e #224 (segredo `DEMO_PASSWORD`) antes do `aws-up`; #182 (subida real na AWS).
 - Decisões do usuário: o banco se chama **capzzPay** (pacotes e repositório seguem `digitalbanking`); rodapé "© 2026 capzz.labs"; "Notificações" no lugar de "Avisos"; nome da pessoa, e não id de conta, nas notificações.
 
