@@ -55,10 +55,12 @@ internal fun JdbcClient.outboxCorrelationIds(transferId: UUID): Map<String, Stri
 /**
  * Empties the saga tables in one transaction. The scheduler of an earlier test may still be recording a step, so the
  * transfers are locked first: `lock ... in exclusive mode` waits for the writers in flight and holds back the next ones
- * (the foreign key check of an insert into `transfer_step` takes a row share lock on `transfer`), and only then are the
- * steps deleted. Deleting the steps in a transaction of their own left a window for a step to commit before
- * `delete from transfer`, which then violated the foreign key. Locking `transfer` first, and never `transfer_step`,
- * keeps the lock order of the writers (which already hold the transfer when they insert a step), so it cannot deadlock.
+ * (the foreign key check of an insert into `transfer_step` or `transfer_manual_resolution` takes a row share lock on
+ * `transfer`), and only then are the steps deleted. Deleting the steps in a transaction of their own left a window for a
+ * step to commit before `delete from transfer`, which then violated the foreign key. Locking `transfer` first, and never
+ * the child tables, keeps the lock order of the writers: a manual resolution inserts into `transfer_manual_resolution`
+ * before it updates `transfer`, and that update goes ahead of the exclusive lock waiting in the queue, so there is no
+ * cycle and it cannot deadlock.
  */
 internal fun DataSource.deleteTransfers() {
     val jdbc = JdbcClient.create(this)
