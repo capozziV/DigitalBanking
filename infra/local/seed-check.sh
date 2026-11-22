@@ -3,12 +3,16 @@
 # das duas execucoes. Um credito em dobro (saldo diferente) ou uma conta nova falham aqui.
 # Com o 2o argumento, confere tambem o saldo da 1a execucao (num ambiente novo: credito inicial de 1000000 mais o bonus de boas-vindas de 10000 = 1010000).
 # Confere tambem o usuario de demonstracao (linhas DEMO_* do seed): conta e saldo estaveis entre as duas execucoes,
-# saldo de 228000 (bonus 10000 + credito 200000 + 30000 recebidos - 12000 enviados), 2 transferencias concluidas,
+# 2 transferencias concluidas,
 # 1 recusada pelo limite diario, as notificacoes WELCOME, TRANSFER_SENT, TRANSFER_RECEIVED e TRANSFER_FAILED e o nome
 # "Parceiro capzzPay" da contraparte nas tres notificacoes das transferencias do proprio seed, achadas pelo transferId em
 # todas as paginas (nunca "outro cliente"; as de terceiros, como recrutadores e Playwright, nao contam; linha
 # DEMO_COUNTERPART, que o seed so imprime depois de conferir os textos e de esperar a consistencia eventual; sem o nome,
 # o seed sai com erro).
+# O saldo absoluto do demo (228000 = bonus 10000 + credito 200000 + 30000 recebidos - 12000 enviados) so e exigido em ambiente
+# novo (com o 2o argumento): numa reexecucao (aws-up repetido) um visitante pode ter transferido para o demo, e vale so a
+# igualdade entre as duas execucoes. As transferencias do seed tem chave fixa (devolvem a mesma, concluida ou recusada),
+# entao DEMO_COMPLETED e DEMO_REFUSED nao mudam com o uso do demo nem com a virada do dia.
 # Com --remote, repassa o modo ao seed.sh (ambiente na AWS, workflow aws-up).
 # Uso: infra/local/seed-check.sh [--remote] [url-base] [saldo-esperado]   (padrao http://127.0.0.1; usado pelo CI)
 set -euo pipefail
@@ -68,8 +72,10 @@ if [ "$first_demo" != "$second_demo" ]; then
   echo "segunda:  $(tr '\n' ' ' <<< "$second_demo")" >&2
   exit 1
 fi
-for expected in DEMO_BALANCE=228000 DEMO_COMPLETED=2 DEMO_REFUSED=1 \
-  'DEMO_NOTIFICATIONS=TRANSFER_FAILED TRANSFER_RECEIVED TRANSFER_SENT WELCOME' 'DEMO_COUNTERPART=Parceiro capzzPay'; do
+expected_demo=(DEMO_COMPLETED=2 DEMO_REFUSED=1
+  'DEMO_NOTIFICATIONS=TRANSFER_FAILED TRANSFER_RECEIVED TRANSFER_SENT WELCOME' 'DEMO_COUNTERPART=Parceiro capzzPay')
+[ -z "$expected_balance" ] || expected_demo+=(DEMO_BALANCE=228000)
+for expected in "${expected_demo[@]}"; do
   if ! grep -qxF "$expected" <<< "$first_demo"; then
     echo "FALHA: demo sem $expected (veio: $(tr '\n' ' ' <<< "$first_demo"))" >&2
     exit 1

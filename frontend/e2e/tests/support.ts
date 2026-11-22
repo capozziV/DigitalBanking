@@ -94,3 +94,13 @@ export async function transfer(
   await page.getByRole('button', { name: 'Continuar' }).click();
   await page.getByRole('button', { name: 'Confirmar' }).click();
 }
+
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+const RAW_TRANSFER_DESCRIPTION = /Transfer (to|from)\b|compensation/i;
+
+/** The screen must not leak the other account's id or the raw English transfer description (customer-facing text is Portuguese). */
+export async function expectNoRawIds(page: Page): Promise<void> {
+  const text = await page.locator('body').innerText();
+  expect(text).not.toMatch(UUID);
+  expect(text).not.toMatch(RAW_TRANSFER_DESCRIPTION);
+}

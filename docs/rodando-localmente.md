@@ -150,6 +150,14 @@ docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml --p
 ```bash
 docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml --profile apps up -d --no-deps <serviço>
 ```
+Ao atualizar uma stack anterior à etapa 9 (e recriar `customer` e `notification`), crie antes a fila do `notification` para o `CustomerRegistered`: o `ready.d` só roda na partida do LocalStack, que aqui não é recriado, e a migration V5 do `customer` (que republica os cadastros para o `notification` aprender os nomes, [ADR 0025](adr/0025-nome-da-contraparte-nas-notificacoes.md)) roda uma vez só: sem a fila e a inscrição, os eventos republicados se perdem e os nomes ficam "outro cliente". O script é idempotente; rode-o no contêiner e confira a inscrição, antes de recriar os dois serviços:
+```bash
+docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml exec localstack bash /etc/localstack/init/ready.d/03-notification-queues.sh
+docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml exec -e AWS_ACCESS_KEY_ID=test -e AWS_SECRET_ACCESS_KEY=test -e AWS_DEFAULT_REGION=us-east-1 localstack \
+  aws --endpoint-url http://127.0.0.1:4566 sns list-subscriptions-by-topic --topic-arn arn:aws:sns:us-east-1:000000000000:customer-events.fifo --query 'Subscriptions[].Endpoint' --output text
+```
+A última saída tem de terminar em `:notification-customer.fifo`. Só então recrie `customer` e `notification` (comando acima).
+
 Se o serviço for `web` ou `bff`, recarregue em seguida o nginx, que resolve esses dois nomes só na partida e responderia `502` com o IP antigo:
 ```bash
 docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml exec nginx nginx -s reload
@@ -165,7 +173,7 @@ infra/local/smoke.sh http://localhost
 O smoke é o mesmo que roda no CI. Cada cliente do smoke é um `sub` novo, cadastrado no `customer` com o próprio token; créditos e débitos de preparo vão com o token de admin do usuário de teste do dono (sem depender do seed). Ele começa pela identidade: `GET /customers/me` sem token dá `401`, o cadastro novo fica `ACTIVE` (`OK: cliente <id> cadastrado e ACTIVE`), e a conta aberta pelo cliente dá `401` sem token e `404` para outro cliente (`OK: conta <id> sem token 401 e de outro cliente 404`). Na parte do `accounts`, ele imprime `OK: eventos de <id> na fila accounts-events-inspection.fifo: AccountOpened LedgerEntryRecorded:1 LedgerEntryRecorded:2 LedgerEntryRecorded:3` (o lançamento 1 é o bônus de boas-vindas); a parte do `transfers` (transferência com o token do cliente da origem) termina em `OK: eventos de <transferId> na fila transfers-events-inspection.fifo: TransferCompleted`; em seguida o smoke confere, em `GET /accounts/<origem>/daily-limit` pelo nginx, o limite diário da origem (`OK: limite diario da conta <id> (limite:usado:disponivel): 500000:400:499600`). As duas linhas seguintes são as do `notification`: o smoke espera até 45 s (45 tentativas de 1 s, acima da visibilidade de 30 s da fila: o evento da transferência pode chegar antes do da conta e voltar à fila só depois de 30 s) e confere `TRANSFER_SENT` para o cliente da origem e `TRANSFER_RECEIVED` para o da conta de destino, lendo `GET /notifications` pelo nginx com o token de cada um (`OK: cliente <id> recebeu TRANSFER_SENT` e `OK: cliente <id> recebeu TRANSFER_RECEIVED`). A última linha é a do `statement`: o smoke espera até 30 s e confere, em `GET /accounts/<id>/statement` pelo nginx, os três lançamentos da primeira conta (bônus, crédito e débito), do mais novo para o mais antigo (`OK: extrato da conta <id>: 3:DEBIT:300:10700 2:CREDIT:1000:11000 1:CREDIT:10000:10000`, no formato `sequence:kind:amount:balanceAfter`). Ele apaga da fila de inspeção `accounts-events-inspection.fifo` só as mensagens da conta que criou; as de outras contas ficam escondidas por 2 minutos depois do smoke. Como a fila de inspeção não tem consumidor (diferente de `statement-accounts.fifo`, que o `statement` consome), ela acumula: se o smoke não achar os próprios eventos, recrie o ambiente com `down -v`.
 
 ### Seed do usuário de teste do dono
-`infra/local/seed.sh` prepara o usuário de teste do dono (`sub` `00000000-0000-7000-8000-000000000001`, `Owner Test`, `owner@example.test`, grupo `admin`): cadastra o cliente no `customer`, o deixa `ACTIVE` pelo papel de admin, abre a conta dele e credita o saldo inicial pelo admin (1000000 centavos; com o bônus de boas-vindas de 10000 da abertura, o saldo do dono é 1010000). Uma conta só: o `accounts` aceita uma conta não encerrada por cliente (`409 customer-already-has-account`; depois de encerrar, o cliente pode abrir outra). As chaves de idempotência são fixas: rodar de novo devolve a mesma conta e não credita outra vez. As duas últimas linhas trazem o id e o saldo, legíveis por máquina (`OWNER_ACCOUNT=<id>` e `OWNER_BALANCE=<centavos>`); o CI roda o seed duas vezes e compara as duas com `infra/local/seed-check.sh` (o mesmo script serve à mão). Para começar do zero, recrie o ambiente com `down -v`.
+`infra/local/seed.sh` prepara o usuário de teste do dono (`sub` `00000000-0000-7000-8000-000000000001`, `Owner Test`, `owner@example.test`, grupo `admin`): cadastra o cliente no `customer`, o deixa `ACTIVE` pelo papel de admin, abre a conta dele e credita o saldo inicial pelo admin (1000000 centavos; com o bônus de boas-vindas de 10000 da abertura, o saldo do dono é 1010000). Uma conta só: o `accounts` aceita uma conta não encerrada por cliente (`409 customer-already-has-account`; depois de encerrar, o cliente pode abrir outra, mas sem novo bônus de boas-vindas). As chaves de idempotência são fixas: rodar de novo devolve a mesma conta e não credita outra vez. O seed também cadastra o usuário de demonstração (`demo@example.test`, telefone `+5511999990001`) e o parceiro (`+5511999990002`), abre as contas, credita 200000 e 100000 e faz as transferências do demo: 12000 enviados, 30000 recebidos e uma de 495000 recusada pelo limite diário. Ao fim, imprime as linhas legíveis por máquina `OWNER_ACCOUNT`, `OWNER_BALANCE`, `DEMO_ACCOUNT`, `DEMO_BALANCE`, `DEMO_COMPLETED`, `DEMO_REFUSED`, `DEMO_NOTIFICATIONS` e `DEMO_COUNTERPART`; o CI roda o seed duas vezes e compara as duas execuções com `infra/local/seed-check.sh` (o mesmo script serve à mão). Com o saldo esperado como 2º argumento (ambiente novo), o script confere também os saldos absolutos (dono 1010000; demo 228000, com o bônus). Sem o 2º argumento, como na reexecução do `aws-up` com o demo já usado por visitantes, só vale a igualdade entre as duas execuções; as transferências do seed têm chave fixa e não mudam com o uso nem com o dia. Para começar do zero, recrie o ambiente com `down -v`.
 
 ### A mesma sequência à mão
 Toda chamada leva `Authorization: Bearer <token>`. O cliente se cadastra no `customer` antes de abrir a conta, e o cliente da conta vem do token (sem `customerId` no corpo). Créditos e débitos são do admin (e da saga, com token de máquina); um cliente recebe `403`:
@@ -175,7 +183,7 @@ CUSTOMER_TOKEN=$(infra/local/auth/token.sh user $CUSTOMER)
 ADMIN_TOKEN=$(infra/local/auth/token.sh user 00000000-0000-7000-8000-000000000001 admin)
 
 curl -sS -X POST http://localhost/customers -H "Authorization: Bearer $CUSTOMER_TOKEN" \
-  -H 'Content-Type: application/json' -d '{"name":"Cliente Teste","email":"cliente@example.test"}'
+  -H 'Content-Type: application/json' -d '{"name":"Cliente Teste","email":"cliente@example.test","phone":"+5531988880001"}'
 
 ACCOUNT_ID=$(curl -sS -X POST http://localhost/accounts -H "Authorization: Bearer $CUSTOMER_TOKEN" \
   -H "Idempotency-Key: $(uuidgen)" | jq -r .id)
@@ -190,15 +198,15 @@ curl -sS -X POST http://localhost/accounts/$ACCOUNT_ID/debits -H "Authorization:
 
 curl -sS http://localhost/accounts/$ACCOUNT_ID -H "Authorization: Bearer $CUSTOMER_TOKEN"
 ```
-A última resposta mostra `"balance":700`. Valores em centavos. `Idempotency-Key` é obrigatório nos `POST` do `accounts` e do `transfers`; repetir a mesma chave devolve `200` com o resultado original. O header `X-Correlation-Id` é repassado pelo nginx e devolvido na resposta.
+A última resposta mostra `"balance":10700` (o bônus de boas-vindas de 10000 da abertura, mais 1000 e menos 300). O bônus é só da primeira conta de cada cliente: quem encerra a conta e abre outra não recebe de novo (ADR 0026). O telefone é obrigatório e único (celular E.164): rodar o cadastro de novo com outro e-mail e o mesmo telefone dá `409`; os dois usados aqui (`+55319888800xx`) não colidem com o seed, o smoke nem as coleções Bruno. Valores em centavos. `Idempotency-Key` é obrigatório nos `POST` do `accounts` e do `transfers`; repetir a mesma chave devolve `200` com o resultado original. O header `X-Correlation-Id` é repassado pelo nginx e devolvido na resposta.
 
 ### Transferência
-O smoke acima também cobre o `transfers`: abre duas contas, credita 1000 na origem, transfere 400, espera o status `COMPLETED`, confere os saldos (600 na origem, 400 no destino) e o evento `TransferCompleted` na fila `transfers-events-inspection.fifo`. A mesma sequência à mão (reaproveita o `ACCOUNT_ID` e o `CUSTOMER_TOKEN` do passo anterior como origem, que precisa de saldo para os 400; com o saldo 700 do passo anterior, sobra 300). A transferência vai com o token do cliente da origem; origem de outro cliente dá `404 account-not-found`, e cliente bloqueado (`PUT /admin/customers/{id}/status` com `{"status":"BLOCKED"}`) dá `422 customer-blocked`:
+O smoke acima também cobre o `transfers`: abre duas contas, credita 1000 na origem, transfere 400, espera o status `COMPLETED`, confere os saldos (10600 na origem, 10400 no destino, com o bônus de 10000 de cada conta) e o evento `TransferCompleted` na fila `transfers-events-inspection.fifo`. A mesma sequência à mão (reaproveita o `ACCOUNT_ID` e o `CUSTOMER_TOKEN` do passo anterior como origem, que precisa de saldo para os 400; com o saldo 10700 do passo anterior, sobra 10300). A transferência vai com o token do cliente da origem; origem de outro cliente dá `404 account-not-found`, e cliente bloqueado (`PUT /admin/customers/{id}/status` com `{"status":"BLOCKED"}`) dá `422 customer-blocked`:
 ```bash
 OTHER=$(uuidgen | tr 'A-Z' 'a-z')
 OTHER_TOKEN=$(infra/local/auth/token.sh user $OTHER)
 curl -sS -X POST http://localhost/customers -H "Authorization: Bearer $OTHER_TOKEN" \
-  -H 'Content-Type: application/json' -d '{"name":"Outro Cliente","email":"outro@example.test"}'
+  -H 'Content-Type: application/json' -d '{"name":"Outro Cliente","email":"outro@example.test","phone":"+5531988880002"}'
 DESTINATION_ID=$(curl -sS -X POST http://localhost/accounts -H "Authorization: Bearer $OTHER_TOKEN" \
   -H "Idempotency-Key: $(uuidgen)" | jq -r .id)
 
@@ -207,7 +215,7 @@ curl -sS -i -X POST http://localhost/transfers -H "Authorization: Bearer $CUSTOM
   -H 'Content-Type: application/json' -H "Idempotency-Key: $TRANSFER_KEY" \
   -d "{\"sourceAccountId\":\"$ACCOUNT_ID\",\"destinationAccountId\":\"$DESTINATION_ID\",\"amount\":400,\"description\":\"transferencia\"}"
 ```
-A primeira resposta é `201` com `"status":"COMPLETED"` (ou `202` se a saga ainda estiver em andamento; consulte `GET /transfers/<id>` até concluir). Repetir o mesmo comando com a mesma `Idempotency-Key` devolve `200` com a mesma transferência, sem novo débito. Os saldos ficam em 300 (origem) e 400 (destino):
+A primeira resposta é `201` com `"status":"COMPLETED"` (ou `202` se a saga ainda estiver em andamento; consulte `GET /transfers/<id>` até concluir). Repetir o mesmo comando com a mesma `Idempotency-Key` devolve `200` com a mesma transferência, sem novo débito. Os saldos ficam em 10300 (origem) e 10400 (destino):
 ```bash
 curl -sS http://localhost/accounts/$ACCOUNT_ID -H "Authorization: Bearer $CUSTOMER_TOKEN" | jq .balance
 curl -sS http://localhost/accounts/$DESTINATION_ID -H "Authorization: Bearer $OTHER_TOKEN" | jq .balance

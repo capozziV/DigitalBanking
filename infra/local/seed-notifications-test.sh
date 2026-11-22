@@ -98,5 +98,12 @@ if bash "$dir/seed-check.sh" > /dev/null 2>&1; then echo "FALHA: seed-check acei
 fake_seed 'echo "DEMO_COUNTERPART=outro cliente"'
 if bash "$dir/seed-check.sh" > /dev/null 2>&1; then echo "FALHA: seed-check aceitou a contraparte 'outro cliente'" >&2; fail=1; fi
 
+# Demo ja usado (um visitante transferiu para ele: saldo diferente de 228000): o saldo absoluto so vale em ambiente novo
+# (com o 2o argumento); na reexecucao (aws-up repetido) so a igualdade entre as duas execucoes.
+fake_seed 'echo "DEMO_COUNTERPART=Parceiro capzzPay"'
+sed -i.bak 's/^echo DEMO_BALANCE=.*/echo DEMO_BALANCE=231000/' "$dir/seed.sh"
+bash "$dir/seed-check.sh" > /dev/null 2>&1 || { echo "FALHA: seed-check recusou o demo usado numa reexecucao (sem 2o argumento)" >&2; fail=1; }
+if bash "$dir/seed-check.sh" http://127.0.0.1 1 > /dev/null 2>&1; then echo "FALHA: seed-check aceitou o demo com saldo diferente em ambiente novo" >&2; fail=1; fi
+
 [ "$fail" = 0 ] && echo "OK: conferencia do nome da contraparte"
 exit "$fail"
