@@ -5,8 +5,10 @@
 # Confere tambem o usuario de demonstracao (linhas DEMO_* do seed): conta e saldo estaveis entre as duas execucoes,
 # saldo de 228000 (bonus 10000 + credito 200000 + 30000 recebidos - 12000 enviados), 2 transferencias concluidas,
 # 1 recusada pelo limite diario, as notificacoes WELCOME, TRANSFER_SENT, TRANSFER_RECEIVED e TRANSFER_FAILED e o nome
-# "Parceiro capzzPay" da contraparte nas tres de transferencia (nunca "outro cliente"; linha DEMO_COUNTERPART, que o seed
-# so imprime depois de conferir os textos e de esperar a consistencia eventual; sem o nome, o seed sai com erro).
+# "Parceiro capzzPay" da contraparte nas tres notificacoes das transferencias do proprio seed, achadas pelo transferId em
+# todas as paginas (nunca "outro cliente"; as de terceiros, como recrutadores e Playwright, nao contam; linha
+# DEMO_COUNTERPART, que o seed so imprime depois de conferir os textos e de esperar a consistencia eventual; sem o nome,
+# o seed sai com erro).
 # Com --remote, repassa o modo ao seed.sh (ambiente na AWS, workflow aws-up).
 # Uso: infra/local/seed-check.sh [--remote] [url-base] [saldo-esperado]   (padrao http://127.0.0.1; usado pelo CI)
 set -euo pipefail
