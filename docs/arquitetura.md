@@ -142,4 +142,4 @@ O BFF não passa pelo API Gateway: chama os Services do cluster direto. Testes m
 ## Em aberto
 Fonte única das decisões pendentes; cada item tem um cartão `Decision` no [board](https://github.com/users/capozziV/projects/2). Ao decidir, registre no ADR indicado (ou crie um), remova o item daqui e feche o cartão.
 
-Nenhum item em aberto.
+- **Perda silenciosa no extrato na AWS (#239):** com 5 tentativas (cerca de 2,5 min) o lançamento vai para a DLQ, sem alarme, e some em 14 dias; as filas guardam 4 dias e a tabela não tem backup. Opções: (a) antes da primeira subida (#182), mais tentativas, alarme, retenção de 14 dias e backup contínuo (recomendada); (b) aceitar no ambiente efêmero e registrar em ADR. Decisão do usuário.
