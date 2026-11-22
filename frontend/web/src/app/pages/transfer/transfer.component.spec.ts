@@ -1,7 +1,12 @@
 import { provideHttpClient } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import {
+  HttpTestingController,
+  provideHttpClientTesting,
+  TestRequest,
+} from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { SessionService } from '../../core/session.service';
 import { setInput, submit, tick } from '../../testing/dom';
 import { TransferComponent } from './transfer.component';
 
@@ -19,7 +24,7 @@ describe('TransferComponent', () => {
     await fixture.whenStable();
   }
 
-  async function create(): Promise<void> {
+  async function create(email = 'ana@example.com'): Promise<void> {
     TestBed.configureTestingModule({
       imports: [TransferComponent],
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
@@ -27,17 +32,18 @@ describe('TransferComponent', () => {
     // Only the interval timers are faked: the polling is driven by hand, `tick` keeps working.
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
     http = TestBed.inject(HttpTestingController);
+    TestBed.inject(SessionService).email.set(email);
     fixture = TestBed.createComponent(TransferComponent);
     await fixture.whenStable();
   }
 
-  async function lookUp(phone = '(11) 98765-4321'): Promise<void> {
+  async function lookUp(phone = '(11) 98765-4321', token = 'token-1'): Promise<void> {
     setInput(fixture, 'phone', phone);
     await fixture.whenStable();
     submit(fixture);
     const req = http.expectOne((r) => r.url === '/bff/transfers/recipient');
-    expect(req.request.params.get('phone')).toBe('11987654321');
-    req.flush({ recipientName: 'Ana Souza', recipientToken: 'token-1' });
+    expect(req.request.params.get('phone')).toBe(phone.replace(/\D/g, ''));
+    req.flush({ recipientName: 'Ana Souza', recipientToken: token });
     await settle();
   }
 
@@ -55,9 +61,55 @@ describe('TransferComponent', () => {
     await enterAmount('25,00');
   }
 
+  /** The POSTs of "Confirmar": they may leave some macrotasks after the click. */
+  async function sentTransfers(count: number): Promise<TestRequest[]> {
+    const sent: TestRequest[] = [];
+    for (let turn = 0; turn < 500 && sent.length < count; turn++) {
+      sent.push(...http.match('/bff/transfers'));
+      if (sent.length < count) await tick();
+    }
+    expect(sent).toHaveLength(count);
+    return sent;
+  }
+
+  async function confirmTransfer(): Promise<TestRequest> {
+    button('Confirmar').click();
+    return (await sentTransfers(1))[0];
+  }
+
+  const keyOf = (request: TestRequest) => request.request.headers.get('Idempotency-Key');
+
+  /** Confirms and loses the answer: the transfer may or may not exist on the server. */
+  async function confirmAndLoseTheAnswer(): Promise<string | null> {
+    const request = await confirmTransfer();
+    request.flush({}, { status: 503, statusText: 'Unavailable' });
+    await settle();
+    return keyOf(request);
+  }
+
+  async function fillIn(amount = '25,00', phone?: string, token?: string): Promise<void> {
+    await lookUp(phone, token);
+    await enterAmount(amount);
+  }
+
+  async function backToPhone(): Promise<void> {
+    button('Voltar').click();
+    await settle();
+    button('Voltar').click();
+    await settle();
+  }
+
+  /** The router destroys the page when the user leaves it, and builds another one on return. */
+  async function leaveAndReturn(): Promise<void> {
+    fixture.destroy();
+    fixture = TestBed.createComponent(TransferComponent);
+    await fixture.whenStable();
+  }
+
   afterEach(() => {
     vi.useRealTimers();
     http.verify();
+    sessionStorage.clear();
   });
 
   it('starts at the phone step and blocks an invalid phone', async () => {
@@ -113,8 +165,7 @@ describe('TransferComponent', () => {
 
   it('sends the amount in cents with the recipient token and an Idempotency-Key', async () => {
     await reachConfirmation();
-    button('Confirmar').click();
-    const req = http.expectOne('/bff/transfers');
+    const req = await confirmTransfer();
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ recipientToken: 'token-1', amount: 2500 });
     expect(req.request.headers.get('Idempotency-Key')).toMatch(/^[0-9a-f-]{36}$/);
@@ -127,8 +178,7 @@ describe('TransferComponent', () => {
     const confirm = button('Confirmar');
     confirm.click();
     confirm.click();
-    const requests = http.match('/bff/transfers');
-    expect(requests).toHaveLength(2);
+    const requests = await sentTransfers(2);
     const key = requests[0].request.headers.get('Idempotency-Key');
     expect(key).toBeTruthy();
     expect(requests[1].request.headers.get('Idempotency-Key')).toBe(key);
@@ -138,14 +188,12 @@ describe('TransferComponent', () => {
 
   it('keeps the same Idempotency-Key when the user retries after a failure', async () => {
     await reachConfirmation();
-    button('Confirmar').click();
-    const first = http.expectOne('/bff/transfers');
+    const first = await confirmTransfer();
     const key = first.request.headers.get('Idempotency-Key');
     first.flush({}, { status: 503, statusText: 'Unavailable' });
     await settle();
     expect(el().querySelector('[role="alert"]')).not.toBeNull();
-    button('Confirmar').click();
-    const second = http.expectOne('/bff/transfers');
+    const second = await confirmTransfer();
     expect(second.request.headers.get('Idempotency-Key')).toBe(key);
     second.flush({ id: 't1', status: 'COMPLETED' });
     await settle();
@@ -154,16 +202,14 @@ describe('TransferComponent', () => {
 
   it('uses a new Idempotency-Key when the amount changes after going back', async () => {
     await reachConfirmation();
-    button('Confirmar').click();
-    const first = http.expectOne('/bff/transfers');
+    const first = await confirmTransfer();
     const key = first.request.headers.get('Idempotency-Key');
     first.flush({}, { status: 503, statusText: 'Unavailable' });
     await settle();
     button('Voltar').click();
     await settle();
     await enterAmount('30,00');
-    button('Confirmar').click();
-    const second = http.expectOne('/bff/transfers');
+    const second = await confirmTransfer();
     expect(second.request.body).toEqual({ recipientToken: 'token-1', amount: 3000 });
     expect(second.request.headers.get('Idempotency-Key')).not.toBe(key);
     second.flush({ id: 't1', status: 'PENDING' });
@@ -171,24 +217,21 @@ describe('TransferComponent', () => {
 
   it('keeps the Idempotency-Key when going back and confirming the same amount', async () => {
     await reachConfirmation();
-    button('Confirmar').click();
-    const first = http.expectOne('/bff/transfers');
+    const first = await confirmTransfer();
     const key = first.request.headers.get('Idempotency-Key');
     first.flush({}, { status: 503, statusText: 'Unavailable' });
     await settle();
     button('Voltar').click();
     await settle();
     await enterAmount('25,00');
-    button('Confirmar').click();
-    const second = http.expectOne('/bff/transfers');
+    const second = await confirmTransfer();
     expect(second.request.headers.get('Idempotency-Key')).toBe(key);
     second.flush({ id: 't1', status: 'PENDING' });
   });
 
   it('fetches the reason right away when the POST already answers a final status', async () => {
     await reachConfirmation();
-    button('Confirmar').click();
-    http.expectOne('/bff/transfers').flush({ id: 't1', status: 'FAILED' });
+    (await confirmTransfer()).flush({ id: 't1', status: 'FAILED' });
     await settle();
     http
       .expectOne('/bff/transfers/t1')
@@ -200,11 +243,224 @@ describe('TransferComponent', () => {
     http.expectNone('/bff/transfers/t1');
   });
 
+  describe('attempt of a transfer', () => {
+    it('keeps the key when the recipient is looked up again and gets another token', async () => {
+      await reachConfirmation();
+      const key = await confirmAndLoseTheAnswer();
+      await backToPhone();
+      await fillIn('25,00', '11987654321', 'token-2');
+      const retry = await confirmTransfer();
+      expect(retry.request.body).toEqual({ recipientToken: 'token-2', amount: 2500 });
+      expect(keyOf(retry)).toBe(key);
+      retry.flush({ id: 't1', status: 'PENDING' });
+    });
+
+    it('keeps the key when the recipient token expired after a lost answer', async () => {
+      await reachConfirmation();
+      const key = await confirmAndLoseTheAnswer();
+      const expired = await confirmTransfer();
+      expired.flush(
+        { code: 'invalid_recipient', message: 'Destinatário expirado. Busque o telefone de novo.' },
+        { status: 400, statusText: 'Bad Request' },
+      );
+      await settle();
+      expect(el().textContent).toContain('Destinatário expirado');
+      await backToPhone();
+      await fillIn('25,00', '(11) 98765-4321', 'token-2');
+      const retry = await confirmTransfer();
+      expect(keyOf(retry)).toBe(key);
+      retry.flush({ id: 't1', status: 'PENDING' });
+    });
+
+    it('uses a new key for another recipient', async () => {
+      await reachConfirmation();
+      const key = await confirmAndLoseTheAnswer();
+      await backToPhone();
+      // Same token on purpose: the phone tells the recipient, not the token.
+      await fillIn('25,00', '(21) 99876-5432', 'token-1');
+      const other = await confirmTransfer();
+      expect(keyOf(other)).not.toBe(key);
+      other.flush({ id: 't2', status: 'PENDING' });
+    });
+
+    it('finds the first key again when the user comes back to the first amount', async () => {
+      await reachConfirmation();
+      const key = await confirmAndLoseTheAnswer();
+      button('Voltar').click();
+      await settle();
+      await enterAmount('30,00');
+      await confirmAndLoseTheAnswer();
+      button('Voltar').click();
+      await settle();
+      await enterAmount('25,00');
+      const retry = await confirmTransfer();
+      expect(keyOf(retry)).toBe(key);
+      retry.flush({ id: 't1', status: 'PENDING' });
+    });
+
+    it('keeps the key when the user leaves the page after a lost answer and returns', async () => {
+      await reachConfirmation();
+      const key = await confirmAndLoseTheAnswer();
+      await leaveAndReturn();
+      await fillIn('25,00', '(11) 98765-4321', 'token-2');
+      const retry = await confirmTransfer();
+      expect(keyOf(retry)).toBe(key);
+      retry.flush({ id: 't1', status: 'PENDING' });
+    });
+
+    it('keeps the key when the tab reloads after a lost answer', async () => {
+      await reachConfirmation();
+      const key = await confirmAndLoseTheAnswer();
+      TestBed.resetTestingModule();
+      await reachConfirmation();
+      const retry = await confirmTransfer();
+      expect(keyOf(retry)).toBe(key);
+      retry.flush({ id: 't1', status: 'PENDING' });
+    });
+
+    it('keeps the key when the same user signs in again', async () => {
+      await reachConfirmation();
+      const key = await confirmAndLoseTheAnswer();
+      const session = TestBed.inject(SessionService);
+      session.clear();
+      session.email.set('ana@example.com');
+      await leaveAndReturn();
+      await fillIn();
+      const retry = await confirmTransfer();
+      expect(keyOf(retry)).toBe(key);
+      retry.flush({ id: 't1', status: 'PENDING' });
+    });
+
+    it('never gives the key to another user of the tab, and keeps it for its owner', async () => {
+      await reachConfirmation();
+      const key = await confirmAndLoseTheAnswer();
+      const session = TestBed.inject(SessionService);
+      session.clear();
+      session.email.set('bia@example.com');
+      await leaveAndReturn();
+      await fillIn();
+      expect(await confirmAndLoseTheAnswer()).not.toBe(key);
+      session.clear();
+      session.email.set('ana@example.com');
+      await leaveAndReturn();
+      await fillIn();
+      const retry = await confirmTransfer();
+      expect(keyOf(retry)).toBe(key);
+      retry.flush({ id: 't1', status: 'PENDING' });
+    });
+
+    it('does not leave the e-mail or the phone readable in the tab storage', async () => {
+      await reachConfirmation();
+      await confirmAndLoseTheAnswer();
+      const stored = JSON.stringify({ ...sessionStorage });
+      expect(sessionStorage.length).toBe(1);
+      expect(stored).not.toContain('ana@example.com');
+      expect(stored).not.toContain('987654321');
+    });
+
+    it('keeps the key when the user leaves before the final status', async () => {
+      await reachConfirmation();
+      const first = await confirmTransfer();
+      first.flush({ id: 't1', status: 'PENDING' });
+      await settle();
+      await leaveAndReturn();
+      await fillIn();
+      const retry = await confirmTransfer();
+      expect(keyOf(retry)).toBe(keyOf(first));
+      retry.flush({ id: 't1', status: 'PENDING' });
+    });
+
+    it('keeps the key when the final answer arrives after the user left the page', async () => {
+      await reachConfirmation();
+      const first = await confirmTransfer();
+      await leaveAndReturn();
+      first.flush({ id: 't1', status: 'COMPLETED' });
+      await settle();
+      // Nobody saw that result, and nobody is left to read its reason.
+      http.expectNone('/bff/transfers/t1');
+      await fillIn();
+      const retry = await confirmTransfer();
+      expect(keyOf(retry)).toBe(keyOf(first));
+      retry.flush({ id: 't1', status: 'PENDING' });
+    });
+
+    it('keeps the key for "Nova transferência" while the status is still not final', async () => {
+      await reachConfirmation();
+      const first = await confirmTransfer();
+      first.flush({ id: 't1', status: 'PENDING' });
+      await settle();
+      vi.advanceTimersByTime(30_000);
+      await settle();
+      http.match('/bff/transfers/t1');
+      button('Nova transferência').click();
+      await settle();
+      await fillIn();
+      const retry = await confirmTransfer();
+      expect(keyOf(retry)).toBe(keyOf(first));
+      retry.flush({ id: 't1', status: 'PENDING' });
+    });
+
+    it('a late answer of a double click does not drop the key of the next transfer', async () => {
+      await reachConfirmation();
+      const confirm = button('Confirmar');
+      confirm.click();
+      confirm.click();
+      const [late, answered] = await sentTransfers(2);
+      answered.flush({ id: 't1', status: 'COMPLETED' });
+      await settle();
+      http.expectOne('/bff/transfers/t1').flush({ id: 't1', status: 'COMPLETED' });
+      await settle();
+      button('Nova transferência').click();
+      await settle();
+      await fillIn();
+      const key = await confirmAndLoseTheAnswer();
+      late.flush({ id: 't1', status: 'COMPLETED' });
+      await settle();
+      http.expectOne('/bff/transfers/t1').flush({ id: 't1', status: 'COMPLETED' });
+      await leaveAndReturn();
+      await fillIn();
+      const retry = await confirmTransfer();
+      expect(keyOf(retry)).toBe(key);
+      retry.flush({ id: 't2', status: 'PENDING' });
+    });
+
+    for (const status of ['COMPLETED', 'FAILED', 'COMPENSATED']) {
+      it(`uses a new key for the same transfer after ${status} in the POST answer`, async () => {
+        await reachConfirmation();
+        const first = await confirmTransfer();
+        first.flush({ id: 't1', status });
+        await settle();
+        http.expectOne('/bff/transfers/t1').flush({ id: 't1', status });
+        await settle();
+        button('Nova transferência').click();
+        await settle();
+        await fillIn();
+        const next = await confirmTransfer();
+        expect(keyOf(next)).not.toBe(keyOf(first));
+        next.flush({ id: 't2', status: 'PENDING' });
+      });
+
+      it(`uses a new key after leaving a transfer that polling showed ${status}`, async () => {
+        await reachConfirmation();
+        const first = await confirmTransfer();
+        first.flush({ id: 't1', status: 'PENDING' });
+        await settle();
+        vi.advanceTimersByTime(1000);
+        http.expectOne('/bff/transfers/t1').flush({ id: 't1', status });
+        await settle();
+        await leaveAndReturn();
+        await fillIn();
+        const next = await confirmTransfer();
+        expect(keyOf(next)).not.toBe(keyOf(first));
+        next.flush({ id: 't2', status: 'PENDING' });
+      });
+    }
+  });
+
   describe('status polling', () => {
     async function confirmAndStartPolling(): Promise<void> {
       await reachConfirmation();
-      button('Confirmar').click();
-      http.expectOne('/bff/transfers').flush({ id: 't1', status: 'PENDING' });
+      (await confirmTransfer()).flush({ id: 't1', status: 'PENDING' });
       await settle();
     }
 
@@ -268,8 +524,7 @@ describe('TransferComponent', () => {
 
     it('starts a new transfer with a new Idempotency-Key', async () => {
       await reachConfirmation();
-      button('Confirmar').click();
-      const first = http.expectOne('/bff/transfers');
+      const first = await confirmTransfer();
       const firstKey = first.request.headers.get('Idempotency-Key');
       first.flush({ id: 't1', status: 'PENDING' });
       await settle();
@@ -278,8 +533,7 @@ describe('TransferComponent', () => {
       await settle();
       await lookUp();
       await enterAmount('1');
-      button('Confirmar').click();
-      const req = http.expectOne('/bff/transfers');
+      const req = await confirmTransfer();
       expect(req.request.headers.get('Idempotency-Key')).toMatch(/^[0-9a-f-]{36}$/);
       expect(req.request.headers.get('Idempotency-Key')).not.toBe(firstKey);
       req.flush({ id: 't2', status: 'PENDING' });
