@@ -12,7 +12,6 @@ import {
   Res,
   ServiceUnavailableException,
   UnauthorizedException,
-  UseGuards,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import type { Logger } from 'pino';
@@ -25,8 +24,8 @@ import {
   setSessionCookies,
   clearSessionCookies,
 } from '../session/cookies.js';
-import { CurrentSession, SessionGuard } from '../session/session.guard.js';
-import { SessionService, type Session } from '../session/session.service.js';
+import { assertCsrf } from '../session/session.guard.js';
+import { SessionService } from '../session/session.service.js';
 import { isValidPassword } from './password.js';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -98,15 +97,17 @@ export class AuthController {
     return { authenticated: true, email };
   }
 
+  // Not behind the SessionGuard, which renews the token: leaving works with the identity provider down.
   @Post('sign-out')
   @HttpCode(204)
-  @UseGuards(SessionGuard)
   async signOut(
-    @CurrentSession() session: Session,
+    @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
-    await this.sessions.destroy(session.id);
+    const session = await this.sessions.find(readCookie(request, SESSION_COOKIE));
+    if (session) assertCsrf(request, session);
     clearSessionCookies(response, this.config);
+    if (session) await this.sessions.destroy(session.id);
   }
 
   @Get('session')

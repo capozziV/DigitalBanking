@@ -11,6 +11,8 @@ export class FakeIdentityProvider extends IdentityProvider {
   expiresInSeconds = 3600;
   failRefresh = false;
   refreshError: IdentityErrorCode | Error | null = null;
+  /** Lets a test hold a refresh in flight. */
+  beforeRefresh: () => Promise<void> = async () => undefined;
   private issued = 0;
 
   async signUp(email: string): Promise<{ confirmationRequired: boolean }> {
@@ -30,6 +32,7 @@ export class FakeIdentityProvider extends IdentityProvider {
 
   async refresh(refreshToken: string): Promise<Tokens> {
     this.calls.push(`refresh:${refreshToken}`);
+    await this.beforeRefresh();
     if (this.refreshError) {
       throw typeof this.refreshError === 'string'
         ? new IdentityError(this.refreshError)

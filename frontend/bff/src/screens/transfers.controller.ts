@@ -20,23 +20,35 @@ import { UUID, isNotFound, type AccountDTO, type CustomerDTO, type TransferDTO }
 
 const MAX_IDEMPOTENCY_KEY_LENGTH = 255;
 
-/** Reasons the saga records (`StepOutcome` of the transfers service), in the words of the screen. */
-const REASONS: Record<string, string> = {
-  'daily-limit-exceeded': 'Você atingiu o limite diário de transferências.',
-  'daily-limit-unavailable': 'Não foi possível conferir o limite diário agora. Tente de novo.',
-  'insufficient-available-balance': 'Saldo insuficiente para esta transferência.',
-  'entry-not-found': 'A transferência não pôde ser concluída.',
-  'debit-not-confirmed':
-    'A transferência não pôde ser concluída e o valor voltou para a sua conta.',
-  'credit-not-confirmed':
-    'A transferência não pôde ser concluída e o valor voltou para a sua conta.',
-};
+/**
+ * Every `Transfer.failureReason` with something to tell the customer; the others are a raw type or status of accounts
+ * and get the generic text. Only the source's owner reads a transfer, and only a debit is refused by a block.
+ */
+const REASONS: ReadonlyMap<string, string> = new Map([
+  ['daily-limit-exceeded', 'Você atingiu o limite diário de transferências.'],
+  ['daily-limit-unavailable', 'Não foi possível conferir o limite diário agora. Tente de novo.'],
+  ['insufficient-available-balance', 'Saldo insuficiente para esta transferência.'],
+  // Always FAILED: the debit was looked up and is not in the ledger.
+  ['debit-not-confirmed', 'Não foi possível confirmar o débito. Nenhum valor saiu da sua conta.'],
+  ['account-blocked', 'Sua conta está bloqueada e não pode enviar transferências.'],
+  ['account-closed', 'Uma das contas está encerrada.'],
+  ['account-not-found', 'Uma das contas não foi encontrada.'],
+  ['credit-not-confirmed', 'Não foi possível confirmar o crédito na conta de destino.'],
+]);
 /** 422 problems of the transfers service that carry the id of the FAILED transfer. */
 const REFUSAL_TYPES = new Set([
   '/problems/transfer-failed',
   '/problems/insufficient-available-balance',
 ]);
 const GENERIC_REASON = 'A transferência não pôde ser concluída.';
+/** A debit confirmed after the deadline is returned without a recorded reason. */
+const RETURNED_WITHOUT_REASON =
+  'A transferência não pôde ser concluída e o valor voltou para a sua conta.';
+
+function reasonOf(status: string, code: string | null): string | null {
+  if (code !== null) return REASONS.get(code) ?? GENERIC_REASON;
+  return status === 'COMPENSATED' ? RETURNED_WITHOUT_REASON : null;
+}
 
 interface RecipientLookupDTO {
   customerId: string;
@@ -176,7 +188,7 @@ export class TransfersController {
     return {
       id: transfer.id,
       status: transfer.status,
-      reason: code === null ? null : (REASONS[code] ?? GENERIC_REASON),
+      reason: reasonOf(transfer.status, code),
       reasonCode: code,
     };
   }

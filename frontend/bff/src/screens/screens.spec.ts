@@ -88,7 +88,6 @@ describe('screens', () => {
       expect(response.body).toEqual({
         customer: { name: 'Ana Souza', email: 'ana@example.test', phone: '+5511987654321' },
         account: {
-          id: ACCOUNT_ID,
           type: 'FREE',
           status: 'ACTIVE',
           balance: 10000,
@@ -174,13 +173,13 @@ describe('screens', () => {
       expect(t.backend.calls).toEqual([]);
     });
 
-    it('passes the problem of the backend through (duplicate phone)', async () => {
-      t.backend.on('POST', `${CUSTOMER}/customers`, problem(409, 'phone-already-registered'));
+    it('answers the refusal of the backend in Portuguese (duplicate phone)', async () => {
+      t.backend.on('POST', `${CUSTOMER}/customers`, problem(409, 'phone-already-in-use'));
       const response = await user
         .post('/bff/customers')
         .send({ name: 'Ana', phone: '11987654321' });
       expect(response.status).toBe(409);
-      expect(response.body.detail).toBe('phone-already-registered detail');
+      expect(response.body.detail).toBe('Este celular já está em uso.');
     });
   });
 
@@ -204,7 +203,7 @@ describe('screens', () => {
     it('opens the account with a generated idempotency key', async () => {
       t.backend.on('POST', `${ACCOUNTS}/accounts`, { status: 201, body: accountDto });
       const response = await user.post('/bff/accounts').expect(201);
-      expect(response.body.id).toBe(ACCOUNT_ID);
+      expect(response.body).not.toHaveProperty('id');
       expect(response.body).not.toHaveProperty('customerId');
       const call = t.backend.callsTo('POST', `${ACCOUNTS}/accounts`)[0]!;
       expect(call.headers['idempotency-key']).toMatch(/^[0-9a-f-]{36}$/);
@@ -220,13 +219,13 @@ describe('screens', () => {
       expect(response.body.status).toBe('CLOSED');
     });
 
-    it('passes the refusal to close through (balance not zero)', async () => {
+    it('answers the refusal to close in Portuguese (balance not zero)', async () => {
       t.backend
         .on('GET', `${ACCOUNTS}/accounts/me`, { body: accountDto })
         .on('POST', `${ACCOUNTS}/accounts/${ACCOUNT_ID}/close`, problem(422, 'balance-not-zero'));
       const response = await user.post('/bff/accounts/close');
       expect(response.status).toBe(422);
-      expect(response.body.detail).toBe('balance-not-zero detail');
+      expect(response.body.detail).toBe('Para encerrar a conta, o saldo precisa estar zerado.');
     });
   });
 
@@ -248,7 +247,7 @@ describe('screens', () => {
           body: { accountId: ACCOUNT_ID, entries, nextCursor: 'abc' },
         });
       const response = await user.get('/bff/home').expect(200);
-      expect(response.body.account.id).toBe(ACCOUNT_ID);
+      expect(response.body.account).not.toHaveProperty('id');
       expect(response.body.dailyLimit).toEqual({ limit: 500000, used: 120000, available: 380000 });
       expect(response.body.latestEntries).toHaveLength(5);
       expect(response.body.latestEntries[0]).toEqual({
@@ -301,7 +300,7 @@ describe('screens', () => {
           problem(404, 'account-not-found'),
         );
       const response = await user.get('/bff/home').expect(200);
-      expect(response.body.account.id).toBe(ACCOUNT_ID);
+      expect(response.body.account.type).toBe('FREE');
       expect(response.body.latestEntries).toEqual([]);
     });
   });

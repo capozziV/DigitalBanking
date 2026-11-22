@@ -9,6 +9,7 @@ import {
   type ExecutionContext,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { SAFE_METHODS } from '../http/safe-methods.js';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
 import {
   CSRF_COOKIE,
@@ -28,7 +29,17 @@ function safeEqual(a: string, b: string | undefined): boolean {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
-const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+/** Double submit: the header matches both the session and the cookie. Throws 403 otherwise. */
+export function assertCsrf(request: Request, session: Session): void {
+  const header = request.header(CSRF_HEADER);
+  if (
+    !header ||
+    !safeEqual(header, session.csrfToken) ||
+    !safeEqual(header, readCookie(request, CSRF_COOKIE))
+  ) {
+    throw new ForbiddenException({ code: 'csrf', message: 'Token CSRF inválido.' });
+  }
+}
 
 /** Requires a live session; every method that is not GET also needs the double-submit CSRF header. */
 @Injectable()
@@ -48,16 +59,7 @@ export class SessionGuard implements CanActivate {
       clearSessionCookies(response, this.config);
       throw new UnauthorizedException({ code: 'session_expired', message: 'Sessão expirada.' });
     }
-    if (!SAFE_METHODS.has(request.method)) {
-      const header = request.header(CSRF_HEADER);
-      if (
-        !header ||
-        !safeEqual(header, session.csrfToken) ||
-        !safeEqual(header, readCookie(request, CSRF_COOKIE))
-      ) {
-        throw new ForbiddenException({ code: 'csrf', message: 'Token CSRF inválido.' });
-      }
-    }
+    if (!SAFE_METHODS.has(request.method)) assertCsrf(request, session);
     request.bankSession = session;
     return true;
   }

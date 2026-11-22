@@ -37,10 +37,9 @@ export interface TransferDTO {
   failureReason: string | null;
 }
 
-/** The account as the screens see it: no customer id, no more than the screens show. */
+/** The account as the screens see it: no account or customer id, no more than the screens show. */
 export function toAccountView(account: AccountDTO) {
   return {
-    id: account.id,
     type: account.type,
     status: account.status,
     balance: account.balance,
@@ -49,12 +48,32 @@ export function toAccountView(account: AccountDTO) {
   };
 }
 
+const UUID_PATTERN = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+
+export const UUID = new RegExp(`^${UUID_PATTERN}$`, 'i');
+const CONTAINS_UUID = new RegExp(UUID_PATTERN, 'i');
+
+/** The descriptions the saga writes on the ledger (`TransferStep` of the transfers service). */
+const SAGA_DESCRIPTIONS: readonly (readonly [RegExp, string])[] = [
+  [new RegExp(`^Transfer to ${UUID_PATTERN}$`, 'i'), 'Transferência enviada'],
+  [new RegExp(`^Transfer from ${UUID_PATTERN}$`, 'i'), 'Transferência recebida'],
+  [new RegExp(`^Transfer ${UUID_PATTERN} compensation$`, 'i'), 'Transferência devolvida'],
+];
+
+/** Translated on read, so that the entries already recorded are fixed too; no id gets through. */
+function descriptionOf({ description, kind }: StatementEntryDTO): string | null {
+  if (!description || !CONTAINS_UUID.test(description)) return description;
+  const known = SAGA_DESCRIPTIONS.find(([format]) => format.test(description));
+  if (known) return known[1];
+  return kind === 'CREDIT' ? 'Crédito' : 'Débito';
+}
+
 export function toEntryView(entry: StatementEntryDTO) {
   return {
     id: entry.entryId,
     kind: entry.kind,
     amount: entry.amount,
-    description: entry.description,
+    description: descriptionOf(entry),
     balanceAfter: entry.balanceAfter,
     createdAt: entry.createdAt,
   };
@@ -73,5 +92,3 @@ export async function orNull<T>(call: Promise<T>): Promise<T | null> {
     throw error;
   }
 }
-
-export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
