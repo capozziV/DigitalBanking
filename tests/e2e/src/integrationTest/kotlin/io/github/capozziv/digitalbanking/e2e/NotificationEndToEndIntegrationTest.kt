@@ -60,8 +60,8 @@ class NotificationEndToEndIntegrationTest {
         val account = accounts.openAccount(customer)
 
         val welcome = notifications.awaitKinds(customer, listOf("WELCOME"), NOTIFICATION_TIMEOUT).single()
-        assertThat(welcome.get("title").asString()).isEqualTo("Bem-vindo ao banco!")
-        assertThat(welcome.get("body").asString()).contains("Free").contains(account.toString())
+        assertThat(welcome.get("title").asString()).isEqualTo("Bem-vindo ao capzzPay!")
+        assertThat(welcome.get("body").asString()).contains("Free").doesNotContain(account.toString())
         assertThat(welcome.get("data").get("accountId").asString()).isEqualTo(account.toString())
     }
 

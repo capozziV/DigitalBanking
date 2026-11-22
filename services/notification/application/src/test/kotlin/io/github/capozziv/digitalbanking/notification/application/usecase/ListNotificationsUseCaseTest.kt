@@ -165,13 +165,13 @@ class ListNotificationsUseCaseTest {
     }
 
     @Test
-    fun `a notification about the customer's own account keeps its stored text`() {
+    fun `a notification about the customer's own account is rendered without an account number`() {
         store(1)
 
         val item = useCase.execute(Caller.Customer(customer), null, null).items.single()
 
-        assertThat(item.title).isEqualTo("t0")
-        assertThat(item.body).isEqualTo("b0")
+        assertThat(item.title).isEqualTo("Bem-vindo ao capzzPay!")
+        assertThat(item.body).doesNotContain("b0")
     }
 
     @Test
