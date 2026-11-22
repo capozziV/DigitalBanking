@@ -71,7 +71,7 @@ class AccountController(
      * caller's own (a customer, or an admin who is also a customer); the `customer` service must report it ACTIVE.
      */
     @Operation(
-        summary = "Open the caller's own account (type FREE, with the welcome bonus)",
+        summary = "Open the caller's own account (type FREE; the welcome bonus only on the customer's first account)",
         description =
             "No body: the customer is the `sub` of the token. The `customer` service is asked on every call, " +
                 "retries included, and nothing is written unless it reports the customer ACTIVE.",

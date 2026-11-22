@@ -59,6 +59,17 @@ class JdbcAccountRepository(
             .optional()
             .orElse(null)
 
+    override fun existsOtherByCustomerId(
+        customerId: UUID,
+        excludingId: UUID,
+    ): Boolean =
+        jdbcClient
+            .sql("select exists (select 1 from account where customer_id = :customerId and id <> :excludingId)")
+            .param("customerId", customerId)
+            .param("excludingId", excludingId)
+            .query(Boolean::class.java)
+            .single()
+
     override fun findNotClosedByCustomerId(customerId: UUID): Account? =
         jdbcClient
             .sql("select id, customer_id, type, status from account where customer_id = :customerId and status <> 'CLOSED'")

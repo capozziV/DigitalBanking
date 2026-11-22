@@ -17,6 +17,7 @@ import io.github.capozziv.digitalbanking.accounts.application.fake.StubCustomerG
 import io.github.capozziv.digitalbanking.accounts.application.port.CustomerStatus
 import io.github.capozziv.digitalbanking.accounts.domain.Account
 import io.github.capozziv.digitalbanking.accounts.domain.AccountOpened
+import io.github.capozziv.digitalbanking.accounts.domain.AccountStatus
 import io.github.capozziv.digitalbanking.accounts.domain.AccountType
 import io.github.capozziv.digitalbanking.accounts.domain.AccountTypeLimit
 import io.github.capozziv.digitalbanking.accounts.domain.AvailableBalance
@@ -119,6 +120,29 @@ class OpenAccountUseCaseTest {
         assertThat(result.view.balance).isEqualTo(Balance.ZERO)
         assertThat(entries.all()).isEmpty()
         assertThat(outbox.events).containsExactly(AccountOpened(expectedAccount.id, customerId, AccountType.FREE))
+    }
+
+    @Test
+    fun `a customer whose earlier account is closed gets no bonus on the new account`() {
+        val previous = Account(UUID.fromString("0199a0b0-0000-7000-8000-0000000000a1"), customerId, AccountType.FREE, AccountStatus.CLOSED)
+        accounts.insert(previous, "previous-opening-key")
+
+        val result = useCase.execute(OpenAccountCommand(Caller.Customer(customerId), OPENING_KEY))
+
+        assertThat(result.created).isTrue()
+        assertThat(result.view.balance).isEqualTo(Balance.ZERO)
+        assertThat(entries.all()).isEmpty()
+        assertThat(outbox.events).containsExactly(AccountOpened(expectedAccount.id, customerId, AccountType.FREE))
+    }
+
+    @Test
+    fun `the bonus of another customer does not stop the bonus of a new customer`() {
+        val other = Account(UUID.fromString("0199a0b0-0000-7000-8000-0000000000a2"), UUID.randomUUID(), AccountType.FREE)
+        accounts.insert(other, "other-opening-key")
+
+        val result = useCase.execute(OpenAccountCommand(Caller.Customer(customerId), OPENING_KEY))
+
+        assertThat(result.view.balance).isEqualTo(Balance(BONUS_CENTS))
     }
 
     @Test

@@ -20,6 +20,17 @@ interface AccountRepository {
 
     fun findById(id: UUID): Account?
 
+    /**
+     * Whether the customer has an account other than [excludingId], in any status (a closed one counts).
+     * OpenAccountUseCase asks it right after inserting the new account, in the same transaction: the partial
+     * unique index on not-closed accounts makes a concurrent opening of the same customer wait for that
+     * transaction, so every earlier account is already committed and visible here.
+     */
+    fun existsOtherByCustomerId(
+        customerId: UUID,
+        excludingId: UUID,
+    ): Boolean
+
     /** The account of the customer that is ACTIVE or BLOCKED (at most one exists), or null when none or all closed. */
     fun findNotClosedByCustomerId(customerId: UUID): Account?
 
