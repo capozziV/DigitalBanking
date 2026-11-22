@@ -47,7 +47,7 @@ class TransferAdminApiIntegrationTest : TransfersIntegrationTest() {
     @BeforeEach
     fun reset() {
         accountsServer.resetAll()
-        ownerJdbc.deleteTransfers()
+        ownerDataSource.deleteTransfers()
     }
 
     // --- who ---

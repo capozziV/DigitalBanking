@@ -37,7 +37,7 @@ class TransferMetricsIntegrationTest : TransfersIntegrationTest() {
 
     @BeforeEach
     fun reset() {
-        ownerJdbc.deleteTransfers()
+        ownerDataSource.deleteTransfers()
     }
 
     @Test
