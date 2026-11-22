@@ -442,7 +442,7 @@ jobs:
             grep -q '"status":"UP"' <<< "$body"
           done
       - name: Seed do usuario de teste do dono (duas vezes, comparadas, para provar a idempotencia)
-        run: bash infra/local/seed-check.sh http://127.0.0.1 1000000
+        run: bash infra/local/seed-check.sh http://127.0.0.1 1010000
       - name: Operacoes via nginx com tokens e eventos na fila de inspecao do LocalStack
         run: bash infra/local/smoke.sh http://127.0.0.1
       - name: Diagnostico em caso de falha (saude e logs dos conteineres, servicos inclusos)

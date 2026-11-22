@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Prova a idempotencia do seed.sh: roda o seed duas vezes seguidas e compara as linhas OWNER_ACCOUNT e OWNER_BALANCE
 # das duas execucoes. Um credito em dobro (saldo diferente) ou uma conta nova falham aqui.
-# Com o 2o argumento, confere tambem o saldo da 1a execucao (num ambiente novo, o saldo inicial do seed: 1000000).
+# Com o 2o argumento, confere tambem o saldo da 1a execucao (num ambiente novo: credito inicial de 1000000 mais o bonus de boas-vindas de 10000 = 1010000).
 # Confere tambem o usuario de demonstracao (linhas DEMO_* do seed): conta e saldo estaveis entre as duas execucoes,
 # saldo de 228000 (bonus 10000 + credito 200000 + 30000 recebidos - 12000 enviados), 2 transferencias concluidas,
 # 1 recusada pelo limite diario, as notificacoes WELCOME, TRANSFER_SENT, TRANSFER_RECEIVED e TRANSFER_FAILED e o nome

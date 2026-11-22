@@ -28,10 +28,13 @@ script:pre-request {
       });
       return r.data.access_token;
     }
+    // Telefone unico por cadastro (o customer exige celular E.164 e unico): DDD 21 e oito digitos aleatorios, fora do
+    // +5511999990000..2 do seed e do DDD 11 do smoke e da colecao customer.
+    const phone = () => "+55219" + String(Math.floor(Math.random() * 100000000)).padStart(8, "0");
     async function registeredCustomer(name) {
       const sub = bru.interpolate("{{$guid}}");
       const token = await userToken(sub, false);
-      await axios.post(`${base}/customers`, { name, email: `bruno-${sub}@example.test` },
+      await axios.post(`${base}/customers`, { name, email: `bruno-${sub}@example.test`, phone: phone() },
         { headers: { Authorization: `Bearer ${token}` } });
       return { sub, token };
     }
