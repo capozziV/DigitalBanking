@@ -32,17 +32,18 @@
 Navegador (Angular)
    │ cookie de sessão HttpOnly + token CSRF
    ▼
-ALB público ── /     → Angular (nginx)
+API Gateway HTTP API (autorizador JWT Cognito nas rotas da API)
+   │ VPC Link
+   ▼
+ALB interno ── rotas da API → customer / accounts / transfers / statement / notification
+            ├─ /     → Angular (nginx)
             └─ /bff  → BFF (NestJS, sessão no Redis)
                           │ Bearer token Cognito + X-Correlation-Id
                           ▼
-                 API Gateway HTTP API (autorizador JWT Cognito)
-                          │ VPC Link
-                          ▼
-                 ALB interno → customer / accounts / transfers / statement / notification
-                               (chamadas entre serviços pelo DNS de Service do Kubernetes)
+                 customer / accounts / transfers / statement / notification
+                 (o BFF e os serviços se chamam pelo DNS de Service do Kubernetes, sem passar pelo API Gateway)
 ```
-Até a etapa 9 não existe BFF: testes manuais usam a coleção Bruno versionada em `api/bruno/`.
+O BFF não passa pelo API Gateway: chama os Services do cluster direto. Testes manuais da API usam a coleção Bruno em `api/bruno/`.
 
 ## Decisões tomadas
 ### Dados e consistência
@@ -127,17 +128,17 @@ Até a etapa 9 não existe BFF: testes manuais usam a coleção Bruno versionada
 - Actuator fora da borda; endpoint público do EKS aberto para `0.0.0.0/0`; Redis sem TLS nem AUTH.
 - (ver [ADR 0021](adr/0021-deploy-e-ambiente-efemero.md), [`infra/terraform/README.md`](../infra/terraform/README.md) e [`deploy/helm/README.md`](../deploy/helm/README.md))
 
-### Frontend (etapa 9, detalhar depois)
+### Frontend (etapa 9)
 - Angular (standalone components, signals); Angular Material como biblioteca de componentes.
 - BFF em NestJS: login e cadastro pela API do Cognito (`SignUp`, `ConfirmSignUp`, `InitiateAuth` com `USER_PASSWORD_AUTH`), com app client próprio e sem hosted UI ([ADR 0024](adr/0024-login-e-telefone-do-app.md)), sessão no Redis, cookie `HttpOnly`, CSRF, refresh de token, correlation ID via `AsyncLocalStorage`, logs JSON com pino.
 - BFF expõe endpoints por tela (agregação), não proxy genérico.
 - `Idempotency-Key` gerada no Angular ao abrir o formulário de transferência; o BFF só repassa.
 - Status da saga por polling (RxJS).
-- Front e BFF na mesma origem (ALB roteando `/` e `/bff`), sem CORS.
-- Organização: `frontend/web` (Angular), `frontend/bff` (NestJS), `frontend/shared` (DTOs de apresentação, opcional), com workspaces npm/pnpm e job próprio no CI.
+- Front e BFF na mesma origem (API Gateway -> ALB interno roteando `/` e `/bff`), sem CORS; o BFF chama os Services do cluster direto.
+- Organização: `frontend/web` (Angular), `frontend/bff` (NestJS), `frontend/e2e` (Playwright), com workspaces npm e job próprio no CI.
 - (ver [ADR 0005](adr/0005-frontend-angular-e-bff-nestjs.md))
 
 ## Em aberto
 Fonte única das decisões pendentes; cada item tem um cartão `Decision` no [board](https://github.com/users/capozziV/projects/2). Ao decidir, registre no ADR indicado (ou crie um), remova o item daqui e feche o cartão.
 
-Nenhum item em aberto.
+- **Bônus de boas-vindas repetido (#237):** encerrar e reabrir a conta repete o bônus de R$ 100 (o bônus é por conta), sem fim e com limite diário novo. Opções: (a) um bônus por cliente (recomendada); (b) aceitar o comportamento e registrar em ADR. Decisão do usuário.
