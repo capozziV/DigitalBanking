@@ -11,7 +11,7 @@ O [ADR 0008](0008-statement-cqrs-dynamodb.md) definiu a chave do item do extrato
 - **Gravação idempotente:** `PutItem` com `ConditionExpression` `attribute_not_exists(accountId)`. Na `ConditionalCheckFailedException`, o `statement` lê o item da mesma chave: mesmo `entryId` é evento repetido (sem efeito, mensagem confirmada); `entryId` diferente é inconsistência (erro, a mensagem acaba na DLQ). Não há tabela `processed_events` (diferente do `notification`): o próprio item é a prova.
 - **`AccountOpened` também é consumido**, para guardar a conta e devolver `404` para conta desconhecida. Ele usa o mesmo tópico e o mesmo grupo FIFO por conta dos lançamentos, então chega antes deles.
 - **Cliente:** `DynamoDbClient` de baixo nível do AWS SDK v2, com todo o código do DynamoDB num só adapter. A condição fica explícita.
-- **Sem importação:** lançamentos anteriores ao `statement` não são importados (ambiente local descartável); a reconstrução fica para depois.
+- **Sem importação:** lançamentos anteriores ao `statement` não são importados (ambiente local descartável); a reconstrução fica para depois. *(Em 2026-11-22 o usuário cancelou a reconstrução, #117.)*
 
 ## Consequências
 - Positivas: a ordem do extrato é a do ledger, sem empate; a chave é determinística, então a idempotência não depende de relógio; sem tabela extra de eventos processados; paginação por `sequence` simples.
