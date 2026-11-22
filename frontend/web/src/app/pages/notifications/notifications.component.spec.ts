@@ -86,6 +86,33 @@ describe('NotificationsComponent', () => {
     expect(markAll()).toBeUndefined();
   });
 
+  it('does not let a count requested before marking as read bring the number back', async () => {
+    await create();
+    const session = TestBed.inject(SessionService);
+    session.unreadCount.set(1);
+    http.expectOne('/bff/notifications').flush({
+      items: [notification('1', null)],
+      unreadCount: 1,
+      nextCursor: null,
+    });
+    await settle();
+    void session.refreshUnread();
+    markAll()?.click();
+    http.expectOne('/bff/notifications/read').flush({ marked: 1 });
+    await settle();
+    http.expectOne('/bff/notifications').flush({
+      items: [notification('1', '2026-11-19T14:00:00Z')],
+      unreadCount: 0,
+      nextCursor: null,
+    });
+    await settle();
+    const calls = http.match('/bff/notifications/unread-count');
+    calls[0].flush({ count: 1 });
+    calls[calls.length - 1].flush({ count: 0 });
+    await settle();
+    expect(session.unreadCount()).toBe(0);
+  });
+
   it('says so when there are no notifications', async () => {
     await create();
     http.expectOne('/bff/notifications').flush({ items: [], unreadCount: 0, nextCursor: null });

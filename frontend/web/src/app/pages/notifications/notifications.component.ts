@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
@@ -11,27 +10,17 @@ import {
 import { firstValueFrom } from 'rxjs';
 import { SessionService } from '../../core/session.service';
 import { LoadErrorComponent } from '../../shared/load-error.component';
+import {
+  NotificationDTO,
+  NotificationListComponent,
+  NotificationPageDTO,
+} from '../../shared/notifications';
 import { problemMessage } from '../../shared/problem';
-
-interface NotificationDTO {
-  id: string;
-  kind: string;
-  title: string;
-  body: string;
-  createdAt: string;
-  readAt: string | null;
-}
-
-interface NotificationPageDTO {
-  items: NotificationDTO[];
-  unreadCount: number;
-  nextCursor: string | null;
-}
 
 @Component({
   selector: 'app-notifications',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, LoadErrorComponent],
+  imports: [LoadErrorComponent, NotificationListComponent],
   template: `
     <h1 class="page-title">Notificações</h1>
     @if (failed()) {
@@ -53,17 +42,7 @@ interface NotificationPageDTO {
       }
       <section class="card panel">
         @if (items().length > 0) {
-          <ul>
-            @for (item of items(); track item.id) {
-              <li [class.unread]="!item.readAt">
-                <span class="title">{{ item.title }}</span>
-                <span class="body">{{ item.body }}</span>
-                <span class="small-label">{{
-                  item.createdAt | date: "dd/MM/yyyy 'às' HH:mm"
-                }}</span>
-              </li>
-            }
-          </ul>
+          <app-notification-list [items]="items()" />
         } @else {
           <p class="muted">Nenhuma notificação por enquanto.</p>
         }
@@ -73,32 +52,6 @@ interface NotificationPageDTO {
   styles: `
     .mark {
       margin-bottom: 14px;
-    }
-    ul {
-      margin: 0;
-      padding: 0;
-      list-style: none;
-    }
-    li {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      padding: 12px 0;
-      border-top: 1px solid var(--bank-line);
-      color: var(--bank-muted);
-    }
-    li:first-child {
-      border-top: 0;
-    }
-    .title,
-    .body {
-      font-size: 14px;
-    }
-    .unread {
-      color: var(--bank-text);
-    }
-    .unread .title {
-      font-weight: 700;
     }
   `,
 })
@@ -137,7 +90,7 @@ export class NotificationsComponent implements OnInit {
     try {
       await firstValueFrom(this.http.post('/bff/notifications/read', { upTo: newest }));
       await this.load();
-      await this.session.refreshUnread();
+      await this.session.refreshUnread({ fresh: true });
     } catch (error) {
       this.error.set(problemMessage(error, 'Não foi possível marcar como lidas.'));
     } finally {

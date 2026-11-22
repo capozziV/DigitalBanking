@@ -26,6 +26,13 @@ test('the demo user signs in and sees balance, statement entries and notificatio
     });
   });
 
+  // No notification text may carry an account id.
+  const texts = await page.locator('app-notification-list li').allTextContents();
+  expect(texts.length).toBeGreaterThan(0);
+  for (const text of texts) {
+    expect(text).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  }
+
   await page.locator('aside.menu').getByRole('button', { name: 'Sair' }).click();
   await expect(page).toHaveURL(/\/entrar$/);
   await page.goto('/inicio');

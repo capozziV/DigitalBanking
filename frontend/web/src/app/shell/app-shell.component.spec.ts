@@ -81,6 +81,30 @@ describe('AppShellComponent', () => {
     expect(el().querySelector('.badge .count')?.textContent?.trim()).toBe('2');
   });
 
+  it('shows one bell: at the top of the content when wide, in the top bar when narrow', async () => {
+    await create(true);
+    expect(el().querySelectorAll('app-notification-bell')).toHaveLength(1);
+    expect(el().querySelector('main app-notification-bell')).not.toBeNull();
+    TestBed.resetTestingModule();
+    await create(false);
+    expect(el().querySelectorAll('app-notification-bell')).toHaveLength(1);
+    expect(el().querySelector('header.topbar app-notification-bell')).not.toBeNull();
+  });
+
+  it('polls the unread counter while mounted and stops when destroyed', async () => {
+    await create(true);
+    const session = TestBed.inject(SessionService);
+    const stop = vi.spyOn(session, 'stopUnreadPolling');
+    fixture.destroy();
+    expect(stop).toHaveBeenCalled();
+  });
+
+  it('starts the unread polling on init', async () => {
+    const start = vi.spyOn(SessionService.prototype, 'startUnreadPolling');
+    await create(true);
+    expect(start).toHaveBeenCalledTimes(1);
+  });
+
   it('uses the 960 px breakpoint', async () => {
     await create(true);
     expect(queries).toEqual(['(min-width: 960px)']);

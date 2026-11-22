@@ -130,10 +130,128 @@ describe('SessionService', () => {
     expect(service.unreadCount()).toBe(3);
   });
 
-  it('keeps the unread count at zero when the call fails', async () => {
+  it('keeps the last unread count when the call fails', async () => {
+    service.unreadCount.set(4);
     const promise = service.refreshUnread();
     http.expectOne('/bff/notifications/unread-count').flush('x', { status: 500, statusText: 'x' });
     await promise;
+    expect(service.unreadCount()).toBe(4);
+  });
+
+  it('does not overlap unread calls', async () => {
+    const first = service.refreshUnread();
+    const second = service.refreshUnread();
+    http.expectOne('/bff/notifications/unread-count').flush({ count: 1 });
+    await Promise.all([first, second]);
+    expect(service.unreadCount()).toBe(1);
+  });
+
+  it('does not let a count requested before marking as read overwrite the new one', async () => {
+    const stale = service.refreshUnread();
+    const fresh = service.refreshUnread({ fresh: true });
+    const calls = http.match('/bff/notifications/unread-count');
+    expect(calls).toHaveLength(2);
+    calls[1].flush({ count: 0 });
+    await fresh;
+    calls[0].flush({ count: 3 });
+    await stale;
     expect(service.unreadCount()).toBe(0);
+  });
+
+  it('keeps one call in flight after a fresh read finishes behind a stale one', async () => {
+    const stale = service.refreshUnread();
+    const fresh = service.refreshUnread({ fresh: true });
+    const calls = http.match('/bff/notifications/unread-count');
+    calls[0].flush({ count: 3 });
+    await stale;
+    const next = service.refreshUnread();
+    expect(http.match('/bff/notifications/unread-count')).toHaveLength(0);
+    calls[1].flush({ count: 0 });
+    await Promise.all([fresh, next]);
+    expect(service.unreadCount()).toBe(0);
+  });
+
+  it('ignores a count that arrives after clear and does not reuse that call for the next user', async () => {
+    const stale = service.refreshUnread();
+    const old = http.expectOne('/bff/notifications/unread-count');
+    service.clear();
+    const next = service.refreshUnread();
+    const current = http.expectOne('/bff/notifications/unread-count');
+    old.flush({ count: 7 });
+    await stale;
+    expect(service.unreadCount()).toBe(0);
+    current.flush({ count: 2 });
+    await next;
+    expect(service.unreadCount()).toBe(2);
+  });
+
+  describe('unread polling', () => {
+    let visibility: DocumentVisibilityState;
+
+    beforeEach(() => {
+      visibility = 'visible';
+      vi.useFakeTimers();
+      vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility);
+    });
+
+    afterEach(() => {
+      service.stopUnreadPolling();
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    const flushCount = async (count: number) => {
+      http.expectOne('/bff/notifications/unread-count').flush({ count });
+      await vi.advanceTimersByTimeAsync(0);
+    };
+
+    it('refreshes every 30 seconds while the tab is visible', async () => {
+      service.startUnreadPolling();
+      await vi.advanceTimersByTimeAsync(29_999);
+      http.expectNone('/bff/notifications/unread-count');
+      await vi.advanceTimersByTimeAsync(1);
+      await flushCount(2);
+      expect(service.unreadCount()).toBe(2);
+      await vi.advanceTimersByTimeAsync(30_000);
+      await flushCount(3);
+      expect(service.unreadCount()).toBe(3);
+    });
+
+    it('skips the tick while the tab is hidden', async () => {
+      service.startUnreadPolling();
+      visibility = 'hidden';
+      await vi.advanceTimersByTimeAsync(60_000);
+      http.expectNone('/bff/notifications/unread-count');
+    });
+
+    it('refreshes right away when the tab becomes visible again', async () => {
+      service.startUnreadPolling();
+      document.dispatchEvent(new Event('visibilitychange'));
+      await flushCount(5);
+      expect(service.unreadCount()).toBe(5);
+      visibility = 'hidden';
+      document.dispatchEvent(new Event('visibilitychange'));
+      http.expectNone('/bff/notifications/unread-count');
+    });
+
+    it('does not start a second timer when started twice', async () => {
+      service.startUnreadPolling();
+      service.startUnreadPolling();
+      await vi.advanceTimersByTimeAsync(30_000);
+      await flushCount(1);
+    });
+
+    it('stops when asked and when the session is cleared', async () => {
+      service.startUnreadPolling();
+      service.stopUnreadPolling();
+      await vi.advanceTimersByTimeAsync(60_000);
+      document.dispatchEvent(new Event('visibilitychange'));
+      http.expectNone('/bff/notifications/unread-count');
+      service.startUnreadPolling();
+      service.clear();
+      await vi.advanceTimersByTimeAsync(60_000);
+      document.dispatchEvent(new Event('visibilitychange'));
+      http.expectNone('/bff/notifications/unread-count');
+    });
   });
 });
