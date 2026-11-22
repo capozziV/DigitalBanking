@@ -63,6 +63,9 @@ O BFF não passa pelo API Gateway: chama os Services do cluster direto. Testes m
 - Arrendamento (`locked_until`) no lugar de trava de banco durante a chamada HTTP.
 - (ver [ADR 0016](adr/0016-saga-orquestrada-por-http.md) e a [spec da etapa 2](superpowers/specs/2026-10-27-etapa-2-transfers-design.md))
 
+### Falha longa no extrato
+- Decidido em 2026-11-22, a implementar (#239): o `statement` tenta por cerca de 1 hora (120 recepções de 30 s) antes da DLQ, em vez de 2,5 min. Custo aceito: mensagem defeituosa segura os lançamentos seguintes daquela conta por até 1 hora. Sem alarme, retenção maior nem backup por ora: passada 1 hora, o lançamento fica na DLQ sem aviso até o reenvio manual ou a derrubada do ambiente.
+
 ### Cache
 - Extrato: cache-aside só no Redis (sem Caffeine), só a 1ª página com `limit` 20, TTL 60 s ± 10 s, invalidação ao consumir o lançamento por versão por conta (um script Lua incrementa a versão e apaga a página; a leitura só grava se a versão não mudou, senão `statement.cache.writes{result=stale}`), fallback para o DynamoDB com timeout de 100 ms se o Redis cair (sem circuit breaker). Resíduo aceito: se a versão se perder ou a invalidação falhar no Redis, página velha por no máximo um TTL.
 - Saldo para autorizar débito nunca vem de cache.
@@ -142,4 +145,4 @@ O BFF não passa pelo API Gateway: chama os Services do cluster direto. Testes m
 ## Em aberto
 Fonte única das decisões pendentes; cada item tem um cartão `Decision` no [board](https://github.com/users/capozziV/projects/2). Ao decidir, registre no ADR indicado (ou crie um), remova o item daqui e feche o cartão.
 
-- **Perda silenciosa no extrato na AWS (#239):** com 5 tentativas (cerca de 2,5 min) o lançamento vai para a DLQ, sem alarme, e some em 14 dias; as filas guardam 4 dias e a tabela não tem backup. Opções: (a) antes da primeira subida (#182), mais tentativas, alarme, retenção de 14 dias e backup contínuo (recomendada); (b) aceitar no ambiente efêmero e registrar em ADR. Decisão do usuário.
+Nenhum item em aberto.

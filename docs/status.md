@@ -27,7 +27,8 @@ Nunca rodados: `seed.sh --remote`, login pelo Cognito real e os jobs `frontend` 
 ### Pendências
 - Débito: #222, #223, #225, #230 e #236 (menores da revisão final).
 - #237 (um bônus por cliente, ADR 0026): revisado e juntado na branch da etapa.
-- #234: dados reparados em 2026-11-22. Prevenção aprovada (DynamoDB Local com volume, ADR 0027) em `debito/dynamodb-local` e `debito/dynamodb-local-adr`, PR próprio depois da etapa 9; depois, migrar a stack do usuário com backup (até lá, sem `compose down`). Sem resposta do usuário: #239 (proteções da AWS).
+- #234: dados reparados em 2026-11-22. Prevenção aprovada (DynamoDB Local com volume, ADR 0027) em `debito/dynamodb-local` e `debito/dynamodb-local-adr`, PR próprio depois da etapa 9; depois, migrar a stack do usuário com backup (até lá, sem `compose down`).
+- #239 decidido: só a retentativa de 1 hora do `statement` (sem alarme, sem retenção maior, sem backup); PR pequeno depois de `debito/dynamodb-local`, que mexe nos mesmos arquivos, e antes do #182. #117 cancelado pelo usuário.
 - Tarefas do usuário: #219 (reaplicar o `bootstrap`) e #224 (segredo `DEMO_PASSWORD`) antes do `aws-up`; #182 (subida real na AWS).
 - Decisões do usuário: o banco se chama **capzzPay** (pacotes e repositório seguem `digitalbanking`); rodapé "© 2026 capzz.labs"; "Notificações" no lugar de "Avisos"; nome da pessoa, e não id de conta, nas notificações.
 
