@@ -67,6 +67,9 @@ module "edge" {
   security_group_ids     = [module.edge_alb.vpc_link_security_group_id]
   throttling_rate_limit  = var.throttling_rate_limit
   throttling_burst_limit = var.throttling_burst_limit
+
+  app_throttling_rate_limit  = var.app_throttling_rate_limit
+  app_throttling_burst_limit = var.app_throttling_burst_limit
 }
 
 module "messaging" {

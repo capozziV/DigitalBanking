@@ -1,6 +1,6 @@
 name: aws-up
 
-# Sobe o ambiente efemero na AWS (ADR 0019): terraform apply do envs/aws, imagens no ECR, db-init e os cinco
+# Sobe o ambiente efemero na AWS (ADR 0019): terraform apply do envs/aws, imagens no ECR (sete: cinco servicos, web e bff), db-init e os cinco
 # servicos no EKS, dono no Cognito, seed e smoke contra a borda. Manual e so da main (a trust do papel aceita so
 # repo:capozziV/DigitalBanking:ref:refs/heads/main). O aws-reaper derruba 8 h depois da etiqueta created-at.
 # Configuracao do repositorio (Settings > Secrets and variables > Actions), nunca versionada:
