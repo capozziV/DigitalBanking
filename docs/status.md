@@ -4,8 +4,8 @@
 
 **Última atualização:** 2026-11-22
 **Board:** [Digital Banking no GitHub Projects](https://github.com/users/capozziV/projects/2)
-**Fase atual:** etapa 9 (frontend do capzzPay) na branch `etapa-9-frontend`, worktree `.claude/worktrees/etapa-9`, ainda sem PR e sem CI. Juntados e revisados em 2026-11-22: #232, #233, #229, #102 (sininho) e os achados dos commits que estavam sem revisão; `main` trazida. Etapa 8 na `main` (PR #205).
-**Próximo passo:** onda de correções da revisão da branch inteira ([#235](https://github.com/capozziV/DigitalBanking/issues/235), bloqueia o PR); depois, re-revisão, CI local e PR.
+**Fase atual:** etapa 9 (frontend do capzzPay) com revisão final **aprovada** em `fa05405` (3 Critical e 11 Important fechados), PR [#240](https://github.com/capozziV/DigitalBanking/pull/240) para a `main`. Etapa 8 na `main` (PR #205).
+**Próximo passo:** merge do #240 com o `ci-ok` verde no último commit; depois o PR do DynamoDB Local (`debito/dynamodb-local`, em revisão) com a migração da stack do usuário, e o #239 (retentativa de 1 hora).
 
 ## Handoff da etapa 9 (2026-11-22)
 O checkout principal está na `main` 132 commits atrás e com um `docs/status.md` antigo: vale este arquivo, no worktree da etapa. Há mudanças não commitadas no checkout principal (memória de agentes, grafo) e em cerca de 35 worktrees: não descarte sem olhar.
@@ -15,18 +15,19 @@ O checkout principal está na `main` 132 commits atrás e com um `docs/status.md
 - **#231:** os commits novos seguem com o e-mail atual por enquanto; o cartão fica aberto. Não ligar o bloqueio de push com e-mail no GitHub enquanto isso.
 - Stack `capzzpay`: pode atualizar com backup (em `.superpowers/backups/`), recriando só os serviços alterados com `--no-deps`, sem tocar em volumes nem no LocalStack, que não tem `PERSISTENCE`.
 
-### Rodada final
-1. Feito: `./gradlew build` completo em `56e8f16` (1617 testes, 0 falhas, 0 pulados; e2e com 21 executados). O sininho, juntado depois, só muda `frontend/`.
-2. Feito: #232 e #233 conferidos na stack `capzzpay` pela API (19 notificações, 0 com "outro cliente", 0 com id de conta).
-3. Seed, smoke e Bruno rodados numa stack isolada (nunca semear a do usuário): smoke verde; dois bugs (saldo do `seed-check` no CI, Bruno sem telefone) em `etapa-9/fix-verificacao`, que também roda o Playwright.
-4. Feito: `npm ci`, lint, testes (web 169, BFF 177) e build de `frontend/`; `customer`, `notification`, `web` e `bff` da stack `capzzpay` atualizados. Atualizar `web` e `bff` de novo depois da onda de correções (recarregar o nginx).
-5. Revisão da branch inteira: **reprovada**, 3 Critical e 11 Important (#235; relatório e ledger em `.superpowers/sdd/etapa-9-final/`, fora do git). Primeira leva nas branches `etapa-9/rf-{bff,web,edge,docs,kdoc}`; segunda depois da `fix-verificacao` (guia, I6, I7, I10, Playwright sem UUID no extrato). Cada uma passa pela Beatriz antes de juntar.
-5a. Andamento da onda: juntados BFF, borda, docs, guia/CI/seed e bônus. Em revisão: `etapa-9/rf-web` (`a56d6d7`). Depois dele: texto do Início sobre o bônus, docs da `Idempotency-Key` (arquitetura e ADR 0005), `Transferência enviada` também no Início do Playwright, rodada completa na stack isolada e atualização de `accounts`, `web` e `bff` na stack do usuário (recarregar o nginx).
-6. PR para a `main` (aberto em rascunho para o CI rodar); merge com a aprovação dela e o `ci-ok` verde; cartões #16, #102, #229, #232 e #233 em Done.
-Nunca rodados: `seed.sh --remote`, login pelo Cognito real e os jobs `frontend` e `frontend-e2e` no CI.
+### Verificação da etapa 9
+- Build completo 1617 testes, 0 falhas, 0 pulados (`56e8f16`); no commit aprovado, web 224 e BFF 324 testes; CI do PR com os 17 jobs verdes em `789201c`.
+- Seed, smoke, as cinco coleções Bruno e o Playwright rodados numa stack isolada.
+- Nunca rodados: `seed.sh --remote`, Cognito real e a subida na AWS (#182).
+
+### Depois do merge
+- #241 (retentativa em outra aba duplica): pergunta ao usuário sem resposta; incluir em "Em aberto" da arquitetura como `Decision`.
+- `.claude/agents/dev-frontend.md:13` ensina a regra antiga da chave de transferência: corrigir só com o aval do usuário (perguntado, sem resposta).
+- Docs sem prazo: plano da etapa 9 linhas 29 e 181, guia linha 141 ("cinco imagens").
+- Antes de qualquer `up` com o compose do DynamoDB Local na stack `capzzpay`, copiar o extrato: o compose novo recria o LocalStack e apaga a origem.
 
 ### Pendências
-- Débito: #222, #223, #225, #230 e #236 (menores da revisão final).
+- Débito: #222, #223, #225, #230, #236 (menores da revisão final), #238 e #241.
 - #237 (um bônus por cliente, ADR 0026): revisado e juntado na branch da etapa.
 - #234: dados reparados em 2026-11-22. Prevenção aprovada (DynamoDB Local com volume, ADR 0027) em `debito/dynamodb-local` e `debito/dynamodb-local-adr`, PR próprio depois da etapa 9; depois, migrar a stack do usuário com backup (até lá, sem `compose down`).
 - #239 decidido: só a retentativa de 1 hora do `statement` (sem alarme, sem retenção maior, sem backup); PR pequeno depois de `debito/dynamodb-local`, que mexe nos mesmos arquivos, e antes do #182. #117 cancelado pelo usuário.
