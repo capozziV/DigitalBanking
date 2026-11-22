@@ -14,7 +14,7 @@ O projeto terá frontend na **etapa 9**. Até lá, testes manuais usam uma cole�
 - BFF expõe **endpoints por tela** (agregação).
 - Front e BFF na **mesma origem**: ALB público roteando `/` (Angular) e `/bff` (BFF), sem CORS.
 - BFF gera o correlation ID (via `AsyncLocalStorage`) e envia `X-Correlation-Id` e o Bearer token ao API Gateway.
-- `Idempotency-Key` gerada no Angular ao abrir o formulário de transferência; o BFF só repassa.
+- `Idempotency-Key` gerada no Angular ao abrir o formulário de transferência; o BFF só repassa. *(Corrigido em 2026-11-22: ver a emenda.)*
 - Organização: `frontend/web`, `frontend/bff`, `frontend/shared` (opcional), workspaces npm/pnpm, job próprio no CI.
 
 ## Consequências
@@ -24,3 +24,6 @@ O projeto terá frontend na **etapa 9**. Até lá, testes manuais usam uma cole�
 ## Alternativas consideradas
 - **Proxy genérico no BFF:** descartado em favor de endpoints por tela.
 - **PrimeNG:** descartado em favor do Angular Material.
+
+## Emenda de 2026-11-22
+- **Chave da transferência:** gerar ao abrir o formulário causava débito em dobro na retentativa. A chave é gerada no Angular por tentativa (usuário + telefone + valor), guardada no `sessionStorage` da aba até o estado final aparecer; o BFF só repassa. Limite: outra aba gera chave nova (#241).
