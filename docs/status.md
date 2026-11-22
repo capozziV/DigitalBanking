@@ -2,15 +2,38 @@
 
 > Resumo do projeto, atualizado pela coordenadora ao fim de cada tarefa. Tasks, débito técnico, decisões pendentes e tarefas do usuário ficam no board.
 
-**Última atualização:** 2026-11-19
+**Última atualização:** 2026-11-22
 **Board:** [Digital Banking no GitHub Projects](https://github.com/users/capozziV/projects/2)
-**Fase atual:** etapa 9 (frontend do capzzPay) em execução na branch `etapa-9-frontend`. Etapa 8 na `main` (PR #205). Na branch da etapa: Tasks 1, 2, 3, 4, 5, 6, 8, 10 e 12 e o débito #221.
-**Próximo passo:** Tasks 7 (endpoints do BFF), 9 (telas, nome capzzPay e rodapé, #220) e 11 (usuário de demonstração) em andamento; depois a Task 13 (Playwright no CI), a rodada final (build completo, e2e, smoke e Bruno com a máquina livre), a revisão da branch e o PR. Tarefas do usuário: reaplicar o stack `bootstrap` (#219) antes do primeiro `aws-up` com o app; subida real na AWS (#182).
+**Fase atual:** etapa 9 (frontend do capzzPay) na branch `etapa-9-frontend`, worktree `.claude/worktrees/etapa-9`, ainda sem PR e sem CI. As 13 tasks do plano e os pedidos #220, #221, #226, #227 e #228 estão juntados. Etapa 8 na `main` (PR #205).
+**Próximo passo:** corrigir os bugs #232 e #233 (prioridade alta) e, depois, a rodada final abaixo.
 
-## Em andamento
-- **Etapa 9:** Task 7 (#212), Task 9 (#214 e #220) e Task 11 (#216). Débitos novos: #222 (teste do padrão de 500 ms do timeout do transfers) e #223 (troca concorrente de telefone).
-- **Decisões do usuário (2026-11-19):** o banco se chama **capzzPay** (app e documentação; pacotes e repositório seguem `digitalbanking`); rodapé "© 2026 capzz.labs" em todas as páginas.
-- **Atenção:** a suíte e2e completa passa de 20 min com a máquina carregada por builds em paralelo; as classes passam uma a uma. Rodar a final com a máquina livre.
+## Handoff da etapa 9 (2026-11-22)
+O checkout principal está na `main` 132 commits atrás e com um `docs/status.md` antigo: vale este arquivo, no worktree da etapa. Há mudanças não commitadas no checkout principal (memória de agentes, grafo) e em sete worktrees de agentes: não descarte sem olhar.
+
+### Bugs achados com o app de pé
+- **#232:** o nome da contraparte (#228) não aparece para cliente cadastrado antes da fila `notification-customer.fifo`: os eventos saíram antes de ela existir, `customer_names` ficou vazia e tudo mostra "outro cliente". Falta backfill, teste do upgrade e o `seed-check` conferindo o nome. O ADR 0025 afirma o contrário ("sem migração de dados") e precisa de correção. Apagar os volumes só esconde o bug.
+- **#233:** a notificação de boas-vindas mostra o id da conta, "banco" e "sininho" (`NotificationText.kt:15-18`). O texto é gravado, então as já existentes também precisam de correção. O id ainda chega ao navegador dentro do `body`.
+
+### Rodada final
+1. Com a máquina livre, uma verificação pesada por vez: `./gradlew build` completo, e2e completo (estourou o limite de 20 min do Gradle sob carga), `smoke.sh`, as cinco coleções Bruno, `npm ci`, lint, testes e build de `frontend/`, e o Playwright contra imagens novas. Nada disso rodou inteiro na branch juntada.
+2. Nunca rodados: smoke e as coleções Bruno com o bônus (Task 1) e com a fila do #228; `seed.sh --remote`; login pelo Cognito real; os jobs `frontend` e `frontend-e2e` no CI.
+3. `docs/rodando-localmente.md`: com o perfil `apps`, o BFF precisa de `MOCK_OAUTH2_HOST=mock-oauth2-server:8080` no `up`, senão os serviços devolvem `401`; e o `up` constrói `web` e `bff`.
+4. Trazer a `origin/main` (3 commits à frente, merge sem conflito em 2026-11-22) e rodar `graphify update .`.
+5. Revisão da branch inteira pela Beatriz. Entraram só com conferência da coordenadora, sem revisão dela: `36f109a`, `ac16b0e`, `29f6404`, `84382d5` e os commits de docs do capzzPay, do ADR 0009 e do ADR 0025.
+6. PR para a `main`; merge com a aprovação dela e o `ci-ok` verde; cartão #16 em Done.
+
+### Pendências
+- Débito: #222, #223, #225, #229 (teste instável do `transfers`, pode derrubar o CI do PR) e #230.
+- Perguntas sem resposta do usuário: as três "Open questions" do #102 (sininho de notificações).
+- Tarefas do usuário: #219 (reaplicar o `bootstrap`) e #224 (segredo `DEMO_PASSWORD`) antes do `aws-up`; #182 (subida real na AWS).
+- Decisões do usuário: o banco se chama **capzzPay** (pacotes e repositório seguem `digitalbanking`); rodapé "© 2026 capzz.labs"; "Notificações" no lugar de "Avisos"; nome da pessoa, e não id de conta, nas notificações.
+
+### Ambiente que ficou de pé
+- Projeto compose `capzzpay` em `http://127.0.0.1`, imagens `etapa9` do commit `f546bf3`, com dados do usuário nos volumes (não apague sem perguntar). Credenciais do demo no `infra/local/.env` do worktree.
+- O `up` usa `MOCK_OAUTH2_HOST=mock-oauth2-server:8080 IMAGE_TAG=etapa9`, `-p capzzpay` e `--profile apps`.
+- Nesse `.env`, `LOCALSTACK_AUTH_TOKEN` ficou vazio.
+- O projeto `local` antigo foi derrubado com autorização do usuário.
+- As capturas em `telas/` estão fora do git.
 
 ## Como usar o board
 - Colunas: **Backlog** (pendência sem resposta, ou etapa anterior fora de Done), **Ready** (sem pendência e etapa anterior em Done), **In progress**, **In review** (revisão da Beatriz) e **Done** (revisado, build, testes e lint verdes, merge feito).
