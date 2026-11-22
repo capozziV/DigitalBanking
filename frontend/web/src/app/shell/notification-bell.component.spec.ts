@@ -84,6 +84,20 @@ describe('NotificationBellComponent', () => {
     expect(panel()!.querySelectorAll('li.unread')).toHaveLength(2);
   });
 
+  it('does not let a count requested before marking as read bring the number back', async () => {
+    await create();
+    session.unreadCount.set(3);
+    await openWith([notification('9'), notification('8')], null);
+    void session.refreshUnread();
+    http.expectOne('/bff/notifications/read').flush({ marked: 2 });
+    await settle();
+    const calls = http.match('/bff/notifications/unread-count');
+    calls[0].flush({ count: 3 });
+    calls[calls.length - 1].flush({ count: 0 });
+    await settle();
+    expect(session.unreadCount()).toBe(0);
+  });
+
   it('does not mark anything when everything is already read', async () => {
     await create();
     await openWith([notification('9', '2026-11-19T13:00:00Z')], null);

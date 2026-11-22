@@ -40,6 +40,8 @@ export class SessionService {
 
   private loading: Promise<void> | null = null;
   private refreshing: Promise<void> | null = null;
+  /** Bumped to discard the answer of any unread call started before it. */
+  private unreadGeneration = 0;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
 
   /** Loads the session (and the profile when signed in) once. */
@@ -90,6 +92,7 @@ export class SessionService {
   /** Forgets the local state, as when the BFF says the session is gone. */
   clear(): void {
     this.stopUnreadPolling();
+    this.discardUnreadInFlight();
     this.authenticated.set(false);
     this.email.set(null);
     this.customer.set(null);
@@ -99,9 +102,18 @@ export class SessionService {
     this.loaded.set(true);
   }
 
-  /** Reads the unread count; a call already in flight is reused, a failure keeps the last number. */
-  refreshUnread(): Promise<void> {
-    this.refreshing ??= this.fetchUnread().finally(() => (this.refreshing = null));
+  /**
+   * Reads the unread count; a call already in flight is reused, a failure keeps the last number.
+   * With `fresh` (after marking as read) a call started earlier is discarded and a new one is made.
+   */
+  refreshUnread(options?: { fresh?: boolean }): Promise<void> {
+    if (options?.fresh) this.discardUnreadInFlight();
+    if (this.refreshing === null) {
+      const call: Promise<void> = this.fetchUnread(this.unreadGeneration).finally(() => {
+        if (this.refreshing === call) this.refreshing = null;
+      });
+      this.refreshing = call;
+    }
     return this.refreshing;
   }
 
@@ -119,12 +131,17 @@ export class SessionService {
     document.removeEventListener('visibilitychange', this.onVisibilityChange);
   }
 
-  private async fetchUnread(): Promise<void> {
+  private discardUnreadInFlight(): void {
+    this.unreadGeneration++;
+    this.refreshing = null;
+  }
+
+  private async fetchUnread(generation: number): Promise<void> {
     try {
       const result = await firstValueFrom(
         this.http.get<{ count: number }>('/bff/notifications/unread-count'),
       );
-      this.unreadCount.set(result.count);
+      if (generation === this.unreadGeneration) this.unreadCount.set(result.count);
     } catch {
       // Transient failure: keep the last number.
     }

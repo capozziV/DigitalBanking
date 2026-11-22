@@ -183,7 +183,7 @@ export class NotificationBellComponent {
     if (!items.some((item) => !item.readAt)) return;
     try {
       await firstValueFrom(this.http.post('/bff/notifications/read', { upTo: items[0].id }));
-      if (generation === this.generation) await this.session.refreshUnread();
+      if (generation === this.generation) await this.session.refreshUnread({ fresh: true });
     } catch {
       // Not marked: the counter stays and the next open tries again.
     }

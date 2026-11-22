@@ -146,6 +146,45 @@ describe('SessionService', () => {
     expect(service.unreadCount()).toBe(1);
   });
 
+  it('does not let a count requested before marking as read overwrite the new one', async () => {
+    const stale = service.refreshUnread();
+    const fresh = service.refreshUnread({ fresh: true });
+    const calls = http.match('/bff/notifications/unread-count');
+    expect(calls).toHaveLength(2);
+    calls[1].flush({ count: 0 });
+    await fresh;
+    calls[0].flush({ count: 3 });
+    await stale;
+    expect(service.unreadCount()).toBe(0);
+  });
+
+  it('keeps one call in flight after a fresh read finishes behind a stale one', async () => {
+    const stale = service.refreshUnread();
+    const fresh = service.refreshUnread({ fresh: true });
+    const calls = http.match('/bff/notifications/unread-count');
+    calls[0].flush({ count: 3 });
+    await stale;
+    const next = service.refreshUnread();
+    expect(http.match('/bff/notifications/unread-count')).toHaveLength(0);
+    calls[1].flush({ count: 0 });
+    await Promise.all([fresh, next]);
+    expect(service.unreadCount()).toBe(0);
+  });
+
+  it('ignores a count that arrives after clear and does not reuse that call for the next user', async () => {
+    const stale = service.refreshUnread();
+    const old = http.expectOne('/bff/notifications/unread-count');
+    service.clear();
+    const next = service.refreshUnread();
+    const current = http.expectOne('/bff/notifications/unread-count');
+    old.flush({ count: 7 });
+    await stale;
+    expect(service.unreadCount()).toBe(0);
+    current.flush({ count: 2 });
+    await next;
+    expect(service.unreadCount()).toBe(2);
+  });
+
   describe('unread polling', () => {
     let visibility: DocumentVisibilityState;
 

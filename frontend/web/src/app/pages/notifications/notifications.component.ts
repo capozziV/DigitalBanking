@@ -90,7 +90,7 @@ export class NotificationsComponent implements OnInit {
     try {
       await firstValueFrom(this.http.post('/bff/notifications/read', { upTo: newest }));
       await this.load();
-      await this.session.refreshUnread();
+      await this.session.refreshUnread({ fresh: true });
     } catch (error) {
       this.error.set(problemMessage(error, 'Não foi possível marcar como lidas.'));
     } finally {
