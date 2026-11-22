@@ -19,7 +19,7 @@ O checkout principal está na `main` 132 commits atrás e com um `docs/status.md
 1. Feito: `./gradlew build` completo em `56e8f16` (1617 testes, 0 falhas, 0 pulados; e2e com 21 executados). O sininho, juntado depois, só muda `frontend/`.
 2. Feito: #232 e #233 conferidos na stack `capzzpay` pela API (19 notificações, 0 com "outro cliente", 0 com id de conta).
 3. Em andamento: `seed-check`, smoke e as cinco coleções Bruno numa stack isolada (`capzzpay-verify`, worktree `e9-verificacao`); nunca semear a do usuário.
-4. Falta: `npm ci`, lint, testes e build de `frontend/` na branch juntada; Playwright na stack isolada; atualizar `web` e `bff` da stack `capzzpay`.
+4. Feito: `npm ci`, lint, testes (web 169, BFF 177) e build de `frontend/`; `customer`, `notification`, `web` e `bff` da stack `capzzpay` atualizados. Falta: Playwright na stack isolada.
 5. Falta: revisão da branch inteira pela Beatriz, com o ajuste do KDoc de `deleteTransfers` (#229) na onda de correções.
 6. PR para a `main`; merge com a aprovação dela e o `ci-ok` verde; cartões #16, #102, #229, #232 e #233 em Done.
 Nunca rodados: `seed.sh --remote`, login pelo Cognito real e os jobs `frontend` e `frontend-e2e` no CI.

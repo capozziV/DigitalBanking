@@ -150,6 +150,10 @@ docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml --p
 ```bash
 docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml --profile apps up -d --no-deps <serviço>
 ```
+Se o serviço for `web` ou `bff`, recarregue em seguida o nginx, que resolve esses dois nomes só na partida e responderia `502` com o IP antigo:
+```bash
+docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml exec nginx nginx -s reload
+```
 
 ## 5. Conferir a API pelo nginx
 Primeiro o health, que deve responder `"status":"UP"` (aberto, sem token; os detalhes só para admin). Depois o seed do dono (abaixo) e o smoke. Os dois pegam tokens no `mock-oauth2-server` com `infra/local/auth/token.sh` e precisam dos cinco serviços no ar:
