@@ -163,3 +163,4 @@ Confira as tarifas atuais na calculadora de preços da AWS. O `bootstrap` fica d
 | Testes de contrato com Stubborn Contract | [0022](docs/adr/0022-testes-de-contrato.md) |
 | Login pela API do Cognito, senha de 6 dígitos e telefone como chave de transferência | [0024](docs/adr/0024-login-e-telefone-do-app.md) |
 | Nome da contraparte nas notificações, por projeção própria no `notification` | [0025](docs/adr/0025-nome-da-contraparte-nas-notificacoes.md) |
+| DynamoDB Local com volume no ambiente local, para o extrato sobreviver ao `down` | [0027](docs/adr/0027-dynamodb-local-com-volume.md) |
