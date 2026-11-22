@@ -91,7 +91,7 @@ Lançamento que diminui o saldo da conta; valor de Tipo de lançamento.
 _Código_: `EntryKind.DEBIT`
 
 **Bônus de boas-vindas**:
-Crédito de R$ 100 lançado uma única vez ao abrir a conta.
+Crédito de R$ 100 lançado uma única vez por cliente, ao abrir a primeira conta.
 _Código_: `WelcomeBonus`
 _Evite_: cashback, promoção, depósito inicial
 
