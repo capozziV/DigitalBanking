@@ -74,7 +74,7 @@ As telas aprovadas como referência estão em `.superpowers/brainstorm/2215-1795
 | Início | Cartão do saldo (saldo disponível, tipo de conta, cheque especial, Transferir e Extrato), limite diário usado e disponível, últimos lançamentos; sem conta, botão "Abrir conta" | `GET /accounts/...`, `GET /accounts/{id}/daily-limit`, `GET /accounts/{id}/statement` |
 | Extrato | Lançamentos paginados com o ícone de entrada e saída; o bônus aparece como "Bônus de boas-vindas" | `GET /accounts/{id}/statement` (cursor) |
 | Transferir | Em passos: (1) o cliente digita o telefone do destinatário e aperta "Próximo"; (2) o app mostra o **nome completo** do destinatário ("Ana Souza") para conferir e pede o valor; (3) "Confirmar" envia; depois o status até `COMPLETED`, `FAILED` ou `COMPENSATED`, com o motivo em português | busca por telefone (nova), `POST /transfers`, `GET /transfers/{id}` |
-| Avisos | Lista de notificações, marcar como lidas, contador no menu | `GET /notifications`, `POST /notifications/read` |
+| Notificações (antes "Avisos") | Lista de notificações, marcar como lidas, contador no menu | `GET /notifications`, `POST /notifications/read` |
 | Minha conta | Dados do cliente e da conta; trocar o telefone; encerrar conta (saldo zero, sem pendentes) | `GET /customers/me`, troca do telefone (nova), `POST /accounts/{id}/close` |
 
 O builder confere os caminhos exatos de cada rota no OpenAPI de cada serviço.

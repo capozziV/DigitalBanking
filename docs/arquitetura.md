@@ -63,7 +63,7 @@ Até a etapa 9 não existe BFF: testes manuais usam a coleção Bruno versionada
 - (ver [ADR 0016](adr/0016-saga-orquestrada-por-http.md) e a [spec da etapa 2](superpowers/specs/2026-10-27-etapa-2-transfers-design.md))
 
 ### Cache
-- Extrato: cache-aside só no Redis (sem Caffeine), só a 1ª página com `limit` 20, TTL 60 s ± 10 s, invalidação por remoção da chave ao consumir o lançamento, fallback para o DynamoDB com timeout de 100 ms se o Redis cair (sem circuit breaker). Corrida aceita: página velha por no máximo um TTL.
+- Extrato: cache-aside só no Redis (sem Caffeine), só a 1ª página com `limit` 20, TTL 60 s ± 10 s, invalidação ao consumir o lançamento por versão por conta (um script Lua incrementa a versão e apaga a página; a leitura só grava se a versão não mudou, senão `statement.cache.writes{result=stale}`), fallback para o DynamoDB com timeout de 100 ms se o Redis cair (sem circuit breaker). Resíduo aceito: se a versão se perder ou a invalidação falhar no Redis, página velha por no máximo um TTL.
 - Saldo para autorizar débito nunca vem de cache.
 - (ver [ADR 0009](adr/0009-cache-do-extrato.md) e [ADR 0007](adr/0007-conta-e-ledger-no-accounts.md))
 
