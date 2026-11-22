@@ -196,6 +196,7 @@ class EndToEndEnvironment(
             "ACCOUNTS_TRANSFERS_BASE_URL" to "http://127.0.0.1:$transfersPort",
             // The first request to a fresh transfers can pass the default 500 ms (cold JVM); the 503 itself is tested in accounts.
             "ACCOUNTS_TRANSFERS_TIMEOUT" to "5s",
+            "ACCOUNTS_CUSTOMER_TIMEOUT" to CUSTOMER_TIMEOUT,
         )
 
     private fun transfersEnvironment() =
@@ -214,6 +215,7 @@ class EndToEndEnvironment(
             "TRANSFERS_JWT_ISSUER_URI" to issuer(),
             "TRANSFERS_OAUTH_TOKEN_URI" to "${issuer()}/token",
             "TRANSFERS_CUSTOMER_BASE_URL" to customer.baseUrl,
+            "TRANSFERS_CUSTOMER_TIMEOUT" to CUSTOMER_TIMEOUT,
         )
 
     private fun notificationEnvironment() =
@@ -301,6 +303,9 @@ class EndToEndEnvironment(
                 "NOTIFICATION_VISIBILITY_TIMEOUT_SECONDS" to "2",
             )
 
+        // 50 parallel transfers each ask the customer service on a loaded laptop; the 500 ms default flaked with 503 (#194).
+        // The 503 path itself is covered in accounts and transfers (customer refused, 5xx and slower than the timeout).
+        private const val CUSTOMER_TIMEOUT = "3s"
         private const val POSTGRES_IMAGE = "postgres:17-alpine"
         private const val POSTGRES_PORT = 5432
         private const val REDIS_IMAGE = "redis:7-alpine"
