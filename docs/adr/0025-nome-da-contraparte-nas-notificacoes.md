@@ -23,6 +23,6 @@ As notificações de transferência devem mostrar o nome completo da outra parte
 ## Emenda de 2026-11-22
 - **Erro na decisão:** "as notificações antigas passam a mostrar o nome sem migração de dados" era falso para o cliente cadastrado antes de a fila `notification-customer.fifo` existir. O `CustomerRegistered` dele não é reentregue, a projeção `customer_names` fica vazia e a notificação mostra "outro cliente" (#232).
 - **Correção:** a migration V5 do `customer` grava no outbox um `CustomerRegistered` v2 por cliente existente; o relay o publica e o consumidor faz upsert. As notificações em si seguem sem migração.
-- **Pré-condição de deploy:** a fila e a inscrição existem antes de o `customer` novo subir; senão o evento do backfill se perde.
+- **Pré-condição de deploy:** a fila e a inscrição existem antes de o `customer` novo subir; senão o evento do backfill se perde. Numa stack local já existente, o `ready.d` do LocalStack só roda na partida dele: execute o `03-notification-queues.sh` (idempotente) no contêiner do LocalStack e confira a inscrição antes de recriar o `notification` e o `customer`. Na AWS a ordem do `terraform apply` já garante a pré-condição.
 - **Consumidor novo:** quem passar a consumir `customer-events.fifo` no futuro precisa do próprio backfill.
 - **Texto na leitura (#233):** boas-vindas, bloqueio, desbloqueio e encerramento também têm o texto montado na leitura, sem id de conta, o que corrige as já gravadas.

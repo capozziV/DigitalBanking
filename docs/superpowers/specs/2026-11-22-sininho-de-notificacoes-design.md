@@ -30,7 +30,7 @@ Ver que chegou notificação, e lê-la, sem sair da tela atual ("a notificação
 Push, mudança no backend e preferências de notificação.
 
 ## Consequência aceita
-O polling renova o token e, com ele, a sessão de 7 dias: uma aba sempre visível não expira por inatividade.
+Corrigido em 2026-11-22: a versão anterior dizia que o polling renova a sessão de 7 dias, e isso é falso. O polling renova o token e o TTL no Redis, mas o cookie tem `maxAge` fixo desde o login: a sessão cai 7 dias após o login mesmo com uso. Débito #236.
 
 ## Testes
 Unidade para intervalo, visibilidade, `upTo`, paginação, falha e teclado. Playwright: o contador aparece, zera ao abrir e nenhum texto de notificação tem id de conta.

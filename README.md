@@ -133,7 +133,7 @@ Região `sa-east-1`. **Ainda não houve subida real:** o código é validado no 
    - `secrets.OWNER_PASSWORD`: senha do usuário do dono no Cognito (12+ caracteres, maiúscula, minúscula, número e símbolo).
 
 ### Workflows (só da `main`)
-- **`aws-up`** (manual): constrói as cinco imagens, aplica o `envs/aws` com a etiqueta `created-at`, publica as imagens no ECR, instala o `db-init` e os serviços no EKS, roda o seed do dono e o smoke pela borda. O resumo do job traz a URL da borda e o horário da derrubada automática.
+- **`aws-up`** (manual): constrói as sete imagens (cinco serviços, web e BFF), aplica o `envs/aws` com a etiqueta `created-at`, publica as imagens no ECR, instala o `db-init` e os serviços no EKS, roda o seed do dono e o smoke pela borda. O resumo do job traz a URL da borda e o horário da derrubada automática.
 - **`aws-down`** (manual): `helm uninstall`, `terraform destroy` e conferência do que sobrou. Se sobrou algo, o job falha com a lista.
 - **`aws-reaper`** (a cada 30 min): chama o `aws-down` quando o ambiente passa de 8 h, ou quando a etiqueta `created-at` falta ou está malformada. Sem `vars.AWS_ROLE_ARN`, não faz nada.
 
@@ -162,3 +162,4 @@ Confira as tarifas atuais na calculadora de preços da AWS. O `bootstrap` fica d
 | EKS e ambiente efêmero na AWS | [0019](docs/adr/0019-runtime-na-aws-com-eks.md), [0021](docs/adr/0021-deploy-e-ambiente-efemero.md) |
 | Testes de contrato com Stubborn Contract | [0022](docs/adr/0022-testes-de-contrato.md) |
 | Login pela API do Cognito, senha de 6 dígitos e telefone como chave de transferência | [0024](docs/adr/0024-login-e-telefone-do-app.md) |
+| Nome da contraparte nas notificações, por projeção própria no `notification` | [0025](docs/adr/0025-nome-da-contraparte-nas-notificacoes.md) |

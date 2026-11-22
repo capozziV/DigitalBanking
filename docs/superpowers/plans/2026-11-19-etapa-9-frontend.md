@@ -158,7 +158,7 @@
   - `POST /bff/accounts` (gera a chave de abertura); `POST /bff/accounts/close`.
   - `GET /bff/home` → `{ account, dailyLimit: {limit, used, available}, latestEntries: Entry[5] }`.
   - `GET /bff/statement?cursor=` → `{ entries: Entry[], nextCursor }`, `Entry = { id, kind, amount, description, balanceAfter, createdAt }`.
-  - `GET /bff/transfers/recipient?phone=` → `{ recipientName, recipientToken }`, onde `recipientToken` é opaco (accountId assinado com HMAC da sessão), nunca o accountId cru.
+  - `GET /bff/transfers/recipient?phone=` → `{ recipientName, recipientToken }`, onde `recipientToken` é opaco (accountId assinado com HMAC da sessão), nunca o accountId cru. **[Superado: não há HMAC nem Secret; o `recipientToken` é um token aleatório guardado no Redis e preso à sessão.]**
   - `POST /bff/transfers` `{ recipientToken, amount }` + `Idempotency-Key` → `{ id, status }`; `GET /bff/transfers/:id` → `{ id, status, reason }`.
   - `GET /bff/notifications`, `POST /bff/notifications/read`, `GET /bff/notifications/unread-count`.
 - [ ] **Step 1: testes que falham:** `(11) 98765-4321`, `11987654321` e `+55 11 98765-4321` viram `+5511987654321`; `1234` → `400` (Review Focus 1); telefone do próprio cliente → `422` (Review Focus 2); conta de destino `404` → `404` "sem conta para receber" (Review Focus 5); `recipientToken` adulterado → `400`; `POST /bff/transfers` repassa a mesma `Idempotency-Key` (Review Focus 4); `home` agrega as três chamadas em paralelo.
