@@ -1,4 +1,4 @@
-import { createServer, type Server } from 'node:http';
+import { ClientRequest, createServer, type Server } from 'node:http';
 import { createServer as createNetServer } from 'node:net';
 import type { AddressInfo, Socket } from 'node:net';
 import { httpFetch } from './http-fetch.js';
@@ -61,14 +61,29 @@ describe('httpFetch', () => {
   });
 
   it('returns a null body for 204', async () => {
-    server.removeAllListeners('request');
-    server.on('request', (_req, res) => {
+    const noContent = createServer((_req, res) => {
       res.writeHead(204);
       res.end();
     });
-    const port = (server.address() as AddressInfo).port;
-    const response = await httpFetch(`http://127.0.0.1:${port}/`);
-    expect(response.status).toBe(204);
-    expect(response.body).toBeNull();
+    await new Promise<void>((resolve) => noContent.listen(0, '127.0.0.1', resolve));
+    const port = (noContent.address() as AddressInfo).port;
+    try {
+      const response = await httpFetch(`http://127.0.0.1:${port}/`);
+      expect(response.status).toBe(204);
+      expect(response.body).toBeNull();
+    } finally {
+      await new Promise((resolve) => noContent.close(resolve));
+    }
+  });
+
+  it('applies a 5 s inactivity timeout when none is given', async () => {
+    const setTimeoutSpy = vi.spyOn(ClientRequest.prototype, 'setTimeout');
+    try {
+      const port = (server.address() as AddressInfo).port;
+      await httpFetch(`http://127.0.0.1:${port}/`);
+      expect(setTimeoutSpy).toHaveBeenCalledWith(5000, expect.any(Function));
+    } finally {
+      setTimeoutSpy.mockRestore();
+    }
   });
 });

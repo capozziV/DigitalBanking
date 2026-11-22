@@ -729,7 +729,8 @@ describe('screens', () => {
     });
 
     it('answers 400 for an upTo that is not a UUID', async () => {
-      await user.post('/bff/notifications/read').send({ upTo: 'x' }).expect(400);
+      const response = await user.post('/bff/notifications/read').send({ upTo: 'x' }).expect(400);
+      expect(response.body.message).toBe('Notificação inválida.');
       expect(t.backend.calls).toEqual([]);
     });
   });

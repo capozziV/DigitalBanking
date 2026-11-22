@@ -30,7 +30,7 @@ interface NotificationPageDTO {
   nextCursor: string | null;
 }
 
-/** "Avisos": the caller's notifications, always taken from the token (never a customer id from the browser). */
+/** "Notificações": the caller's notifications, always taken from the token (never a customer id from the browser). */
 @Controller('notifications')
 @UseGuards(SessionGuard)
 export class NotificationsController {
@@ -92,7 +92,7 @@ export class NotificationsController {
       if (upTo === undefined) return { marked: 0 };
     }
     if (typeof upTo !== 'string' || !UUID.test(upTo)) {
-      throw new BadRequestException({ code: 'invalid_id', message: 'Aviso inválido.' });
+      throw new BadRequestException({ code: 'invalid_id', message: 'Notificação inválida.' });
     }
     return this.backend.post<{ marked: number }>(
       'notification',
