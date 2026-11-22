@@ -4,8 +4,8 @@
 
 **Última atualização:** 2026-11-22
 **Board:** [Digital Banking no GitHub Projects](https://github.com/users/capozziV/projects/2)
-**Fase atual:** etapa 9 (frontend do capzzPay) na branch `etapa-9-frontend`, worktree `.claude/worktrees/etapa-9`, ainda sem PR e sem CI. As 13 tasks do plano e os pedidos #220, #221, #226, #227 e #228 estão juntados. Etapa 8 na `main` (PR #205).
-**Próximo passo:** em andamento #232, #233, #229 e #102 (branches `etapa-9/fix-232`, `fix-233`, `fix-229`, `sininho-102`); depois, a rodada final abaixo.
+**Fase atual:** etapa 9 (frontend do capzzPay) na branch `etapa-9-frontend`, worktree `.claude/worktrees/etapa-9`, ainda sem PR e sem CI. Juntados e revisados em 2026-11-22: #232, #233, #229, #102 (sininho) e os achados dos commits que estavam sem revisão; `main` trazida. Etapa 8 na `main` (PR #205).
+**Próximo passo:** terminar a rodada final abaixo (seed, smoke, Bruno, frontend, Playwright, revisão da branch inteira) e abrir o PR.
 
 ## Handoff da etapa 9 (2026-11-22)
 O checkout principal está na `main` 132 commits atrás e com um `docs/status.md` antigo: vale este arquivo, no worktree da etapa. Há mudanças não commitadas no checkout principal (memória de agentes, grafo) e em cerca de 35 worktrees: não descarte sem olhar.
@@ -15,20 +15,18 @@ O checkout principal está na `main` 132 commits atrás e com um `docs/status.md
 - **#231:** os commits novos seguem com o e-mail atual por enquanto; o cartão fica aberto. Não ligar o bloqueio de push com e-mail no GitHub enquanto isso.
 - Stack `capzzpay`: pode atualizar com backup (em `.superpowers/backups/`), recriando só os serviços alterados com `--no-deps`, sem tocar em volumes nem no LocalStack, que não tem `PERSISTENCE`.
 
-### Bugs achados com o app de pé
-- **#232:** o nome da contraparte (#228) não aparece para cliente cadastrado antes da fila `notification-customer.fifo`: os eventos saíram antes de ela existir, `customer_names` ficou vazia e tudo mostra "outro cliente". Falta backfill, teste do upgrade e o `seed-check` conferindo o nome. O ADR 0025 afirma o contrário ("sem migração de dados") e precisa de correção. Apagar os volumes só esconde o bug.
-- **#233:** a notificação de boas-vindas mostra o id da conta, "banco" e "sininho" (`NotificationText.kt:15-18`), e os textos de bloqueio, desbloqueio e encerramento também levam o id. O texto é gravado, então as já existentes também precisam de correção. O id ainda chega ao navegador dentro do `body`.
-
 ### Rodada final
-1. Com a máquina livre, uma verificação pesada por vez: `./gradlew build` completo, e2e completo (estourou o limite de 20 min do Gradle sob carga), `smoke.sh`, as cinco coleções Bruno, `npm ci`, lint, testes e build de `frontend/`, e o Playwright contra imagens novas. Nada disso rodou inteiro na branch juntada.
-2. Nunca rodados: smoke e as coleções Bruno com o bônus (Task 1) e com a fila do #228; `seed.sh --remote`; login pelo Cognito real; os jobs `frontend` e `frontend-e2e` no CI.
-3. `docs/rodando-localmente.md`: com o perfil `apps`, o BFF precisa de `MOCK_OAUTH2_HOST=mock-oauth2-server:8080` no `up`, senão os serviços devolvem `401`; e o `up` constrói `web` e `bff`.
-4. Trazer a `origin/main` (3 commits à frente, merge sem conflito em 2026-11-22) e rodar `graphify update .`.
-5. Revisão da branch inteira pela Beatriz. Entraram só com conferência da coordenadora, sem revisão dela: `36f109a`, `ac16b0e`, `29f6404`, `84382d5` e os commits de docs do capzzPay, do ADR 0009 e do ADR 0025.
-6. PR para a `main`; merge com a aprovação dela e o `ci-ok` verde; cartão #16 em Done.
+1. Feito: `./gradlew build` completo em `56e8f16` (1617 testes, 0 falhas, 0 pulados; e2e com 21 executados). O sininho, juntado depois, só muda `frontend/`.
+2. Feito: #232 e #233 conferidos na stack `capzzpay` pela API (19 notificações, 0 com "outro cliente", 0 com id de conta).
+3. Em andamento: `seed-check`, smoke e as cinco coleções Bruno numa stack isolada (`capzzpay-verify`, worktree `e9-verificacao`); nunca semear a do usuário.
+4. Falta: `npm ci`, lint, testes e build de `frontend/` na branch juntada; Playwright na stack isolada; atualizar `web` e `bff` da stack `capzzpay`.
+5. Falta: revisão da branch inteira pela Beatriz, com o ajuste do KDoc de `deleteTransfers` (#229) na onda de correções.
+6. PR para a `main`; merge com a aprovação dela e o `ci-ok` verde; cartões #16, #102, #229, #232 e #233 em Done.
+Nunca rodados: `seed.sh --remote`, login pelo Cognito real e os jobs `frontend` e `frontend-e2e` no CI.
 
 ### Pendências
-- Débito: #222, #223, #225, #229 (teste instável do `transfers`, pode derrubar o CI do PR) e #230.
+- Débito: #222, #223, #225 e #230.
+- Pergunta sem resposta do usuário: #234 (extrato local vazio desde que o LocalStack foi recriado em 2026-11-20: republicar pelo outbox ou esperar o #117).
 - Tarefas do usuário: #219 (reaplicar o `bootstrap`) e #224 (segredo `DEMO_PASSWORD`) antes do `aws-up`; #182 (subida real na AWS).
 - Decisões do usuário: o banco se chama **capzzPay** (pacotes e repositório seguem `digitalbanking`); rodapé "© 2026 capzz.labs"; "Notificações" no lugar de "Avisos"; nome da pessoa, e não id de conta, nas notificações.
 
