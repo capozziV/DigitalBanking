@@ -592,6 +592,9 @@ jobs:
       # O vetor do `sub` local do seed.sh (e-mail -> UUID) tem de bater com o do BFF (local-identity-provider.spec.ts).
       - name: Vetor do sub local do seed
         run: infra/local/seed-sub-test.sh
+      # A conferencia do nome da contraparte nas notificacoes do demo (issue 232), com entrada falsa.
+      - name: Conferencia das notificacoes do seed
+        run: infra/local/seed-notifications-test.sh
       - name: shellcheck nos scripts de infra/local e infra/aws
         run: find infra/local infra/aws -name '*.sh' -print0 | xargs -0 shellcheck
       # O Bruno nao compartilha scripts entre colecoes: estas quatro copias tem de ficar iguais.

@@ -13,14 +13,17 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.web.server.LocalServerPort
+import org.springframework.core.io.ClassPathResource
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.TestPropertySource
 import org.testcontainers.localstack.LocalStackContainer
 import org.testcontainers.utility.MountableFile
+import software.amazon.awssdk.services.sns.SnsClient
 import software.amazon.awssdk.services.sqs.SqsClient
 import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName
+import software.amazon.awssdk.services.sqs.model.QueueAttributeName
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
 import java.net.URI
@@ -109,7 +112,84 @@ class OutboxRelayIntegrationTest : CustomerIntegrationTest() {
         return received
     }
 
-    private fun receiveBatch(waitSeconds: Int): List<ReceivedEvent> {
+    /**
+     * Issue 232, in the real order: the event is published while no queue is subscribed (the late queue does not exist
+     * yet, so it never sees it), the queue is created and subscribed afterwards, and the V5 migration (run here as a
+     * script, since the database is already migrated) republishes it through the relay to the late queue.
+     */
+    @Test
+    fun `the V5 republication reaches a queue created after the original event was published`() {
+        val sub = UUID.randomUUID()
+        val phone = nextPhone()
+        api.post(
+            "/customers",
+            """{"name":"Ana Souza","email":"ana@example.test","phone":"$phone"}""",
+            JwtTestSupport.customerToken(sub),
+        )
+        awaitEvents(sub.toString(), 1) // the original reached the inspection queue, which already existed
+        val lateQueueUrl = createLateQueueSubscribedToTheTopic()
+        assertThat(receiveFrom(lateQueueUrl, 2).filter { it.groupId == sub.toString() })
+            .describedAs("a queue created later never receives the original event")
+            .isEmpty()
+
+        val v5 = ClassPathResource("db/migration/V5__republish_customer_registered.sql").getContentAsString(Charsets.UTF_8)
+        ownerJdbc.sql(v5).update()
+
+        val republished = mutableListOf<ReceivedEvent>()
+        val deadline = Instant.now().plus(DELIVERY_TIMEOUT)
+        while (Instant.now().isBefore(deadline) && republished.none { it.groupId == sub.toString() }) {
+            republished += receiveFrom(lateQueueUrl, 1)
+        }
+        val event = republished.single { it.groupId == sub.toString() }
+        assertThat(event.eventType).isEqualTo("CustomerRegistered")
+        assertThat(event.body.get("eventVersion").asInt()).isEqualTo(2)
+        assertThat(event.body.get("aggregateId").asString()).isEqualTo(sub.toString())
+        assertThat(
+            event.body
+                .get("payload")
+                .get("phone")
+                .asString(),
+        ).isEqualTo(phone)
+        assertThat(
+            event.body
+                .get("payload")
+                .get("name")
+                .asString(),
+        ).isEqualTo("Ana Souza")
+    }
+
+    private fun createLateQueueSubscribedToTheTopic(): String {
+        val url =
+            sqs
+                .createQueue {
+                    it.queueName("late-notification-customer.fifo").attributes(
+                        mapOf(
+                            QueueAttributeName.FIFO_QUEUE to "true",
+                            QueueAttributeName.CONTENT_BASED_DEDUPLICATION to "false",
+                        ),
+                    )
+                }.queueUrl()
+        val arn =
+            sqs
+                .getQueueAttributes { it.queueUrl(url).attributeNames(QueueAttributeName.QUEUE_ARN) }
+                .attributes()
+                .getValue(QueueAttributeName.QUEUE_ARN)
+        sns.subscribe {
+            it
+                .topicArn("arn:aws:sns:${localStack.region}:000000000000:$TOPIC_NAME")
+                .protocol("sqs")
+                .endpoint(arn)
+                .attributes(mapOf("RawMessageDelivery" to "true"))
+        }
+        return url
+    }
+
+    private fun receiveBatch(waitSeconds: Int): List<ReceivedEvent> = receiveFrom(queueUrl, waitSeconds)
+
+    private fun receiveFrom(
+        queueUrl: String,
+        waitSeconds: Int,
+    ): List<ReceivedEvent> {
         val messages =
             sqs
                 .receiveMessage {
@@ -147,6 +227,7 @@ class OutboxRelayIntegrationTest : CustomerIntegrationTest() {
 
         private lateinit var localStack: LocalStackContainer
         private lateinit var sqs: SqsClient
+        private lateinit var sns: SnsClient
         private lateinit var queueUrl: String
 
         /** Started here, not in a static initializer, so a missing token skips the class (or fails it on CI). */
@@ -165,6 +246,7 @@ class OutboxRelayIntegrationTest : CustomerIntegrationTest() {
             localStack.start()
             awaitInitScripts()
             sqs = LocalStackTestSupport.sqsClient(localStack)
+            sns = LocalStackTestSupport.snsClient(localStack)
             queueUrl = sqs.getQueueUrl { it.queueName(INSPECTION_QUEUE) }.queueUrl()
         }
 
@@ -172,6 +254,7 @@ class OutboxRelayIntegrationTest : CustomerIntegrationTest() {
         @AfterAll
         fun stopLocalStack() {
             if (::sqs.isInitialized) sqs.close()
+            if (::sns.isInitialized) sns.close()
             if (::localStack.isInitialized) localStack.stop()
         }
 

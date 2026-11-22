@@ -17,7 +17,7 @@
 #    AWS: o demo e o parceiro sao usuarios do Cognito criados por infra/aws/cognito-user.sh (AdminCreateUser +
 #    AdminSetUserPassword permanente); a senha do demo vem de DEMO_PASSWORD (segredo do repositorio, obrigatoria).
 # Saida: as linhas OWNER_ACCOUNT=<id> e OWNER_BALANCE=<centavos>, depois DEMO_ACCOUNT, DEMO_BALANCE, DEMO_COMPLETED,
-# DEMO_REFUSED e DEMO_NOTIFICATIONS (o seed-check compara duas execucoes seguidas).
+# DEMO_REFUSED, DEMO_NOTIFICATIONS e DEMO_COUNTERPART (o seed-check compara duas execucoes seguidas).
 # Modo --remote (ambiente na AWS, workflow aws-up): o dono e um usuario do Cognito no grupo admin, criado ou
 # atualizado por infra/aws/cognito-user.sh (AdminInitiateAuth); o id do cliente e o sub que o Cognito der.
 # E-mail em OWNER_EMAIL (padrao owner@example.test) e senha em OWNER_PASSWORD (segredo do repositorio, obrigatoria).
@@ -108,6 +108,7 @@ demo_email=$(printf '%s' "${DEMO_EMAIL:-demo@example.test}" | tr '[:upper:]' '[:
 demo_phone="${DEMO_PHONE:-+5511999990001}"
 partner_email=partner@example.test
 partner_phone=+5511999990002
+partner_name="Parceiro capzzPay"
 if [ "$remote" = true ]; then
   if [ -z "${DEMO_PASSWORD:-}" ]; then
     echo "FALHA: DEMO_PASSWORD ausente (senha de 6 digitos do usuario de demonstracao, segredo do repositorio)" >&2
@@ -164,7 +165,7 @@ fi
 token="$demo_token"
 call "201|200" POST /customers "{\"name\":\"Demo capzzPay\",\"email\":\"$demo_email\",\"phone\":\"$demo_phone\"}" > /dev/null
 token="$partner_token"
-call "201|200" POST /customers "{\"name\":\"Parceiro capzzPay\",\"email\":\"$partner_email\",\"phone\":\"$partner_phone\"}" > /dev/null
+call "201|200" POST /customers "{\"name\":\"$partner_name\",\"email\":\"$partner_email\",\"phone\":\"$partner_phone\"}" > /dev/null
 echo "OK: clientes $demo (Demo capzzPay) e $partner (Parceiro capzzPay) cadastrados"
 
 token="$demo_token"
@@ -178,7 +179,7 @@ call "201|200" POST "/accounts/$partner_account/credits" \
   '{"amount":100000,"description":"seed saldo do parceiro"}' seed-partner-initial-credit-1 > /dev/null
 
 # Pede a transferencia (201 concluida, 202 em andamento, 422 recusada; a mesma chave devolve a existente) e imprime
-# o status final depois de esperar a saga (ate 30 s). Uso: transfer_status <token> <origem> <destino> <centavos> <descricao> <chave>
+# "<status final> <id da transferencia>" depois de esperar a saga (ate 30 s). Uso: transfer_status <token> <origem> <destino> <centavos> <descricao> <chave>
 transfer_status() {
   local from_token="$1" source="$2" destination="$3" amount="$4" description="$5" key="$6" id status="" saved="$token"
   token="$from_token"
@@ -191,13 +192,17 @@ transfer_status() {
     sleep 1
   done
   token="$saved"
-  echo "$status"
+  echo "$status $id"
 }
 
 sent=$(transfer_status "$demo_token" "$demo_account" "$partner_account" 12000 "seed pizza com o parceiro" seed-demo-transfer-sent-1)
 received=$(transfer_status "$partner_token" "$partner_account" "$demo_account" 30000 "seed acerto de contas" seed-demo-transfer-received-1)
 # 12000 ja usados do limite diario de 500000: 495000 passa do que resta (488000) e a saga recusa antes do debito.
 refused=$(transfer_status "$demo_token" "$demo_account" "$partner_account" 495000 "seed acima do limite diario" seed-demo-transfer-refused-1)
+transfer_ids=$(printf '%s\n' "$sent" "$received" "$refused" | jq -Rsc 'split("\n") | map(select(length > 0) | split(" ")[1])')
+sent=${sent%% *}
+received=${received%% *}
+refused=${refused%% *}
 completed=0
 [ "$sent" != COMPLETED ] || completed=$((completed + 1))
 [ "$received" != COMPLETED ] || completed=$((completed + 1))
@@ -208,15 +213,59 @@ if [ "$completed" != 2 ] || [ "$refusals" != 1 ]; then
   exit 1
 fi
 
-# O notification e assincrono: espera ate 45 s pelos quatro tipos de aviso do demo.
+# Confere o texto das notificacoes das transferencias DESTE seed (as de terceiros, como as de recrutadores e do Playwright,
+# nao contam). Entrada (stdin): {"items":[...]} com todas as paginas de GET /notifications; $1: o JSON com os transferId do
+# seed. Passa quando as tres (enviada, recebida, recusada) existem, todas trazem o nome da contraparte e nenhuma diz
+# "outro cliente", que o notification mostra enquanto a projecao de nomes (customer_names) nao recebeu o CustomerRegistered.
+notification_names_ok() {
+  jq -e --arg name "$partner_name" --argjson ids "$1" '
+    [.items[] | select(.kind | IN("TRANSFER_SENT", "TRANSFER_RECEIVED", "TRANSFER_FAILED"))
+      | select(.data.transferId as $t | $ids | index($t))] as $own
+    | ($own | map(.kind) | unique | length) == 3
+      and all($own[]; .body | contains($name))
+      and all($own[]; .body | contains("outro cliente") | not)' > /dev/null
+}
+
+# Os tipos de aviso do demo achados: WELCOME e os das transferencias do seed (stdin e $1 como acima), ordenados.
+notification_found_kinds() {
+  jq -r --argjson ids "$1" '
+    [.items[] | select(.kind == "WELCOME" or (.data.transferId as $t | $ids | index($t)))
+      | .kind] | unique | join(" ")'
+}
+
+# Todas as paginas de GET /notifications (segue o nextCursor; no maximo 50 paginas), como {"items":[...]}.
+fetch_notifications() {
+  local cursor="" page items="[]" path _
+  for _ in $(seq 1 50); do
+    path=/notifications
+    [ -z "$cursor" ] || path="/notifications?cursor=$(jq -rn --arg c "$cursor" '$c | @uri')"
+    page=$(call 200 GET "$path")
+    items=$(jq -c --argjson more "$(jq -c '.items' <<< "$page")" '. + $more' <<< "$items")
+    cursor=$(jq -r '.nextCursor // empty' <<< "$page")
+    [ -n "$cursor" ] || break
+  done
+  jq -c '{items: .}' <<< "$items"
+}
+
+# O notification e assincrono: espera ate 45 s pelos quatro tipos de aviso do demo e pelo nome da contraparte nos
+# textos das transferencias do seed (consistencia eventual: o nome chega pelo CustomerRegistered do parceiro).
 token="$demo_token"
 wanted='TRANSFER_FAILED TRANSFER_RECEIVED TRANSFER_SENT WELCOME'
 kinds=""
+names_ok=false
 for _ in $(seq 1 45); do
-  kinds=$(call 200 GET /notifications | jq -r '[.items[].kind] | unique | join(" ")')
-  [ "$kinds" != "$wanted" ] || break
+  notifications=$(fetch_notifications)
+  kinds=$(notification_found_kinds "$transfer_ids" <<< "$notifications")
+  if notification_names_ok "$transfer_ids" <<< "$notifications"; then names_ok=true; else names_ok=false; fi
+  if [ "$kinds" = "$wanted" ] && [ "$names_ok" = true ]; then break; fi
   sleep 1
 done
+if [ "$names_ok" != true ] || [ "$kinds" != "$wanted" ]; then
+  echo "FALHA: as notificacoes do demo nao trazem os quatro tipos e o nome '$partner_name' nas transferencias do seed (ou dizem 'outro cliente') apos 45 s;" >&2
+  echo "       confira se a fila notification-customer.fifo existe e se o customer republicou os CustomerRegistered (migration V5)" >&2
+  jq -r '.items[] | "  \(.kind): \(.body)"' <<< "$notifications" >&2 || true
+  exit 1
+fi
 demo_balance=$(call 200 GET "/accounts/$demo_account" | jq -r .balance)
 echo "OK: demo $demo_account com saldo $demo_balance, $completed concluidas, $refusals recusada, avisos: $kinds"
 echo "DEMO_ACCOUNT=$demo_account"
@@ -224,3 +273,4 @@ echo "DEMO_BALANCE=$demo_balance"
 echo "DEMO_COMPLETED=$completed"
 echo "DEMO_REFUSED=$refusals"
 echo "DEMO_NOTIFICATIONS=$kinds"
+echo "DEMO_COUNTERPART=$partner_name"

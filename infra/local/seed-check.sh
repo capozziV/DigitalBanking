@@ -4,7 +4,11 @@
 # Com o 2o argumento, confere tambem o saldo da 1a execucao (num ambiente novo, o saldo inicial do seed: 1000000).
 # Confere tambem o usuario de demonstracao (linhas DEMO_* do seed): conta e saldo estaveis entre as duas execucoes,
 # saldo de 228000 (bonus 10000 + credito 200000 + 30000 recebidos - 12000 enviados), 2 transferencias concluidas,
-# 1 recusada pelo limite diario e as notificacoes WELCOME, TRANSFER_SENT, TRANSFER_RECEIVED e TRANSFER_FAILED.
+# 1 recusada pelo limite diario, as notificacoes WELCOME, TRANSFER_SENT, TRANSFER_RECEIVED e TRANSFER_FAILED e o nome
+# "Parceiro capzzPay" da contraparte nas tres notificacoes das transferencias do proprio seed, achadas pelo transferId em
+# todas as paginas (nunca "outro cliente"; as de terceiros, como recrutadores e Playwright, nao contam; linha
+# DEMO_COUNTERPART, que o seed so imprime depois de conferir os textos e de esperar a consistencia eventual; sem o nome,
+# o seed sai com erro).
 # Com --remote, repassa o modo ao seed.sh (ambiente na AWS, workflow aws-up).
 # Uso: infra/local/seed-check.sh [--remote] [url-base] [saldo-esperado]   (padrao http://127.0.0.1; usado pelo CI)
 set -euo pipefail
@@ -50,11 +54,11 @@ echo "OK: seed idempotente ($(tr '\n' ' ' <<< "$first_owner"))"
 
 # --- usuario de demonstracao ---
 demo_lines() {
-  grep -E '^DEMO_(ACCOUNT|BALANCE|COMPLETED|REFUSED|NOTIFICATIONS)=' <<< "$1" || true
+  grep -E '^DEMO_(ACCOUNT|BALANCE|COMPLETED|REFUSED|NOTIFICATIONS|COUNTERPART)=' <<< "$1" || true
 }
 first_demo=$(demo_lines "$first")
 second_demo=$(demo_lines "$second")
-if [ "$(wc -l <<< "$first_demo" | tr -d ' ')" != 5 ] || ! grep -q '^DEMO_ACCOUNT=.' <<< "$first_demo"; then
+if [ "$(wc -l <<< "$first_demo" | tr -d ' ')" != 6 ] || ! grep -q '^DEMO_ACCOUNT=.' <<< "$first_demo"; then
   echo "FALHA: o seed nao imprimiu as linhas DEMO_* do usuario de demonstracao" >&2
   exit 1
 fi
@@ -65,7 +69,7 @@ if [ "$first_demo" != "$second_demo" ]; then
   exit 1
 fi
 for expected in DEMO_BALANCE=228000 DEMO_COMPLETED=2 DEMO_REFUSED=1 \
-  'DEMO_NOTIFICATIONS=TRANSFER_FAILED TRANSFER_RECEIVED TRANSFER_SENT WELCOME'; do
+  'DEMO_NOTIFICATIONS=TRANSFER_FAILED TRANSFER_RECEIVED TRANSFER_SENT WELCOME' 'DEMO_COUNTERPART=Parceiro capzzPay'; do
   if ! grep -qxF "$expected" <<< "$first_demo"; then
     echo "FALHA: demo sem $expected (veio: $(tr '\n' ' ' <<< "$first_demo"))" >&2
     exit 1
