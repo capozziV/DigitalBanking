@@ -17,7 +17,7 @@
 #    AWS: o demo e o parceiro sao usuarios do Cognito criados por infra/aws/cognito-user.sh (AdminCreateUser +
 #    AdminSetUserPassword permanente); a senha do demo vem de DEMO_PASSWORD (segredo do repositorio, obrigatoria).
 # Saida: as linhas OWNER_ACCOUNT=<id> e OWNER_BALANCE=<centavos>, depois DEMO_ACCOUNT, DEMO_BALANCE, DEMO_COMPLETED,
-# DEMO_REFUSED e DEMO_NOTIFICATIONS (o seed-check compara duas execucoes seguidas).
+# DEMO_REFUSED, DEMO_NOTIFICATIONS e DEMO_COUNTERPART (o seed-check compara duas execucoes seguidas).
 # Modo --remote (ambiente na AWS, workflow aws-up): o dono e um usuario do Cognito no grupo admin, criado ou
 # atualizado por infra/aws/cognito-user.sh (AdminInitiateAuth); o id do cliente e o sub que o Cognito der.
 # E-mail em OWNER_EMAIL (padrao owner@example.test) e senha em OWNER_PASSWORD (segredo do repositorio, obrigatoria).
@@ -108,6 +108,7 @@ demo_email=$(printf '%s' "${DEMO_EMAIL:-demo@example.test}" | tr '[:upper:]' '[:
 demo_phone="${DEMO_PHONE:-+5511999990001}"
 partner_email=partner@example.test
 partner_phone=+5511999990002
+partner_name="Parceiro capzzPay"
 if [ "$remote" = true ]; then
   if [ -z "${DEMO_PASSWORD:-}" ]; then
     echo "FALHA: DEMO_PASSWORD ausente (senha de 6 digitos do usuario de demonstracao, segredo do repositorio)" >&2
@@ -164,7 +165,7 @@ fi
 token="$demo_token"
 call "201|200" POST /customers "{\"name\":\"Demo capzzPay\",\"email\":\"$demo_email\",\"phone\":\"$demo_phone\"}" > /dev/null
 token="$partner_token"
-call "201|200" POST /customers "{\"name\":\"Parceiro capzzPay\",\"email\":\"$partner_email\",\"phone\":\"$partner_phone\"}" > /dev/null
+call "201|200" POST /customers "{\"name\":\"$partner_name\",\"email\":\"$partner_email\",\"phone\":\"$partner_phone\"}" > /dev/null
 echo "OK: clientes $demo (Demo capzzPay) e $partner (Parceiro capzzPay) cadastrados"
 
 token="$demo_token"
@@ -208,15 +209,36 @@ if [ "$completed" != 2 ] || [ "$refusals" != 1 ]; then
   exit 1
 fi
 
-# O notification e assincrono: espera ate 45 s pelos quatro tipos de aviso do demo.
+# Confere o texto das notificacoes de transferencia do demo (stdin: a resposta de GET /notifications): as tres
+# (enviada, recebida, recusada) existem, todas trazem o nome da contraparte e nenhuma diz "outro cliente", que o
+# notification mostra enquanto a projecao de nomes (customer_names) nao recebeu o CustomerRegistered da contraparte.
+notification_names_ok() {
+  jq -e --arg name "$partner_name" '
+    [.items[] | select(.kind | IN("TRANSFER_SENT", "TRANSFER_RECEIVED", "TRANSFER_FAILED"))] as $transfers
+    | ($transfers | map(.kind) | unique | length) == 3
+      and all($transfers[]; .body | contains($name))
+      and all(.items[]; .body | contains("outro cliente") | not)' > /dev/null
+}
+
+# O notification e assincrono: espera ate 45 s pelos quatro tipos de aviso do demo e pelo nome da contraparte nos
+# textos das transferencias (consistencia eventual: o nome chega pelo CustomerRegistered do parceiro).
 token="$demo_token"
 wanted='TRANSFER_FAILED TRANSFER_RECEIVED TRANSFER_SENT WELCOME'
 kinds=""
+names_ok=false
 for _ in $(seq 1 45); do
-  kinds=$(call 200 GET /notifications | jq -r '[.items[].kind] | unique | join(" ")')
-  [ "$kinds" != "$wanted" ] || break
+  notifications=$(call 200 GET /notifications)
+  kinds=$(jq -r '[.items[].kind] | unique | join(" ")' <<< "$notifications")
+  if notification_names_ok <<< "$notifications"; then names_ok=true; else names_ok=false; fi
+  if [ "$kinds" = "$wanted" ] && [ "$names_ok" = true ]; then break; fi
   sleep 1
 done
+if [ "$names_ok" != true ]; then
+  echo "FALHA: as notificacoes de transferencia do demo nao trazem o nome '$partner_name' (ou dizem 'outro cliente') apos 45 s;" >&2
+  echo "       confira se a fila notification-customer.fifo existe e se o customer republicou os CustomerRegistered (migration V5)" >&2
+  jq -r '.items[] | "  \(.kind): \(.body)"' <<< "$notifications" >&2 || true
+  exit 1
+fi
 demo_balance=$(call 200 GET "/accounts/$demo_account" | jq -r .balance)
 echo "OK: demo $demo_account com saldo $demo_balance, $completed concluidas, $refusals recusada, avisos: $kinds"
 echo "DEMO_ACCOUNT=$demo_account"
@@ -224,3 +246,4 @@ echo "DEMO_BALANCE=$demo_balance"
 echo "DEMO_COMPLETED=$completed"
 echo "DEMO_REFUSED=$refusals"
 echo "DEMO_NOTIFICATIONS=$kinds"
+echo "DEMO_COUNTERPART=$partner_name"
