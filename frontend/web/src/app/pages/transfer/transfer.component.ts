@@ -110,7 +110,14 @@ const STATUS_TITLES: Record<string, string> = {
           <span class="small-label">para</span>
           <strong class="recipient">{{ recipientName() }}</strong>
           <div class="row">
-            <button class="btn btn-outline btn-auto" type="button" (click)="back()">Voltar</button>
+            <button
+              class="btn btn-outline btn-auto"
+              type="button"
+              [disabled]="busy()"
+              (click)="back()"
+            >
+              Voltar
+            </button>
             <button
               class="btn btn-primary btn-auto"
               type="button"
@@ -125,6 +132,13 @@ const STATUS_TITLES: Record<string, string> = {
           @let current = result();
           <span class="small-label">Transferência para {{ recipientName() }}</span>
           <strong class="value">{{ amountCents() | money }}</strong>
+          @if (resumed()) {
+            <p class="status" role="status" data-testid="resumed-notice">
+              Você já tinha confirmado uma transferência igual sem ver o resultado. Este é o
+              resultado dela: não houve um segundo envio. Para enviar mais uma, use Nova
+              transferência.
+            </p>
+          }
           <p class="status" role="status">
             @if (timedOut()) {
               Ainda processando. Veja o resultado no extrato em instantes.
@@ -186,6 +200,7 @@ export class TransferComponent {
   protected readonly amountInvalid = signal(false);
   protected readonly result = signal<TransferStatusDTO>({ id: '', status: 'PENDING' });
   protected readonly timedOut = signal(false);
+  protected readonly resumed = signal(false);
 
   protected readonly phoneForm = inject(FormBuilder).nonNullable.group({
     phone: ['', [Validators.required, mobilePhone]],
@@ -244,11 +259,13 @@ export class TransferComponent {
   }
 
   protected back(): void {
+    if (this.busy()) return;
     this.error.set(null);
     this.step.set(this.step() === 'confirm' ? 'amount' : 'phone');
   }
 
   protected async confirm(): Promise<void> {
+    if (this.busy()) return;
     this.busy.set(true);
     this.error.set(null);
     // Read before the first await, so that the key and the body are of the same transfer.
@@ -260,6 +277,7 @@ export class TransferComponent {
     };
     try {
       const attempt = await this.attempts.open(intent);
+      this.resumed.set(attempt.resumed);
       const created = await firstValueFrom(
         this.http.post<TransferStatusDTO>('/bff/transfers', body, {
           headers: { 'Idempotency-Key': attempt.idempotencyKey },
@@ -270,7 +288,12 @@ export class TransferComponent {
       this.step.set('status');
       this.startPolling(created, attempt);
     } catch (error) {
-      this.error.set(problemMessage(error, 'Não foi possível enviar a transferência.'));
+      this.error.set(
+        problemMessage(
+          error,
+          'Não foi possível confirmar o envio. Tente de novo aqui ou confira o extrato.',
+        ),
+      );
     } finally {
       this.busy.set(false);
     }

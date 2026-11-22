@@ -122,6 +122,9 @@ describe('HomeComponent', () => {
     await fixture.whenStable();
     expect(el().textContent).toContain('Você ainda não tem conta');
     expect(el().textContent).not.toContain('Não foi possível carregar');
+    expect(el().textContent).toContain(
+      'Abra uma conta para transferir. O bônus de boas-vindas vale só para a primeira conta.',
+    );
   });
 
   it('shows the message of a failed account opening', async () => {

@@ -173,17 +173,17 @@ describe('TransferComponent', () => {
     await settle();
   });
 
-  it('repeats the same Idempotency-Key on a double click on Confirmar', async () => {
+  it('sends one POST on a double click on Confirmar', async () => {
     await reachConfirmation();
     const confirm = button('Confirmar');
     confirm.click();
     confirm.click();
-    const requests = await sentTransfers(2);
-    const key = requests[0].request.headers.get('Idempotency-Key');
-    expect(key).toBeTruthy();
-    expect(requests[1].request.headers.get('Idempotency-Key')).toBe(key);
-    requests[0].flush({ id: 't1', status: 'PENDING' });
-    requests[1].flush({ id: 't1', status: 'PENDING' });
+    const [request] = await sentTransfers(1);
+    await settle();
+    http.expectNone('/bff/transfers');
+    request.flush({ id: 't1', status: 'PENDING' });
+    await settle();
+    expect(el().querySelector('[data-testid="resumed-notice"]')).toBeNull();
   });
 
   it('keeps the same Idempotency-Key when the user retries after a failure', async () => {
@@ -400,30 +400,6 @@ describe('TransferComponent', () => {
       retry.flush({ id: 't1', status: 'PENDING' });
     });
 
-    it('a late answer of a double click does not drop the key of the next transfer', async () => {
-      await reachConfirmation();
-      const confirm = button('Confirmar');
-      confirm.click();
-      confirm.click();
-      const [late, answered] = await sentTransfers(2);
-      answered.flush({ id: 't1', status: 'COMPLETED' });
-      await settle();
-      http.expectOne('/bff/transfers/t1').flush({ id: 't1', status: 'COMPLETED' });
-      await settle();
-      button('Nova transferência').click();
-      await settle();
-      await fillIn();
-      const key = await confirmAndLoseTheAnswer();
-      late.flush({ id: 't1', status: 'COMPLETED' });
-      await settle();
-      http.expectOne('/bff/transfers/t1').flush({ id: 't1', status: 'COMPLETED' });
-      await leaveAndReturn();
-      await fillIn();
-      const retry = await confirmTransfer();
-      expect(keyOf(retry)).toBe(key);
-      retry.flush({ id: 't2', status: 'PENDING' });
-    });
-
     for (const status of ['COMPLETED', 'FAILED', 'COMPENSATED']) {
       it(`uses a new key for the same transfer after ${status} in the POST answer`, async () => {
         await reachConfirmation();
@@ -455,6 +431,142 @@ describe('TransferComponent', () => {
         next.flush({ id: 't2', status: 'PENDING' });
       });
     }
+  });
+
+  describe('resumed attempt notice', () => {
+    const notice = () => el().querySelector('[data-testid="resumed-notice"]');
+    const NOTICE =
+      'Você já tinha confirmado uma transferência igual sem ver o resultado. Este é o resultado dela: não houve um segundo envio. Para enviar mais uma, use Nova transferência.';
+
+    it('warns when "Nova transferência" after "Ainda processando" sends the same transfer', async () => {
+      await reachConfirmation();
+      const first = await confirmTransfer();
+      first.flush({ id: 't1', status: 'PENDING' });
+      await settle();
+      vi.advanceTimersByTime(30_000);
+      await settle();
+      http.match('/bff/transfers/t1');
+      expect(notice()).toBeNull();
+      button('Nova transferência').click();
+      await settle();
+      await fillIn();
+      const second = await confirmTransfer();
+      second.flush({ id: 't1', status: 'COMPLETED' });
+      await settle();
+      http.expectOne('/bff/transfers/t1').flush({ id: 't1', status: 'COMPLETED' });
+      await settle();
+      expect(notice()?.getAttribute('role')).toBe('status');
+      expect(notice()?.textContent?.trim()).toBe(NOTICE);
+    });
+
+    it('warns when the user left with the POST in flight and sends the same transfer later', async () => {
+      await reachConfirmation();
+      const first = await confirmTransfer();
+      await leaveAndReturn();
+      first.flush({ id: 't1', status: 'COMPLETED' });
+      await settle();
+      http.match('/bff/transfers/t1');
+      await fillIn();
+      const second = await confirmTransfer();
+      second.flush({ id: 't1', status: 'COMPLETED' });
+      await settle();
+      http.expectOne('/bff/transfers/t1').flush({ id: 't1', status: 'COMPLETED' });
+      await settle();
+      expect(notice()?.textContent?.trim()).toBe(NOTICE);
+    });
+
+    it('does not warn on the first transfer', async () => {
+      await reachConfirmation();
+      const first = await confirmTransfer();
+      first.flush({ id: 't1', status: 'COMPLETED' });
+      await settle();
+      http.expectOne('/bff/transfers/t1').flush({ id: 't1', status: 'COMPLETED' });
+      await settle();
+      expect(notice()).toBeNull();
+    });
+
+    it('does not warn on an equal transfer after a final status was seen', async () => {
+      await reachConfirmation();
+      const first = await confirmTransfer();
+      first.flush({ id: 't1', status: 'COMPLETED' });
+      await settle();
+      http.expectOne('/bff/transfers/t1').flush({ id: 't1', status: 'COMPLETED' });
+      await settle();
+      button('Nova transferência').click();
+      await settle();
+      await fillIn();
+      const second = await confirmTransfer();
+      second.flush({ id: 't2', status: 'COMPLETED' });
+      await settle();
+      http.expectOne('/bff/transfers/t2').flush({ id: 't2', status: 'COMPLETED' });
+      await settle();
+      expect(notice()).toBeNull();
+    });
+  });
+
+  describe('Voltar while the POST is in flight', () => {
+    it('cannot go back until the POST ends, then can', async () => {
+      await reachConfirmation();
+      const request = await confirmTransfer();
+      await settle();
+      expect(button('Voltar').disabled).toBe(true);
+      button('Voltar').click();
+      await settle();
+      expect(el().textContent).toContain('Você vai enviar');
+      request.flush({}, { status: 503, statusText: 'Unavailable' });
+      await settle();
+      expect(button('Voltar').disabled).toBe(false);
+      button('Voltar').click();
+      await settle();
+      expect(el().querySelector('input[name="amount"]')).not.toBeNull();
+    });
+  });
+
+  describe('failure without a body', () => {
+    it('says the send could not be confirmed and that trying here is safe', async () => {
+      await reachConfirmation();
+      const request = await confirmTransfer();
+      request.error(new ProgressEvent('error'));
+      await settle();
+      expect(el().querySelector('[role="alert"]')?.textContent?.trim()).toBe(
+        'Não foi possível confirmar o envio. Tente de novo aqui ou confira o extrato.',
+      );
+    });
+  });
+
+  describe('storage failures close the attempt', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it('sends nothing when reading the storage throws', async () => {
+      await reachConfirmation();
+      vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw new Error('blocked');
+      });
+      button('Confirmar').click();
+      await settle();
+      http.expectNone('/bff/transfers');
+      expect(el().querySelector('[role="alert"]')).not.toBeNull();
+    });
+
+    it('sends nothing when writing the storage throws', async () => {
+      await reachConfirmation();
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('quota');
+      });
+      button('Confirmar').click();
+      await settle();
+      http.expectNone('/bff/transfers');
+      expect(el().querySelector('[role="alert"]')).not.toBeNull();
+    });
+
+    it('sends nothing when crypto.subtle is missing', async () => {
+      await reachConfirmation();
+      vi.spyOn(crypto, 'subtle', 'get').mockReturnValue(undefined as unknown as SubtleCrypto);
+      button('Confirmar').click();
+      await settle();
+      http.expectNone('/bff/transfers');
+      expect(el().querySelector('[role="alert"]')).not.toBeNull();
+    });
   });
 
   describe('status polling', () => {
