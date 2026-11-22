@@ -21,7 +21,8 @@ O checkout principal está na `main` 132 commits atrás e com um `docs/status.md
 3. Seed, smoke e Bruno rodados numa stack isolada (nunca semear a do usuário): smoke verde; dois bugs (saldo do `seed-check` no CI, Bruno sem telefone) em `etapa-9/fix-verificacao`, que também roda o Playwright.
 4. Feito: `npm ci`, lint, testes (web 169, BFF 177) e build de `frontend/`; `customer`, `notification`, `web` e `bff` da stack `capzzpay` atualizados. Atualizar `web` e `bff` de novo depois da onda de correções (recarregar o nginx).
 5. Revisão da branch inteira: **reprovada**, 3 Critical e 11 Important (#235; relatório e ledger em `.superpowers/sdd/etapa-9-final/`, fora do git). Primeira leva nas branches `etapa-9/rf-{bff,web,edge,docs,kdoc}`; segunda depois da `fix-verificacao` (guia, I6, I7, I10, Playwright sem UUID no extrato). Cada uma passa pela Beatriz antes de juntar.
-6. PR para a `main`; merge com a aprovação dela e o `ci-ok` verde; cartões #16, #102, #229, #232 e #233 em Done.
+5a. Andamento da onda: juntados BFF, borda, docs, guia/CI/seed e bônus. Em revisão: `etapa-9/rf-web` (`a56d6d7`). Depois dele: texto do Início sobre o bônus, docs da `Idempotency-Key` (arquitetura e ADR 0005), `Transferência enviada` também no Início do Playwright, rodada completa na stack isolada e atualização de `accounts`, `web` e `bff` na stack do usuário (recarregar o nginx).
+6. PR para a `main` (aberto em rascunho para o CI rodar); merge com a aprovação dela e o `ci-ok` verde; cartões #16, #102, #229, #232 e #233 em Done.
 Nunca rodados: `seed.sh --remote`, login pelo Cognito real e os jobs `frontend` e `frontend-e2e` no CI.
 
 ### Pendências
