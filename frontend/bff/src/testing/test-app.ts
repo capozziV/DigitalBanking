@@ -1,11 +1,13 @@
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
+import type { Logger } from 'pino';
 import { AppModule } from '../app.module.js';
 import { FETCH } from '../backend/backend-client.js';
 import { configureApp } from '../configure-app.js';
 import { APP_CONFIG, loadConfig } from '../config/config.js';
 import { IdentityProvider } from '../identity/identity-provider.js';
+import { LOGGER, createLogger } from '../observability/logger.js';
 import { KEY_VALUE_STORE } from '../redis/key-value-store.js';
 import { CLOCK } from '../session/session.service.js';
 import { FakeBackend } from './fake-backend.js';
@@ -30,22 +32,30 @@ export interface SignedIn {
 export interface TestApp {
   app: INestApplication;
   backend: FakeBackend;
+  identity: FakeIdentityProvider;
+  store: InMemoryKeyValueStore;
   clock: { now: number };
   /** Signs in as ana@example.test and returns request helpers that carry the cookies and the CSRF header. */
   signIn(): Promise<SignedIn>;
   close(): Promise<void>;
 }
 
-export async function createTestApp(): Promise<TestApp> {
+export async function createTestApp(
+  logger: Logger = createLogger(TEST_ENV.LOG_LEVEL),
+): Promise<TestApp> {
   const backend = new FakeBackend();
   const clock = { now: 1_000_000 };
+  const identity = new FakeIdentityProvider();
+  const store = new InMemoryKeyValueStore(() => clock.now);
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(APP_CONFIG)
     .useValue(loadConfig(TEST_ENV))
     .overrideProvider(IdentityProvider)
-    .useValue(new FakeIdentityProvider())
+    .useValue(identity)
     .overrideProvider(KEY_VALUE_STORE)
-    .useValue(new InMemoryKeyValueStore(() => clock.now))
+    .useValue(store)
+    .overrideProvider(LOGGER)
+    .useValue(logger)
     .overrideProvider(FETCH)
     .useValue(backend.fetch)
     .overrideProvider(CLOCK)
@@ -58,6 +68,8 @@ export async function createTestApp(): Promise<TestApp> {
   return {
     app,
     backend,
+    identity,
+    store,
     clock,
     async signIn() {
       const response = await request(app.getHttpServer())

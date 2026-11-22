@@ -22,6 +22,11 @@ export class FakeBackend {
     return this;
   }
 
+  /** From now on every route answers [failure]. */
+  failAll(failure: FakeResponse): void {
+    for (const key of this.routes.keys()) this.routes.set(key, failure);
+  }
+
   callsTo(method: string, url: string): BackendCall[] {
     return this.calls.filter((c) => c.method === method && c.url === url);
   }

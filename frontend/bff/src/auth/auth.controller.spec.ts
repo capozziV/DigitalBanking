@@ -253,68 +253,153 @@ describe('AuthController', () => {
         .set('X-CSRF-Token', csrf + 'x')
         .expect(403);
     });
+  });
 
-    it('answers 401 (not 403) on sign-out without a session', async () => {
-      await http().post('/bff/auth/sign-out').set('X-CSRF-Token', 'x').expect(401);
+  describe('sign-out', () => {
+    const signOut = (cookie: string, csrf: string) =>
+      http().post('/bff/auth/sign-out').set('Cookie', cookie).set('X-CSRF-Token', csrf);
+
+    function expectCleared(response: { headers: Record<string, unknown> }) {
+      const cookies = (response.headers['set-cookie'] ?? []) as string[];
+      for (const name of ['bank_session', 'bank_csrf']) {
+        expect(cookies.find((c) => c.startsWith(`${name}=;`))).toContain(
+          'Expires=Thu, 01 Jan 1970',
+        );
+      }
+    }
+
+    it('clears both cookies', async () => {
+      const { header, csrf } = await signIn();
+      expectCleared(await signOut(header, csrf).expect(204));
+    });
+
+    it('answers 204 and clears the cookies when the session is already gone', async () => {
+      expectCleared(await signOut('bank_session=gone; bank_csrf=x', 'x').expect(204));
+    });
+
+    it('answers 204 and clears the cookies without any session cookie', async () => {
+      expectCleared(await http().post('/bff/auth/sign-out').expect(204));
+    });
+
+    it.each([
+      ['unavailable', 'unavailable'],
+      ['off the network', new TypeError('fetch failed')],
+      ['refusing the refresh', 'refresh_failed'],
+    ] as const)(
+      'ends the session without renewing it, with the identity provider %s',
+      async (_name, error) => {
+        identity.expiresInSeconds = 30;
+        const { header, csrf } = await signIn();
+        identity.refreshError = error;
+        expectCleared(await signOut(header, csrf).expect(204));
+        expect(store.keys()).toEqual([]);
+        expect(identity.calls.filter((c) => c.startsWith('refresh'))).toEqual([]);
+      },
+    );
+
+    it('checks CSRF before anything else, even near expiry', async () => {
+      identity.expiresInSeconds = 30;
+      const { header } = await signIn();
+      identity.refreshError = 'unavailable';
+      const response = await signOut(header, 'wrong').expect(403);
+      expect(response.headers['set-cookie']).toBeUndefined();
+      expect(store.keys()).toHaveLength(1);
+    });
+
+    it('clears the cookies also when Redis fails to delete', async () => {
+      const { header, csrf } = await signIn();
+      vi.spyOn(store, 'delete').mockRejectedValueOnce(new Error('redis down'));
+      expectCleared(await signOut(header, csrf).expect(500));
+    });
+
+    it.each([
+      ['/bff/transfers/not-a-uuid', 401],
+      ['/bff/auth/session', 200],
+    ])('a refresh in flight on %s does not bring the session back', async (path, status) => {
+      identity.expiresInSeconds = 30;
+      const { header, csrf } = await signIn();
+      let started!: () => void;
+      let release!: () => void;
+      const inFlight = new Promise<void>((resolve) => (started = resolve));
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      identity.beforeRefresh = () => {
+        started();
+        return gate;
+      };
+      const polling = http()
+        .get(path)
+        .set('Cookie', header)
+        .then((response) => response);
+      await inFlight;
+      // Released also when the sign-out fails or waits, so the test ends with its assertion.
+      const releaseLater = setTimeout(release, 1000);
+      await signOut(header, csrf).expect(204);
+      clearTimeout(releaseLater);
+      release();
+      const late = await polling;
+      expect(store.keys()).toEqual([]);
+      expect(late.status).toBe(status);
+      if (status === 200) expect(late.body.authenticated).toBe(false);
+      expectCleared(late);
     });
   });
 
   describe('token refresh', () => {
+    // Any route behind the session guard: this one answers 400 once the guard lets it through.
+    const guarded = (cookie: string) =>
+      http().get('/bff/transfers/not-a-uuid').set('Cookie', cookie);
+
     it('refreshes when fewer than 60 s remain and keeps the session', async () => {
       identity.expiresInSeconds = 100;
-      const { header, csrf } = await signIn();
+      const { header } = await signIn();
       now += 30_000; // 70 s left: no refresh
-      await http()
-        .post('/bff/auth/sign-out')
-        .set('Cookie', header)
-        .set('X-CSRF-Token', 'wrong')
-        .expect(403);
+      await guarded(header).expect(400);
       expect(identity.calls.filter((c) => c.startsWith('refresh'))).toEqual([]);
       now += 20_000; // 50 s left: refresh
-      await http()
-        .post('/bff/auth/sign-out')
-        .set('Cookie', header)
-        .set('X-CSRF-Token', 'wrong')
-        .expect(403);
+      await guarded(header).expect(400);
       expect(identity.calls.filter((c) => c.startsWith('refresh'))).toEqual(['refresh:refresh']);
-      expect(csrf).not.toBe('');
       expect(store.keys()).toHaveLength(1);
+    });
+
+    it('renews the TTL of the session', async () => {
+      identity.expiresInSeconds = 30;
+      const { header, session } = await signIn();
+      const renew = vi.spyOn(store, 'setIfExists');
+      await guarded(header).expect(400);
+      expect(renew).toHaveBeenCalledWith(`bff:session:${session}`, expect.any(String), 604800);
     });
 
     it('deletes the session and answers 401 when the refresh fails', async () => {
       identity.expiresInSeconds = 30;
-      const { header, csrf } = await signIn();
+      const { header } = await signIn();
       identity.failRefresh = true;
-      await http()
-        .post('/bff/auth/sign-out')
-        .set('Cookie', header)
-        .set('X-CSRF-Token', csrf)
-        .expect(401);
+      await guarded(header).expect(401);
       expect(store.keys()).toEqual([]);
     });
 
     it('keeps the session and answers 503 when the identity provider is unavailable', async () => {
       identity.expiresInSeconds = 30;
-      const { header, csrf } = await signIn();
+      const { header } = await signIn();
       identity.refreshError = 'unavailable';
-      const response = await http()
-        .post('/bff/auth/sign-out')
-        .set('Cookie', header)
-        .set('X-CSRF-Token', csrf)
-        .expect(503);
+      const response = await guarded(header).expect(503);
       expect(response.body.code).toBe('unavailable');
+      expect(store.keys()).toHaveLength(1);
+    });
+
+    it('answers 503 on GET session when the identity provider is unavailable', async () => {
+      identity.expiresInSeconds = 30;
+      const { header } = await signIn();
+      identity.refreshError = 'unavailable';
+      const response = await http().get('/bff/auth/session').set('Cookie', header).expect(503);
+      expect(response.headers['set-cookie']).toBeUndefined();
       expect(store.keys()).toHaveLength(1);
     });
 
     it('keeps the session and answers 503 on an unexpected refresh error (network)', async () => {
       identity.expiresInSeconds = 30;
-      const { header, csrf } = await signIn();
+      const { header } = await signIn();
       identity.refreshError = new TypeError('fetch failed');
-      await http()
-        .post('/bff/auth/sign-out')
-        .set('Cookie', header)
-        .set('X-CSRF-Token', csrf)
-        .expect(503);
+      await guarded(header).expect(503);
       expect(store.keys()).toHaveLength(1);
     });
   });
@@ -322,9 +407,8 @@ describe('AuthController', () => {
   describe('malformed cookies', () => {
     it('treats a bank_session that cannot be decoded as no session (401, not 500)', async () => {
       await http()
-        .post('/bff/auth/sign-out')
+        .get('/bff/transfers/not-a-uuid')
         .set('Cookie', 'bank_session=%; bank_csrf=x')
-        .set('X-CSRF-Token', 'x')
         .expect(401);
     });
 
