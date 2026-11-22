@@ -11,7 +11,8 @@
       >
         ☰
       </button>
-      <strong>capzzPay</strong>
+      <strong class="topbar-brand">capzzPay</strong>
+      <app-notification-bell class="topbar-bell" />
     </header>
     @if (open()) {
       <div class="backdrop" (click)="close()" aria-hidden="true"></div>
@@ -49,6 +50,9 @@
   </aside>
 
   <main class="content">
+    @if (wide()) {
+      <div class="content-bell"><app-notification-bell /></div>
+    }
     @if (session.loadFailed()) {
       <app-load-error (retry)="retry()" />
     }

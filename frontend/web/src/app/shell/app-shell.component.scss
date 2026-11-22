@@ -142,3 +142,13 @@ nav {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+.topbar-bell {
+  margin-left: auto;
+}
+
+.content-bell {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}

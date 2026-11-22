@@ -4,6 +4,7 @@ import {
   Component,
   ElementRef,
   inject,
+  OnDestroy,
   OnInit,
   signal,
   viewChild,
@@ -14,17 +15,25 @@ import { map } from 'rxjs';
 import { AppFooterComponent } from '../shared/app-footer.component';
 import { LoadErrorComponent } from '../shared/load-error.component';
 import { SessionService } from '../core/session.service';
+import { NotificationBellComponent } from './notification-bell.component';
 
 /** Side menu: fixed from 960 px up, a sliding drawer (hamburger) below. */
 @Component({
   selector: 'app-shell',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown.escape)': 'escape()' },
-  imports: [AppFooterComponent, LoadErrorComponent, RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [
+    AppFooterComponent,
+    LoadErrorComponent,
+    NotificationBellComponent,
+    RouterLink,
+    RouterLinkActive,
+    RouterOutlet,
+  ],
   templateUrl: './app-shell.component.html',
   styleUrl: './app-shell.component.scss',
 })
-export class AppShellComponent implements OnInit {
+export class AppShellComponent implements OnInit, OnDestroy {
   protected readonly session = inject(SessionService);
 
   protected readonly wide = toSignal(
@@ -39,6 +48,11 @@ export class AppShellComponent implements OnInit {
 
   ngOnInit(): void {
     void this.session.refreshUnread();
+    this.session.startUnreadPolling();
+  }
+
+  ngOnDestroy(): void {
+    this.session.stopUnreadPolling();
   }
 
   protected retry(): void {
