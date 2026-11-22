@@ -27,7 +27,7 @@ Nunca rodados: `seed.sh --remote`, login pelo Cognito real e os jobs `frontend` 
 ### Pendências
 - Débito: #222, #223, #225, #230 e #236 (menores da revisão final).
 - Decidido em 2026-11-22: #237, um bônus por cliente (só na primeira conta), neste PR (branches `etapa-9/bonus-237` e `bonus-docs`).
-- Pergunta sem resposta do usuário: #234 (extrato local vazio desde que o LocalStack foi recriado em 2026-11-20: republicar pelo outbox ou esperar o #117).
+- #234: dados reparados em 2026-11-22 (19 lançamentos e 8 aberturas reenviados pelo outbox; extrato confere com o ledger nas 8 contas). Falta a decisão do usuário sobre a prevenção, em PR próprio: DynamoDB Local com volume; na AWS, retenção de 14 dias, mais tentativas, alarme na DLQ e backup contínuo.
 - Tarefas do usuário: #219 (reaplicar o `bootstrap`) e #224 (segredo `DEMO_PASSWORD`) antes do `aws-up`; #182 (subida real na AWS).
 - Decisões do usuário: o banco se chama **capzzPay** (pacotes e repositório seguem `digitalbanking`); rodapé "© 2026 capzz.labs"; "Notificações" no lugar de "Avisos"; nome da pessoa, e não id de conta, nas notificações.
 
