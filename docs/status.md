@@ -5,7 +5,7 @@
 **Última atualização:** 2026-11-22
 **Board:** [Digital Banking no GitHub Projects](https://github.com/users/capozziV/projects/2)
 **Fase atual:** etapa 9 (frontend do capzzPay) na branch `etapa-9-frontend`, worktree `.claude/worktrees/etapa-9`, ainda sem PR e sem CI. Juntados e revisados em 2026-11-22: #232, #233, #229, #102 (sininho) e os achados dos commits que estavam sem revisão; `main` trazida. Etapa 8 na `main` (PR #205).
-**Próximo passo:** terminar a rodada final abaixo (seed, smoke, Bruno, frontend, Playwright, revisão da branch inteira) e abrir o PR.
+**Próximo passo:** onda de correções da revisão da branch inteira ([#235](https://github.com/capozziV/DigitalBanking/issues/235), bloqueia o PR); depois, re-revisão, CI local e PR.
 
 ## Handoff da etapa 9 (2026-11-22)
 O checkout principal está na `main` 132 commits atrás e com um `docs/status.md` antigo: vale este arquivo, no worktree da etapa. Há mudanças não commitadas no checkout principal (memória de agentes, grafo) e em cerca de 35 worktrees: não descarte sem olhar.
@@ -18,14 +18,15 @@ O checkout principal está na `main` 132 commits atrás e com um `docs/status.md
 ### Rodada final
 1. Feito: `./gradlew build` completo em `56e8f16` (1617 testes, 0 falhas, 0 pulados; e2e com 21 executados). O sininho, juntado depois, só muda `frontend/`.
 2. Feito: #232 e #233 conferidos na stack `capzzpay` pela API (19 notificações, 0 com "outro cliente", 0 com id de conta).
-3. Em andamento: `seed-check`, smoke e as cinco coleções Bruno numa stack isolada (`capzzpay-verify`, worktree `e9-verificacao`); nunca semear a do usuário.
-4. Feito: `npm ci`, lint, testes (web 169, BFF 177) e build de `frontend/`; `customer`, `notification`, `web` e `bff` da stack `capzzpay` atualizados. Falta: Playwright na stack isolada.
-5. Falta: revisão da branch inteira pela Beatriz, com o ajuste do KDoc de `deleteTransfers` (#229) na onda de correções.
+3. Seed, smoke e Bruno rodados numa stack isolada (nunca semear a do usuário): smoke verde; dois bugs (saldo do `seed-check` no CI, Bruno sem telefone) em `etapa-9/fix-verificacao`, que também roda o Playwright.
+4. Feito: `npm ci`, lint, testes (web 169, BFF 177) e build de `frontend/`; `customer`, `notification`, `web` e `bff` da stack `capzzpay` atualizados. Atualizar `web` e `bff` de novo depois da onda de correções (recarregar o nginx).
+5. Revisão da branch inteira: **reprovada**, 3 Critical e 11 Important (#235; relatório e ledger em `.superpowers/sdd/etapa-9-final/`, fora do git). Primeira leva nas branches `etapa-9/rf-{bff,web,edge,docs,kdoc}`; segunda depois da `fix-verificacao` (guia, I6, I7, I10, Playwright sem UUID no extrato). Cada uma passa pela Beatriz antes de juntar.
 6. PR para a `main`; merge com a aprovação dela e o `ci-ok` verde; cartões #16, #102, #229, #232 e #233 em Done.
 Nunca rodados: `seed.sh --remote`, login pelo Cognito real e os jobs `frontend` e `frontend-e2e` no CI.
 
 ### Pendências
-- Débito: #222, #223, #225 e #230.
+- Débito: #222, #223, #225, #230 e #236 (menores da revisão final).
+- Decisão do usuário: #237 (bônus de boas-vindas repete ao encerrar e reabrir a conta).
 - Pergunta sem resposta do usuário: #234 (extrato local vazio desde que o LocalStack foi recriado em 2026-11-20: republicar pelo outbox ou esperar o #117).
 - Tarefas do usuário: #219 (reaplicar o `bootstrap`) e #224 (segredo `DEMO_PASSWORD`) antes do `aws-up`; #182 (subida real na AWS).
 - Decisões do usuário: o banco se chama **capzzPay** (pacotes e repositório seguem `digitalbanking`); rodapé "© 2026 capzz.labs"; "Notificações" no lugar de "Avisos"; nome da pessoa, e não id de conta, nas notificações.
