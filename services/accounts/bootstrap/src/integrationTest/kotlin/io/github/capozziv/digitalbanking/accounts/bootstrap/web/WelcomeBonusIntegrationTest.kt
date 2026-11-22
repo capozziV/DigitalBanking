@@ -6,11 +6,13 @@ import io.github.capozziv.digitalbanking.accounts.domain.AccountEvent
 import io.github.capozziv.digitalbanking.accounts.domain.AccountOpened
 import io.github.capozziv.digitalbanking.accounts.domain.AccountType
 import io.github.capozziv.digitalbanking.accounts.domain.LedgerEntryRecorded
+import io.github.capozziv.digitalbanking.testing.security.JwtTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.doAnswer
 import org.springframework.boot.test.web.server.LocalServerPort
+import org.springframework.http.HttpMethod
 import org.springframework.test.context.TestPropertySource
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean
 import java.util.UUID
@@ -130,6 +132,122 @@ class WelcomeBonusIntegrationTest : AccountsIntegrationTest() {
                 .query(Long::class.java)
                 .single()
         assertThat(entries).isZero()
+    }
+
+    @Test
+    fun `reopening after closing starts at zero with no bonus entry and no bonus event`() {
+        val customerId = UUID.randomUUID()
+        val firstId =
+            api
+                .openAccount(customerId)
+                .body!!
+                .get("id")
+                .asString()
+        drainAndClose(firstId, customerId)
+
+        val reopened = api.openAccount(customerId)
+
+        assertThat(reopened.status).describedAs(reopened.rawBody).isEqualTo(201)
+        assertThat(reopened.body!!.get("balance").asLong()).isZero()
+        val secondId = reopened.body.get("id").asString()
+        assertThat(secondId).isNotEqualTo(firstId)
+        assertThat(entryCountOf(secondId)).isZero()
+        assertThat(eventTypesOf(secondId)).containsExactly("AccountOpened")
+        assertThat(entryCountOf(firstId)).isEqualTo(2)
+    }
+
+    @Test
+    fun `retrying the reopening with the same key still returns the same zero-balance account`() {
+        val customerId = UUID.randomUUID()
+        drainAndClose(
+            api
+                .openAccount(customerId)
+                .body!!
+                .get("id")
+                .asString(),
+            customerId,
+        )
+        val key = UUID.randomUUID().toString()
+        val first = api.openAccount(customerId, key)
+
+        val retry = api.openAccount(customerId, key)
+
+        assertThat(retry.status).describedAs(retry.rawBody).isEqualTo(200)
+        assertThat(retry.body!!.get("id").asString()).isEqualTo(first.body!!.get("id").asString())
+        assertThat(retry.body.get("balance").asLong()).isZero()
+    }
+
+    @Test
+    fun `concurrent openings of a new customer with different keys write exactly one bonus in total`() {
+        val customerId = UUID.randomUUID()
+        val start = CountDownLatch(1)
+        val pool = Executors.newFixedThreadPool(2)
+        try {
+            val calls =
+                List(2) {
+                    pool.submit<Int> {
+                        start.await()
+                        api.openAccount(customerId).status
+                    }
+                }
+            start.countDown()
+            assertThat(calls.map { it.get(30, TimeUnit.SECONDS) }).containsExactlyInAnyOrder(201, 409)
+        } finally {
+            pool.shutdownNow()
+        }
+        assertThat(totalEntriesOf(customerId)).isEqualTo(1)
+    }
+
+    @Test
+    fun `concurrent reopenings with different keys write no bonus at all`() {
+        val customerId = UUID.randomUUID()
+        drainAndClose(
+            api
+                .openAccount(customerId)
+                .body!!
+                .get("id")
+                .asString(),
+            customerId,
+        )
+        val start = CountDownLatch(1)
+        val pool = Executors.newFixedThreadPool(2)
+        try {
+            val calls =
+                List(2) {
+                    pool.submit<Int> {
+                        start.await()
+                        api.openAccount(customerId).status
+                    }
+                }
+            start.countDown()
+            assertThat(calls.map { it.get(30, TimeUnit.SECONDS) }).containsExactlyInAnyOrder(201, 409)
+        } finally {
+            pool.shutdownNow()
+        }
+        assertThat(totalEntriesOf(customerId)).isEqualTo(2)
+    }
+
+    private fun totalEntriesOf(customerId: UUID): Long =
+        ownerJdbc
+            .sql("select count(*) from ledger_entry e join account a on a.id = e.account_id where a.customer_id = :id")
+            .param("id", customerId)
+            .query(Long::class.java)
+            .single()
+
+    /** Debits the whole bonus through the service API, then closes the account as its owner. */
+    private fun drainAndClose(
+        accountId: String,
+        customerId: UUID,
+    ) {
+        val debit =
+            api.post(
+                "/accounts/$accountId/debits",
+                """{"amount":10000}""",
+                mapOf("Idempotency-Key" to UUID.randomUUID().toString()) + bearer(JwtTestSupport.serviceToken()),
+            )
+        assertThat(debit.status).describedAs(debit.rawBody).isEqualTo(201)
+        val close = api.send(HttpMethod.POST, "/accounts/$accountId/close", headers = asCustomer(customerId))
+        assertThat(close.status).describedAs(close.rawBody).isEqualTo(200)
     }
 
     /** Mockito matcher for a non-null Kotlin parameter: registers `any()` and returns a placeholder event. */
