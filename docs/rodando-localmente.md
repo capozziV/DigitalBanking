@@ -1,6 +1,6 @@
 # Rodando o capzzPay localmente (macOS)
 
-Guia para subir a infraestrutura local, os serviços `accounts`, `transfers`, `notification` e `statement` e conferir as APIs pelo nginx.
+Guia para subir a infraestrutura local, os serviços `customer`, `accounts`, `transfers`, `notification` e `statement` e conferir as APIs pelo nginx.
 Todos os comandos rodam na raiz do repositório e valem tanto para o zsh (o shell padrão do macOS) quanto para o bash. Os blocos de comando não têm comentários: as explicações ficam no texto antes e depois de cada bloco, porque o zsh do macOS, por padrão, não aceita `# comentário` na linha de comando.
 
 ## Pré-requisitos
@@ -54,11 +54,11 @@ cp infra/local/.env.example infra/local/.env
 ```
 Preencha `LOCALSTACK_AUTH_TOKEN` no `infra/local/.env`. Os outros valores do `.env.example` servem para desenvolvimento. Se a porta 80 ou 5432 já estiver em uso, troque `NGINX_PORT` ou `POSTGRES_PORT` no `infra/local/.env`. Ao trocar `POSTGRES_PORT`, ajuste a porta em `ACCOUNTS_DB_URL`, `TRANSFERS_DB_URL`, `NOTIFICATION_DB_URL` e `CUSTOMER_DB_URL` no mesmo arquivo. Ao trocar `NGINX_PORT`, use a porta nova nas URLs abaixo (`http://localhost:<porta>`) e no `baseUrl` de `local.bru` de cada coleção em `api/bruno/*/environments/`.
 
-## 2. Subir a infraestrutura (PostgreSQL, Redis, nginx, LocalStack, mock-oauth2-server)
+## 2. Subir a infraestrutura (PostgreSQL, Redis, nginx, LocalStack, mock-oauth2-server, web, BFF)
 ```bash
 docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml up --wait
 ```
-O comando volta quando os cinco contêineres estão saudáveis. Sem o token, o `up --wait` volta com erro porque o LocalStack encerra, mas PostgreSQL, Redis e nginx ficam de pé. O LocalStack só fica saudável depois que os scripts de `infra/local/localstack/init/ready.d/` criam os tópicos `accounts-events.fifo` e `transfers-events.fifo`, cada um com sua fila de inspeção assinada (`accounts-events-inspection.fifo` e `transfers-events-inspection.fifo`), a fila `statement-accounts.fifo` (assinada em `accounts-events.fifo`, com a DLQ `statement-accounts-dlq.fifo`), a tabela DynamoDB `statement` e as filas do `notification`: `notification-accounts.fifo` (assinada em `accounts-events.fifo`), `notification-transfers.fifo` (assinada em `transfers-events.fifo`) e `notification-customer.fifo` (assinada em `customer-events.fifo`, [ADR 0025](adr/0025-nome-da-contraparte-nas-notificacoes.md)), cada uma com sua DLQ FIFO (`notification-accounts-dlq.fifo`, `notification-transfers-dlq.fifo` e `notification-customer-dlq.fifo`). A fila de origem move a mensagem para a DLQ na 5ª recepção (`NOTIFICATION_MAX_RECEIVE_COUNT`) e esconde a mensagem em leitura por 30 s (`NOTIFICATION_VISIBILITY_TIMEOUT_SECONDS`); os dois valores podem ser trocados no `infra/local/.env`. O script de init do PostgreSQL (`infra/local/postgres/init/01-create-service-databases.sh`) cria um banco por serviço, cada um com dois roles: `<serviço>_owner` (dono, usado pelo Flyway) e `<serviço>_app` (só `LOGIN`; as permissões vêm das migrations). Hoje são `accounts`, `transfers`, `notification` e `customer`. Os dados ficam no volume nomeado `postgres-data`, que sobrevive a `down` e `up`; o script só roda com volume novo, então, se mudar senhas ou o script, recrie com `down -v` (passo 8). O script é idempotente: para rodá-lo de novo sem apagar nada, execute `docker compose exec postgres /docker-entrypoint-initdb.d/01-create-service-databases.sh`. Ele cria só o que falta e não troca a senha de um role que já existe.
+O comando constrói as imagens `web` e `bff`, que não têm perfil, e volta quando os sete contêineres estão saudáveis. Sem o token, o `up --wait` volta com erro porque o LocalStack encerra, mas PostgreSQL, Redis e nginx ficam de pé. O LocalStack só fica saudável depois que os scripts de `infra/local/localstack/init/ready.d/` criam os tópicos `accounts-events.fifo` e `transfers-events.fifo`, cada um com sua fila de inspeção assinada (`accounts-events-inspection.fifo` e `transfers-events-inspection.fifo`), a fila `statement-accounts.fifo` (assinada em `accounts-events.fifo`, com a DLQ `statement-accounts-dlq.fifo`), a tabela DynamoDB `statement` e as filas do `notification`: `notification-accounts.fifo` (assinada em `accounts-events.fifo`), `notification-transfers.fifo` (assinada em `transfers-events.fifo`) e `notification-customer.fifo` (assinada em `customer-events.fifo`, [ADR 0025](adr/0025-nome-da-contraparte-nas-notificacoes.md)), cada uma com sua DLQ FIFO (`notification-accounts-dlq.fifo`, `notification-transfers-dlq.fifo` e `notification-customer-dlq.fifo`). A fila de origem move a mensagem para a DLQ na 5ª recepção (`NOTIFICATION_MAX_RECEIVE_COUNT`) e esconde a mensagem em leitura por 30 s (`NOTIFICATION_VISIBILITY_TIMEOUT_SECONDS`); os dois valores podem ser trocados no `infra/local/.env`. O script de init do PostgreSQL (`infra/local/postgres/init/01-create-service-databases.sh`) cria um banco por serviço, cada um com dois roles: `<serviço>_owner` (dono, usado pelo Flyway) e `<serviço>_app` (só `LOGIN`; as permissões vêm das migrations). Hoje são `accounts`, `transfers`, `notification` e `customer`. Os dados ficam no volume nomeado `postgres-data`, que sobrevive a `down` e `up`; o script só roda com volume novo, então, se mudar senhas ou o script, recrie com `down -v` (passo 8). O script é idempotente: para rodá-lo de novo sem apagar nada, execute `docker compose exec postgres /docker-entrypoint-initdb.d/01-create-service-databases.sh`. Ele cria só o que falta e não troca a senha de um role que já existe.
 
 Para adicionar o banco de um serviço novo: acrescente ao fim do script a linha `create_service_db <serviço> <SERVICO>_DB_OWNER_PASSWORD <SERVICO>_DB_PASSWORD` (os dois últimos argumentos são os nomes das variáveis com as senhas), declare essas duas variáveis no `environment` do `postgres` em `docker-compose.yml` e em `infra/local/.env.example`, e recrie o volume com `down -v`.
 
@@ -127,6 +127,7 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 ./gradlew :services:customer:bootstrap:bootJar :services:accounts:bootstrap:bootJar \
   :services:transfers:bootstrap:bootJar :services:notification:bootstrap:bootJar :services:statement:bootstrap:bootJar
 docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml --profile apps build
+export MOCK_OAUTH2_HOST=mock-oauth2-server:8080
 docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml --profile apps up --wait
 ```
 As imagens se chamam `digitalbanking/<serviço>:<etiqueta>`, com a etiqueta de `IMAGE_TAG` (padrão `local`; no CI, o SHA do commit). Depois de mudar o código, gere o jar de novo e rode o `build` outra vez. Cada contêiner fica `healthy` quando o `/actuator/health` responde em `127.0.0.1` dentro dele; o `up --wait` espera os cinco. As portas 8081–8085 continuam publicadas no host, então o nginx não muda; não rode os `bootRun` ao mesmo tempo.
@@ -138,6 +139,17 @@ bash infra/local/seed-check.sh http://127.0.0.1 1000000
 bash infra/local/smoke.sh http://127.0.0.1
 ```
 É assim que o CI roda o smoke: o job `images` constrói as cinco imagens a partir dos jars dos jobs de build, e o job `smoke` sobe o perfil `apps` com elas. Um token pedido sem `MOCK_OAUTH2_HOST` (inclusive pelas coleções Bruno) sai com o `iss` `http://localhost:8090/default` e leva `401` nos contêineres.
+
+O mesmo vale para o BFF: o `up` do perfil `apps` precisa de `MOCK_OAUTH2_HOST=mock-oauth2-server:8080` no ambiente, porque o `bff` pede os tokens ao mock com esse Host (padrão `localhost:8090`, certo só para serviços em `bootRun`); senão os serviços devolvem `401` ao BFF. Esse `up` também constrói as imagens `web` e `bff` (`digitalbanking/web` e `digitalbanking/bff`, de `frontend/`), que não têm perfil e sobem em qualquer `up`:
+```bash
+export MOCK_OAUTH2_HOST=mock-oauth2-server:8080
+docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml --profile apps up --wait
+```
+
+**Atualizar um serviço numa stack com dados.** O LocalStack roda sem `PERSISTENCE`: recriar o contêiner dele perde filas, mensagens e a tabela `statement` do DynamoDB, mesmo sem apagar volumes, enquanto o PostgreSQL mantém o ledger. Por isso, para atualizar só um serviço, não recrie o resto:
+```bash
+docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml --profile apps up -d --no-deps <serviço>
+```
 
 ## 5. Conferir a API pelo nginx
 Primeiro o health, que deve responder `"status":"UP"` (aberto, sem token; os detalhes só para admin). Depois o seed do dono (abaixo) e o smoke. Os dois pegam tokens no `mock-oauth2-server` com `infra/local/auth/token.sh` e precisam dos cinco serviços no ar:
