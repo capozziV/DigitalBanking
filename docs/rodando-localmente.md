@@ -23,6 +23,7 @@ Os comandos `brew` abaixo valem só para Mac com chip Apple (M1 em diante): o Ho
 - **Docker Desktop em execução.** O compose e os testes de integração com Testcontainers precisam dele. Confira com `docker info`.
 - **Porta 80 no Docker Desktop.** O nginx publica a porta 80. Se o `up` falhar ao publicar essa porta, ative "Allow privileged port mapping" em Settings → Advanced do Docker Desktop, ou troque `NGINX_PORT` no `infra/local/.env` (passo 1).
 - **jq** para o smoke. A partir do macOS 15 costuma vir em `/usr/bin/jq`; confira com `jq --version`. Se faltar: `brew install jq`, ou as outras formas de instalação em [jqlang.org/download](https://jqlang.org/download/).
+- **Python 3** só para migrar o extrato de uma stack antiga ([procedimento](#migrar-o-extrato-de-uma-stack-anterior-ao-dynamodb-local)). Confira com `python3 --version` (3.9 ou mais novo; vem com as ferramentas de linha de comando do Xcode).
 - **Token do LocalStack.** O LocalStack emula o SNS e o SQS e exige um token, mesmo no plano gratuito. Crie uma conta Hobby em [app.localstack.cloud](https://app.localstack.cloud), copie o seu Auth Token no painel da conta e preencha `LOCALSTACK_AUTH_TOKEN` no `infra/local/.env` (passo 1). Sem o token, o contêiner do LocalStack encerra na partida e os testes com LocalStack são pulados. Nunca coloque o token no `.env.example` nem em outro arquivo versionado; o `infra/local/.env` está no `.gitignore`.
 - **Opcional:** Node (para a CLI do Bruno) e uv (para o graphify). Com Homebrew:
   ```bash
@@ -52,13 +53,17 @@ Os comandos `brew` abaixo valem só para Mac com chip Apple (M1 em diante): o Ho
 ```bash
 cp infra/local/.env.example infra/local/.env
 ```
-Preencha `LOCALSTACK_AUTH_TOKEN` no `infra/local/.env`. Os outros valores do `.env.example` servem para desenvolvimento. Se a porta 80 ou 5432 já estiver em uso, troque `NGINX_PORT` ou `POSTGRES_PORT` no `infra/local/.env`. Ao trocar `POSTGRES_PORT`, ajuste a porta em `ACCOUNTS_DB_URL`, `TRANSFERS_DB_URL`, `NOTIFICATION_DB_URL` e `CUSTOMER_DB_URL` no mesmo arquivo. Ao trocar `NGINX_PORT`, use a porta nova nas URLs abaixo (`http://localhost:<porta>`) e no `baseUrl` de `local.bru` de cada coleção em `api/bruno/*/environments/`.
+**Já tem uma stack com dados, criada antes do DynamoDB Local?** Não rode `up`, `down`, `stop` nem `restart` nela antes de [migrar o extrato](#migrar-o-extrato-de-uma-stack-anterior-ao-dynamodb-local): o extrato dela mora no LocalStack e some quando ele para ou é recriado.
 
-## 2. Subir a infraestrutura (PostgreSQL, Redis, nginx, LocalStack, mock-oauth2-server, web, BFF)
+Preencha `LOCALSTACK_AUTH_TOKEN` no `infra/local/.env`. Os outros valores do `.env.example` servem para desenvolvimento. Se a porta 80 ou 5432 já estiver em uso, troque `NGINX_PORT` ou `POSTGRES_PORT` no `infra/local/.env`. Ao trocar `POSTGRES_PORT`, ajuste a porta em `ACCOUNTS_DB_URL`, `TRANSFERS_DB_URL`, `NOTIFICATION_DB_URL` e `CUSTOMER_DB_URL` no mesmo arquivo. Ao trocar `DYNAMODB_PORT` (padrão 8000, publicada só em `127.0.0.1`), ajuste a porta em `STATEMENT_DYNAMODB_ENDPOINT`. Um `.env` criado antes do DynamoDB Local precisa ganhar essas duas linhas: sem `STATEMENT_DYNAMODB_ENDPOINT`, o `statement` em `bootRun` procura o DynamoDB real da AWS. Ao trocar `NGINX_PORT`, use a porta nova nas URLs abaixo (`http://localhost:<porta>`) e no `baseUrl` de `local.bru` de cada coleção em `api/bruno/*/environments/`.
+
+## 2. Subir a infraestrutura (PostgreSQL, Redis, nginx, LocalStack, DynamoDB Local, mock-oauth2-server, web, BFF)
 ```bash
 docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml up --wait
 ```
-O comando constrói as imagens `web` e `bff`, que não têm perfil, e volta quando os sete contêineres estão saudáveis. Sem o token, o `up --wait` volta com erro porque o LocalStack encerra, mas PostgreSQL, Redis e nginx ficam de pé. O LocalStack só fica saudável depois que os scripts de `infra/local/localstack/init/ready.d/` criam os tópicos `accounts-events.fifo` e `transfers-events.fifo`, cada um com sua fila de inspeção assinada (`accounts-events-inspection.fifo` e `transfers-events-inspection.fifo`), a fila `statement-accounts.fifo` (assinada em `accounts-events.fifo`, com a DLQ `statement-accounts-dlq.fifo`), a tabela DynamoDB `statement` e as filas do `notification`: `notification-accounts.fifo` (assinada em `accounts-events.fifo`), `notification-transfers.fifo` (assinada em `transfers-events.fifo`) e `notification-customer.fifo` (assinada em `customer-events.fifo`, [ADR 0025](adr/0025-nome-da-contraparte-nas-notificacoes.md)), cada uma com sua DLQ FIFO (`notification-accounts-dlq.fifo`, `notification-transfers-dlq.fifo` e `notification-customer-dlq.fifo`). A fila de origem move a mensagem para a DLQ na 5ª recepção (`NOTIFICATION_MAX_RECEIVE_COUNT`) e esconde a mensagem em leitura por 30 s (`NOTIFICATION_VISIBILITY_TIMEOUT_SECONDS`); os dois valores podem ser trocados no `infra/local/.env`. O script de init do PostgreSQL (`infra/local/postgres/init/01-create-service-databases.sh`) cria um banco por serviço, cada um com dois roles: `<serviço>_owner` (dono, usado pelo Flyway) e `<serviço>_app` (só `LOGIN`; as permissões vêm das migrations). Hoje são `accounts`, `transfers`, `notification` e `customer`. Os dados ficam no volume nomeado `postgres-data`, que sobrevive a `down` e `up`; o script só roda com volume novo, então, se mudar senhas ou o script, recrie com `down -v` (passo 8). O script é idempotente: para rodá-lo de novo sem apagar nada, execute `docker compose exec postgres /docker-entrypoint-initdb.d/01-create-service-databases.sh`. Ele cria só o que falta e não troca a senha de um role que já existe.
+O comando constrói as imagens `web` e `bff`, que não têm perfil, e volta quando os oito contêineres estão saudáveis (um nono, o `dynamodb-volume`, só entrega o volume ao usuário do DynamoDB Local e sai com código 0: ficar `Exited (0)` é o esperado). Sem o token, o `up --wait` volta com erro porque o LocalStack encerra, mas PostgreSQL, Redis, DynamoDB Local e nginx ficam de pé. O LocalStack só fica saudável depois que os scripts de `infra/local/localstack/init/ready.d/` criam os tópicos `accounts-events.fifo` e `transfers-events.fifo`, cada um com sua fila de inspeção assinada (`accounts-events-inspection.fifo` e `transfers-events-inspection.fifo`), a fila `statement-accounts.fifo` (assinada em `accounts-events.fifo`, com a DLQ `statement-accounts-dlq.fifo`) e as filas do `notification`: `notification-accounts.fifo` (assinada em `accounts-events.fifo`), `notification-transfers.fifo` (assinada em `transfers-events.fifo`) e `notification-customer.fifo` (assinada em `customer-events.fifo`, [ADR 0025](adr/0025-nome-da-contraparte-nas-notificacoes.md)), cada uma com sua DLQ FIFO (`notification-accounts-dlq.fifo`, `notification-transfers-dlq.fifo` e `notification-customer-dlq.fifo`). A fila de origem move a mensagem para a DLQ na 5ª recepção (`NOTIFICATION_MAX_RECEIVE_COUNT`) e esconde a mensagem em leitura por 30 s (`NOTIFICATION_VISIBILITY_TIMEOUT_SECONDS`); os dois valores podem ser trocados no `infra/local/.env`. O script de init do PostgreSQL (`infra/local/postgres/init/01-create-service-databases.sh`) cria um banco por serviço, cada um com dois roles: `<serviço>_owner` (dono, usado pelo Flyway) e `<serviço>_app` (só `LOGIN`; as permissões vêm das migrations). Hoje são `accounts`, `transfers`, `notification` e `customer`. Os dados ficam no volume nomeado `postgres-data`, que sobrevive a `down` e `up`; o script só roda com volume novo, então, se mudar senhas ou o script, recrie com `down -v` (passo 8). O script é idempotente: para rodá-lo de novo sem apagar nada, execute `docker compose exec postgres /docker-entrypoint-initdb.d/01-create-service-databases.sh`. Ele cria só o que falta e não troca a senha de um role que já existe.
+
+O DynamoDB Local (serviço `dynamodb`) guarda a tabela `statement` no volume nomeado `dynamodb-data`, que também sobrevive a `down` e `up`; só o `down -v` a apaga. Ele fica saudável depois de criar a tabela, se ela não existir (`infra/local/dynamodb/init/run.sh`, com a definição em `statement-table.json` na mesma pasta), e o contêiner do `statement` espera por isso. O LocalStack segue sem persistência, só com SNS e SQS: ao parar ou recriar, perde as mensagens em trânsito e as das DLQs. Um evento perdido assim não volta ao extrato sozinho; antes de derrubar, espere as filas esvaziarem.
 
 Para adicionar o banco de um serviço novo: acrescente ao fim do script a linha `create_service_db <serviço> <SERVICO>_DB_OWNER_PASSWORD <SERVICO>_DB_PASSWORD` (os dois últimos argumentos são os nomes das variáveis com as senhas), declare essas duas variáveis no `environment` do `postgres` em `docker-compose.yml` e em `infra/local/.env.example`, e recrie o volume com `down -v`.
 
@@ -112,13 +117,13 @@ set -a; . infra/local/.env; set +a
 ```
 O `notification` sobe na porta 8083 e aplica as próprias migrations; o nginx o expõe em `/notifications`.
 
-O `statement` consome os eventos do `accounts` e roda num quinto terminal, com o mesmo `.env` carregado. Não usa PostgreSQL: grava no DynamoDB do LocalStack. Ele lê `STATEMENT_AWS_ENDPOINT` (no `.env.example`: `http://localhost:4566`; vazio usa o endpoint real da AWS) e, se definidas, `STATEMENT_AWS_REGION` (padrão `us-east-1`), `STATEMENT_TABLE` (padrão `statement`), `STATEMENT_ACCOUNTS_QUEUE` (padrão `statement-accounts.fifo`), `STATEMENT_ACCOUNTS_DLQ` (padrão `statement-accounts-dlq.fifo`), `STATEMENT_DLQ_METRICS_REFRESH` (padrão `30s`), `STATEMENT_REDIS_HOST` (padrão `localhost`), `STATEMENT_REDIS_PORT` (padrão `6379`), `STATEMENT_CACHE_TIMEOUT` (padrão `100ms`, tempo de conexão e de comando ao Redis) e `STATEMENT_CACHE_ENABLED` (padrão `true`; `false` desliga o cache e o extrato sempre lê do DynamoDB):
+O `statement` consome os eventos do `accounts` e roda num quinto terminal, com o mesmo `.env` carregado. Não usa PostgreSQL: consome do SQS do LocalStack e grava no DynamoDB Local. Ele lê `STATEMENT_AWS_ENDPOINT` (o do SQS; no `.env.example`, `http://localhost:4566`), `STATEMENT_DYNAMODB_ENDPOINT` (o do DynamoDB; no `.env.example`, `http://127.0.0.1:8000`), cada um usando o endpoint real da AWS daquele serviço quando vazio, e, se definidas, `STATEMENT_AWS_REGION` (padrão `us-east-1`), `STATEMENT_TABLE` (padrão `statement`), `STATEMENT_ACCOUNTS_QUEUE` (padrão `statement-accounts.fifo`), `STATEMENT_ACCOUNTS_DLQ` (padrão `statement-accounts-dlq.fifo`), `STATEMENT_DLQ_METRICS_REFRESH` (padrão `30s`), `STATEMENT_REDIS_HOST` (padrão `localhost`), `STATEMENT_REDIS_PORT` (padrão `6379`), `STATEMENT_CACHE_TIMEOUT` (padrão `100ms`, tempo de conexão e de comando ao Redis) e `STATEMENT_CACHE_ENABLED` (padrão `true`; `false` desliga o cache e o extrato sempre lê do DynamoDB):
 ```bash
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 set -a; . infra/local/.env; set +a
 ./gradlew :services:statement:bootstrap:bootRun
 ```
-O `statement` sobe na porta 8084. O `statement` guarda no Redis do compose a primeira página do extrato (20 lançamentos, sem cursor) por cerca de 60 s; com o Redis fora, ele lê do DynamoDB. A tabela DynamoDB `statement` (chave `accountId` texto + `sequence` numérica, cobrança `PAY_PER_REQUEST`) e as filas são criadas pelo `infra/local/localstack/init/ready.d/04-statement.sh`, não pelo serviço. O nginx expõe `GET /accounts/{id}/statement` e `/statement/actuator/`. Use um sexto terminal para os passos seguintes.
+O `statement` sobe na porta 8084. O `statement` guarda no Redis do compose a primeira página do extrato (20 lançamentos, sem cursor) por cerca de 60 s; com o Redis fora, ele lê do DynamoDB. A tabela DynamoDB `statement` (chave `accountId` texto + `sequence` numérica, cobrança `PAY_PER_REQUEST`) é criada pelo serviço `dynamodb` do compose e as filas pelo `infra/local/localstack/init/ready.d/04-statement.sh`, não pelo `statement`. O nginx expõe `GET /accounts/{id}/statement` e `/statement/actuator/`. Use um sexto terminal para os passos seguintes.
 
 ### Alternativa: os cinco serviços pelas imagens Docker (perfil `apps`)
 Em vez dos cinco `bootRun`, o perfil `apps` do compose sobe os serviços como contêineres, pelas imagens de `services/<serviço>/Dockerfile` (as mesmas do CI). A imagem não compila: ela usa o `bootJar` já gerado pelo Gradle, separado em camadas (dependências, carregador do Spring Boot, dependências snapshot e classes do serviço) e roda com usuário não root (uid 10001). Gere os jars e suba tudo (infra e serviços) de uma vez:
@@ -132,7 +137,7 @@ docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml --p
 ```
 As imagens se chamam `digitalbanking/<serviço>:<etiqueta>`, com a etiqueta de `IMAGE_TAG` (padrão `local`; no CI, o SHA do commit). Depois de mudar o código, gere o jar de novo e rode o `build` outra vez. Cada contêiner fica `healthy` quando o `/actuator/health` responde em `127.0.0.1` dentro dele; o `up --wait` espera os cinco. As portas 8081–8085 continuam publicadas no host, então o nginx não muda; não rode os `bootRun` ao mesmo tempo.
 
-Dentro do compose, os serviços falam entre si e com a infra pelo nome do serviço (`postgres`, `redis`, `localstack`, `customer:8085`, `accounts:8081`), com as mesmas variáveis do `.env.example` apontando para esses nomes (veja o perfil no `docker-compose.yml`). O emissor dos tokens muda: os contêineres validam o `iss` `http://mock-oauth2-server:8080/default`, e o mock monta o `iss` pelo Host pedido (veja [Identidade local](#identidade-local-mock-oauth2-server)). Por isso, com o perfil `apps`, peça os tokens do host com `MOCK_OAUTH2_HOST=mock-oauth2-server:8080`, que o `token.sh` manda como cabeçalho Host; o seed e o smoke usam o `token.sh` e herdam a variável:
+Dentro do compose, os serviços falam entre si e com a infra pelo nome do serviço (`postgres`, `redis`, `localstack`, `dynamodb:8000`, `customer:8085`, `accounts:8081`), com as mesmas variáveis do `.env.example` apontando para esses nomes (veja o perfil no `docker-compose.yml`). O emissor dos tokens muda: os contêineres validam o `iss` `http://mock-oauth2-server:8080/default`, e o mock monta o `iss` pelo Host pedido (veja [Identidade local](#identidade-local-mock-oauth2-server)). Por isso, com o perfil `apps`, peça os tokens do host com `MOCK_OAUTH2_HOST=mock-oauth2-server:8080`, que o `token.sh` manda como cabeçalho Host; o seed e o smoke usam o `token.sh` e herdam a variável:
 ```bash
 export MOCK_OAUTH2_HOST=mock-oauth2-server:8080
 bash infra/local/seed-check.sh http://127.0.0.1 1010000
@@ -146,7 +151,7 @@ export MOCK_OAUTH2_HOST=mock-oauth2-server:8080
 docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml --profile apps up --wait
 ```
 
-**Atualizar um serviço numa stack com dados.** O LocalStack roda sem `PERSISTENCE`: recriar o contêiner dele perde filas, mensagens e a tabela `statement` do DynamoDB, mesmo sem apagar volumes, enquanto o PostgreSQL mantém o ledger. Por isso, para atualizar só um serviço, não recrie o resto:
+**Atualizar um serviço numa stack com dados.** O LocalStack roda sem `PERSISTENCE`: recriar o contêiner dele perde filas e mensagens, mesmo sem apagar volumes; o ledger (PostgreSQL) e o extrato (DynamoDB Local) ficam nos volumes, mas um evento em trânsito não chega ao extrato. Numa stack anterior ao DynamoDB Local, perde também o extrato inteiro: [migre](#migrar-o-extrato-de-uma-stack-anterior-ao-dynamodb-local) antes. Por isso, para atualizar só um serviço, não recrie o resto:
 ```bash
 docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml --profile apps up -d --no-deps <serviço>
 ```
@@ -162,6 +167,56 @@ Se o serviço for `web` ou `bff`, recarregue em seguida o nginx, que resolve ess
 ```bash
 docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml exec nginx nginx -s reload
 ```
+
+### Migrar o extrato de uma stack anterior ao DynamoDB Local
+Vale para a stack cujo extrato ainda está no DynamoDB do LocalStack. **A origem só existe enquanto aquele contêiner do LocalStack não parar nem for recriado**, e o compose novo o recria. Por isso a ordem importa: copie antes de qualquer `up` geral. O script só lê a origem, só cria o que falta no destino e falha se a contagem ou o conteúdo divergirem; pode ser repetido enquanto a origem existir e o `statement` estiver parado.
+
+1. Descubra o projeto e a etiqueta das imagens da stack (`docker compose ls`; `docker ps --format '{{.Names}} {{.Image}}'`) e use os dois em todos os comandos. No exemplo, projeto `capzzpay`, etiqueta `local` e portas padrão:
+```bash
+export COMPOSE_PROJECT_NAME=capzzpay
+export IMAGE_TAG=local
+export MOCK_OAUTH2_HOST=mock-oauth2-server:8080
+```
+2. Acrescente `DYNAMODB_PORT=8000` e `STATEMENT_DYNAMODB_ENDPOINT=http://127.0.0.1:8000` ao `infra/local/.env` e construa a imagem nova do `statement`. A imagem antiga ignora o endpoint novo, e construir não mexe no contêiner que está rodando:
+```bash
+./gradlew :services:statement:bootstrap:bootJar
+docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml --profile apps build statement
+```
+3. Pare quem publica eventos (com `bootRun`, Ctrl+C nos três):
+```bash
+docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml --profile apps stop accounts transfers customer
+```
+4. Espere as filas esvaziarem: repita até os dois números de cada uma serem `0`. O que estiver nelas e nas DLQs se perde no passo 8; devolva antes as mensagens de DLQ que importarem ([DLQ do statement](#dlq-do-statement), [DLQ do notification](#dlq-do-notification)).
+```bash
+for queue in statement-accounts.fifo notification-accounts.fifo notification-transfers.fifo notification-customer.fifo statement-accounts-dlq.fifo; do
+  docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml exec -T \
+    -e AWS_ACCESS_KEY_ID=test -e AWS_SECRET_ACCESS_KEY=test -e AWS_DEFAULT_REGION=us-east-1 \
+    localstack aws --endpoint-url http://127.0.0.1:4566 sqs get-queue-attributes \
+    --queue-url "http://127.0.0.1:4566/000000000000/$queue" \
+    --attribute-names ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible
+done
+```
+5. Pare o `statement` (com `bootRun`, Ctrl+C):
+```bash
+docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml --profile apps stop statement
+```
+6. Suba só o banco novo, citando o serviço, para o LocalStack não ser recriado:
+```bash
+docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml up --wait dynamodb
+```
+7. Copie e confira. O script exige que os endpoints sejam as portas do projeto informado:
+```bash
+python3 infra/local/dynamodb/migrate_from_localstack.py --project "$COMPOSE_PROJECT_NAME" \
+  --source-endpoint http://127.0.0.1:4566 --target-endpoint http://127.0.0.1:8000
+```
+Só siga com `OK: <n> itens na origem e no destino, conteudo identico`, com `<n>` diferente de zero se havia contas. Se falhar, pare aqui: a origem está intacta, e `docker start` nos contêineres parados devolve a stack ao que era.
+
+8. Troque a stack. Este passo recria o LocalStack e descarta a origem; com `bootRun`, tire o `--profile apps` e suba os serviços de novo com o `.env` atualizado:
+```bash
+docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml --profile apps up --wait --no-build
+docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml exec nginx nginx -s reload
+```
+Confira o extrato de uma conta pela API. Depois da troca, rodar o script de novo falha sem mudar nada, porque a origem não existe mais.
 
 ## 5. Conferir a API pelo nginx
 Primeiro o health, que deve responder `"status":"UP"` (aberto, sem token; os detalhes só para admin). Depois o seed do dono (abaixo) e o smoke. Os dois pegam tokens no `mock-oauth2-server` com `infra/local/auth/token.sh` e precisam dos cinco serviços no ar:
@@ -288,9 +343,11 @@ docker compose -f infra/local/docker-compose.yml exec -T \
 ```
 O consumo é idempotente (`PutItem` condicional pela chave `accountId` + `sequence`), então devolver uma mensagem já gravada não duplica o lançamento. Para conferir a tabela:
 ```bash
-docker compose -f infra/local/docker-compose.yml exec -T \
-  -e AWS_ACCESS_KEY_ID=test -e AWS_SECRET_ACCESS_KEY=test -e AWS_DEFAULT_REGION=us-east-1 \
-  localstack aws --endpoint-url http://127.0.0.1:4566 dynamodb scan --table-name statement --max-items 10
+curl -sS http://127.0.0.1:8000/ \
+  -H 'Content-Type: application/x-amz-json-1.0' \
+  -H 'X-Amz-Target: DynamoDB_20120810.Scan' \
+  -H 'Authorization: AWS4-HMAC-SHA256 Credential=test/20260101/us-east-1/dynamodb/aws4_request, SignedHeaders=host, Signature=0' \
+  -d '{"TableName":"statement","Limit":10}' | jq .
 ```
 
 ## 7. Coleção Bruno
@@ -357,7 +414,13 @@ curl -H "Authorization: Bearer $(infra/local/auth/token.sh user <uuid>)" http://
 O usuário de teste do dono tem `sub` `00000000-0000-7000-8000-000000000001`, nome `Owner Test`, e-mail `owner@example.test` e o grupo `admin`; o nome e o e-mail entram no cadastro do `customer` pelo seed local. Os tokens duram 1 hora.
 
 ## 8. Derrubar tudo
-Pare os cinco `bootRun` com Ctrl+C nos terminais deles. Depois derrube os contêineres; o `-v` apaga os dados (com o perfil `apps`, acrescente `--profile apps` para derrubar também os serviços):
+Pare os cinco `bootRun` com Ctrl+C nos terminais deles. Depois derrube os contêineres (com o perfil `apps`, acrescente `--profile apps` para derrubar também os serviços). Sem `-v`, o ledger e o extrato ficam nos volumes `postgres-data` e `dynamodb-data`, e o próximo `up` os encontra; as filas do LocalStack se perdem:
+```bash
+docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml down
+```
+O CI prova isso com `infra/local/dynamodb/persistence-check.sh --project <projeto-descartável> [url-base]`, que grava, derruba, sobe e compara o extrato pela API. Ele derruba a stack do projeto informado: não o rode numa stack com dados que importam.
+
+Com `-v`, os dados são apagados, o extrato inclusive:
 ```bash
 docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml down -v
 ```

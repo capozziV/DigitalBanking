@@ -1,5 +1,6 @@
 package io.github.capozziv.digitalbanking.statement.bootstrap
 
+import io.github.capozziv.digitalbanking.testing.localstack.DynamoDbLocalTestSupport
 import io.github.capozziv.digitalbanking.testing.localstack.LocalStackTestSupport
 import io.github.capozziv.digitalbanking.testing.redis.RedisTestSupport
 import io.github.capozziv.digitalbanking.testing.security.JwtTestSupport
@@ -21,9 +22,10 @@ import software.amazon.awssdk.services.sqs.SqsClient
 import software.amazon.awssdk.services.sqs.model.QueueAttributeName
 
 /**
- * Base of the integration tests of the statement service. One LocalStack container (DynamoDB, SNS, SQS) is shared by
- * all subclasses; the table and the queues, with the names the application uses by default, exist before the
- * context starts, since SQS listener containers resolve their queue URLs on startup.
+ * Base of the integration tests of the statement service. As in the local environment, LocalStack has SNS and SQS
+ * and DynamoDB Local has the table; one container of each is shared by all subclasses. The table and the queues, with
+ * the names the application uses by default, exist before the context starts, since SQS listener containers resolve
+ * their queue URLs on startup.
  *
  * The properties are in [TestPropertySource], which subclasses inherit and merge, so a subclass's own
  * `@SpringBootTest` (e.g. a web environment) does not drop them. Tests share the table: each one uses its own
@@ -50,7 +52,12 @@ abstract class StatementIntegrationTest {
 
         @JvmStatic
         val localStack: LocalStackContainer by lazy {
-            LocalStackTestSupport.container(listOf("dynamodb", "sns", "sqs")).also { it.start() }
+            LocalStackTestSupport.container(listOf("sns", "sqs")).also { it.start() }
+        }
+
+        @JvmStatic
+        val dynamoDbLocal: GenericContainer<*> by lazy {
+            DynamoDbLocalTestSupport.container().also { it.start() }
         }
 
         /** Redis of the first-page cache, shared by all subclasses like the LocalStack container. */
@@ -61,7 +68,7 @@ abstract class StatementIntegrationTest {
 
         /** Raw DynamoDB client, for setup and for inspecting items as stored. */
         @JvmStatic
-        val dynamoDb: DynamoDbClient by lazy { LocalStackTestSupport.dynamoDbClient(localStack) }
+        val dynamoDb: DynamoDbClient by lazy { DynamoDbLocalTestSupport.client(dynamoDbLocal) }
 
         @JvmStatic
         val sqs: SqsClient by lazy { LocalStackTestSupport.sqsClient(localStack) }
@@ -69,11 +76,12 @@ abstract class StatementIntegrationTest {
         @JvmStatic
         @DynamicPropertySource
         fun awsProperties(registry: DynamicPropertyRegistry) {
-            createTable()
+            // LocalStack first: without the token the class is skipped locally before anything else starts.
             createQueueWithDlq(ACCOUNTS_QUEUE, ACCOUNTS_DLQ)
+            createTable()
             // An explicit endpoint also selects the static test credentials (AwsCredentialsConfiguration).
             registry.add("spring.cloud.aws.sqs.endpoint") { localStack.endpoint.toString() }
-            registry.add("statement.dynamodb.endpoint") { localStack.endpoint.toString() }
+            registry.add("statement.dynamodb.endpoint") { DynamoDbLocalTestSupport.endpoint(dynamoDbLocal).toString() }
             registry.add("spring.cloud.aws.region.static") { localStack.region }
             registry.add("spring.data.redis.host") { redis.host }
             registry.add("spring.data.redis.port") { redis.getMappedPort(RedisTestSupport.PORT) }

@@ -412,11 +412,14 @@ jobs:
     if: >-
       ${{ !failure() && !cancelled() && needs.images.result == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Duas partidas da stack: a do smoke e a da prova do extrato.
+    timeout-minutes: 30
     env:
       IMAGE_TAG: ${{ github.sha }}
       # Os conteineres aceitam o iss http://mock-oauth2-server:8080/default; o mock monta o iss pelo Host pedido.
       MOCK_OAUTH2_HOST: mock-oauth2-server:8080
+      # Nome explicito: a prova do extrato derruba e sobe este projeto.
+      COMPOSE_PROJECT_NAME: capzzpay-ci
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Baixar as imagens do job images
@@ -446,6 +449,11 @@ jobs:
         run: bash infra/local/seed-check.sh http://127.0.0.1 1010000
       - name: Operacoes via nginx com tokens e eventos na fila de inspecao do LocalStack
         run: bash infra/local/smoke.sh http://127.0.0.1
+      # Por ultimo: derruba (sem -v) e sobe a stack. Sem o volume do DynamoDB Local, o extrato some e falha (#234).
+      - name: O extrato sobrevive a derrubar e subir a stack
+        env:
+          LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
+        run: bash infra/local/dynamodb/persistence-check.sh --project "$COMPOSE_PROJECT_NAME" http://127.0.0.1
       - name: Diagnostico em caso de falha (saude e logs dos conteineres, servicos inclusos)
         if: failure()
         run: |
@@ -596,6 +604,9 @@ jobs:
       # A conferencia do nome da contraparte nas notificacoes do demo (issue 232), com entrada falsa.
       - name: Conferencia das notificacoes do seed
         run: infra/local/seed-notifications-test.sh
+      # A migracao do extrato para o DynamoDB Local, com bancos e Docker falsos: so cria, confere e nunca apaga.
+      - name: Migracao do extrato
+        run: python3 -B infra/local/dynamodb/migrate_from_localstack_test.py
       - name: shellcheck nos scripts de infra/local e infra/aws
         run: find infra/local infra/aws -name '*.sh' -print0 | xargs -0 shellcheck
       # O Bruno nao compartilha scripts entre colecoes: estas quatro copias tem de ficar iguais.

@@ -1,5 +1,6 @@
 package io.github.capozziv.digitalbanking.e2e
 
+import io.github.capozziv.digitalbanking.testing.localstack.DynamoDbLocalTestSupport
 import io.github.capozziv.digitalbanking.testing.localstack.LocalStackTestSupport
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.wait.strategy.Wait
@@ -22,7 +23,8 @@ import java.time.Instant
  * Everything the end-to-end tests run against, as in the local environment: one Redis (the `statement` first-page cache
  * and the `transfers` daily limit), one PostgreSQL with the `accounts`, `transfers`, `notification` and `customer`
  * databases and their owner/app users (created by the compose init script itself), LocalStack with the topics,
- * inspection queues, notification queues and statement queue and table of the compose init scripts, the
+ * inspection queues, notification queues and statement queue of the compose init scripts, DynamoDB Local with the
+ * statement table (created by the compose script itself), the
  * `mock-oauth2-server` with the issuer config of the compose (every service validates its tokens, and `accounts` and
  * `transfers` get their machine tokens from it), the five services as `java -jar` processes, and [AccountsProxy]
  * between `transfers` and `accounts`. The API clients get their tokens from [tokens].
@@ -50,6 +52,15 @@ class EndToEndEnvironment(
             withEnv("JSON_CONFIG_PATH", MOCK_OAUTH2_CONFIG)
             withCopyFileToContainer(MountableFile.forHostPath(systemPath("e2e.oauth-config")), MOCK_OAUTH2_CONFIG)
             waitingFor(Wait.forHttp("/default/.well-known/openid-configuration").forStatusCode(200))
+        }
+    private val dynamoDb: GenericContainer<*> =
+        DynamoDbLocalTestSupport.container().apply {
+            withCopyFileToContainer(MountableFile.forHostPath(systemPath("e2e.dynamodb-init-dir")), DYNAMODB_INIT)
+            withCreateContainerCmdModifier { it.withEntrypoint("bash") }
+            withCommand("$DYNAMODB_INIT/run.sh", "-sharedDb", "-inMemory")
+            waitingFor(
+                Wait.forLogMessage(".*table statement ready.*", 1).withStartupTimeout(LocalStackTestSupport.STARTUP_TIMEOUT),
+            )
         }
     private lateinit var localStack: LocalStackContainer
     private lateinit var sqs: SqsClient
@@ -94,7 +105,7 @@ class EndToEndEnvironment(
 
     /** Starts LocalStack first: without the token the whole class is skipped locally (and fails on CI) right away. */
     fun start() {
-        localStack = LocalStackTestSupport.container(listOf("sns", "sqs", "dynamodb")).withEnv(NOTIFICATION_QUEUE_SETTINGS)
+        localStack = LocalStackTestSupport.container(listOf("sns", "sqs")).withEnv(NOTIFICATION_QUEUE_SETTINGS)
         scripts(systemPath("e2e.localstack-init-dir")).forEach { script ->
             localStack.withCopyFileToContainer(
                 MountableFile.forHostPath(script, EXECUTABLE),
@@ -103,6 +114,7 @@ class EndToEndEnvironment(
         }
         localStack.start()
         awaitLocalStackInit()
+        dynamoDb.start()
         postgres.start()
         redis.start()
         oauth.start()
@@ -157,6 +169,7 @@ class EndToEndEnvironment(
         if (::proxy.isInitialized) proxy.close()
         if (::sqs.isInitialized) sqs.close()
         if (::localStack.isInitialized) localStack.stop()
+        dynamoDb.stop()
         postgres.stop()
         redis.stop()
         oauth.stop()
@@ -233,6 +246,7 @@ class EndToEndEnvironment(
     private fun statementEnvironment() =
         mapOf(
             "STATEMENT_AWS_ENDPOINT" to localStack.endpoint.toString(),
+            "STATEMENT_DYNAMODB_ENDPOINT" to DynamoDbLocalTestSupport.endpoint(dynamoDb).toString(),
             "STATEMENT_AWS_REGION" to localStack.region,
             "STATEMENT_REDIS_HOST" to redis.host,
             "STATEMENT_REDIS_PORT" to redis.getMappedPort(REDIS_PORT).toString(),
@@ -308,6 +322,7 @@ class EndToEndEnvironment(
         private const val CUSTOMER_TIMEOUT = "3s"
         private const val POSTGRES_IMAGE = "postgres:17-alpine"
         private const val POSTGRES_PORT = 5432
+        private const val DYNAMODB_INIT = "/opt/statement"
         private const val REDIS_IMAGE = "redis:7-alpine"
         private const val REDIS_PORT = 6379
 

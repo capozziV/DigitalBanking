@@ -1,0 +1,12 @@
+{
+  "TableName": "statement",
+  "AttributeDefinitions": [
+    { "AttributeName": "accountId", "AttributeType": "S" },
+    { "AttributeName": "sequence", "AttributeType": "N" }
+  ],
+  "KeySchema": [
+    { "AttributeName": "accountId", "KeyType": "HASH" },
+    { "AttributeName": "sequence", "KeyType": "RANGE" }
+  ],
+  "BillingMode": "PAY_PER_REQUEST"
+}

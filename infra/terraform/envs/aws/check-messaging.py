@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compara a mensageria do Terraform (modules/messaging) com os scripts do LocalStack.
+"""Compara o Terraform (modules/messaging) com os recursos locais: scripts do LocalStack e tabela do DynamoDB Local.
 
 Le infra/local/localstack/init/ready.d/*.sh com um interpretador minimo do bash que os scripts usam
 (atribuicoes, `$(...)` com o CLI da AWS, a funcao `create_consumer_queue`, comentarios ignorados) e
@@ -11,10 +11,11 @@ Confere, contra modules/messaging/resources.json e main.tf:
 - topicos com FifoTopic=true e filas com FifoQueue=true, sempre com ContentBasedDeduplication=false;
 - filas de consumo com VisibilityTimeout e RedrivePolicy (DLQ e maxReceiveCount) nos atributos do create-queue;
 - assinaturas com RawMessageDelivery=true;
-- a tabela DynamoDB do extrato (chaves, tipos e cobranca).
+- a tabela DynamoDB do extrato (chaves, tipos e cobranca), definida em infra/local/dynamodb/init/statement-table.json;
+  ela nao pode voltar para os scripts do LocalStack, que nao tem persistencia (#234).
 As filas *-inspection.fifo sao so locais (sem consumidor) e ficam de fora da comparacao de nomes.
 
-Uso: check-messaging.py [ready.d] [resources.json] [main.tf]
+Uso: check-messaging.py [ready.d] [resources.json] [main.tf] [statement-table.json]
 """
 import json
 import re
@@ -25,6 +26,7 @@ ROOT = Path(__file__).resolve().parents[4]
 READY = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "infra/local/localstack/init/ready.d"
 SPEC = Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "infra/terraform/modules/messaging/resources.json"
 MAIN_TF = Path(sys.argv[3]) if len(sys.argv) > 3 else SPEC.parent / "main.tf"
+TABLE = Path(sys.argv[4]) if len(sys.argv) > 4 else ROOT / "infra/local/dynamodb/init/statement-table.json"
 
 IGNORED = ("set", "export", "echo", "if", "fi", "then", "else", "local")
 
@@ -188,7 +190,6 @@ class Local:
         self.topics = []  # (script, nome, atributos)
         self.queues = []  # (script, nome, atributos)
         self.subs = []  # (script, topico, fila, atributos)
-        self.tables = []  # (script, nome, atributos, chaves, cobranca)
 
     def run(self, script, lines, env, functions):
         """Executa as linhas; devolve o valor do ultimo comando (o que `$(...)` captura)."""
@@ -220,10 +221,7 @@ class Local:
 
     def statement(self, script, line, env, functions):
         if line.startswith("if "):
-            # `if ! aws_local dynamodb describe-table ...; then`: so a checagem de existencia.
-            if "describe-table" not in line:
-                raise ScriptError(f"{script}: if nao suportado: {line}")
-            return ""
+            raise ScriptError(f"{script}: if nao suportado: {line}")
         m = re.fullmatch(r"(\w+)=\$\((.*)\)", line)
         if m:
             env[m.group(1)] = self.command(script, words(m.group(2), env), env, functions)
@@ -268,12 +266,8 @@ class Local:
                 raise ScriptError(f"{where}: protocolo diferente de sqs")
             self.subs.append((script, topic[6:], endpoint[6:], attributes((opts.get("attributes") or [None])[0])))
             return ""
-        if (service, op) == ("dynamodb", "create-table"):
-            self.tables.append((script, one(opts, "table-name", where), set(opts.get("attribute-definitions", [])),
-                                opts.get("key-schema", []), one(opts, "billing-mode", where)))
-            return ""
-        if (service, op) == ("dynamodb", "describe-table"):
-            return ""
+        if service == "dynamodb":
+            raise ScriptError(f"{where}: a tabela fica no DynamoDB Local ({TABLE.name}), nunca no LocalStack")
         raise ScriptError(f"{where}: chamada nao reconhecida")
 
 
@@ -366,23 +360,32 @@ def main():
         errors.append("Terraform: assinatura sem raw_message_delivery = true")
 
     tables = spec["dynamodb_tables"]
-    if len(local.tables) != 1 or len(tables) != 1:
-        errors.append("tabela DynamoDB: esperava uma no LocalStack e uma no Terraform")
+    if len(tables) != 1:
+        errors.append("tabela DynamoDB: esperava uma no Terraform")
     else:
-        _, name, attrs, keys, billing = local.tables[0]
         t = tables[0]
-        want_attrs = {f"AttributeName={t['hash_key']['name']},AttributeType={t['hash_key']['type']}",
-                      f"AttributeName={t['range_key']['name']},AttributeType={t['range_key']['type']}"}
-        want_keys = [f"AttributeName={t['hash_key']['name']},KeyType=HASH", f"AttributeName={t['range_key']['name']},KeyType=RANGE"]
-        if name != t["name"] or attrs != want_attrs or keys != want_keys or billing != "PAY_PER_REQUEST":
-            errors.append(f"tabela {name}: atributos ou chaves diferem do Terraform ({t})")
+        want = {
+            "TableName": t["name"],
+            "AttributeDefinitions": [{"AttributeName": t[k]["name"], "AttributeType": t[k]["type"]}
+                                     for k in ("hash_key", "range_key")],
+            "KeySchema": [{"AttributeName": t["hash_key"]["name"], "KeyType": "HASH"},
+                          {"AttributeName": t["range_key"]["name"], "KeyType": "RANGE"}],
+            "BillingMode": "PAY_PER_REQUEST",
+        }
+        try:
+            table = json.loads(TABLE.read_text())
+        except (OSError, ValueError) as e:
+            errors.append(f"tabela DynamoDB: nao li {TABLE} ({e})")
+        else:
+            if table != want:
+                errors.append(f"tabela {t['name']}: {TABLE.name} difere do Terraform ({want})")
 
     if errors:
-        print("check-messaging: diferencas entre o LocalStack e o Terraform:", file=sys.stderr)
+        print("check-messaging: diferencas entre o ambiente local e o Terraform:", file=sys.stderr)
         for e in errors:
             print(f"  - {e}", file=sys.stderr)
         sys.exit(1)
-    print(f"check-messaging: ok ({len(tf_topics)} topicos, {len(tf_queues) + len(tf_dlqs)} filas, {len(tf_dlqs)} DLQs, "
+    print(f"check-messaging: ok (1 tabela, {len(tf_topics)} topicos, {len(tf_queues) + len(tf_dlqs)} filas, {len(tf_dlqs)} DLQs, "
           f"{len(local.topics)} create-topic, {len(local.queues)} create-queue, {len(local.subs)} subscribe conferidos)")
 
 

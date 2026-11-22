@@ -2,8 +2,8 @@ import org.springframework.boot.gradle.tasks.bundling.BootJar
 import java.time.Duration
 
 // End-to-end tests of the transfer saga, the notifications, the statement and identity: accounts, transfers, notification,
-// statement and customer run as real processes (java -jar of the boot jars), with PostgreSQL, Redis, LocalStack and the
-// mock-oauth2-server (the local token issuer) in Testcontainers. Everything lives in the integrationTest source set.
+// statement and customer run as real processes (java -jar of the boot jars), with PostgreSQL, Redis, LocalStack, DynamoDB
+// Local and the mock-oauth2-server (the local token issuer) in Testcontainers. Everything lives in the integrationTest source set.
 plugins {
     id("digitalbanking.integration-test")
 }
@@ -53,6 +53,10 @@ abstract class EndToEndInputs : CommandLineArgumentProvider {
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val localStackInitDir: DirectoryProperty
 
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val dynamoDbInitDir: DirectoryProperty
+
     @get:Internal
     abstract val logDir: DirectoryProperty
 
@@ -66,6 +70,7 @@ abstract class EndToEndInputs : CommandLineArgumentProvider {
             "-De2e.oauth-config=${oauthConfig.get().asFile.absolutePath}",
             "-De2e.postgres-init-dir=${postgresInitDir.get().asFile.absolutePath}",
             "-De2e.localstack-init-dir=${localStackInitDir.get().asFile.absolutePath}",
+            "-De2e.dynamodb-init-dir=${dynamoDbInitDir.get().asFile.absolutePath}",
             "-De2e.log-dir=${logDir.get().asFile.absolutePath}",
         )
 }
@@ -98,6 +103,7 @@ tasks.named<Test>("integrationTest") {
             oauthConfig.set(root.file("infra/local/auth/mock-oauth2-config.json"))
             postgresInitDir.set(root.dir("infra/local/postgres/init"))
             localStackInitDir.set(root.dir("infra/local/localstack/init/ready.d"))
+            dynamoDbInitDir.set(root.dir("infra/local/dynamodb/init"))
             logDir.set(layout.buildDirectory.dir("e2e-logs"))
         },
     )
