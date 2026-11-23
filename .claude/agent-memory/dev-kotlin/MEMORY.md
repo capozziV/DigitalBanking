@@ -3,3 +3,7 @@
 - [DynamicPropertySource override](project_dynamic_property_source_override.md) — base IT class key beats subclass; override via placeholder indirection keys
 - [SQS listener tests](project_sqs_listener_tests.md) — notification @SqsListener starts in every SpringBootTest; auto-startup=false in base, explicit SQS endpoint in every test
 - [Local scripts pitfalls](project_local_scripts_pitfalls.md) — bash 3.2 errexit in $(), bru sandbox lacks URLSearchParams, one account per customer
+- [Kotlin test pitfalls](project_kotlin_test_pitfalls.md) — nested /** in KDoc, no colon in backtick names, Apache HttpClient retries 503 in test RestClient
+- [AssertJ containsOnly in race tests](project_assertj_containsonly_race.md) — containsOnly(a,b) demands both; use isSubsetOf for allowed statuses; CI 2 vCPU serializes
+- [Docker Desktop down](project_docker_desktop_down.md) — mass integrationTest NoClassDefFoundError at DockerClientProviderStrategy = Docker stopped; `open -a Docker`
+- [Stubborn Contract pitfalls](project_stubborn_contract_pitfalls.md) — wiremock-standalone clash, WebMvcTest needs security-test starter, base-class regex on folder

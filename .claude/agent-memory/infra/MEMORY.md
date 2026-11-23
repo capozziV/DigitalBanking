@@ -1,0 +1,2 @@
+- [Terraform no Mac local](project_terraform_local_quirks.md) — 1o validate apos init da timeout do plugin aws; repetir. Ferramentas em ~/.local/bin
+- [Comentario em template Helm](feedback_helm_template_comments.md) — `#` sai no render e casa com grep do validate.sh; use {{/* */}}
