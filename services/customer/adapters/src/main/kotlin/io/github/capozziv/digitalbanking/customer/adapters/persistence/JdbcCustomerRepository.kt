@@ -65,7 +65,13 @@ class JdbcCustomerRepository(
         check(updated == 1) { "customer ${customer.id} was not updated" }
     }
 
-    /** The unique index on the phone is what refuses a number another customer has, also for two concurrent writes. */
+    /**
+     * The unique index on the phone is what refuses a number another customer has, also for two concurrent writes.
+     *
+     * Note: migration V4 gave the customers that existed then fictitious phones (+5511900000001 onwards). A real number
+     * chosen later may equal one of them and is refused like any other duplicate (409). The note lives here, not in
+     * V4, because editing an applied migration changes its Flyway checksum.
+     */
     private fun <T> refusingDuplicatePhone(
         phone: PhoneNumber,
         write: () -> T,
