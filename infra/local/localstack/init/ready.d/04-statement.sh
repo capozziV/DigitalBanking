@@ -1,8 +1,8 @@
 #!/bin/bash
 # Recursos do statement no LocalStack: fila FIFO (com DLQ FIFO) assinada no topico accounts-events.fifo
-# (criado pelo script 01, que roda antes deste) e a tabela DynamoDB do extrato.
-# Idempotente: create-queue e subscribe com os mesmos parametros devolvem o recurso existente, e a tabela
-# so e criada se nao existir.
+# (criado pelo script 01, que roda antes deste). A tabela do extrato fica no DynamoDB Local, com volume
+# (infra/local/dynamodb/init/), fora do LocalStack, que nao tem persistencia.
+# Idempotente: create-queue e subscribe com os mesmos parametros devolvem o recurso existente.
 # Raw message delivery: o corpo e o envelope do evento e eventType/correlationId chegam como atributos SQS.
 # Configuravel por variavel de ambiente do conteiner: STATEMENT_MAX_RECEIVE_COUNT (padrao 5) e
 # STATEMENT_VISIBILITY_TIMEOUT_SECONDS (padrao 30).
@@ -46,12 +46,4 @@ aws_local sns subscribe \
   --notification-endpoint "$arn" \
   --attributes RawMessageDelivery=true > /dev/null
 
-if ! aws_local dynamodb describe-table --table-name statement > /dev/null 2>&1; then
-  aws_local dynamodb create-table \
-    --table-name statement \
-    --attribute-definitions AttributeName=accountId,AttributeType=S AttributeName=sequence,AttributeType=N \
-    --key-schema AttributeName=accountId,KeyType=HASH AttributeName=sequence,KeyType=RANGE \
-    --billing-mode PAY_PER_REQUEST > /dev/null
-fi
-
-echo "statement: fila $queue_url (DLQ $dlq_url) assinada em $topic_arn; tabela statement pronta"
+echo "statement: fila $queue_url (DLQ $dlq_url) assinada em $topic_arn"

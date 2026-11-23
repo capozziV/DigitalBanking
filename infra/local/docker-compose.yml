@@ -98,13 +98,14 @@ services:
       timeout: 3s
       retries: 10
 
-  # Emulador AWS (SNS, SQS e DynamoDB). Exige LOCALSTACK_AUTH_TOKEN (conta Hobby gratuita) no .env.
+  # Emulador AWS (SNS e SQS), sem persistencia: recriar ou parar perde filas e mensagens.
+  # Exige LOCALSTACK_AUTH_TOKEN (conta Hobby gratuita) no .env.
   # Mesma imagem de LocalStackTestSupport.IMAGE (libs/testing-localstack); mude as duas juntas.
   localstack:
     image: localstack/localstack:2026.10.2
     environment:
       LOCALSTACK_AUTH_TOKEN: ${LOCALSTACK_AUTH_TOKEN:-}
-      SERVICES: sns,sqs,dynamodb
+      SERVICES: sns,sqs
       NOTIFICATION_MAX_RECEIVE_COUNT: ${NOTIFICATION_MAX_RECEIVE_COUNT:-5}
       NOTIFICATION_VISIBILITY_TIMEOUT_SECONDS: ${NOTIFICATION_VISIBILITY_TIMEOUT_SECONDS:-30}
       STATEMENT_MAX_RECEIVE_COUNT: ${STATEMENT_MAX_RECEIVE_COUNT:-5}
@@ -122,6 +123,42 @@ services:
         - "import json, urllib.request as r; s = json.load(r.urlopen('http://127.0.0.1:4566/_localstack/init/ready')); exit(0 if s['completed'] and s['scripts'] and all(x['state'] == 'SUCCESSFUL' for x in s['scripts']) else 1)"
       interval: 5s
       timeout: 5s
+      retries: 30
+
+  # A imagem roda como dynamodblocal (uid 1000) e um volume nomeado novo nasce do root: este passo, sem rede e so com
+  # a capacidade de chown, entrega o diretorio ao usuario da imagem e sai. O banco nao roda como root.
+  dynamodb-volume:
+    image: amazon/dynamodb-local:3.3.2
+    user: root
+    entrypoint: ["chown", "dynamodblocal:dynamodblocal", "/data"]
+    command: []
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN]
+    volumes:
+      - dynamodb-data:/data
+
+  # Tabela do extrato (statement), em disco no volume dynamodb-data: sobrevive a `down` (sem -v) e a recriacao.
+  # Saudavel so com a tabela criada (dynamodb/init/run.sh). A porta so abre no loopback da maquina.
+  # Mesma imagem de DynamoDbLocalTestSupport.IMAGE (libs/testing-localstack); mude as duas juntas.
+  dynamodb:
+    image: amazon/dynamodb-local:3.3.2
+    entrypoint: ["bash", "/opt/statement/run.sh"]
+    command: ["-sharedDb", "-dbPath", "/data"]
+    ports:
+      - "127.0.0.1:${DYNAMODB_PORT:-8000}:8000"
+    volumes:
+      - dynamodb-data:/data
+      - ./dynamodb/init:/opt/statement:ro
+    depends_on:
+      dynamodb-volume:
+        condition: service_completed_successfully
+    healthcheck:
+      # Pergunta em 127.0.0.1 se a tabela existe.
+      test: ["CMD", "bash", "/opt/statement/run.sh", "--check"]
+      interval: 5s
+      timeout: 10s
       retries: 30
 
   # Emissor OIDC local (no lugar do Cognito). Emissor: http://localhost:8090/default.
@@ -252,15 +289,20 @@ services:
     build: ../../services/statement
     environment:
       STATEMENT_AWS_ENDPOINT: http://localstack:4566
+      STATEMENT_DYNAMODB_ENDPOINT: http://dynamodb:8000
       STATEMENT_REDIS_HOST: redis
       STATEMENT_REDIS_PORT: "6379"
       STATEMENT_JWT_ISSUER_URI: http://mock-oauth2-server:8080/default
     ports:
       - "8084:8084"
-    depends_on: *apps-infra
+    depends_on:
+      <<: *apps-infra
+      dynamodb:
+        condition: service_healthy
     healthcheck:
       <<: *apps-health
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8084/actuator/health"]
 
 volumes:
   postgres-data:
+  dynamodb-data:

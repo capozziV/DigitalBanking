@@ -42,8 +42,9 @@ statement:
     ttl: 60s
     ttl-jitter: 10s
   dynamodb:
-    # Same endpoint as SQS (DynamoDbConfiguration).
-    endpoint: ${STATEMENT_AWS_ENDPOINT:}
+    # Its own endpoint, apart from the SQS one: DynamoDB Local in the local environment, blank on AWS
+    # (DynamoDbConfiguration).
+    endpoint: ${STATEMENT_DYNAMODB_ENDPOINT:}
     table: ${STATEMENT_TABLE:statement}
   queues:
     accounts: ${STATEMENT_ACCOUNTS_QUEUE:statement-accounts.fifo}

@@ -342,7 +342,7 @@ class OutboxRelayIntegrationTest : AccountsIntegrationTest() {
             val initDir = Path.of(System.getProperty("accounts.localstack.init-dir"))
             localStack = LocalStackTestSupport.container(listOf("sns", "sqs"))
             // Only this service's script: mounting the whole folder breaks whenever another service adds one
-            // that needs a LocalStack service this test does not start (04-statement.sh needs DynamoDB).
+            // that needs a LocalStack service or resource this test does not start.
             val script = initDir.resolve("01-accounts-topic.sh")
             localStack.withCopyFileToContainer(
                 MountableFile.forHostPath(script, 0b111_101_101),

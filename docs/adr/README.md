@@ -30,3 +30,4 @@ Registros de decisões arquiteturais. Formato: `NNNN-titulo-em-kebab-case.md`.
 | 0024 | Login e telefone do app | aceito; ajusta o login do 0005 | [0024](0024-login-e-telefone-do-app.md) |
 | 0025 | Nome da contraparte nas notificações | aceito | [0025](0025-nome-da-contraparte-nas-notificacoes.md) |
 | 0026 | Bônus de boas-vindas por cliente | aceito | [0026](0026-bonus-de-boas-vindas-por-cliente.md) |
+| 0027 | DynamoDB Local com volume no ambiente local | aceito | [0027](0027-dynamodb-local-com-volume.md) |
