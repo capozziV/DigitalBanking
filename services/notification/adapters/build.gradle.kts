@@ -28,7 +28,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-jackson")
     implementation("tools.jackson.module:jackson-module-kotlin")
 
-    // EventContractsTest delivers the messages of the contracts of accounts and transfers to the listener.
+    // EventContractsTest delivers the messages of the contracts of accounts, transfers and customer to the listener.
     contractStubs(project(":services:accounts:bootstrap"))
     contractStubs(project(":services:transfers:bootstrap"))
+    contractStubs(project(":services:customer:bootstrap"))
 }

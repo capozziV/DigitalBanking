@@ -60,7 +60,7 @@ class TransferSagaResumeIntegrationTest : TransfersIntegrationTest() {
     @BeforeEach
     fun reset() {
         accountsServer.resetAll()
-        ownerJdbc.deleteTransfers()
+        ownerDataSource.deleteTransfers()
         stubs.accountExists(source)
         stubs.accountExists(destination)
     }

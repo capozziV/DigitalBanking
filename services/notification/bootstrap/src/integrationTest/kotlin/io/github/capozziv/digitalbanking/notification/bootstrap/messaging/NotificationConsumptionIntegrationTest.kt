@@ -33,7 +33,7 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * Consumption of both FIFO queues against LocalStack, with the redrive policy of production (5 receives) and a
+ * Consumption of the three FIFO queues against LocalStack, with the redrive policy of production (5 receives) and a
  * visibility timeout of 1 s so retries are quick: redeliveries are no-ops, a malformed message ends in the DLQ
  * without holding other groups, and an event about an account not known yet is retried until it is.
  *
@@ -52,11 +52,13 @@ class NotificationConsumptionIntegrationTest {
 
     private var accountsDlqAtStart = 0
     private var transfersDlqAtStart = 0
+    private var customerDlqAtStart = 0
 
     @BeforeEach
     fun recordDlqDepths() {
         accountsDlqAtStart = visibleMessages(ACCOUNTS_DLQ)
         transfersDlqAtStart = visibleMessages(TRANSFERS_DLQ)
+        customerDlqAtStart = visibleMessages(CUSTOMER_DLQ)
     }
 
     private val jdbc: JdbcClient by lazy {
@@ -78,6 +80,59 @@ class NotificationConsumptionIntegrationTest {
         assertThat(kindsOf(alice)).containsExactlyInAnyOrder("WELCOME", "TRANSFER_SENT")
         assertThat(kindsOf(bob)).containsExactlyInAnyOrder("WELCOME", "TRANSFER_RECEIVED")
         awaitEmpty(TRANSFERS_QUEUE)
+    }
+
+    @Test
+    fun `the same customer registered delivered 20 times keeps one name and notifies nobody`() {
+        val ana = UUID.randomUUID()
+        val eventId = UUID.randomUUID()
+        val body = customerRegistered(eventId, ana, "Ana Souza")
+        // Each send has its own deduplication ID, so SQS delivers all 20: the redelivery after a lost ack.
+        repeat(20) { sendCustomerEvent(ana, body) }
+
+        await { processedRows(eventId) == 1 }
+        awaitEmpty(CUSTOMER_QUEUE)
+        assertThat(visibleMessages(CUSTOMER_DLQ)).isEqualTo(customerDlqAtStart)
+        assertThat(nameOf(ana)).isEqualTo("Ana Souza")
+        assertThat(notificationsOfEvent(eventId)).isZero()
+    }
+
+    @Test
+    fun `a later registration of the same customer replaces the name`() {
+        val ana = UUID.randomUUID()
+        sendCustomerEvent(ana, customerRegistered(UUID.randomUUID(), ana, "Ana Souza"))
+        await { nameOf(ana) == "Ana Souza" }
+
+        sendCustomerEvent(ana, customerRegistered(UUID.randomUUID(), ana, "Ana Souza Lima"))
+
+        await { nameOf(ana) == "Ana Souza Lima" }
+        assertThat(
+            jdbc
+                .sql("select count(*) from customer_names where customer_id = ?")
+                .param(ana)
+                .query(Int::class.java)
+                .single(),
+        ).isEqualTo(1)
+    }
+
+    @Test
+    fun `a transfer consumed before the names arrive shows the names once they do, in any order`() {
+        val (ana, anaAccount) = UUID.randomUUID() to UUID.randomUUID()
+        val (bruno, brunoAccount) = UUID.randomUUID() to UUID.randomUUID()
+        sendAccountEvent(anaAccount, accountOpened(anaAccount, ana))
+        sendAccountEvent(brunoAccount, accountOpened(brunoAccount, bruno))
+        val transferEventId = UUID.randomUUID()
+        sendTransferEvent(transferEventId, transferCompleted(transferEventId, anaAccount, brunoAccount))
+        await { notificationsOfEvent(transferEventId) == 2 }
+        assertThat(transferBody(bruno)).isEqualTo("Você recebeu R$ 25,00 de outro cliente.")
+
+        sendCustomerEvent(ana, customerRegistered(UUID.randomUUID(), ana, "Ana Souza"))
+        sendCustomerEvent(bruno, customerRegistered(UUID.randomUUID(), bruno, "Bruno Lima"))
+
+        await { nameOf(ana) != null && nameOf(bruno) != null }
+        assertThat(transferBody(bruno)).isEqualTo("Você recebeu R$ 25,00 de Ana Souza.")
+        assertThat(transferBody(ana)).isEqualTo("Você enviou R$ 25,00 para Bruno Lima.")
+        assertThat(visibleMessages(CUSTOMER_DLQ)).isEqualTo(customerDlqAtStart)
     }
 
     @Test
@@ -180,7 +235,7 @@ class NotificationConsumptionIntegrationTest {
         val tags = response.body!!.get("availableTags")
         val queueTag = (0 until tags.size()).map { tags.get(it) }.single { it.get("tag").asString() == "queue" }
         val values = (0 until queueTag.get("values").size()).map { queueTag.get("values").get(it).asString() }
-        assertThat(values).containsExactlyInAnyOrder(ACCOUNTS_DLQ, TRANSFERS_DLQ)
+        assertThat(values).containsExactlyInAnyOrder(ACCOUNTS_DLQ, TRANSFERS_DLQ, CUSTOMER_DLQ)
     }
 
     @Test
@@ -279,6 +334,31 @@ class NotificationConsumptionIntegrationTest {
             .query(Int::class.java)
             .single()
 
+    private fun nameOf(customerId: UUID): String? =
+        jdbc
+            .sql("select name from customer_names where customer_id = ?")
+            .param(customerId)
+            .query(String::class.java)
+            .optional()
+            .orElse(null)
+
+    /** The text of the only transfer notification of [customerId], as GET /notifications shows it to them. */
+    private fun transferBody(customerId: UUID): String {
+        val response = ApiClient(port).get("/notifications", bearer = JwtTestSupport.customerToken(customerId))
+        assertThat(response.status).describedAs(response.rawBody).isEqualTo(200)
+        val items = response.body!!.get("items")
+        return (0 until items.size())
+            .map { items.get(it) }
+            .single { it.get("kind").asString().startsWith("TRANSFER_") }
+            .get("body")
+            .asString()
+    }
+
+    private fun sendCustomerEvent(
+        customerId: UUID,
+        body: String,
+    ) = send(CUSTOMER_QUEUE, customerId.toString(), body)
+
     private fun sendAccountEvent(
         accountId: UUID,
         body: String,
@@ -321,6 +401,16 @@ class NotificationConsumptionIntegrationTest {
         UUID.randomUUID(),
         "AccountOpened",
         """{"accountId":"$accountId","customerId":"$customerId","type":"STANDARD"}""",
+    )
+
+    private fun customerRegistered(
+        eventId: UUID,
+        customerId: UUID,
+        name: String,
+    ) = envelope(
+        eventId,
+        "CustomerRegistered",
+        """{"customerId":"$customerId","name":"$name","email":"cliente@example.test","phone":"+5511987654321"}""",
     )
 
     private fun transferCompleted(
@@ -373,6 +463,8 @@ class NotificationConsumptionIntegrationTest {
         private const val TRANSFERS_QUEUE = "a5-notification-transfers.fifo"
         private const val ACCOUNTS_DLQ = "a5-notification-accounts-dlq.fifo"
         private const val TRANSFERS_DLQ = "a5-notification-transfers-dlq.fifo"
+        private const val CUSTOMER_QUEUE = "a5-notification-customer.fifo"
+        private const val CUSTOMER_DLQ = "a5-notification-customer-dlq.fifo"
         private const val MAX_RECEIVE_COUNT = 5
         private const val VISIBILITY_SECONDS = 1
         private const val CORRELATION_ID = "a5-correlation"
@@ -422,11 +514,14 @@ class NotificationConsumptionIntegrationTest {
         fun properties(registry: DynamicPropertyRegistry) {
             createWithDlq(ACCOUNTS_QUEUE, ACCOUNTS_DLQ)
             createWithDlq(TRANSFERS_QUEUE, TRANSFERS_DLQ)
+            createWithDlq(CUSTOMER_QUEUE, CUSTOMER_DLQ)
             NotificationIntegrationTest.databaseProperties(registry)
             registry.add("notification.queues.accounts") { ACCOUNTS_QUEUE }
             registry.add("notification.queues.transfers") { TRANSFERS_QUEUE }
             registry.add("notification.queues.accounts-dlq") { ACCOUNTS_DLQ }
             registry.add("notification.queues.transfers-dlq") { TRANSFERS_DLQ }
+            registry.add("notification.queues.customer") { CUSTOMER_QUEUE }
+            registry.add("notification.queues.customer-dlq") { CUSTOMER_DLQ }
             NotificationTestPropertiesSupport.localStack(registry, localStack)
             // The DLQ gauge shows what the last refresh read, so the DLQ test needs frequent refreshes.
             registry.add("notification.dlq-metrics.refresh-interval") { "200ms" }

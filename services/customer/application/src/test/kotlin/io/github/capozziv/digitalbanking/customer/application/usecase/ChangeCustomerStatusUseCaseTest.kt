@@ -9,6 +9,7 @@ import io.github.capozziv.digitalbanking.customer.domain.Customer
 import io.github.capozziv.digitalbanking.customer.domain.CustomerBlocked
 import io.github.capozziv.digitalbanking.customer.domain.CustomerStatus
 import io.github.capozziv.digitalbanking.customer.domain.CustomerUnblocked
+import io.github.capozziv.digitalbanking.customer.domain.PhoneNumber
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -24,7 +25,9 @@ class ChangeCustomerStatusUseCaseTest {
     private val id = UUID.randomUUID()
 
     private fun existingCustomer(): Customer =
-        Customer.register(id, "Ana Souza", "ana@example.test", clock.instant()).first.also { customers.insertIfAbsent(it) }
+        Customer.register(id, "Ana Souza", "ana@example.test", PhoneNumber("+5511987654321"), clock.instant()).first.also {
+            customers.insertIfAbsent(it)
+        }
 
     @Test
     fun `blocking writes the new status and CustomerBlocked in one transaction`() {

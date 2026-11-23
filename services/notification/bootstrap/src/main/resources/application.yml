@@ -40,8 +40,10 @@ notification:
   queues:
     accounts: ${NOTIFICATION_ACCOUNTS_QUEUE:notification-accounts.fifo}
     transfers: ${NOTIFICATION_TRANSFERS_QUEUE:notification-transfers.fifo}
+    customer: ${NOTIFICATION_CUSTOMER_QUEUE:notification-customer.fifo}
     accounts-dlq: ${NOTIFICATION_ACCOUNTS_DLQ:notification-accounts-dlq.fifo}
     transfers-dlq: ${NOTIFICATION_TRANSFERS_DLQ:notification-transfers-dlq.fifo}
+    customer-dlq: ${NOTIFICATION_CUSTOMER_DLQ:notification-customer-dlq.fifo}
   dlq-metrics:
     # How often the notification.dlq.messages gauge reads the DLQ depths from SQS (a scrape only reads the last value).
     refresh-interval: ${NOTIFICATION_DLQ_METRICS_REFRESH_INTERVAL:30s}

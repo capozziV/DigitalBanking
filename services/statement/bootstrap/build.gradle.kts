@@ -26,6 +26,8 @@ dependencies {
     integrationTestImplementation(project(":libs:testing-localstack"))
     integrationTestImplementation(project(":libs:testing-security"))
     integrationTestImplementation(project(":libs:testing-redis"))
+    // StatementCacheInvalidationRaceIntegrationTest calls the use case directly, with an admin caller.
+    integrationTestImplementation(project(":libs:security-caller"))
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-webmvc")
     integrationTestImplementation(libs.testcontainers.junit.jupiter)
 }

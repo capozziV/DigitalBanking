@@ -14,7 +14,7 @@ class MalformedEventException(
 ) : RuntimeException(message, cause)
 
 /**
- * Reads the outbox envelope (eventId, eventType, eventVersion, …, payload) published by accounts and transfers
+ * Reads the outbox envelope (eventId, eventType, eventVersion, …, payload) published by accounts, transfers and customer
  * and decodes the payload of the event types this service notifies about. Only the JSON is shared: no type of
  * the producers is used. Amounts are integer numbers of cents.
  */
@@ -103,6 +103,12 @@ class EventEnvelopeReader {
             "AccountClosed" -> {
                 val payload = envelope.payload()
                 ReceivedEvent.AccountClosed(eventId, payload.uuid("accountId"), payload.uuid("customerId"))
+            }
+
+            "CustomerRegistered" -> {
+                // Every version carries the name; the other fields (email, phone) are not used here.
+                val payload = envelope.payload()
+                ReceivedEvent.CustomerRegistered(eventId, payload.uuid("customerId"), payload.text("name"))
             }
 
             else -> {

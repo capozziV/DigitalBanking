@@ -16,9 +16,9 @@ variable "github_repository" {
 }
 
 variable "services" {
-  description = "Servicos que ganham um repositorio ECR."
+  description = "Servicos e apps (web e bff, da etapa 9) que ganham um repositorio ECR."
   type        = list(string)
-  default     = ["accounts", "transfers", "notification", "statement", "customer"]
+  default     = ["accounts", "transfers", "notification", "statement", "customer", "web", "bff"]
 }
 
 variable "monthly_budget_usd" {

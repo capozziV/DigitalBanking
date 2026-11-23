@@ -19,5 +19,7 @@ class CustomerSecurityConfiguration {
         SecurityRules {
             authorize(HttpMethod.POST, "/customers", hasAnyRole(CUSTOMER, ADMIN))
             authorize(HttpMethod.GET, "/customers/me", hasAnyRole(CUSTOMER, ADMIN))
+            authorize(HttpMethod.PUT, "/customers/me/phone", hasAnyRole(CUSTOMER, ADMIN))
+            authorize(HttpMethod.GET, "/customers/lookup", hasAnyRole(CUSTOMER, ADMIN))
         }
 }

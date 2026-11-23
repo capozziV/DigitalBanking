@@ -8,6 +8,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 # ("1.36" no Terraform = 1.36.0 aqui) por kubernetes-version.sh, fonte unica. KUBERNETES_VERSION sobrepoe.
 k8s_version="${KUBERNETES_VERSION:-$("$here/../../infra/terraform/envs/aws/kubernetes-version.sh")}"
 services=(accounts transfers statement notification customer)
+app_services=(web bff)
 tg_arn="arn:aws:elasticloadbalancing:sa-east-1:123456789012:targetgroup/validate/0123456789abcdef"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
@@ -49,6 +50,42 @@ for svc in "${services[@]}"; do
   grep -qE '_AWS_REGION: "sa-east-1"' "$m" || { echo "ERRO: $svc sem *_AWS_REGION sa-east-1" >&2; exit 1; }
 done
 
+# web e bff (etapa 9): mesmo chart, sem Spring (sem perfil nem actuator) e sem papel na AWS. As probes batem nos
+# caminhos de health do ALB (routes.json); o resto das regras de seguranca e de regiao e o mesmo dos servicos.
+for svc in "${app_services[@]}"; do
+  echo "== $svc (app)"
+  # shellcheck disable=SC2046
+  helm lint "$here/service" -f "$here/values/$svc.yaml" $(sets "$svc") --strict
+  # shellcheck disable=SC2046
+  helm template "$svc" "$here/service" -f "$here/values/$svc.yaml" $(sets "$svc") > "$tmp/$svc.yaml"
+
+  kubeconform -strict -summary -kubernetes-version "$k8s_version" \
+    -schema-location default \
+    -schema-location "$here/schemas/{{ .ResourceKind }}_{{ .ResourceAPIVersion }}.json" \
+    "$tmp/$svc.yaml"
+
+  m="$tmp/$svc.yaml"
+  health=$(jq -er --arg s "$svc" '.health[$s]' "$here/../../infra/terraform/modules/edge-alb/routes.json")
+  # startup, liveness e readiness: as tres no health do ALB.
+  [ "$(grep -c "path: $health\$" "$m")" = 3 ] || { echo "ERRO: $svc com probe fora do health do ALB ($health)" >&2; exit 1; }
+  if grep -q 'actuator' "$m"; then echo "ERRO: $svc com actuator, que nao e Spring" >&2; exit 1; fi
+  if grep -q 'SPRING_PROFILES_ACTIVE' "$m"; then echo "ERRO: $svc com perfil Spring" >&2; exit 1; fi
+  grep -q 'runAsNonRoot: true' "$m" || { echo "ERRO: $svc pode rodar como root" >&2; exit 1; }
+  grep -q 'readOnlyRootFilesystem: true' "$m" || { echo "ERRO: $svc com sistema de arquivos gravavel" >&2; exit 1; }
+  grep -qE "^      serviceAccountName: $svc\$" "$m" || { echo "ERRO: $svc com serviceAccountName diferente do nome do servico" >&2; exit 1; }
+  grep -q 'kind: TargetGroupBinding' "$m" || { echo "ERRO: $svc sem TargetGroupBinding" >&2; exit 1; }
+  grep -q 'kind: PodDisruptionBudget' "$m" || { echo "ERRO: $svc sem PodDisruptionBudget" >&2; exit 1; }
+  if grep -q 'eks.amazonaws.com/role-arn' "$m"; then echo "ERRO: $svc com anotacao IRSA na ServiceAccount" >&2; exit 1; fi
+  if grep -qE 'us-east-1|AWS_REGION: "[^s]' "$m"; then echo "ERRO: $svc com regiao diferente de sa-east-1" >&2; exit 1; fi
+  # Nunca segredo no chart: o app nao usa secretEnv.
+  if grep -q 'secretKeyRef' "$m"; then echo "ERRO: $svc com segredo do Kubernetes" >&2; exit 1; fi
+done
+# O nginx do web escuta na 80 sem root: o pod libera a porta; sem isso ele nao sobe no cluster.
+grep -q 'net.ipv4.ip_unprivileged_port_start' "$tmp/web.yaml" || { echo "ERRO: web sem o sysctl da porta 80 sem root" >&2; exit 1; }
+# Na AWS o BFF entra com o Cognito e cookie Secure; o provedor local so existe no compose.
+grep -q 'IDENTITY_PROVIDER: "cognito"' "$tmp/bff.yaml" || { echo "ERRO: bff sem IDENTITY_PROVIDER cognito" >&2; exit 1; }
+grep -q 'COOKIE_SECURE: "true"' "$tmp/bff.yaml" || { echo "ERRO: bff com cookie sem Secure" >&2; exit 1; }
+
 echo "== db-init"
 db_init_sets=(--set dbHost=validate.cluster-x.sa-east-1.rds.amazonaws.com
   --set masterSecretId=arn:aws:secretsmanager:sa-east-1:123456789012:secret:rds!db-validate
@@ -78,7 +115,7 @@ if helm template x "$here/service" -f "$here/values/accounts.yaml" --set image.r
 fi
 
 echo "== o chart recusa render sem cada valor obrigatorio (requiredEnv)"
-for svc in "${services[@]}"; do
+for svc in "${services[@]}" "${app_services[@]}"; do
   for key in $(required_env "$svc"); do
     # shellcheck disable=SC2046
     if helm template "$svc" "$here/service" -f "$here/values/$svc.yaml" $(sets "$svc") --set-string "env.$key=" >/dev/null 2>&1; then

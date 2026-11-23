@@ -1,0 +1,37 @@
+meta {
+  name: Cadastrar com telefone em uso
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/customers
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "Outro Cliente",
+    "email": "bruno-outro-{{customerId}}@example.test",
+    "phone": "{{customerNewPhone}}"
+  }
+}
+
+script:pre-request {
+  // Um usuario novo, sem cadastro, tenta ficar com o telefone que o cliente desta execucao acabou de trocar.
+  const axios = require("axios");
+  const form = `grant_type=password&username=${encodeURIComponent(bru.interpolate("{{$guid}}"))}&password=unused`;
+  const r = await axios.post(bru.getEnvVar("tokenUrl"), form, {
+    auth: { username: "web", password: "local-secret" },
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  });
+  req.setHeader("Authorization", `Bearer ${r.data.access_token}`);
+}
+
+tests {
+  test("409 phone-already-in-use", function () {
+    expect(res.status).to.equal(409);
+    expect(res.body.type).to.contain("phone-already-in-use");
+  });
+}

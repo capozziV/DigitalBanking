@@ -1,9 +1,11 @@
 package io.github.capozziv.digitalbanking.notification.application.usecase
 
 import io.github.capozziv.digitalbanking.notification.application.ForeignCustomerException
+import io.github.capozziv.digitalbanking.notification.application.port.CustomerNameRepository
 import io.github.capozziv.digitalbanking.notification.application.port.NotificationCursor
 import io.github.capozziv.digitalbanking.notification.application.port.NotificationRepository
 import io.github.capozziv.digitalbanking.notification.domain.Notification
+import io.github.capozziv.digitalbanking.notification.domain.NotificationText
 import io.github.capozziv.digitalbanking.security.Caller
 import java.util.UUID
 
@@ -15,11 +17,15 @@ data class NotificationPage(
 
 class ListNotificationsUseCase(
     private val notifications: NotificationRepository,
+    private val customerNames: CustomerNameRepository,
 ) {
     /**
      * Lists the notifications of the caller. [requestedCustomerId] (the `customerId` query parameter) is for an admin
      * who reads the notifications of a customer; without it the caller reads their own. A customer who names anyone
      * but themselves gets [ForeignCustomerException].
+     *
+     * Each item carries the text shown to the customer, built now: a transfer names the other party from the local
+     * copy of names, or says "outro cliente" while the name has not arrived.
      */
     fun execute(
         caller: Caller,
@@ -32,7 +38,16 @@ class ListNotificationsUseCase(
         val items = fetched.take(PAGE_SIZE)
         val nextCursor =
             if (fetched.size > PAGE_SIZE) items.last().let { NotificationCursor(it.createdAt, it.id) } else null
-        return NotificationPage(items, notifications.countUnread(customerId), nextCursor)
+        return NotificationPage(withText(items), notifications.countUnread(customerId), nextCursor)
+    }
+
+    private fun withText(items: List<Notification>): List<Notification> {
+        val counterparts = items.mapNotNull { it.counterpartAccountId() }.toSet()
+        val names = if (counterparts.isEmpty()) emptyMap() else customerNames.namesOfAccountOwners(counterparts)
+        return items.map { notification ->
+            val content = NotificationText.render(notification, notification.counterpartAccountId()?.let { names[it] })
+            notification.copy(title = content.title, body = content.body)
+        }
     }
 
     private fun customerToRead(

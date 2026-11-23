@@ -1,6 +1,7 @@
 package io.github.capozziv.digitalbanking.customer.bootstrap
 
 import io.github.capozziv.digitalbanking.customer.bootstrap.web.ApiClient
+import io.github.capozziv.digitalbanking.customer.domain.PhoneNumber
 import io.github.capozziv.digitalbanking.testing.security.ApiDocsAssertions
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -38,10 +39,12 @@ class OpenApiIntegrationTest : CustomerIntegrationTest() {
     }
 
     @Test
-    fun `the contract has exactly the five paths and methods of the spec`() {
+    fun `the contract has exactly the paths and methods of the spec`() {
         assertThat(operations().keys).containsExactlyInAnyOrder(
             "POST /customers",
             "GET /customers/me",
+            "PUT /customers/me/phone",
+            "GET /customers/lookup",
             "GET /admin/customers/{id}",
             "PUT /admin/customers/{id}/status",
             "GET /internal/customers/{id}",
@@ -73,9 +76,11 @@ class OpenApiIntegrationTest : CustomerIntegrationTest() {
     fun `registering documents 201, 200 and 400 and the lookups document 404`() {
         val operations = operations()
 
-        assertThat(operations.getValue("POST /customers").get("responses").propertyNames()).contains("201", "200", "400")
+        assertThat(operations.getValue("POST /customers").get("responses").propertyNames()).contains("201", "200", "400", "409")
         for (name in listOf(
             "GET /customers/me",
+            "PUT /customers/me/phone",
+            "GET /customers/lookup",
             "GET /admin/customers/{id}",
             "PUT /admin/customers/{id}/status",
             "GET /internal/customers/{id}",
@@ -83,5 +88,22 @@ class OpenApiIntegrationTest : CustomerIntegrationTest() {
             assertThat(operations.getValue(name).get("responses").propertyNames()).describedAs(name).contains("404")
         }
         assertThat(operations.getValue("PUT /admin/customers/{id}/status").get("responses").propertyNames()).contains("400")
+    }
+
+    @Test
+    fun `the phone routes document the validation error and the conflict, and the phone has its pattern`() {
+        val operations = operations()
+
+        assertThat(operations.getValue("PUT /customers/me/phone").get("responses").propertyNames()).contains("200", "400", "404", "409")
+        assertThat(operations.getValue("GET /customers/lookup").get("responses").propertyNames()).contains("200", "400", "404")
+        val pattern =
+            docs
+                .get("components")
+                .get("schemas")
+                .get("ChangePhoneDTO")
+                .get("properties")
+                .get("phone")
+                .get("pattern")
+        assertThat(pattern.asString()).isEqualTo(PhoneNumber.PATTERN)
     }
 }

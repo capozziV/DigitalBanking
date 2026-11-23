@@ -4,6 +4,7 @@
   "issuer_url": { "sensitive": false, "type": "string", "value": "https://cognito-idp.sa-east-1.amazonaws.com/sa-east-1_TESTPOOL" },
   "token_endpoint_url": { "sensitive": false, "type": "string", "value": "https://digitalbanking-test.auth.sa-east-1.amazoncognito.com/oauth2/token" },
   "machine_client_id": { "sensitive": false, "type": "string", "value": "machineclientid0123456789" },
+  "cognito_bff_client_id": { "sensitive": false, "type": "string", "value": "bffclientid0123456789" },
   "redis_endpoint": { "sensitive": false, "type": "string", "value": "digitalbanking-redis.abc123.0001.sae1.cache.amazonaws.com" },
   "service_role_arns": { "sensitive": false, "type": ["map", "string"], "value": {
     "accounts": "arn:aws:iam::123456789012:role/digitalbanking-accounts",
@@ -26,7 +27,9 @@
     "transfers": "arn:aws:elasticloadbalancing:sa-east-1:123456789012:targetgroup/db-transfers/0000000000000002",
     "notification": "arn:aws:elasticloadbalancing:sa-east-1:123456789012:targetgroup/db-notification/0000000000000003",
     "statement": "arn:aws:elasticloadbalancing:sa-east-1:123456789012:targetgroup/db-statement/0000000000000004",
-    "customer": "arn:aws:elasticloadbalancing:sa-east-1:123456789012:targetgroup/db-customer/0000000000000005"
+    "customer": "arn:aws:elasticloadbalancing:sa-east-1:123456789012:targetgroup/db-customer/0000000000000005",
+    "web": "arn:aws:elasticloadbalancing:sa-east-1:123456789012:targetgroup/db-web/0000000000000006",
+    "bff": "arn:aws:elasticloadbalancing:sa-east-1:123456789012:targetgroup/db-bff/0000000000000007"
   } },
   "topic_arns": { "sensitive": false, "type": ["map", "string"], "value": {
     "accounts-events.fifo": "arn:aws:sns:sa-east-1:123456789012:accounts-events.fifo",

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Recursos do customer no LocalStack: topico SNS FIFO e fila FIFO de inspecao assinada nele.
-# A fila nao tem consumidor (nesta etapa ninguem consome os eventos do customer); serve para ver os eventos
-# publicados (testes e inspecao manual). Raw message delivery: o corpo e o envelope do evento e
+# A fila de inspecao nao tem consumidor; serve para ver os eventos publicados (testes e inspecao manual). O
+# notification consome o topico pela propria fila, notification-customer.fifo (script 03). Raw message delivery: o corpo e o envelope do evento e
 # eventType/correlationId chegam como atributos SQS.
 set -euo pipefail
 

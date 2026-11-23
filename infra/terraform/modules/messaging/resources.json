@@ -10,11 +10,13 @@
   "queues": [
     { "name": "notification-accounts.fifo", "fifo": true, "dlq": "notification-accounts-dlq.fifo", "topic": "accounts-events.fifo" },
     { "name": "notification-transfers.fifo", "fifo": true, "dlq": "notification-transfers-dlq.fifo", "topic": "transfers-events.fifo" },
+    { "name": "notification-customer.fifo", "fifo": true, "dlq": "notification-customer-dlq.fifo", "topic": "customer-events.fifo" },
     { "name": "statement-accounts.fifo", "fifo": true, "dlq": "statement-accounts-dlq.fifo", "topic": "accounts-events.fifo" }
   ],
   "dead_letter_queues": [
     { "name": "notification-accounts-dlq.fifo", "fifo": true },
     { "name": "notification-transfers-dlq.fifo", "fifo": true },
+    { "name": "notification-customer-dlq.fifo", "fifo": true },
     { "name": "statement-accounts-dlq.fifo", "fifo": true }
   ],
   "dynamodb_tables": [

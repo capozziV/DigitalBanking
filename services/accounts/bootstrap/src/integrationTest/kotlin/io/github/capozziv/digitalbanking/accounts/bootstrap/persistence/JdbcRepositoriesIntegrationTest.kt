@@ -137,6 +137,20 @@ class JdbcRepositoriesIntegrationTest : AccountsIntegrationTest() {
     }
 
     @Test
+    fun `existsOtherByCustomerId sees another account of the customer in any status, never the excluded one nor other customers`() {
+        val first = openAccount()
+        assertThat(accounts.existsOtherByCustomerId(first.customerId, first.id)).isFalse()
+        assertThat(accounts.existsOtherByCustomerId(first.customerId, UUID.randomUUID())).isTrue()
+        assertThat(accounts.existsOtherByCustomerId(UUID.randomUUID(), first.id)).isFalse()
+
+        tx.inTransaction { accounts.updateStatus(first.copy(status = AccountStatus.CLOSED)) }
+        val second = Account(ids.newId(), first.customerId, AccountType.FREE)
+        tx.inTransaction { accounts.insert(second, "open-${second.id}") }
+
+        assertThat(accounts.existsOtherByCustomerId(first.customerId, second.id)).isTrue()
+    }
+
+    @Test
     fun `second account of the same customer with another key is DUPLICATE_CUSTOMER`() {
         val first = openAccount()
         val second = Account(ids.newId(), first.customerId, AccountType.FREE)
@@ -277,6 +291,24 @@ class JdbcRepositoriesIntegrationTest : AccountsIntegrationTest() {
         assertThat(tx.inTransaction { accounts.insert(second, "open-${second.id}") }).isEqualTo(InsertAccountResult.INSERTED)
         val third = Account(ids.newId(), first.customerId, AccountType.FREE)
         assertThat(tx.inTransaction { accounts.insert(third, "open-${third.id}") }).isEqualTo(InsertAccountResult.DUPLICATE_CUSTOMER)
+    }
+
+    @Test
+    fun `findNotClosedByCustomerId finds the active or blocked account and ignores closed ones`() {
+        val first = openAccount()
+        assertThat(accounts.findNotClosedByCustomerId(first.customerId)).isEqualTo(first)
+        assertThat(accounts.findNotClosedByCustomerId(UUID.randomUUID())).isNull()
+
+        val blocked = first.copy(status = AccountStatus.BLOCKED)
+        tx.inTransaction { accounts.updateStatus(blocked) }
+        assertThat(accounts.findNotClosedByCustomerId(first.customerId)).isEqualTo(blocked)
+
+        tx.inTransaction { accounts.updateStatus(first.copy(status = AccountStatus.CLOSED)) }
+        assertThat(accounts.findNotClosedByCustomerId(first.customerId)).isNull()
+
+        val second = Account(ids.newId(), first.customerId, AccountType.FREE)
+        tx.inTransaction { accounts.insert(second, "open-${second.id}") }
+        assertThat(accounts.findNotClosedByCustomerId(first.customerId)).isEqualTo(second)
     }
 
     @Test

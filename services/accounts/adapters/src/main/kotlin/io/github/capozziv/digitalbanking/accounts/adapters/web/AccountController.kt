@@ -3,11 +3,14 @@ package io.github.capozziv.digitalbanking.accounts.adapters.web
 import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.AccountDTO
 import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.ChangeAccountTypeDTO
 import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.LedgerEntryDTO
+import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.RecipientAccountDTO
 import io.github.capozziv.digitalbanking.accounts.adapters.web.dto.RecordEntryDTO
 import io.github.capozziv.digitalbanking.accounts.application.usecase.ChangeAccountTypeUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.DebitOutcome
 import io.github.capozziv.digitalbanking.accounts.application.usecase.FindEntryByIdempotencyKeyUseCase
+import io.github.capozziv.digitalbanking.accounts.application.usecase.FindRecipientAccountUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.GetAccountUseCase
+import io.github.capozziv.digitalbanking.accounts.application.usecase.GetOwnAccountUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.OpenAccountCommand
 import io.github.capozziv.digitalbanking.accounts.application.usecase.OpenAccountUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.RecordCreditUseCase
@@ -46,6 +49,8 @@ import java.util.UUID
 class AccountController(
     private val openAccount: OpenAccountUseCase,
     private val getAccount: GetAccountUseCase,
+    private val getOwnAccount: GetOwnAccountUseCase,
+    private val findRecipientAccount: FindRecipientAccountUseCase,
     private val recordCredit: RecordCreditUseCase,
     private val recordDebit: RecordDebitUseCase,
     private val findEntryByIdempotencyKey: FindEntryByIdempotencyKeyUseCase,
@@ -66,7 +71,7 @@ class AccountController(
      * caller's own (a customer, or an admin who is also a customer); the `customer` service must report it ACTIVE.
      */
     @Operation(
-        summary = "Open the caller's own account (type FREE, zero balance)",
+        summary = "Open the caller's own account (type FREE; the welcome bonus only on the customer's first account)",
         description =
             "No body: the customer is the `sub` of the token. The `customer` service is asked on every call, " +
                 "retries included, and nothing is written unless it reports the customer ACTIVE.",
@@ -119,6 +124,42 @@ class AccountController(
             ResponseEntity.ok(body)
         }
     }
+
+    @Operation(
+        summary = "Get the caller's own account, the one that is not closed",
+        description = "The customer is the `sub` of the token. Used by the BFF, which does not know the account id.",
+    )
+    @ApiResponses(
+        ApiResponse(
+            responseCode = "200",
+            description = "The account",
+            content = [Content(mediaType = "application/json", schema = Schema(implementation = AccountDTO::class))],
+        ),
+        ApiResponse(responseCode = "404", description = "/problems/account-not-found: the caller has no account that is not closed"),
+    )
+    @GetMapping("/me")
+    fun getOwn(): AccountDTO = AccountDTO.from(getOwnAccount.execute(currentCaller()))
+
+    @Operation(
+        summary = "Find the account that receives a transfer to a customer",
+        description =
+            "Answers only the account id, never the balance or the type. The account is the one of the customer that " +
+                "is not closed (ACTIVE or BLOCKED).",
+    )
+    @ApiResponses(
+        ApiResponse(
+            responseCode = "200",
+            description = "The account id",
+            content = [Content(mediaType = "application/json", schema = Schema(implementation = RecipientAccountDTO::class))],
+        ),
+        ApiResponse(responseCode = "400", description = "/problems/validation-error: customerId is missing or not a UUID"),
+        ApiResponse(responseCode = "404", description = "/problems/account-not-found: the customer has no account that is not closed"),
+    )
+    @GetMapping("/recipient")
+    fun findRecipient(
+        @Parameter(description = "Id of the customer who receives the transfer", required = true)
+        @RequestParam customerId: UUID,
+    ): RecipientAccountDTO = RecipientAccountDTO(findRecipientAccount.execute(customerId))
 
     @Operation(summary = "Get an account with its balance, overdraft limit and available balance")
     @ApiResponses(

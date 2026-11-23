@@ -32,6 +32,14 @@ class InMemoryAccountRepository : AccountRepository {
 
     override fun findById(id: UUID): Account? = accounts[id]
 
+    override fun existsOtherByCustomerId(
+        customerId: UUID,
+        excludingId: UUID,
+    ): Boolean = accounts.values.any { it.customerId == customerId && it.id != excludingId }
+
+    override fun findNotClosedByCustomerId(customerId: UUID): Account? =
+        accounts.values.firstOrNull { it.customerId == customerId && it.status != AccountStatus.CLOSED }
+
     override fun lockById(id: UUID): Account? {
         if (id in busyAccounts) throw AccountBusyException(id)
         return accounts[id]

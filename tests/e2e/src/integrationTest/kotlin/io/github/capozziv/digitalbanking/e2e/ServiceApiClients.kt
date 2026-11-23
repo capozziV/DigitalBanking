@@ -69,9 +69,12 @@ class AccountsApiClient(
 ) {
     private val owners = ConcurrentHashMap<UUID, UUID>()
 
-    /** Registers [customerId] in `customer` (idempotent) and opens an account for them with their own token. */
-    fun openAccount(customerId: UUID = UUID.randomUUID()): UUID {
-        customers.register(customerId)
+    /** Registers [customerId] in `customer` as [name] (idempotent) and opens an account for them with their own token. */
+    fun openAccount(
+        customerId: UUID = UUID.randomUUID(),
+        name: String = CustomerApiClient.DEFAULT_NAME,
+    ): UUID {
+        customers.register(customerId, name)
         val result =
             send("POST", "$baseUrl/accounts", tokens.customer(customerId), headers = mapOf("Idempotency-Key" to newKey()))
         check(result.status == 201) { "open account: ${result.status} ${result.body}" }
@@ -272,6 +275,28 @@ class NotificationApiClient(
         }
     }
 
+    /**
+     * Polls until the notification of [kind] of [customerId] reads [expected] and returns it: the text names the other
+     * party of a transfer once `notification` has consumed their `CustomerRegistered`, which has no order with the
+     * transfer events. Fails with what was seen when the time runs out.
+     */
+    fun awaitBody(
+        customerId: UUID,
+        kind: String,
+        expected: String,
+        timeout: Duration,
+    ): JsonNode {
+        val deadline = Instant.now().plus(timeout)
+        while (true) {
+            val seen = all(customerId).filter { it.get("kind").asString() == kind }
+            seen.singleOrNull()?.takeIf { it.get("body").asString() == expected }?.let { return it }
+            check(Instant.now().isBefore(deadline)) {
+                "$kind of customer $customerId: expected \"$expected\", got ${seen.map { it.get("body").asString() }} after $timeout"
+            }
+            Thread.sleep(POLL.toMillis())
+        }
+    }
+
     private companion object {
         val POLL: Duration = Duration.ofMillis(200)
     }
@@ -379,16 +404,26 @@ class CustomerApiClient(
     private val baseUrl: String,
     private val tokens: TokenIssuer,
 ) {
-    /** Registers [customerId] with fictitious data; `201` the first time, `200` when already registered. */
-    fun register(customerId: UUID) {
+    /** Registers [customerId] as [name] with fictitious data; `201` the first time, `200` when already registered. */
+    fun register(
+        customerId: UUID,
+        name: String = DEFAULT_NAME,
+    ) {
         val result =
             send(
                 "POST",
                 "$baseUrl/customers",
                 tokens.customer(customerId),
-                """{"name":"E2E Customer","email":"e2e-$customerId@example.test"}""",
+                """{"name":"$name","email":"e2e-$customerId@example.test","phone":"${phoneOf(customerId)}"}""",
             )
         check(result.status == 201 || result.status == 200) { "register customer: ${result.status} ${result.body}" }
+    }
+
+    /** Fictitious, unique mobile phone derived from the id: +55 11 9 and eight digits taken from the uuid. */
+    private fun phoneOf(customerId: UUID): String = "+55119" + (customerId.toString().filter { it.isDigit() } + "00000000").take(8)
+
+    companion object {
+        const val DEFAULT_NAME = "E2E Customer"
     }
 
     /** `ACTIVE` or `BLOCKED`, set by an admin. */

@@ -61,6 +61,7 @@ class AccountEventsContractTest {
             override fun put(
                 accountId: UUID,
                 page: StatementPage,
+                version: Long,
             ) = error("not used")
 
             override fun evict(accountId: UUID) {

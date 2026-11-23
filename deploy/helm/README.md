@@ -24,3 +24,6 @@ O chart `db-init/` cria, no RDS privado, o banco, o dono (`<servico>_owner`, do 
 
 ## Propriedades sem placeholder
 `TRANSFERS_ACCOUNTS_URL` (e `TRANSFERS_CUSTOMER_BASE_URL`) funciona por relaxed binding de `transfers.accounts.url`: não há `${...}` no YAML, então o `check-env-vars.sh` não a enxerga. Fica no `env` do `values/transfers.yaml` por convenção.
+
+## App do cliente (web e bff)
+O mesmo chart instala o `web` (Angular em nginx sem root, porta 80, probes em `/`) e o `bff` (NestJS, porta 3000, probes em `/bff/health`). Eles não são Spring: `springProfile: ""` tira o `SPRING_PROFILES_ACTIVE` do ConfigMap, e não têm papel no Pod Identity nem segredo (o `check-service-names.py` os trata à parte). O `web` liga o sysctl `net.ipv4.ip_unprivileged_port_start=0` para escutar na 80 sem root. O `bff` pede `COGNITO_CLIENT_ID` (saída `cognito_bff_client_id`) e `REDIS_URL` (`redis://<redis_endpoint>:6379`) no `requiredEnv`; as URLs dos serviços são os Services do namespace. O `deploy-services.sh` instala o `bff` e depois o `web`, e o `validate.sh` confere as probes contra o `health` do `routes.json`. Os repositórios ECR `web` e `bff` vêm do stack `bootstrap` (`var.services`): reaplique o bootstrap antes do primeiro `aws-up` com o app.

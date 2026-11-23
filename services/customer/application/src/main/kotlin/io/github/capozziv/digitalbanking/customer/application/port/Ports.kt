@@ -1,11 +1,16 @@
 package io.github.capozziv.digitalbanking.customer.application.port
 
+import io.github.capozziv.digitalbanking.customer.application.PhoneAlreadyInUseException
 import io.github.capozziv.digitalbanking.customer.domain.Customer
 import io.github.capozziv.digitalbanking.customer.domain.CustomerEvent
+import io.github.capozziv.digitalbanking.customer.domain.PhoneNumber
 import java.util.UUID
 
 interface CustomerRepository {
-    /** Inserts the customer unless one with the same id exists; true when it was inserted. Never aborts the transaction. */
+    /**
+     * Inserts the customer unless one with the same id exists; true when it was inserted. Throws
+     * [PhoneAlreadyInUseException] when another customer has the phone.
+     */
     fun insertIfAbsent(customer: Customer): Boolean
 
     fun findById(id: UUID): Customer?
@@ -13,7 +18,9 @@ interface CustomerRepository {
     /** Reads the customer taking a row lock until the end of the transaction. */
     fun lockById(id: UUID): Customer?
 
-    /** Writes the status and the update time of an existing customer. */
+    fun findByPhone(phone: PhoneNumber): Customer?
+
+    /** Writes the status, the phone and the update time of an existing customer; throws [PhoneAlreadyInUseException]. */
     fun update(customer: Customer)
 }
 

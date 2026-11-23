@@ -6,6 +6,7 @@ import io.github.capozziv.digitalbanking.customer.application.CustomerNotFoundEx
 import io.github.capozziv.digitalbanking.customer.application.usecase.GetCustomerUseCase
 import io.github.capozziv.digitalbanking.customer.domain.Customer
 import io.github.capozziv.digitalbanking.customer.domain.CustomerStatus
+import io.github.capozziv.digitalbanking.customer.domain.PhoneNumber
 import io.github.capozziv.digitalbanking.observability.ObservabilityAutoConfiguration
 import io.github.capozziv.digitalbanking.security.DigitalBankingSecurityAutoConfiguration
 import io.github.capozziv.digitalbanking.testing.security.JwtTestSupport
@@ -58,7 +59,7 @@ abstract class HttpContractBase {
 
     private fun customer(id: UUID): Customer {
         val status = STATUSES[id] ?: throw CustomerNotFoundException(id)
-        return Customer(id, "Contract Customer", "contract@example.test", status, CREATED_AT, CREATED_AT)
+        return Customer(id, "Contract Customer", "contract@example.test", PhoneNumber("+5511987654321"), status, CREATED_AT, CREATED_AT)
     }
 
     private companion object {

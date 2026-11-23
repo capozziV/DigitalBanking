@@ -1,0 +1,50 @@
+# Valores do BFF (NestJS) para o chart deploy/helm/service.
+# Valores vazios ("") dependem do ambiente e entram na instalacao (--set ou -f), a partir dos outputs do Terraform:
+# image.repository/tag, targetGroupArn, COGNITO_CLIENT_ID (cognito_bff_client_id) e REDIS_URL (redis_endpoint).
+# Nao e um servico Spring: sem perfil e sem acesso a AWS por papel (o login chama a API publica do Cognito com o
+# app client do BFF, que nao tem segredo). Nenhum segredo aqui (o recipientToken e um id aleatorio guardado no Redis).
+name: bff
+port: 3000
+
+image:
+  repository: ""
+  tag: ""
+
+targetGroupArn: ""
+
+springProfile: ""
+
+# Obrigatorios: o chart recusa o render se algum estiver vazio ou ausente.
+requiredEnv:
+  - COGNITO_REGION
+  - COGNITO_CLIENT_ID
+  - REDIS_URL
+
+env:
+  IDENTITY_PROVIDER: cognito
+  COGNITO_CLIENT_ID: ""
+  COGNITO_REGION: sa-east-1
+  # O Redis provisionado (ElastiCache, sem senha, so acessivel de dentro da VPC); o BFF usa o prefixo bff: nas chaves.
+  REDIS_URL: ""
+  # A borda e HTTPS (API Gateway HTTP API): o cookie leva Secure.
+  COOKIE_SECURE: "true"
+  # Services do cluster, no namespace do release (DNS curto do Kubernetes); portas dos values de cada servico.
+  ACCOUNTS_URL: http://accounts:8081
+  TRANSFERS_URL: http://transfers:8082
+  NOTIFICATION_URL: http://notification:8083
+  STATEMENT_URL: http://statement:8084
+  CUSTOMER_URL: http://customer:8085
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+probes:
+  livenessPath: /bff/health
+  readinessPath: /bff/health
+  startup:
+    periodSeconds: 2
+    failureThreshold: 30

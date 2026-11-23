@@ -1,0 +1,19 @@
+meta {
+  name: Conta encerrada nao conta
+  type: http
+  seq: 18
+}
+
+get {
+  url: {{baseUrl}}/accounts/recipient?customerId={{customerId}}
+  body: none
+  auth: inherit
+}
+
+tests {
+  // A conta foi encerrada (17): o cliente nao tem conta para receber nem para consultar.
+  test("404 account-not-found no destinatario", function () {
+    expect(res.status).to.equal(404);
+    expect(res.body.type).to.contain("account-not-found");
+  });
+}

@@ -48,16 +48,47 @@ resource "aws_apigatewayv2_route" "service" {
   authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
 }
 
+locals {
+  public_route_keys = flatten([for prefix in var.public_route_prefixes : ["ANY ${prefix}", "ANY ${prefix}/{proxy+}"]])
+  # Rotas do app (BFF e web): carga de pagina e polling, com limite proprio (route_settings do stage).
+  app_route_keys = concat(local.public_route_keys, ["$default"])
+}
+
+# O BFF (/bff) e o web (/, pela rota padrao) sao publicos: o login e feito pelo BFF, com cookie de sessao.
+# O web e a rota padrao, que so recebe o que nenhuma rota de servico (com JWT) casou.
+resource "aws_apigatewayv2_route" "public" {
+  for_each = toset(local.app_route_keys)
+
+  api_id             = aws_apigatewayv2_api.this.id
+  route_key          = each.value
+  target             = "integrations/${aws_apigatewayv2_integration.alb.id}"
+  authorization_type = "NONE"
+}
+
 resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.this.id
   name        = "$default"
   auto_deploy = true
   tags        = var.tags
 
+  # Limite da API (rotas com JWT).
   default_route_settings {
     throttling_rate_limit  = var.throttling_rate_limit
     throttling_burst_limit = var.throttling_burst_limit
   }
+
+  # Limite do app: $default (estaticos do web) e /bff, que o stage inteiro de 10/20 derrubaria com poucos visitantes.
+  dynamic "route_settings" {
+    for_each = toset(local.app_route_keys)
+
+    content {
+      route_key              = route_settings.value
+      throttling_rate_limit  = var.app_throttling_rate_limit
+      throttling_burst_limit = var.app_throttling_burst_limit
+    }
+  }
+
+  depends_on = [aws_apigatewayv2_route.public, aws_apigatewayv2_route.service]
 
   access_log_settings {
     destination_arn = aws_cloudwatch_log_group.access.arn

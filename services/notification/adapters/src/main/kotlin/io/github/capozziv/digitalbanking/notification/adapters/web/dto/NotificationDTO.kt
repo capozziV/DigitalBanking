@@ -14,6 +14,12 @@ data class NotificationDTO(
     val id: UUID,
     val kind: NotificationKind,
     val title: String,
+    @field:Schema(
+        description =
+            "Text shown to the customer, built when the list is read. A transfer names the other party by their full " +
+                "name (\"outro cliente\" while the name is not known yet), never by account number.",
+        example = "Você recebeu R$ 25,00 de Ana Souza.",
+    )
     val body: String,
     @field:Schema(
         description = "Event details: identifiers as text, amounts in cents as numbers.",

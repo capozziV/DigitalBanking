@@ -34,6 +34,12 @@ variable "route_prefixes" {
   default     = ["/accounts", "/transfers", "/notifications", "/customers", "/admin"]
 }
 
+variable "public_route_prefixes" {
+  description = "Prefixos sem autorizador JWT: o BFF (/bff) autentica pelo cookie de sessao, nao pelo cabecalho Authorization."
+  type        = list(string)
+  default     = ["/bff"]
+}
+
 variable "tags" {
   description = "Tags aplicadas aos recursos."
   type        = map(string)
@@ -50,6 +56,18 @@ variable "throttling_burst_limit" {
   description = "Rajada maxima de requisicoes no stage."
   type        = number
   default     = 20
+}
+
+variable "app_throttling_rate_limit" {
+  description = "Requisicoes por segundo nas rotas do app ($default e /bff). Conta: 10 visitantes simultaneos x ~12 requisicoes de carga (index, JS, CSS, chunks, /bff), mais o polling de 1 req/s por transferencia e o do sininho (30 s), dao ~15 req/s sustentados; 50 deixa folga."
+  type        = number
+  default     = 50
+}
+
+variable "app_throttling_burst_limit" {
+  description = "Rajada maxima nas rotas do app. Conta: 10 visitantes abrindo o app juntos fazem ~120 requisicoes de carga na mesma rajada; 150 cobre com folga."
+  type        = number
+  default     = 150
 }
 
 variable "access_log_retention_days" {

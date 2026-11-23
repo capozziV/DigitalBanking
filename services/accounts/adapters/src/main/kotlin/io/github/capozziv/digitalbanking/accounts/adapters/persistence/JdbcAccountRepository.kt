@@ -59,6 +59,25 @@ class JdbcAccountRepository(
             .optional()
             .orElse(null)
 
+    override fun existsOtherByCustomerId(
+        customerId: UUID,
+        excludingId: UUID,
+    ): Boolean =
+        jdbcClient
+            .sql("select exists (select 1 from account where customer_id = :customerId and id <> :excludingId)")
+            .param("customerId", customerId)
+            .param("excludingId", excludingId)
+            .query(Boolean::class.java)
+            .single()
+
+    override fun findNotClosedByCustomerId(customerId: UUID): Account? =
+        jdbcClient
+            .sql("select id, customer_id, type, status from account where customer_id = :customerId and status <> 'CLOSED'")
+            .param("customerId", customerId)
+            .query(ACCOUNT_ROW_MAPPER)
+            .optional()
+            .orElse(null)
+
     override fun lockById(id: UUID): Account? {
         // SET does not take bind parameters; the value is a number of milliseconds, never user input.
         jdbcClient.sql("set local lock_timeout = '${lockTimeout.toMillis()}ms'").update()

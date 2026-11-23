@@ -1,6 +1,6 @@
 name: aws-up
 
-# Sobe o ambiente efemero na AWS (ADR 0019): terraform apply do envs/aws, imagens no ECR, db-init e os cinco
+# Sobe o ambiente efemero na AWS (ADR 0019): terraform apply do envs/aws, imagens no ECR (sete: cinco servicos, web e bff), db-init e os cinco
 # servicos no EKS, dono no Cognito, seed e smoke contra a borda. Manual e so da main (a trust do papel aceita so
 # repo:capozziV/DigitalBanking:ref:refs/heads/main). O aws-reaper derruba 8 h depois da etiqueta created-at.
 # Configuracao do repositorio (Settings > Secrets and variables > Actions), nunca versionada:
@@ -9,6 +9,8 @@ name: aws-up
 #   vars.COGNITO_DOMAIN_PREFIX   prefixo do dominio do Cognito, unico na regiao
 #   vars.OWNER_EMAIL             e-mail do usuario do dono no Cognito (opcional; padrao owner@example.test)
 #   secrets.OWNER_PASSWORD       senha do dono no Cognito (12+ caracteres, maiuscula, minuscula, numero e simbolo)
+#   secrets.DEMO_PASSWORD        senha do usuario de demonstracao (exatamente 6 digitos, ADR 0024)
+#   vars.DEMO_EMAIL, vars.DEMO_PHONE  e-mail e telefone E.164 do usuario de demonstracao (opcionais; padroes do seed)
 on:
   workflow_dispatch:
 
@@ -41,9 +43,10 @@ jobs:
           TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
           COGNITO_DOMAIN_PREFIX: ${{ vars.COGNITO_DOMAIN_PREFIX }}
           OWNER_PASSWORD: ${{ secrets.OWNER_PASSWORD }}
+          DEMO_PASSWORD: ${{ secrets.DEMO_PASSWORD }}
         run: |
           missing=()
-          for name in AWS_ROLE_ARN TF_STATE_BUCKET COGNITO_DOMAIN_PREFIX OWNER_PASSWORD; do
+          for name in AWS_ROLE_ARN TF_STATE_BUCKET COGNITO_DOMAIN_PREFIX OWNER_PASSWORD DEMO_PASSWORD; do
             [ -n "${!name}" ] || missing+=("$name")
           done
           if [ "${#missing[@]}" -gt 0 ]; then
@@ -57,7 +60,7 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
-      - name: Construir os jars e as cinco imagens
+      - name: Construir os jars e as sete imagens (cinco servicos, web e bff)
         run: |
           tasks=()
           for service in customer accounts transfers notification statement; do
@@ -66,6 +69,10 @@ jobs:
           ./gradlew "${tasks[@]}"
           for service in customer accounts transfers notification statement; do
             docker build -t "digitalbanking/$service:$IMAGE_TAG" "services/$service"
+          done
+          # O app do cliente (etapa 9): contexto frontend/, sem jar.
+          for app in web bff; do
+            docker build -f "frontend/$app/Dockerfile" -t "digitalbanking/$app:$IMAGE_TAG" frontend
           done
 
       - uses: ./.github/actions/aws-tools
@@ -138,7 +145,7 @@ jobs:
       - name: Publicar as imagens no ECR
         run: |
           aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
-          for service in customer accounts transfers notification statement; do
+          for service in customer accounts transfers notification statement web bff; do
             if aws ecr describe-images --region "$AWS_REGION" --repository-name "digital-banking/$service" \
               --image-ids "imageTag=$IMAGE_TAG" > /dev/null 2>&1; then
               echo "$service:$IMAGE_TAG ja esta no ECR"
@@ -152,8 +159,9 @@ jobs:
         run: aws eks update-kubeconfig --region "$AWS_REGION" --name "$CLUSTER_NAME"
 
       # db-init antes dos servicos (o helm espera o Job e o script confere status.succeeded), Secrets a partir do
-      # Secrets Manager e os cinco servicos no namespace digitalbanking, sem ARN de papel (Pod Identity).
-      - name: Instalar o db-init e os cinco servicos
+      # Secrets Manager, os cinco servicos e o app (bff, depois web) no namespace digitalbanking, sem ARN de papel
+      # (Pod Identity). O bff usa o app client do Cognito (cognito_bff_client_id) e o Redis provisionado.
+      - name: Instalar o db-init, os cinco servicos, o bff e o web
         run: infra/aws/deploy-services.sh "$TF_OUTPUTS" "$ECR_REGISTRY" "$IMAGE_TAG"
 
       - name: Credenciais da AWS (OIDC) para o seed e o smoke
@@ -163,11 +171,15 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           role-session-name: aws-up-smoke-${{ github.run_id }}
 
-      # Dono no grupo admin do Cognito, token por AdminInitiateAuth; duas execucoes comparadas (idempotencia).
-      - name: Seed do dono pela borda
+      # Dono no grupo admin do Cognito, token por AdminInitiateAuth; depois o usuario de demonstracao (AdminCreateUser e
+      # AdminSetUserPassword com a senha do segredo). Duas execucoes comparadas (idempotencia).
+      - name: Seed do dono e do usuario de demonstracao pela borda
         env:
           OWNER_PASSWORD: ${{ secrets.OWNER_PASSWORD }}
           OWNER_EMAIL: ${{ vars.OWNER_EMAIL }}
+          DEMO_PASSWORD: ${{ secrets.DEMO_PASSWORD }}
+          DEMO_EMAIL: ${{ vars.DEMO_EMAIL }}
+          DEMO_PHONE: ${{ vars.DEMO_PHONE }}
         run: bash infra/local/seed-check.sh --remote "$EDGE_URL"
 
       - name: Smoke pela borda

@@ -27,9 +27,14 @@ import java.time.Instant
  * `transfers` get their machine tokens from it), the five services as `java -jar` processes, and [AccountsProxy]
  * between `transfers` and `accounts`. The API clients get their tokens from [tokens].
  *
+ * [welcomeBonusCents] is the welcome bonus of `accounts` (`accounts.welcome-bonus.amount`); it is off (0) by default so
+ * the scenarios start from a zero balance, and the tests about the bonus turn it on.
+ *
  * The saga runs with short times (see [SAGA_ARGUMENTS]) so the deadline and lease scenarios take seconds, not minutes.
  */
-class EndToEndEnvironment : AutoCloseable {
+class EndToEndEnvironment(
+    private val welcomeBonusCents: Long = 0,
+) : AutoCloseable {
     private val postgres: PostgreSQLContainer =
         PostgreSQLContainer(POSTGRES_IMAGE)
             .withEnv(DATABASE_PASSWORDS)
@@ -175,6 +180,7 @@ class EndToEndEnvironment : AutoCloseable {
 
     private fun accountsEnvironment(transfersPort: Int) =
         mapOf(
+            "ACCOUNTS_WELCOME_BONUS_AMOUNT" to welcomeBonusCents.toString(),
             "ACCOUNTS_DB_URL" to jdbcUrl("accounts"),
             "ACCOUNTS_DB_USER" to "accounts_app",
             "ACCOUNTS_DB_PASSWORD" to DATABASE_PASSWORDS.getValue("ACCOUNTS_DB_PASSWORD"),

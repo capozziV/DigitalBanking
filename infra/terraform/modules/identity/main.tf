@@ -4,12 +4,25 @@ resource "aws_cognito_user_pool" "this" {
   auto_verified_attributes = ["email"]
   deletion_protection      = "INACTIVE" # ambiente efemero, destruido por terraform destroy
 
+  # Senha de 6 digitos de proposito: banco simulado, sem dinheiro nem dados reais (spec da etapa 9). O Cognito
+  # exige minimo 6; a regra de "so digitos" e do BFF e da tela. O bloqueio por tentativas erradas do Cognito
+  # segue ligado (nao ha como desligar).
   password_policy {
-    minimum_length    = 12
-    require_lowercase = true
-    require_uppercase = true
-    require_numbers   = true
-    require_symbols   = true
+    minimum_length    = 6
+    require_lowercase = false
+    require_uppercase = false
+    require_numbers   = false
+    require_symbols   = false
+  }
+
+  # Autocadastro pela API (SignUp), com codigo por e-mail. E-mail padrao do Cognito (sem SES): limite diario baixo,
+  # suficiente para a demonstracao.
+  admin_create_user_config {
+    allow_admin_create_user_only = false
+  }
+
+  email_configuration {
+    email_sending_account = "COGNITO_DEFAULT"
   }
 
   tags = var.tags
@@ -47,6 +60,16 @@ resource "aws_cognito_user_pool_client" "web" {
   logout_urls                          = var.web_logout_urls
   explicit_auth_flows                  = ["ALLOW_REFRESH_TOKEN_AUTH"]
   prevent_user_existence_errors        = "ENABLED"
+}
+
+# App client do BFF: login pela API (USER_PASSWORD_AUTH) e refresh, sem segredo e sem OAuth. O client web nao muda.
+resource "aws_cognito_user_pool_client" "bff" {
+  name         = "${var.name}-bff"
+  user_pool_id = aws_cognito_user_pool.this.id
+
+  generate_secret               = false
+  explicit_auth_flows           = ["ALLOW_USER_PASSWORD_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"]
+  prevent_user_existence_errors = "ENABLED"
 }
 
 # App client de maquina: client credentials com o escopo internal. O segredo fica no estado do Terraform

@@ -60,8 +60,8 @@ class NotificationEndToEndIntegrationTest {
         val account = accounts.openAccount(customer)
 
         val welcome = notifications.awaitKinds(customer, listOf("WELCOME"), NOTIFICATION_TIMEOUT).single()
-        assertThat(welcome.get("title").asString()).isEqualTo("Bem-vindo ao banco!")
-        assertThat(welcome.get("body").asString()).contains("Free").contains(account.toString())
+        assertThat(welcome.get("title").asString()).isEqualTo("Bem-vindo ao capzzPay!")
+        assertThat(welcome.get("body").asString()).contains("Free").doesNotContain(account.toString())
         assertThat(welcome.get("data").get("accountId").asString()).isEqualTo(account.toString())
     }
 
@@ -80,8 +80,8 @@ class NotificationEndToEndIntegrationTest {
     @Test
     @Order(3)
     fun `a completed transfer notifies sender and receiver once, even when its event is delivered 20 more times`() {
-        val (sender, source) = welcomedAccount()
-        val (receiver, destination) = welcomedAccount()
+        val (sender, source) = welcomedAccount("Ana Souza")
+        val (receiver, destination) = welcomedAccount("Bruno Lima")
         accounts.credit(source, 1_000)
         val key = UUID.randomUUID().toString()
 
@@ -91,13 +91,20 @@ class NotificationEndToEndIntegrationTest {
         assertThat(transfers.awaitTerminal(id, SAGA_FINISH_TIMEOUT)).isEqualTo("COMPLETED")
         val sent = notifications.awaitKinds(sender, listOf("WELCOME", "TRANSFER_SENT"), NOTIFICATION_TIMEOUT)
         val received = notifications.awaitKinds(receiver, listOf("WELCOME", "TRANSFER_RECEIVED"), NOTIFICATION_TIMEOUT)
-        val sentNotification = sent.single { it.get("kind").asString() == "TRANSFER_SENT" }
-        assertThat(sentNotification.get("body").asString()).isEqualTo("Você enviou R$ 3,00 para a conta $destination.")
+        assertThat(sent.map { it.get("body").asString() }).noneMatch { destination.toString() in it }
+        // The name of the other party, never their account.
+        val sentNotification =
+            notifications.awaitBody(
+                sender,
+                "TRANSFER_SENT",
+                "Você enviou R$ 3,00 para Bruno Lima.",
+                NOTIFICATION_TIMEOUT,
+            )
         // Amounts in cents are JSON numbers in data, not strings.
         assertThat(sentNotification.get("data").get("amountCents").isIntegralNumber).isTrue()
         assertThat(sentNotification.get("data").get("amountCents").asLong()).isEqualTo(300L)
-        assertThat(received.single { it.get("kind").asString() == "TRANSFER_RECEIVED" }.get("body").asString())
-            .isEqualTo("Você recebeu R$ 3,00 da conta $source.")
+        assertThat(received.map { it.get("body").asString() }).noneMatch { source.toString() in it }
+        notifications.awaitBody(receiver, "TRANSFER_RECEIVED", "Você recebeu R$ 3,00 de Ana Souza.", NOTIFICATION_TIMEOUT)
 
         // The published event, as the outbox relay sent it, delivered 20 more times with new deduplication ids.
         val event = environment.transferEvents.awaitMessage(id, "TransferCompleted", EVENTS_TIMEOUT)
@@ -133,18 +140,19 @@ class NotificationEndToEndIntegrationTest {
     @Order(5)
     fun `a refused transfer notifies the sender that nothing left the account`() {
         val (sender, source) = welcomedAccount()
-        val (receiver, destination) = welcomedAccount()
+        val (receiver, destination) = welcomedAccount("Carla Dias")
 
         val response = transfers.requestTransfer(source, destination, 500)
 
         assertThat(response.status).describedAs(response.body).isEqualTo(422)
         assertThat(transfers.awaitTerminal(response.transferId(), SAGA_FINISH_TIMEOUT)).isEqualTo("FAILED")
-        val failed = notifications.awaitKinds(sender, listOf("WELCOME", "TRANSFER_FAILED"), NOTIFICATION_TIMEOUT)
-        assertThat(failed.single { it.get("kind").asString() == "TRANSFER_FAILED" }.get("body").asString())
-            .isEqualTo(
-                "Sua transferência de R$ 5,00 para a conta $destination foi recusada: saldo disponível insuficiente. " +
-                    "Nenhum valor saiu da sua conta.",
-            )
+        notifications.awaitKinds(sender, listOf("WELCOME", "TRANSFER_FAILED"), NOTIFICATION_TIMEOUT)
+        notifications.awaitBody(
+            sender,
+            "TRANSFER_FAILED",
+            "Sua transferência de R$ 5,00 para Carla Dias foi recusada: saldo disponível insuficiente. Nenhum valor saiu da sua conta.",
+            NOTIFICATION_TIMEOUT,
+        )
         assertThat(notifications.all(receiver).map { it.get("kind").asString() }).containsExactly("WELCOME")
     }
 
@@ -152,7 +160,7 @@ class NotificationEndToEndIntegrationTest {
     @Order(6)
     fun `a compensated transfer notifies the sender that the money came back`() {
         val (sender, source) = welcomedAccount()
-        val (receiver, destination) = welcomedAccount()
+        val (receiver, destination) = welcomedAccount("Davi Rocha")
         accounts.credit(source, 1_000)
 
         // As in the saga tests: the credit is held, accounts stops, and comes back only after the deadline.
@@ -167,12 +175,14 @@ class NotificationEndToEndIntegrationTest {
         environment.accounts.start()
 
         assertThat(transfers.awaitTerminal(id, SAGA_FINISH_TIMEOUT)).isEqualTo("COMPENSATED")
-        val compensated = notifications.awaitKinds(sender, listOf("WELCOME", "TRANSFER_COMPENSATED"), NOTIFICATION_TIMEOUT)
-        assertThat(compensated.single { it.get("kind").asString() == "TRANSFER_COMPENSATED" }.get("body").asString())
-            .isEqualTo(
-                "Sua transferência de R$ 3,00 para a conta $destination não pôde ser concluída: " +
-                    "não foi possível confirmar o crédito na conta de destino. O valor voltou para a sua conta.",
-            )
+        notifications.awaitKinds(sender, listOf("WELCOME", "TRANSFER_COMPENSATED"), NOTIFICATION_TIMEOUT)
+        notifications.awaitBody(
+            sender,
+            "TRANSFER_COMPENSATED",
+            "Sua transferência de R$ 3,00 para Davi Rocha não pôde ser concluída: " +
+                "não foi possível confirmar o crédito na conta de destino. O valor voltou para a sua conta.",
+            NOTIFICATION_TIMEOUT,
+        )
         assertThat(notifications.all(receiver).map { it.get("kind").asString() }).containsExactly("WELCOME")
     }
 
@@ -226,9 +236,9 @@ class NotificationEndToEndIntegrationTest {
     }
 
     /** A new customer and account whose welcome notification has arrived, so `notification` knows the account. */
-    private fun welcomedAccount(): Pair<UUID, UUID> {
+    private fun welcomedAccount(name: String = CustomerApiClient.DEFAULT_NAME): Pair<UUID, UUID> {
         val customer = UUID.randomUUID()
-        val account = accounts.openAccount(customer)
+        val account = accounts.openAccount(customer, name)
         notifications.awaitKinds(customer, listOf("WELCOME"), NOTIFICATION_TIMEOUT)
         return customer to account
     }

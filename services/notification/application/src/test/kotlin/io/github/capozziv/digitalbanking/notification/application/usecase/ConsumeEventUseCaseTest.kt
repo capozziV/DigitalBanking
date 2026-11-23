@@ -3,6 +3,7 @@ package io.github.capozziv.digitalbanking.notification.application.usecase
 import io.github.capozziv.digitalbanking.notification.application.ReceivedEvent
 import io.github.capozziv.digitalbanking.notification.application.UnknownAccountException
 import io.github.capozziv.digitalbanking.notification.application.fake.ImmediateTransactionRunner
+import io.github.capozziv.digitalbanking.notification.application.fake.InMemoryCustomerNameRepository
 import io.github.capozziv.digitalbanking.notification.application.fake.InMemoryKnownAccountRepository
 import io.github.capozziv.digitalbanking.notification.application.fake.InMemoryNotificationRepository
 import io.github.capozziv.digitalbanking.notification.application.fake.InMemoryProcessedEventRepository
@@ -26,8 +27,9 @@ class ConsumeEventUseCaseTest {
     private val processed = InMemoryProcessedEventRepository(transactions)
     private val accounts = InMemoryKnownAccountRepository(transactions)
     private val notifications = InMemoryNotificationRepository(transactions)
+    private val names = InMemoryCustomerNameRepository(transactions, accounts)
     private val useCase =
-        ConsumeEventUseCase(processed, accounts, notifications, transactions, SequentialIdGenerator(), MutableClock(now))
+        ConsumeEventUseCase(processed, accounts, names, notifications, transactions, SequentialIdGenerator(), MutableClock(now))
 
     private val alice = UUID.randomUUID()
     private val bob = UUID.randomUUID()
@@ -44,7 +46,7 @@ class ConsumeEventUseCaseTest {
         assertThat(outcome).isEqualTo(ConsumeOutcome.PROCESSED)
         assertThat(accounts.customerOf(aliceAccount)).isEqualTo(alice)
         val welcome = notifications.all.single()
-        val expected = NotificationText.welcome("GOLD", aliceAccount)
+        val expected = NotificationText.welcome("GOLD")
         assertThat(welcome.customerId).isEqualTo(alice)
         assertThat(welcome.kind).isEqualTo(NotificationKind.WELCOME)
         assertThat(welcome.title).isEqualTo(expected.title)
@@ -55,6 +57,38 @@ class ConsumeEventUseCaseTest {
         assertThat(welcome.data).containsEntry("accountId", aliceAccount.toString()).containsEntry("accountType", "GOLD")
         assertThat(processed.processed).containsEntry(event.eventId, "AccountOpened")
         assertThat(transactions.transactions).isEqualTo(1)
+    }
+
+    @Test
+    fun `customer registered keeps the name of the customer and notifies nobody`() {
+        accounts.owners[aliceAccount] = alice
+        val event = ReceivedEvent.CustomerRegistered(UUID.randomUUID(), alice, "Ana Souza")
+
+        val outcome = useCase.execute(event)
+
+        assertThat(outcome).isEqualTo(ConsumeOutcome.PROCESSED)
+        assertThat(names.names).containsExactlyEntriesOf(mapOf(alice to "Ana Souza"))
+        assertThat(names.namesOfAccountOwners(setOf(aliceAccount))).isEqualTo(mapOf(aliceAccount to "Ana Souza"))
+        assertThat(notifications.all).isEmpty()
+        assertThat(processed.processed).containsEntry(event.eventId, "CustomerRegistered")
+    }
+
+    @Test
+    fun `customer registered delivered again is a duplicate`() {
+        val event = ReceivedEvent.CustomerRegistered(UUID.randomUUID(), alice, "Ana Souza")
+        useCase.execute(event)
+
+        assertThat(useCase.execute(event.copy(name = "changed"))).isEqualTo(ConsumeOutcome.DUPLICATE)
+        assertThat(names.names[alice]).isEqualTo("Ana Souza")
+    }
+
+    @Test
+    fun `another registration of the same customer replaces the name`() {
+        useCase.execute(ReceivedEvent.CustomerRegistered(UUID.randomUUID(), alice, "Ana Souza"))
+
+        useCase.execute(ReceivedEvent.CustomerRegistered(UUID.randomUUID(), alice, "Ana Souza Lima"))
+
+        assertThat(names.names).containsExactlyEntriesOf(mapOf(alice to "Ana Souza Lima"))
     }
 
     @Test
@@ -79,12 +113,12 @@ class ConsumeEventUseCaseTest {
         val sent = notifications.all.single { it.kind == NotificationKind.TRANSFER_SENT }
         val received = notifications.all.single { it.kind == NotificationKind.TRANSFER_RECEIVED }
         assertThat(sent.customerId).isEqualTo(alice)
-        assertThat(sent.body).isEqualTo(NotificationText.transferSent(12_345, bobAccount).body)
+        assertThat(sent.body).isEqualTo(NotificationText.transferSent(12_345, null).body)
         assertThat(sent.data)
             .containsEntry("transferId", event.transferId.toString())
             .containsEntry("amountCents", 12_345L)
         assertThat(received.customerId).isEqualTo(bob)
-        assertThat(received.body).isEqualTo(NotificationText.transferReceived(12_345, aliceAccount).body)
+        assertThat(received.body).isEqualTo(NotificationText.transferReceived(12_345, null).body)
         assertThat(sent.sourceEventId).isEqualTo(event.eventId)
         assertThat(received.sourceEventId).isEqualTo(event.eventId)
     }
@@ -121,7 +155,7 @@ class ConsumeEventUseCaseTest {
         assertThat(failed.customerId).isEqualTo(alice)
         assertThat(failed.kind).isEqualTo(NotificationKind.TRANSFER_FAILED)
         assertThat(failed.body)
-            .isEqualTo(NotificationText.transferFailed(700, bobAccount, "insufficient-available-balance").body)
+            .isEqualTo(NotificationText.transferFailed(700, null, "insufficient-available-balance").body)
         assertThat(failed.data).containsEntry("reason", "insufficient-available-balance")
     }
 
@@ -135,7 +169,7 @@ class ConsumeEventUseCaseTest {
         val compensated = notifications.all.single { it.sourceEventId == event.eventId }
         assertThat(compensated.customerId).isEqualTo(alice)
         assertThat(compensated.kind).isEqualTo(NotificationKind.TRANSFER_COMPENSATED)
-        assertThat(compensated.body).isEqualTo(NotificationText.transferCompensated(900, bobAccount).body)
+        assertThat(compensated.body).isEqualTo(NotificationText.transferCompensated(900, null).body)
     }
 
     @Test
@@ -146,7 +180,7 @@ class ConsumeEventUseCaseTest {
         useCase.execute(event)
 
         val compensated = notifications.all.single { it.sourceEventId == event.eventId }
-        assertThat(compensated.body).isEqualTo(NotificationText.transferCompensated(900, bobAccount, "account-closed").body)
+        assertThat(compensated.body).isEqualTo(NotificationText.transferCompensated(900, null, "account-closed").body)
         assertThat(compensated.body).contains("encerrada")
         assertThat(compensated.data).containsEntry("reason", "account-closed")
     }
@@ -244,7 +278,7 @@ class ConsumeEventUseCaseTest {
         eventType: String,
         newEvent: (UUID, UUID, UUID) -> ReceivedEvent,
         kind: NotificationKind,
-        text: (UUID) -> NotificationContent,
+        text: () -> NotificationContent,
     ) {
         // The customer comes from the payload: the account does not need to be known here.
         val event = newEvent(UUID.randomUUID(), aliceAccount, alice)
@@ -255,8 +289,8 @@ class ConsumeEventUseCaseTest {
         val notification = notifications.all.single()
         assertThat(notification.customerId).isEqualTo(alice)
         assertThat(notification.kind).isEqualTo(kind)
-        assertThat(notification.title).isEqualTo(text(aliceAccount).title)
-        assertThat(notification.body).isEqualTo(text(aliceAccount).body)
+        assertThat(notification.title).isEqualTo(text().title)
+        assertThat(notification.body).isEqualTo(text().body)
         assertThat(notification.sourceEventId).isEqualTo(event.eventId)
         assertThat(notification.data).containsEntry("accountId", aliceAccount.toString())
         assertThat(processed.processed).containsEntry(event.eventId, eventType)
@@ -298,19 +332,19 @@ class ConsumeEventUseCaseTest {
                     "AccountBlocked",
                     { e: UUID, a: UUID, c: UUID -> ReceivedEvent.AccountBlocked(e, a, c) },
                     NotificationKind.ACCOUNT_BLOCKED,
-                    { a: UUID -> NotificationText.accountBlocked(a) },
+                    { NotificationText.accountBlocked() },
                 ),
                 Arguments.of(
                     "AccountUnblocked",
                     { e: UUID, a: UUID, c: UUID -> ReceivedEvent.AccountUnblocked(e, a, c) },
                     NotificationKind.ACCOUNT_UNBLOCKED,
-                    { a: UUID -> NotificationText.accountUnblocked(a) },
+                    { NotificationText.accountUnblocked() },
                 ),
                 Arguments.of(
                     "AccountClosed",
                     { e: UUID, a: UUID, c: UUID -> ReceivedEvent.AccountClosed(e, a, c) },
                     NotificationKind.ACCOUNT_CLOSED,
-                    { a: UUID -> NotificationText.accountClosed(a) },
+                    { NotificationText.accountClosed() },
                 ),
             )
     }

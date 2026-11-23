@@ -2,14 +2,44 @@
 
 > Resumo do projeto, atualizado pela coordenadora ao fim de cada tarefa. Tasks, débito técnico, decisões pendentes e tarefas do usuário ficam no board.
 
-**Última atualização:** 2026-11-19
+**Última atualização:** 2026-11-22
 **Board:** [Digital Banking no GitHub Projects](https://github.com/users/capozziV/projects/2)
-**Fase atual:** etapa 8 (acabamento) concluída na branch `etapa-8-acabamento`, com revisão final aprovada; PR para a `main`. Spec da etapa 9 (frontend) escrita, aguardando aprovação do usuário.
-**Próximo passo:** merge da etapa 8 com o `ci-ok` verde; aprovação da spec da etapa 9 ([spec](superpowers/specs/2026-11-19-etapa-9-frontend-design.md)) e, depois, o plano. A subida real na AWS (Task 10, cartão #182) é do usuário.
+**Fase atual:** etapa 9 (frontend do capzzPay) com revisão final **aprovada** em `fa05405` (3 Critical e 11 Important fechados), PR [#240](https://github.com/capozziV/DigitalBanking/pull/240) para a `main`. Etapa 8 na `main` (PR #205).
+**Próximo passo:** merge do #240 com o `ci-ok` verde no último commit; depois o PR do DynamoDB Local (`debito/dynamodb-local`, em revisão) com a migração da stack do usuário, e o #239 (retentativa de 1 hora).
 
-## Em andamento
-- **PR #203** (#194, timeout do customer no e2e): aprovado pela Beatriz; merge quando o `ci-ok` passar.
-- **Etapa 9:** decisões do usuário registradas na spec (cliente só, visual off-white preto e branco, menu lateral, login e cadastro próprios com senha de 6 dígitos, bônus de R$ 100, usuário de demonstração, telefone verificado como chave de transferência com SMS simulado). Backlog: telas de admin (#201), observabilidade (#202), SMS real (#204).
+## Handoff da etapa 9 (2026-11-22)
+O checkout principal está na `main` 132 commits atrás e com um `docs/status.md` antigo: vale este arquivo, no worktree da etapa. Há mudanças não commitadas no checkout principal (memória de agentes, grafo) e em cerca de 35 worktrees: não descarte sem olhar.
+
+### Decisões do usuário em 2026-11-22
+- Tarefa: #232, #233, #229 e o sininho (#102) neste PR, depois a rodada final até o merge. Tudo em paralelo, sem validar com ele o que não tiver dúvida.
+- **#231:** os commits novos seguem com o e-mail atual por enquanto; o cartão fica aberto. Não ligar o bloqueio de push com e-mail no GitHub enquanto isso.
+- Stack `capzzpay`: pode atualizar com backup (em `.superpowers/backups/`), recriando só os serviços alterados com `--no-deps`, sem tocar em volumes nem no LocalStack, que não tem `PERSISTENCE`.
+
+### Verificação da etapa 9
+- Build completo 1617 testes, 0 falhas, 0 pulados (`56e8f16`); no commit aprovado, web 224 e BFF 324 testes; CI do PR com os 17 jobs verdes em `789201c`.
+- Seed, smoke, as cinco coleções Bruno e o Playwright rodados numa stack isolada.
+- Nunca rodados: `seed.sh --remote`, Cognito real e a subida na AWS (#182).
+
+### Depois do merge
+- #241 (retentativa em outra aba duplica): pergunta ao usuário sem resposta; incluir em "Em aberto" da arquitetura como `Decision`.
+- `.claude/agents/dev-frontend.md:13` ensina a regra antiga da chave de transferência: corrigir só com o aval do usuário (perguntado, sem resposta).
+- Docs sem prazo: plano da etapa 9 linhas 29 e 181, guia linha 141 ("cinco imagens").
+- Antes de qualquer `up` com o compose do DynamoDB Local na stack `capzzpay`, copiar o extrato: o compose novo recria o LocalStack e apaga a origem.
+
+### Pendências
+- Débito: #222, #223, #225, #230, #236 (menores da revisão final), #238 e #241.
+- #237 (um bônus por cliente, ADR 0026): revisado e juntado na branch da etapa.
+- #234: dados reparados em 2026-11-22. Prevenção aprovada (DynamoDB Local com volume, ADR 0027) em `debito/dynamodb-local` e `debito/dynamodb-local-adr`, PR próprio depois da etapa 9; depois, migrar a stack do usuário com backup (até lá, sem `compose down`).
+- #239 decidido: só a retentativa de 1 hora do `statement` (sem alarme, sem retenção maior, sem backup); PR pequeno depois de `debito/dynamodb-local`, que mexe nos mesmos arquivos, e antes do #182. #117 cancelado pelo usuário.
+- Tarefas do usuário: #219 (reaplicar o `bootstrap`) e #224 (segredo `DEMO_PASSWORD`) antes do `aws-up`; #182 (subida real na AWS).
+- Decisões do usuário: o banco se chama **capzzPay** (pacotes e repositório seguem `digitalbanking`); rodapé "© 2026 capzz.labs"; "Notificações" no lugar de "Avisos"; nome da pessoa, e não id de conta, nas notificações.
+
+### Ambiente que ficou de pé
+- Projeto compose `capzzpay` em `http://127.0.0.1`, imagens `etapa9` do commit `f546bf3`, com dados do usuário nos volumes (não apague sem perguntar). Credenciais do demo no `infra/local/.env` do worktree.
+- O `up` usa `MOCK_OAUTH2_HOST=mock-oauth2-server:8080 IMAGE_TAG=etapa9`, `-p capzzpay` e `--profile apps`.
+- Nesse `.env`, `LOCALSTACK_AUTH_TOKEN` ficou vazio.
+- O projeto `local` antigo foi derrubado com autorização do usuário.
+- As capturas em `telas/` estão fora do git.
 
 ## Como usar o board
 - Colunas: **Backlog** (pendência sem resposta, ou etapa anterior fora de Done), **Ready** (sem pendência e etapa anterior em Done), **In progress**, **In review** (revisão da Beatriz) e **Done** (revisado, build, testes e lint verdes, merge feito).

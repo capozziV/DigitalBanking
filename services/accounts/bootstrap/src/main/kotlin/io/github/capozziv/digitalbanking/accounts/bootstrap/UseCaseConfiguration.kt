@@ -13,11 +13,15 @@ import io.github.capozziv.digitalbanking.accounts.application.usecase.ChangeAcco
 import io.github.capozziv.digitalbanking.accounts.application.usecase.ChangeOverdraftLimitUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.CloseAccountUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.FindEntryByIdempotencyKeyUseCase
+import io.github.capozziv.digitalbanking.accounts.application.usecase.FindRecipientAccountUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.GetAccountUseCase
+import io.github.capozziv.digitalbanking.accounts.application.usecase.GetOwnAccountUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.ListAccountTypesUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.OpenAccountUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.RecordCreditUseCase
 import io.github.capozziv.digitalbanking.accounts.application.usecase.RecordDebitUseCase
+import io.github.capozziv.digitalbanking.accounts.domain.Money
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import java.time.Clock
@@ -42,7 +46,9 @@ class UseCaseConfiguration {
         tx: TransactionRunner,
         ids: IdGenerator,
         customers: CustomerGateway,
-    ) = OpenAccountUseCase(accounts, entries, types, outbox, tx, ids, customers)
+        clock: Clock,
+        @Value("\${accounts.welcome-bonus.amount:10000}") welcomeBonusCents: Long,
+    ) = OpenAccountUseCase(accounts, entries, types, outbox, tx, ids, customers, welcomeBonusOf(welcomeBonusCents), clock)
 
     @Bean
     fun getAccountUseCase(
@@ -51,6 +57,20 @@ class UseCaseConfiguration {
         types: AccountTypeRepository,
         tx: TransactionRunner,
     ) = GetAccountUseCase(accounts, entries, types, tx)
+
+    @Bean
+    fun getOwnAccountUseCase(
+        accounts: AccountRepository,
+        entries: LedgerEntryRepository,
+        types: AccountTypeRepository,
+        tx: TransactionRunner,
+    ) = GetOwnAccountUseCase(accounts, entries, types, tx)
+
+    @Bean
+    fun findRecipientAccountUseCase(
+        accounts: AccountRepository,
+        tx: TransactionRunner,
+    ) = FindRecipientAccountUseCase(accounts, tx)
 
     @Bean
     fun findEntryByIdempotencyKeyUseCase(
@@ -118,4 +138,10 @@ class UseCaseConfiguration {
         tx: TransactionRunner,
         clock: Clock,
     ) = ChangeOverdraftLimitUseCase(types, tx, clock)
+}
+
+/** Welcome bonus in cents from `accounts.welcome-bonus.amount`: 0 turns it off, a negative value fails the startup. */
+internal fun welcomeBonusOf(cents: Long): Money? {
+    require(cents >= 0) { "accounts.welcome-bonus.amount must not be negative, was $cents" }
+    return cents.takeIf { it > 0 }?.let(::Money)
 }

@@ -3,16 +3,16 @@
 # tokens do mock-oauth2-server (auth/token.sh): cada cliente se cadastra no customer e opera com o proprio token;
 # creditos e debitos de preparo vao com o token de admin do usuario de teste do dono.
 # 0. identidade: sem token -> 401; conta de outro cliente -> 404; GET /customers/me do cliente.
-# 1. accounts: abre conta, credita 1000, debita 300 e confere saldo 700; le a fila de inspecao do
-#    LocalStack e confere os eventos da conta, em ordem: AccountOpened, LedgerEntryRecorded (sequence 1)
-#    e LedgerEntryRecorded (sequence 2).
-# 2. transfers: abre duas contas, credita 1000 na origem, transfere 400, espera COMPLETED, confere
-#    saldos 600 (origem) e 400 (destino) e o evento TransferCompleted na fila transfers-events-inspection.fifo.
+# 1. accounts: abre conta (bonus de boas-vindas de 10000 no lancamento 1), credita 1000, debita 300 e confere saldo 10700;
+#    le a fila de inspecao do LocalStack e confere os eventos da conta, em ordem: AccountOpened e
+#    LedgerEntryRecorded das sequences 1 (bonus), 2 e 3.
+# 2. transfers: abre duas contas, credita 1000 na origem (alem do bonus de 10000 de cada conta), transfere 400, espera
+#    COMPLETED, confere saldos 10600 (origem) e 10400 (destino) e o evento TransferCompleted na fila transfers-events-inspection.fifo.
 #    Depois confere o limite diario da origem em GET /accounts/{id}/daily-limit (500000:400:499600).
 # 3. notification: espera ate 45 s (45 tentativas de 1 s) e confere TRANSFER_SENT para o remetente e TRANSFER_RECEIVED para o
 #    destinatario em GET /notifications, cada um com o proprio token.
 # 4. statement: espera ate 30 s e confere, em GET /accounts/{id}/statement, os lancamentos da conta do passo 1:
-#    sequence 2 (debito de 300, saldo 700) e sequence 1 (credito de 1000, saldo 1000), do mais novo para o mais antigo;
+#    sequence 3 (debito de 300, saldo 10700), sequence 2 (credito de 1000, saldo 11000) e sequence 1 (bonus de 10000), do mais novo para o mais antigo;
 #    o mesmo extrato pedido por outro cliente responde 404 account-not-found.
 # 5. status da conta: o admin bloqueia (PUT /admin/accounts/{id}/status), o debito e recusado (422), o admin desbloqueia
 #    e o encerramento com saldo e recusado (POST /accounts/{id}/close, 422). Com saldo zero e sem transferencias pendentes
@@ -116,17 +116,24 @@ else
   admin=$("$token_sh" user "$admin_sub" admin)
 fi
 
+# Telefone ficticio e unico derivado do sub: +55 11 9 e oito digitos tirados dos digitos do uuid.
+phone_of() {
+  local digits
+  digits=$(printf '%s' "$1" | tr -dc '0-9')00000000
+  printf '+55119%s' "${digits:0:8}"
+}
+
 # Cliente novo: usuario novo, cadastro no customer com o proprio token. Imprime "<sub> <token>"; use com
 # pair=$(new_customer), para o set -e valer (numa substituicao de processo a falha passaria em silencio).
 new_customer() {
   local pair sub token
   pair=$(new_user) || exit 1
   read -r sub token <<< "$pair"
-  call 201 "$token" POST /customers "{\"name\":\"Smoke Customer\",\"email\":\"smoke-$sub@example.test\"}" > /dev/null
+  call 201 "$token" POST /customers "{\"name\":\"Smoke Customer\",\"email\":\"smoke-$sub@example.test\",\"phone\":\"$(phone_of "$sub")\"}" > /dev/null
   echo "$sub $token"
 }
 
-# O notification consome as filas notification-accounts.fifo e notification-transfers.fifo; espera ate 45 s (se o evento chegar antes da conta conhecida, a mensagem so volta apos 30 s de visibilidade).
+# O notification consome as filas notification-accounts.fifo, notification-transfers.fifo e notification-customer.fifo; espera ate 45 s (se o evento chegar antes da conta conhecida, a mensagem so volta apos 30 s de visibilidade).
 # Uso: check_notification <customerId> <token-do-cliente> <kind-esperado>
 check_notification() {
   local customer="$1" token="$2" expected="$3" kinds=""
@@ -165,8 +172,8 @@ call 201 "$admin" POST "/accounts/$id/credits" '{"amount":1000,"description":"sm
 call 201 "$admin" POST "/accounts/$id/debits" '{"amount":300,"description":"smoke debito"}' > /dev/null
 
 balance=$(call 200 "$customer_token" GET "/accounts/$id" | jq -r .balance)
-if [ "$balance" != "700" ]; then
-  echo "FALHA: saldo $balance (esperado 700)" >&2
+if [ "$balance" != "10700" ]; then
+  echo "FALHA: saldo $balance (esperado 10700)" >&2
   exit 1
 fi
 echo "OK: conta $id com saldo $balance"
@@ -216,7 +223,7 @@ if [ "$remote" = true ]; then
   check_notification "$customer" "$customer_token" WELCOME
 else
   check_events "$queue_name" .aggregateId "$id" \
-    "AccountOpened LedgerEntryRecorded:1 LedgerEntryRecorded:2" 3
+    "AccountOpened LedgerEntryRecorded:1 LedgerEntryRecorded:2 LedgerEntryRecorded:3" 4
 fi
 
 # --- transfers ---
@@ -246,8 +253,8 @@ fi
 
 source_balance=$(call 200 "$source_token" GET "/accounts/$source_id" | jq -r .balance)
 destination_balance=$(call 200 "$destination_token" GET "/accounts/$destination_id" | jq -r .balance)
-if [ "$source_balance" != "600" ] || [ "$destination_balance" != "400" ]; then
-  echo "FALHA: saldos origem $source_balance e destino $destination_balance (esperado 600 e 400)" >&2
+if [ "$source_balance" != "10600" ] || [ "$destination_balance" != "10400" ]; then
+  echo "FALHA: saldos origem $source_balance e destino $destination_balance (esperado 10600 e 10400)" >&2
   exit 1
 fi
 echo "OK: transferencia $transfer_id concluida (origem $source_balance, destino $destination_balance)"
@@ -268,15 +275,15 @@ check_notification "$source_customer" "$source_token" TRANSFER_SENT
 check_notification "$destination_customer" "$destination_token" TRANSFER_RECEIVED
 
 # --- statement ---
-# O statement consome a fila statement-accounts.fifo; espera ate 30 s pelos dois lancamentos da conta do passo 1.
+# O statement consome a fila statement-accounts.fifo; espera ate 30 s pelos tres lancamentos da conta do passo 1.
 statement=""
 for _ in $(seq 1 30); do
   statement=$(call "200|404" "$customer_token" GET "/accounts/$id/statement?limit=10" | jq -r '[.entries[]? | "\(.sequence):\(.kind):\(.amount):\(.balanceAfter)"] | join(" ")')
-  [ "$statement" != "2:DEBIT:300:700 1:CREDIT:1000:1000" ] || break
+  [ "$statement" != "3:DEBIT:300:10700 2:CREDIT:1000:11000 1:CREDIT:10000:10000" ] || break
   sleep 1
 done
-if [ "$statement" != "2:DEBIT:300:700 1:CREDIT:1000:1000" ]; then
-  echo "FALHA: extrato da conta $id: '$statement' (esperado '2:DEBIT:300:700 1:CREDIT:1000:1000')" >&2
+if [ "$statement" != "3:DEBIT:300:10700 2:CREDIT:1000:11000 1:CREDIT:10000:10000" ]; then
+  echo "FALHA: extrato da conta $id: '$statement' (esperado '3:DEBIT:300:10700 2:CREDIT:1000:11000 1:CREDIT:10000:10000')" >&2
   exit 1
 fi
 echo "OK: extrato da conta $id: $statement"
@@ -309,8 +316,8 @@ if [ "$blocked:$unblocked" != "BLOCKED:ACTIVE" ]; then
 fi
 echo "OK: conta $status_id bloqueada, desbloqueada e encerramento com saldo recusado"
 
-# Esvazia a conta e encerra: saldo zero e sem pendentes -> 200 CLOSED; conta encerrada recusa debito e credito.
-call 201 "$admin" POST "/accounts/$status_id/debits" '{"amount":100,"description":"smoke esvaziar"}' > /dev/null
+# Esvazia a conta (bonus de 10000 + credito de 100) e encerra: saldo zero e sem pendentes -> 200 CLOSED; conta encerrada recusa debito e credito.
+call 201 "$admin" POST "/accounts/$status_id/debits" '{"amount":10100,"description":"smoke esvaziar"}' > /dev/null
 closed=$(call 200 "$status_token" POST "/accounts/$status_id/close" | jq -r .status)
 closed_read=$(call 200 "$status_token" GET "/accounts/$status_id" | jq -r .status)
 call 422 "$admin" POST "/accounts/$status_id/debits" '{"amount":1,"description":"conta encerrada"}' > /dev/null

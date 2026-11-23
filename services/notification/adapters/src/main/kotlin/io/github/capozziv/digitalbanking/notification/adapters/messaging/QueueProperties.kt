@@ -7,8 +7,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 data class QueueProperties(
     val accounts: String,
     val transfers: String,
+    val customer: String,
     val accountsDlq: String,
     val transfersDlq: String,
+    val customerDlq: String,
 ) {
-    val deadLetterQueues: List<String> get() = listOf(accountsDlq, transfersDlq)
+    val deadLetterQueues: List<String> get() = listOf(accountsDlq, transfersDlq, customerDlq)
 }

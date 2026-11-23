@@ -8,6 +8,7 @@ import io.github.capozziv.digitalbanking.accounts.application.CustomerBlockedExc
 import io.github.capozziv.digitalbanking.accounts.application.CustomerNotFoundException
 import io.github.capozziv.digitalbanking.accounts.application.CustomersUnavailableException
 import io.github.capozziv.digitalbanking.accounts.application.IdempotencyKeyReusedException
+import io.github.capozziv.digitalbanking.accounts.application.NoOpenAccountException
 import io.github.capozziv.digitalbanking.accounts.application.PendingTransfersException
 import io.github.capozziv.digitalbanking.accounts.application.TransfersUnavailableException
 import io.github.capozziv.digitalbanking.accounts.domain.AccountBlockedException
@@ -24,6 +25,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.MissingRequestHeaderException
+import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.ServletRequestBindingException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
@@ -41,6 +43,9 @@ import java.net.URI
 class ProblemDetailsExceptionHandler : ResponseEntityExceptionHandler() {
     @ExceptionHandler
     fun handle(e: AccountNotFoundException) = problem(HttpStatus.NOT_FOUND, "account-not-found", "Account not found", e.message)
+
+    @ExceptionHandler
+    fun handle(e: NoOpenAccountException) = problem(HttpStatus.NOT_FOUND, "account-not-found", "Account not found", e.message)
 
     @ExceptionHandler
     fun handle(e: EntryNotFoundException) =
@@ -74,7 +79,7 @@ class ProblemDetailsExceptionHandler : ResponseEntityExceptionHandler() {
     /** Same type and title as the 403 of the security library: the caller may not do this. */
     @ExceptionHandler
     fun handle(e: CallerNotCustomerException) =
-        problem(HttpStatus.FORBIDDEN, "forbidden", "Forbidden", "Only a customer can open its own account")
+        problem(HttpStatus.FORBIDDEN, "forbidden", "Forbidden", "Only a customer can access its own account")
 
     @ExceptionHandler
     fun handle(e: IdempotencyKeyReusedException) =
@@ -161,6 +166,14 @@ class ProblemDetailsExceptionHandler : ResponseEntityExceptionHandler() {
         }
         return super.handleServletRequestBindingException(ex, headers, status, request)
     }
+
+    /** A required query parameter that is absent, such as the customerId of the recipient lookup. */
+    override fun handleMissingServletRequestParameter(
+        ex: MissingServletRequestParameterException,
+        headers: HttpHeaders,
+        status: HttpStatusCode,
+        request: WebRequest,
+    ): ResponseEntity<Any> = badRequest(listOf(InvalidField(ex.parameterName, "is required")))
 
     @ExceptionHandler
     fun handle(e: InvalidRequestException) = validationError(e.errors)

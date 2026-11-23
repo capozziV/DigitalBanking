@@ -3,6 +3,7 @@ package io.github.capozziv.digitalbanking.notification.bootstrap.web
 import io.github.capozziv.digitalbanking.notification.application.port.NotificationRepository
 import io.github.capozziv.digitalbanking.notification.bootstrap.persistence.aNotification
 import io.github.capozziv.digitalbanking.notification.domain.Notification
+import io.github.capozziv.digitalbanking.notification.domain.NotificationKind
 import io.github.capozziv.digitalbanking.testing.security.JwtTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -43,6 +44,8 @@ class NotificationApiIntegrationTest : NotificationWebIntegrationTest() {
     @BeforeEach
     fun cleanTables() {
         ownerJdbc.sql("delete from notifications").update()
+        ownerJdbc.sql("delete from customer_names").update()
+        ownerJdbc.sql("delete from known_accounts").update()
     }
 
     @Test
@@ -86,8 +89,8 @@ class NotificationApiIntegrationTest : NotificationWebIntegrationTest() {
 
         assertThat(item.get("id").asString()).isEqualTo(notification.id.toString())
         assertThat(item.get("kind").asString()).isEqualTo("WELCOME")
-        assertThat(item.get("title").asString()).isEqualTo(notification.title)
-        assertThat(item.get("body").asString()).isEqualTo(notification.body)
+        assertThat(item.get("title").asString()).isEqualTo("Bem-vindo ao capzzPay!")
+        assertThat(item.get("body").asString()).doesNotContain(notification.data.getValue("accountId").toString())
         assertThat(item.get("data").get("accountId").asString()).isEqualTo(notification.data.getValue("accountId"))
         assertThat(item.get("createdAt").asString()).isNotBlank()
         assertThat(item.get("readAt").isNull).isTrue()
@@ -107,6 +110,84 @@ class NotificationApiIntegrationTest : NotificationWebIntegrationTest() {
         assertThat(data.get("amountCents").isIntegralNumber).isTrue()
         assertThat(data.get("amountCents").asLong()).isEqualTo(250_000L)
     }
+
+    @Test
+    fun `a received transfer is told with the full name of the sender, never the account`() {
+        val (sender, senderAccount) = UUID.randomUUID() to UUID.randomUUID()
+        ownerJdbc.sql("insert into known_accounts (account_id, customer_id) values (?, ?)").params(senderAccount, sender).update()
+        ownerJdbc.sql("insert into customer_names (customer_id, name) values (?, ?)").params(sender, "Ana Souza").update()
+        repository.saveAll(listOf(receivedTransfer(senderAccount)))
+
+        val item = get("/notifications").body!!.get("items").get(0)
+
+        assertThat(item.get("title").asString()).isEqualTo("Você recebeu uma transferência")
+        assertThat(item.get("body").asString()).isEqualTo("Você recebeu R$ 25,00 de Ana Souza.")
+    }
+
+    @Test
+    fun `a transfer stored with the account in its text, before the names, says another customer while the name is unknown`() {
+        val senderAccount = UUID.randomUUID()
+        repository.saveAll(listOf(receivedTransfer(senderAccount)))
+
+        val body =
+            get("/notifications")
+                .body!!
+                .get("items")
+                .get(0)
+                .get("body")
+                .asString()
+
+        assertThat(body).isEqualTo("Você recebeu R$ 25,00 de outro cliente.").doesNotContain(senderAccount.toString())
+    }
+
+    @Test
+    fun `account notifications stored with the old text and the account number are read with the new text`() {
+        val account = UUID.randomUUID()
+        val data = mapOf<String, Any>("accountId" to account.toString(), "accountType" to "GOLD")
+        repository.saveAll(
+            listOf(
+                stored(NotificationKind.WELCOME, data, "Bem-vindo ao banco!", "Pelo número $account no sininho", 4),
+                stored(NotificationKind.ACCOUNT_BLOCKED, data, "Conta bloqueada", "Sua conta $account foi bloqueada.", 3),
+                stored(NotificationKind.ACCOUNT_UNBLOCKED, data, "Conta desbloqueada", "Sua conta $account foi desbloqueada.", 2),
+                stored(NotificationKind.ACCOUNT_CLOSED, data, "Conta encerrada", "Sua conta $account foi encerrada.", 1),
+            ),
+        )
+
+        val items = get("/notifications").body!!.get("items")
+
+        val byKind = (0 until items.size()).associate { items.get(it).get("kind").asString() to items.get(it) }
+        assertThat(byKind.getValue("WELCOME").get("title").asString()).isEqualTo("Bem-vindo ao capzzPay!")
+        assertThat(byKind.getValue("WELCOME").get("body").asString()).startsWith("Sua conta Gold está aberta.")
+        assertThat(byKind.getValue("ACCOUNT_BLOCKED").get("body").asString()).startsWith("Sua conta foi bloqueada.")
+        assertThat(byKind.getValue("ACCOUNT_UNBLOCKED").get("body").asString()).startsWith("Sua conta foi desbloqueada")
+        assertThat(byKind.getValue("ACCOUNT_CLOSED").get("body").asString()).startsWith("Sua conta foi encerrada.")
+        byKind.values.forEach {
+            assertThat(it.get("title").asString() + it.get("body").asString()).doesNotContain(account.toString())
+        }
+    }
+
+    private fun stored(
+        kind: NotificationKind,
+        data: Map<String, Any>,
+        title: String,
+        body: String,
+        minutesAgo: Long,
+    ) = aNotification(customerId = customer, kind = kind, data = data, createdAt = Instant.now().minus(minutesAgo, ChronoUnit.MINUTES))
+        .copy(title = title, body = body)
+
+    /** As the service wrote it before the names existed: the account of the sender in the stored text. */
+    private fun receivedTransfer(senderAccount: UUID) =
+        aNotification(
+            customerId = customer,
+            kind = NotificationKind.TRANSFER_RECEIVED,
+            data =
+                mapOf(
+                    "transferId" to UUID.randomUUID().toString(),
+                    "sourceAccountId" to senderAccount.toString(),
+                    "destinationAccountId" to UUID.randomUUID().toString(),
+                    "amountCents" to 2500L,
+                ),
+        ).copy(body = "Você recebeu R$ 25,00 da conta $senderAccount.")
 
     @Test
     fun `marking up to a notification reads it and the older ones, and repeating changes nothing`() {

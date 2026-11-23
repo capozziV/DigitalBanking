@@ -19,22 +19,31 @@
 | statement | Extrato para leitura (CQRS) | DynamoDB + Redis (cache da 1ª página) |
 | notification | Consome eventos e grava notificações dentro do aplicativo (sininho) | PostgreSQL |
 
+### Componentes do app do cliente (etapa 9)
+| Componente | Responsabilidade | Dados |
+|---|---|---|
+| web | App Angular compilado, servido por nginx na rota `/` | sem estado |
+| bff | NestJS: endpoints por tela, login pela API do Cognito, sessão e CSRF; rota `/bff` | sessão no Redis |
+
+`web` e `bff` ficam na mesma origem (`/` e `/bff`). Login, senha de 6 dígitos e telefone: [ADR 0024](adr/0024-login-e-telefone-do-app.md).
+
 ## Fluxo de entrada
 ```
 Navegador (Angular)
    │ cookie de sessão HttpOnly + token CSRF
    ▼
-ALB público ── /     → Angular (nginx)
+API Gateway HTTP API (autorizador JWT Cognito nas rotas da API)
+   │ VPC Link
+   ▼
+ALB interno ── rotas da API → customer / accounts / transfers / statement / notification
+            ├─ /     → Angular (nginx)
             └─ /bff  → BFF (NestJS, sessão no Redis)
                           │ Bearer token Cognito + X-Correlation-Id
                           ▼
-                 API Gateway HTTP API (autorizador JWT Cognito)
-                          │ VPC Link
-                          ▼
-                 ALB interno → customer / accounts / transfers / statement / notification
-                               (chamadas entre serviços pelo DNS de Service do Kubernetes)
+                 customer / accounts / transfers / statement / notification
+                 (o BFF e os serviços se chamam pelo DNS de Service do Kubernetes, sem passar pelo API Gateway)
 ```
-Até a etapa 9 não existe BFF: testes manuais usam a coleção Bruno versionada em `api/bruno/`.
+O BFF não passa pelo API Gateway: chama os Services do cluster direto. Testes manuais da API usam a coleção Bruno em `api/bruno/`.
 
 ## Decisões tomadas
 ### Dados e consistência
@@ -54,8 +63,11 @@ Até a etapa 9 não existe BFF: testes manuais usam a coleção Bruno versionada
 - Arrendamento (`locked_until`) no lugar de trava de banco durante a chamada HTTP.
 - (ver [ADR 0016](adr/0016-saga-orquestrada-por-http.md) e a [spec da etapa 2](superpowers/specs/2026-10-27-etapa-2-transfers-design.md))
 
+### Falha longa no extrato
+- Decidido em 2026-11-22, a implementar (#239): o `statement` tenta por cerca de 1 hora (120 recepções de 30 s) antes da DLQ, em vez de 2,5 min. Custo aceito: mensagem defeituosa segura os lançamentos seguintes daquela conta por até 1 hora. Sem alarme, retenção maior nem backup por ora: passada 1 hora, o lançamento fica na DLQ sem aviso até o reenvio manual ou a derrubada do ambiente.
+
 ### Cache
-- Extrato: cache-aside só no Redis (sem Caffeine), só a 1ª página com `limit` 20, TTL 60 s ± 10 s, invalidação por remoção da chave ao consumir o lançamento, fallback para o DynamoDB com timeout de 100 ms se o Redis cair (sem circuit breaker). Corrida aceita: página velha por no máximo um TTL.
+- Extrato: cache-aside só no Redis (sem Caffeine), só a 1ª página com `limit` 20, TTL 60 s ± 10 s, invalidação ao consumir o lançamento por versão por conta (um script Lua incrementa a versão e apaga a página; a leitura só grava se a versão não mudou, senão `statement.cache.writes{result=stale}`), fallback para o DynamoDB com timeout de 100 ms se o Redis cair (sem circuit breaker). Resíduo aceito: se a versão se perder ou a invalidação falhar no Redis, página velha por no máximo um TTL.
 - Saldo para autorizar débito nunca vem de cache.
 - (ver [ADR 0009](adr/0009-cache-do-extrato.md) e [ADR 0007](adr/0007-conta-e-ledger-no-accounts.md))
 
@@ -75,7 +87,8 @@ Até a etapa 9 não existe BFF: testes manuais usam a coleção Bruno versionada
 - Relay (`OutboxRelay`) dentro de cada serviço, com um relay ativo por vez (trava consultiva do PostgreSQL). Falha de publicação bloqueia só a conta afetada. Outbox guardado para sempre; envelope com `eventVersion`.
 - A leitura do lote pula os eventos seguintes de uma conta presa, que não ocupa o lote das outras. Limites de tempo: 2 s por publicação e 10 s por ciclo (configuráveis).
 - Evento preso se destrava por descarte manual (só `ADMIN`): `GET /admin/outbox/stuck-events` e `POST /admin/outbox/events/{eventId}/discard`, com motivo obrigatório, em `accounts`, `transfers` e `customer`, chamados direto na porta do serviço (o nginx não roteia). Descartar é perda deliberada, com consequências nos consumidores (ver [ADR 0015](adr/0015-outbox-relay-lider-e-sns-fifo.md)).
-- O `notification` consome com `@SqsListener` (Spring Cloud AWS) as filas FIFO `notification-accounts.fifo` e `notification-transfers.fifo`, cada uma com DLQ FIFO (`notification-accounts-dlq.fifo`, `notification-transfers-dlq.fifo`); a mensagem vai para a DLQ na 5ª tentativa.
+- O `notification` consome com `@SqsListener` (Spring Cloud AWS) as filas FIFO `notification-accounts.fifo`, `notification-transfers.fifo` e `notification-customer.fifo`, cada uma com DLQ FIFO (`notification-accounts-dlq.fifo`, `notification-transfers-dlq.fifo`, `notification-customer-dlq.fifo`); a mensagem vai para a DLQ na 5ª tentativa (visibilidade de 30 s). A terceira fila vem do [ADR 0025](adr/0025-nome-da-contraparte-nas-notificacoes.md).
+- Para mostrar o nome da outra parte, o `notification` consome também `AccountOpened` (`accounts-events.fifo`) e `CustomerRegistered` (`customer-events.fifo`, fila `notification-customer.fifo`) numa projeção própria; o texto é montado na leitura (ver [ADR 0025](adr/0025-nome-da-contraparte-nas-notificacoes.md)).
 - Idempotência do consumidor pela tabela `processed_events`, gravada na mesma transação das notificações; a mensagem é confirmada só depois do commit.
 - O `statement` (porta 8084, sem PostgreSQL) consome `AccountOpened` e `LedgerEntryRecorded` do `accounts-events.fifo` na fila FIFO `statement-accounts.fifo`, com DLQ `statement-accounts-dlq.fifo` (5 tentativas, visibilidade 30 s). Não usa `processed_events`: o `PutItem` condicional é a idempotência.
 - (ver [ADR 0003](adr/0003-transactional-outbox-e-mensageria.md), [ADR 0015](adr/0015-outbox-relay-lider-e-sns-fifo.md), [ADR 0017](adr/0017-notification-com-banco-e-consumo-sqs.md) e [ADR 0018](adr/0018-chave-do-extrato-pela-sequencia.md))
@@ -88,6 +101,7 @@ Até a etapa 9 não existe BFF: testes manuais usam a coleção Bruno versionada
 - **Identidade:** o id do cliente é o `sub` do usuário. Três chamadores: cliente, admin (grupo `admin`, claim configurável) e serviço (token de máquina por client credentials, escopo `digitalbanking/internal`). Recurso de outro cliente devolve `404`; sem token, `401`; rota de admin sem o grupo, `403`.
 - `accounts` (abrir conta) e `transfers` (criar transferência) consultam o `customer` na hora, sem cache; inexistente ou bloqueado dá `422`, `customer` fora dá `503`.
 - **Status da conta** (`ACTIVE`, `BLOCKED`, `CLOSED`): conferido sob a trava da conta, no débito e no crédito. Admin bloqueia e desbloqueia por `PUT /admin/accounts/{id}/status`; o dono (ou admin) encerra por `POST /accounts/{id}/close`, com saldo zero. No encerramento o `accounts` consulta o `transfers` de forma síncrona (`GET /internal/accounts/{id}/pending-transfers`, só token de máquina; transferência pendente dá `422 pending-transfers`, `transfers` fora dá `503 transfers-unavailable`), o que fecha um ciclo síncrono com a saga. Lançamento depois da consulta recusa o encerramento (ver [ADR 0023](adr/0023-status-da-conta-e-encerramento.md)).
+- **Bônus de boas-vindas** (R$ 100): um por cliente, só na primeira conta; encerrar e reabrir não repete (a conta nova nasce com saldo zero). Ao abrir, na mesma transação e depois do insert, o `accounts` credita só se o cliente não tem outra conta, inclusive encerrada; o índice único parcial de conta não encerrada por cliente serializa as aberturas (ver [ADR 0026](adr/0026-bonus-de-boas-vindas-por-cliente.md)).
 - `401` e `403` em Problem Details; desconexão do cliente não vira `500`. `/actuator/health` aberto sem detalhes; o resto do actuator só para admin.
 - **Terraform da borda** (`infra/terraform/modules/identity` e `edge`): parte do ambiente efêmero `envs/aws`, aplicado pelo `aws-up` ([ADR 0021](adr/0021-deploy-e-ambiente-efemero.md)).
 - **Bibliotecas compartilhadas** (só infraestrutura): `libs/security` (resource server, `Caller`, token de máquina), `libs/observabilidade` (filtro de correlation ID, propagação nas chamadas HTTP de saída e interceptor SQS que põe o ID da mensagem no MDC) e `libs/testing-security` (emissor de JWT de teste).
@@ -118,14 +132,14 @@ Até a etapa 9 não existe BFF: testes manuais usam a coleção Bruno versionada
 - Actuator fora da borda; endpoint público do EKS aberto para `0.0.0.0/0`; Redis sem TLS nem AUTH.
 - (ver [ADR 0021](adr/0021-deploy-e-ambiente-efemero.md), [`infra/terraform/README.md`](../infra/terraform/README.md) e [`deploy/helm/README.md`](../deploy/helm/README.md))
 
-### Frontend (etapa 9, detalhar depois)
+### Frontend (etapa 9)
 - Angular (standalone components, signals); Angular Material como biblioteca de componentes.
-- BFF em NestJS: login OAuth2 com Cognito (`openid-client`), sessão no Redis, cookie `HttpOnly`, CSRF, refresh de token, correlation ID via `AsyncLocalStorage`, logs JSON com pino.
+- BFF em NestJS: login e cadastro pela API do Cognito (`SignUp`, `ConfirmSignUp`, `InitiateAuth` com `USER_PASSWORD_AUTH`), com app client próprio e sem hosted UI ([ADR 0024](adr/0024-login-e-telefone-do-app.md)), sessão no Redis, cookie `HttpOnly`, CSRF, refresh de token, correlation ID via `AsyncLocalStorage`, logs JSON com pino.
 - BFF expõe endpoints por tela (agregação), não proxy genérico.
-- `Idempotency-Key` gerada no Angular ao abrir o formulário de transferência; o BFF só repassa.
+- `Idempotency-Key` gerada no Angular por tentativa (usuário + telefone + valor), guardada no `sessionStorage` da aba até o estado final aparecer; o BFF só repassa. Limite: outra aba gera chave nova (#241).
 - Status da saga por polling (RxJS).
-- Front e BFF na mesma origem (ALB roteando `/` e `/bff`), sem CORS.
-- Organização: `frontend/web` (Angular), `frontend/bff` (NestJS), `frontend/shared` (DTOs de apresentação, opcional), com workspaces npm/pnpm e job próprio no CI.
+- Front e BFF na mesma origem (API Gateway -> ALB interno roteando `/` e `/bff`), sem CORS; o BFF chama os Services do cluster direto.
+- Organização: `frontend/web` (Angular), `frontend/bff` (NestJS), `frontend/e2e` (Playwright), com workspaces npm e job próprio no CI.
 - (ver [ADR 0005](adr/0005-frontend-angular-e-bff-nestjs.md))
 
 ## Em aberto

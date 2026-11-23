@@ -14,8 +14,11 @@ image:
 
 replicas: 1
 
-# Perfil Spring ativo nos pods.
+# Perfil Spring ativo nos pods; vazio nos servicos que nao sao Spring (web e bff), que ficam sem a variavel.
 springProfile: aws
+
+# Sysctls "seguros" do pod. O web (nginx sem root) escuta na porta 80 e precisa baixar o limite de porta sem root.
+sysctls: []
 
 # ARN do target group do ALB interno (stack env do Terraform, output target_group_arns). A instalacao informa:
 # --set targetGroupArn=<arn>. targetGroupBinding.enabled=false desliga o TargetGroupBinding.

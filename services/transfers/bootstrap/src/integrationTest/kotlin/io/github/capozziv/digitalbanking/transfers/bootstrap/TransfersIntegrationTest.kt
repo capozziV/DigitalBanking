@@ -18,6 +18,7 @@ import org.springframework.test.context.TestPropertySource
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.postgresql.PostgreSQLContainer
 import java.util.UUID
+import javax.sql.DataSource
 
 /**
  * Base of every integration test of the transfers service. One PostgreSQL container is shared by all subclasses
@@ -43,8 +44,11 @@ import java.util.UUID
 @Import(JwtTestSupport.DecoderConfiguration::class)
 abstract class TransfersIntegrationTest {
     /** JdbcClient connected as the owner user, for setup and inspection outside the application's grants. */
-    protected val ownerJdbc: JdbcClient by lazy {
-        JdbcClient.create(DriverManagerDataSource(postgres.jdbcUrl, postgres.username, postgres.password))
+    protected val ownerJdbc: JdbcClient by lazy { JdbcClient.create(ownerDataSource) }
+
+    /** The owner's data source, for what needs a transaction of its own (see `deleteTransfers`). */
+    protected val ownerDataSource: DataSource by lazy {
+        DriverManagerDataSource(postgres.jdbcUrl, postgres.username, postgres.password)
     }
 
     @BeforeEach

@@ -10,7 +10,7 @@ A primeira página do extrato é a consulta mais comum, e o cache tira essa leit
 
 ## Decisões desta etapa (usuário, 2026-11-12)
 1. **Só Redis**, sem Caffeine local na frente. Encerra a decisão #18. Um cache por instância exigiria invalidação em todas as instâncias, e o ganho sobre o Redis é pequeno. O Caffeine fica para depois do MVP, se uma medição pedir.
-2. **Invalidação por remoção da chave** ao consumir o lançamento, sem reescrever a página.
+2. **Invalidação por remoção da chave** ao consumir o lançamento, sem reescrever a página. *(Superada em 2026-11-20 pelo #226: remoção com versão por conta, ver ADR 0009.)*
 3. **TTL de 60 s com jitter de ±10 s** (entre 50 e 70 s).
 4. **Só a 1ª página com o `limit` padrão (20) entra no cache.** Cursor ou outro `limit` vão direto ao DynamoDB.
 5. **Redis lento ou fora:** timeout de 100 ms, WARN no log, métrica de erro e leitura no DynamoDB, sem circuit breaker.
@@ -116,3 +116,5 @@ A primeira página do extrato é a consulta mais comum, e o cache tira essa leit
 ## Riscos
 - **Serialização da página:** uma mudança no formato do lançamento quebra a leitura de páginas já guardadas. Mitigação: um JSON inválido conta como falta, e a versão no prefixo da chave muda junto com o formato.
 - **Timeout de 100 ms no runner do CI:** pode ser apertado sob carga. Os testes de integração usam o mesmo valor, e o de fallback mede o limite com folga (1 s).
+
+> **Atualização 2026-11-20:** a corrida descrita em "Corrida conhecida" foi corrigida no bug #226; ver [ADR 0009](../../adr/0009-cache-do-extrato.md).

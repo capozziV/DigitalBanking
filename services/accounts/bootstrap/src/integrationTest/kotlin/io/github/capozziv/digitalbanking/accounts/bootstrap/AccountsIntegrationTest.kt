@@ -18,14 +18,22 @@ import java.util.UUID
  * The application connects as [APP_USER] (no UPDATE/DELETE on ledger_entry); Flyway runs as the
  * container's owner user, mirroring accounts_owner / accounts_app of the local environment.
  * The outbox relay is off, so outbox rows stay as the operations wrote them; the relay tests turn it on
- * (a subclass @TestPropertySource overrides this one).
+ * (a subclass @TestPropertySource overrides this one). The welcome bonus is off (amount 0) so the other tests start from a
+ * zero balance; the ones about the bonus turn it on the same way.
  *
  * Security: tokens are signed by [JwtTestSupport] (its decoder replaces the one built from the issuer URI), and the
  * token endpoint and the `customer` service are the [CustomerServiceStub], where every customer is ACTIVE by default; the
  * `transfers` service is the [TransfersServiceStub], where no account has a pending transfer by default.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@TestPropertySource(properties = ["accounts.outbox.relay-enabled=false"])
+// transfers.timeout is 2s (production: 500ms): the first call of each Spring context hits a cold HTTP client and stub.
+@TestPropertySource(
+    properties = [
+        "accounts.outbox.relay-enabled=false",
+        "accounts.transfers.timeout=2s",
+        "accounts.welcome-bonus.amount=0",
+    ],
+)
 @Import(JwtTestSupport.DecoderConfiguration::class)
 abstract class AccountsIntegrationTest {
     /** JdbcClient connected as the owner user, for setup and inspection outside the application's grants. */

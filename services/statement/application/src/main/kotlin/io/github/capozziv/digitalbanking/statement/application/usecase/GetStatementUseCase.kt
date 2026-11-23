@@ -2,6 +2,7 @@ package io.github.capozziv.digitalbanking.statement.application.usecase
 
 import io.github.capozziv.digitalbanking.security.Caller
 import io.github.capozziv.digitalbanking.statement.application.AccountNotFoundException
+import io.github.capozziv.digitalbanking.statement.application.port.FirstPageLookup
 import io.github.capozziv.digitalbanking.statement.application.port.StatementFirstPageCache
 import io.github.capozziv.digitalbanking.statement.application.port.StatementRepository
 import io.github.capozziv.digitalbanking.statement.domain.StatementCursor
@@ -22,14 +23,16 @@ class GetStatementUseCase(
         // The owner check comes before the cache: a cached page must never be served to another customer.
         requireCanRead(accountId, caller)
         val cacheable = cursor == null && limit == DEFAULT_LIMIT
-        if (cacheable) cache.get(accountId)?.let { return it }
+        val lookup = if (cacheable) cache.get(accountId) else FirstPageLookup.Unavailable
+        if (lookup is FirstPageLookup.Hit) return lookup.page
         val page = repository.findPage(accountId, cursor, limit)
         // Only an empty first page needs the account item: entries prove the account exists even before
         // its AccountOpened arrives, and a cursor means an earlier page was already served.
         if (cursor == null && page.entries.isEmpty() && !repository.accountExists(accountId)) {
             throw AccountNotFoundException(accountId)
         }
-        if (cacheable) cache.put(accountId, page)
+        // The version read with the miss keeps this page out of the cache if an entry evicted it meanwhile (#226).
+        if (lookup is FirstPageLookup.Miss) cache.put(accountId, page, lookup.version)
         return page
     }
 

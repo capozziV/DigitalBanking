@@ -5,6 +5,7 @@ import io.github.capozziv.digitalbanking.statement.application.AccountNotFoundEx
 import io.github.capozziv.digitalbanking.statement.application.fake.InMemoryStatementFirstPageCache
 import io.github.capozziv.digitalbanking.statement.application.fake.InMemoryStatementRepository
 import io.github.capozziv.digitalbanking.statement.application.fake.statementEntry
+import io.github.capozziv.digitalbanking.statement.application.port.StatementRepository
 import io.github.capozziv.digitalbanking.statement.domain.StatementCursor
 import io.github.capozziv.digitalbanking.statement.domain.StatementPage
 import org.assertj.core.api.Assertions.assertThat
@@ -148,6 +149,41 @@ class GetStatementUseCaseTest {
 
         assertThat(cache.puts).isEqualTo(1)
         assertThat(cache.peek(account)).isEqualTo(page)
+    }
+
+    @Test
+    fun `a page read before an eviction is not cached after it`() {
+        repository.insertAccount(account, UUID.randomUUID())
+        val racingRepository =
+            object : StatementRepository by repository {
+                override fun findPage(
+                    accountId: UUID,
+                    cursor: StatementCursor?,
+                    limit: Int,
+                ): StatementPage {
+                    val page = repository.findPage(accountId, cursor, limit)
+                    // An entry arrives and evicts the page after the read queried the repository.
+                    repository.insertEntry(statementEntry(accountId, 1))
+                    cache.evict(accountId)
+                    return page
+                }
+            }
+
+        val stale = GetStatementUseCase(racingRepository, cache).execute(account, null, GetStatementUseCase.DEFAULT_LIMIT, admin)
+
+        assertThat(stale.entries).isEmpty()
+        assertThat(cache.peek(account)).isNull()
+        assertThat(statement(account, null, GetStatementUseCase.DEFAULT_LIMIT).entries.map { it.sequence }).containsExactly(1L)
+    }
+
+    @Test
+    fun `an unavailable cache is not written`() {
+        repository.insertAccount(account, UUID.randomUUID())
+        cache.unavailable = true
+
+        statement(account, null, GetStatementUseCase.DEFAULT_LIMIT)
+
+        assertThat(cache.puts).isEqualTo(0)
     }
 
     @Test

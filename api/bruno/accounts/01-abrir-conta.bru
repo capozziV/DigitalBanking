@@ -19,10 +19,11 @@ script:post-response {
 }
 
 tests {
+  // O bonus de boas-vindas (10000, lancamento 1) ja esta no saldo da conta nova.
   // O cliente vem do token (customerToken, cadastrado no customer pelo script da colecao), nao do corpo.
   test("201 com a conta nova do cliente do token", function () {
     expect(res.status).to.equal(201);
-    expect(res.body.balance).to.equal(0);
+    expect(res.body.balance).to.equal(10000);
     expect(res.body.customerId).to.equal(bru.getVar("customerId"));
   });
 }

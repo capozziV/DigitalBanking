@@ -1,7 +1,7 @@
 # Etapa 9: frontend do cliente (design)
 
 **Data:** 2026-11-19
-**Status:** em aprovação
+**Status:** aprovada pelo usuário (2026-11-19)
 **Cartão:** etapa 9 no [board](https://github.com/users/capozziV/projects/2)
 
 ## 1. Intenção
@@ -74,7 +74,7 @@ As telas aprovadas como referência estão em `.superpowers/brainstorm/2215-1795
 | Início | Cartão do saldo (saldo disponível, tipo de conta, cheque especial, Transferir e Extrato), limite diário usado e disponível, últimos lançamentos; sem conta, botão "Abrir conta" | `GET /accounts/...`, `GET /accounts/{id}/daily-limit`, `GET /accounts/{id}/statement` |
 | Extrato | Lançamentos paginados com o ícone de entrada e saída; o bônus aparece como "Bônus de boas-vindas" | `GET /accounts/{id}/statement` (cursor) |
 | Transferir | Em passos: (1) o cliente digita o telefone do destinatário e aperta "Próximo"; (2) o app mostra o **nome completo** do destinatário ("Ana Souza") para conferir e pede o valor; (3) "Confirmar" envia; depois o status até `COMPLETED`, `FAILED` ou `COMPENSATED`, com o motivo em português | busca por telefone (nova), `POST /transfers`, `GET /transfers/{id}` |
-| Avisos | Lista de notificações, marcar como lidas, contador no menu | `GET /notifications`, `POST /notifications/read` |
+| Notificações (antes "Avisos") | Lista de notificações, marcar como lidas, contador no menu | `GET /notifications`, `POST /notifications/read` |
 | Minha conta | Dados do cliente e da conta; trocar o telefone; encerrar conta (saldo zero, sem pendentes) | `GET /customers/me`, troca do telefone (nova), `POST /accounts/{id}/close` |
 
 O builder confere os caminhos exatos de cada rota no OpenAPI de cada serviço.
@@ -90,7 +90,7 @@ O builder confere os caminhos exatos de cada rota no OpenAPI de cada serviço.
 
   O builder define o desenho exato e o registra.
 - **Validação da senha** de 6 dígitos também no BFF, não só na tela.
-- **`Idempotency-Key`** gerada no Angular ao abrir o formulário de transferência; o BFF só repassa.
+- **`Idempotency-Key`** gerada no Angular ao abrir o formulário de transferência; o BFF só repassa. *(Superado em 2026-11-22: uma chave por tentativa, ver a emenda do ADR 0005.)*
 - **Status da transferência** por polling (RxJS) a partir do Angular, com intervalo e prazo definidos pelo builder.
 
 ### 6.4 Mudanças no backend e na infraestrutura
@@ -99,6 +99,7 @@ O builder confere os caminhos exatos de cada rota no OpenAPI de cada serviço.
   - Entra pelo outbox como os demais lançamentos, para o extrato e o notification.
   - Termo novo no `CONTEXT.md`: **Bônus de boas-vindas**.
   - O valor fica numa configuração, com o padrão de 10000.
+  - **Nota (decisão de 2026-11-22, [ADR 0026](../../adr/0026-bonus-de-boas-vindas-por-cliente.md)):** o bônus é só na primeira conta do cliente; encerrar e reabrir não repete, e a conta nova nasce com saldo zero.
 - **customer: telefone do cliente.**
   - O cliente ganha o campo telefone: celular brasileiro, guardado em E.164 (`+55DD9XXXXXXXX`), com formato validado e **único** entre os clientes. **Não há verificação** do número, nem real nem simulada.
   - **Troca do telefone** em "Minha conta": o número novo também precisa ser único. Uma transferência é resolvida no momento do envio, então trocar o telefone depois não afeta transferências já feitas.
