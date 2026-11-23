@@ -22,7 +22,7 @@ Entregar o serviço `statement`, o modelo de leitura do extrato (CQRS). Ele cons
 | 9 | Tabela, fila e DLQ criadas pelo script de init do LocalStack (padrão da etapa 3); nos testes, pelo apoio de testes. Na AWS, Terraform na etapa 8. |
 | 10 | Lançamentos anteriores ao `statement` não são importados. Reconstrução fica no cartão pós-MVP [#117](https://github.com/capozziV/DigitalBanking/issues/117). |
 | 11 | Antes do `statement`, ajustar no `notification` os padrões que ele vai copiar (migrations em `adapters`, endpoint AWS vazio = AWS real, WARN sem stack trace, gauge da DLQ sem chamada bloqueante). Feito em paralelo à revisão desta spec (cartão [#113](https://github.com/capozziV/DigitalBanking/issues/113)). |
-| 12 | Porta `8084`, sem PostgreSQL; fila `statement-accounts.fifo` com DLQ `statement-accounts-dlq.fifo` (5 tentativas, visibilidade 30 s, configuráveis). |
+| 12 | Porta `8084`, sem PostgreSQL; fila `statement-accounts.fifo` com DLQ `statement-accounts-dlq.fifo` (5 tentativas, visibilidade 30 s, configuráveis; passou para 120 tentativas no #239, cerca de 1 hora antes da DLQ). |
 
 ## Critério de pronto
 - Um crédito, um débito e uma transferência aparecem no extrato das contas envolvidas, em ordem de `sequence`, poucos segundos depois de gravados (e2e com os quatro serviços).

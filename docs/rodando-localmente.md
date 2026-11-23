@@ -321,7 +321,7 @@ curl http://localhost/statement/actuator/metrics/statement.cache.evictions
 ```
 
 ### DLQ do statement
-A fila `statement-accounts.fifo` tem a DLQ FIFO `statement-accounts-dlq.fifo`. A mensagem vai para lá na 5ª tentativa que falha (`STATEMENT_MAX_RECEIVE_COUNT`, visibilidade de 30 s em `STATEMENT_VISIBILITY_TIMEOUT_SECONDS`, ambos lidos pelo compose; veja o `.env.example`). A métrica `statement.dlq.messages` também mostra a quantidade (o valor é relido do SQS a cada 30 s, `STATEMENT_DLQ_METRICS_REFRESH`); consulte pelo actuator, direto no serviço ou pelo nginx:
+A fila `statement-accounts.fifo` tem a DLQ FIFO `statement-accounts-dlq.fifo`. A mensagem vai para lá na 120ª tentativa que falha, cerca de 1 hora com a visibilidade de 30 s (`STATEMENT_MAX_RECEIVE_COUNT`, padrão 120: para provocar a DLQ localmente, suba o compose com um valor baixo, como 3; visibilidade de 30 s em `STATEMENT_VISIBILITY_TIMEOUT_SECONDS`, ambos lidos pelo compose; veja o `.env.example`). A métrica `statement.dlq.messages` também mostra a quantidade (o valor é relido do SQS a cada 30 s, `STATEMENT_DLQ_METRICS_REFRESH`); consulte pelo actuator, direto no serviço ou pelo nginx:
 ```bash
 curl http://localhost:8084/actuator/metrics/statement.dlq.messages
 curl http://localhost/statement/actuator/metrics/statement.dlq.messages

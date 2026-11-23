@@ -83,7 +83,7 @@ flowchart LR
     qSA --> statement
 ```
 
-O `customer-events.fifo` ainda não tem consumidor. Cada fila tem a sua DLQ FIFO (5 tentativas, visibilidade de 30 s).
+O `customer-events.fifo` ainda não tem consumidor. Cada fila tem a sua DLQ FIFO (5 tentativas, visibilidade de 30 s; a do extrato, `statement-accounts.fifo`, tem 120 tentativas, cerca de 1 hora).
 
 ## Pontos fortes
 - **Consistência:** conta e ledger na mesma transação; o saldo fica no próprio lançamento, com trava pessimista por conta. Saldo para autorizar débito nunca vem de cache. ([ADR 0007](docs/adr/0007-conta-e-ledger-no-accounts.md), [ADR 0012](docs/adr/0012-saldo-no-lancamento-e-trava-pessimista.md))

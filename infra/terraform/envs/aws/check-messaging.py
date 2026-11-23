@@ -325,8 +325,9 @@ def main():
                 errors.append(f"{script}: fila {name} com DLQ desconhecida ({target})")
                 continue
             local_dlqs.setdefault(name, set()).add(target[6:])
-            if str(policy.get("maxReceiveCount")) != max_receive:
-                errors.append(f"{script}: fila {name} com maxReceiveCount {policy.get('maxReceiveCount')}, Terraform {max_receive}")
+            expected = str(tf_queues[name].get("max_receive_count", max_receive))
+            if str(policy.get("maxReceiveCount")) != expected:
+                errors.append(f"{script}: fila {name} com maxReceiveCount {policy.get('maxReceiveCount')}, Terraform {expected}")
         elif "RedrivePolicy" in attrs:
             errors.append(f"{script}: fila {name} com RedrivePolicy e fora das filas do Terraform")
     for script, topic, queue, attrs in local.subs:
