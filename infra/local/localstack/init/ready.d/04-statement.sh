@@ -4,8 +4,9 @@
 # (infra/local/dynamodb/init/), fora do LocalStack, que nao tem persistencia.
 # Idempotente: create-queue e subscribe com os mesmos parametros devolvem o recurso existente.
 # Raw message delivery: o corpo e o envelope do evento e eventType/correlationId chegam como atributos SQS.
-# Configuravel por variavel de ambiente do conteiner: STATEMENT_MAX_RECEIVE_COUNT (padrao 5) e
+# Configuravel por variavel de ambiente do conteiner: STATEMENT_MAX_RECEIVE_COUNT (padrao 120) e
 # STATEMENT_VISIBILITY_TIMEOUT_SECONDS (padrao 30).
+# 120 recebimentos x 30 s deixam cerca de 1 h de retentativa antes da DLQ (#239).
 set -euo pipefail
 
 export AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=us-east-1
@@ -13,7 +14,7 @@ aws_local() {
   aws --endpoint-url http://127.0.0.1:4566 "$@"
 }
 
-max_receive_count="${STATEMENT_MAX_RECEIVE_COUNT:-5}"
+max_receive_count="${STATEMENT_MAX_RECEIVE_COUNT:-120}"
 visibility_timeout="${STATEMENT_VISIBILITY_TIMEOUT_SECONDS:-30}"
 
 queue_arn() {
