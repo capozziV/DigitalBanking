@@ -2,10 +2,10 @@
 
 > Resumo do projeto, atualizado pela coordenadora ao fim de cada tarefa. Tasks, débito técnico, decisões pendentes e tarefas do usuário ficam no board.
 
-**Última atualização:** 2026-11-22
+**Última atualização:** 2026-11-23
 **Board:** [Digital Banking no GitHub Projects](https://github.com/users/capozziV/projects/2)
-**Fase atual:** etapa 9 (frontend do capzzPay) com revisão final **aprovada** em `fa05405` (3 Critical e 11 Important fechados), PR [#240](https://github.com/capozziV/DigitalBanking/pull/240) para a `main`. Etapa 8 na `main` (PR #205).
-**Próximo passo:** merge do #240 com o `ci-ok` verde no último commit; depois o PR do DynamoDB Local (`debito/dynamodb-local`, em revisão) com a migração da stack do usuário, e o #239 (retentativa de 1 hora).
+**Fase atual:** etapas 0 a 9 na `main`. Em 2026-11-23 entraram: DynamoDB Local com volume (#234, PR #248, ADR 0027), com o extrato da stack local `capzzpay` recuperado pelo outbox; retentativa de ~1 hora antes da DLQ do extrato (#239, PR #251); débitos #222/#238 (PR #243), #223 (PR #245) e #152 (PR #249). Minor novos em Ready: #244, #246, #247, #250.
+**Próximo passo:** escolher com o usuário entre os débitos em Ready (#225, #230, #236 e os Minor #244, #246, #247, #250), a etapa 10 de observabilidade (#202, proposta) e a subida real na AWS (#182), que depende das tarefas do usuário #219 e #224.
 
 ## Handoff da etapa 9 (2026-11-22)
 O checkout principal está na `main` 132 commits atrás e com um `docs/status.md` antigo: vale este arquivo, no worktree da etapa. Há mudanças não commitadas no checkout principal (memória de agentes, grafo) e em cerca de 35 worktrees: não descarte sem olhar.
@@ -62,6 +62,10 @@ Detalhes de cada etapa na spec, no plano e nos PRs.
 - **Bloqueio e encerramento de conta** (#27; [spec](superpowers/specs/2026-11-16-bloqueio-e-encerramento-de-conta-design.md), [plano](superpowers/plans/2026-11-16-bloqueio-e-encerramento-de-conta.md), ADR 0023; PR #197): status da conta (Ativa, Bloqueada, Encerrada) conferido sob a trava; rotas de admin; encerramento com saldo zero e sem pendentes, consultando o `transfers` (`GET /internal/accounts/{id}/pending-transfers`); saga trata conta bloqueada ou encerrada devolvendo o limite; notificações de status. Revisão final: 1441 testes, 0 falhas; smoke, Bruno 15/15 e e2e 21/21.
 - **Débitos técnicos de 2026-11-16 a 19:** PRs #188 (#170, #56), #190 (#23), #191 (#33, #40, #44), #193 (#159, #160), #199 (#189), #200 (#196, `TransferCompensated` v2 com `reason`).
 - **Etapa 8, acabamento** ([spec](superpowers/specs/2026-11-16-etapa-8-acabamento-design.md), [plano](superpowers/plans/2026-11-16-etapa-8-acabamento.md), ADRs 0021 e 0022): imagens Docker em camadas; chart Helm comum e `db-init`; Terraform `bootstrap` (estado, OIDC, ECR, Budget) e `envs/aws` (VPC, EKS 1.36 com nós EC2, ALB interno, borda, RDS, ElastiCache, DynamoDB, SNS/SQS, Pod Identity), tudo validado sem aplicar; workflows `aws-up`, `aws-down` e `aws-reaper` (8 h, falha segura); contratos HTTP e de mensagem com o Stubborn Contract 0.2.2; README com diagrama. Revisão final: 1504 testes verdes, validações de infra e mutantes vermelhos.
+- **Etapa 9, frontend do capzzPay** ([spec](superpowers/specs/2026-11-19-etapa-9-frontend-design.md), [plano](superpowers/plans/2026-11-19-etapa-9-frontend.md), ADRs 0024–0026; PR #240): web Angular e BFF NestJS com login e cadastro no Cognito, telefone do cliente, bônus de boas-vindas, nome da contraparte nas notificações, Playwright no CI. Mergeado em 2026-11-23.
+- **Memória dos agentes** das etapas 8 e 9 versionada (PR #242).
+- **DynamoDB Local e retentativa do extrato (2026-11-23):** PR #248 (#234, [ADR 0027](adr/0027-dynamodb-local-com-volume.md); extrato local fora do LocalStack, com volume, migração e prova de persistência no smoke) e PR #251 (#239, `statement-accounts.fifo` com 120 recebimentos de 30 s). Extrato da stack `capzzpay` recuperado republicando o outbox.
+- **Débitos técnicos de 2026-11-23:** PR #249 (#152, lacunas de teste do cache do extrato), PR #243 (#222 padrão de 500 ms do timeout do `transfers`; #238 índice em `account(customer_id)`, V10) e PR #245 (#223 troca concorrente de telefone no `customer`).
 - **Board** no GitHub Projects (2026-10-26) e **guia local no Mac** (PR #6).
 
 ## Como rodar localmente
