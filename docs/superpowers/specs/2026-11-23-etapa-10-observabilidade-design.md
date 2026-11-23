@@ -1,7 +1,7 @@
 # Etapa 10 — observabilidade: design
 
 - **Data:** 2026-11-23
-- **Status:** rascunho, aguardando aprovação do usuário
+- **Status:** aprovada pelo usuário em 2026-11-23
 - **Roadmap:** etapa 10, proposta pelo usuário em 2026-11-19 (cartão #202): correlation ID, linha do tempo da saga, painéis de logs, traces e métricas.
 - **ADR base:** [0006 — Observabilidade só com correlation ID](../../adr/0006-observabilidade-com-correlation-id.md), que esta etapa substitui em parte por um ADR novo (seção 9).
 
