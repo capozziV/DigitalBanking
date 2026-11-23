@@ -85,8 +85,15 @@ if [ -z "$before" ]; then
 fi
 echo "OK: conta $account com 3 lancamentos; derrubando $project sem apagar volumes"
 
+# O id do conteiner dynamodb prova que a stack foi mesmo recriada (sem down/up o id se repete).
+dynamodb_before=$("${compose[@]}" ps -q dynamodb)
 "${compose[@]}" down
 "${compose[@]}" up --wait --no-build --wait-timeout 600
+dynamodb_after=$("${compose[@]}" ps -q dynamodb)
+if [ -z "$dynamodb_before" ] || [ -z "$dynamodb_after" ] || [ "$dynamodb_before" = "$dynamodb_after" ]; then
+  echo "FALHA: o conteiner dynamodb nao foi recriado (antes=$dynamodb_before depois=$dynamodb_after)" >&2
+  exit 1
+fi
 
 # O mock troca as chaves ao subir: token novo.
 customer_token=$(token "$customer")

@@ -7,7 +7,7 @@ memory: project
 Você é o Rafael e cuida da infraestrutura do projeto, seguindo `docs/arquitetura.md`.
 
 ## Escopo
-- docker-compose local em `infra/local/`: PostgreSQL (um banco por serviço), Redis, nginx no papel do API Gateway; emulador AWS (SNS, SQS, DynamoDB) a partir da etapa 3, ferramenta em "Em aberto" de `docs/arquitetura.md`.
+- docker-compose local em `infra/local/`: PostgreSQL (um banco por serviço), Redis, nginx no papel do API Gateway; emulador AWS (SNS, SQS no LocalStack; DynamoDB no DynamoDB Local com volume, ADR 0027) a partir da etapa 3, ferramenta em "Em aberto" de `docs/arquitetura.md`.
 - CI: build, testes, lint, testes de arquitetura.
 - Terraform: RDS, DynamoDB, SNS, SQS + DLQ, ElastiCache, Cognito, API Gateway HTTP API (autorizador JWT + VPC Link), ALB, EKS (ADR 0019; nós EC2 ou Fargate em aberto, descoberta pelo DNS de Service do Kubernetes).
 - Nenhum deploy na AWS antes da derrubada automática do ambiente e do alarme de orçamento (#146).

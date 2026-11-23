@@ -6,7 +6,7 @@
 - **AWS:** RDS PostgreSQL, DynamoDB, SNS, SQS + DLQ, ElastiCache (Redis), Cognito, API Gateway (HTTP API), EKS ([ADR 0019](adr/0019-runtime-na-aws-com-eks.md)), em `sa-east-1`. O ambiente na AWS é efêmero: sobe sob demanda, fica no máximo 8 h e é destruído com Terraform ([ADR 0021](adr/0021-deploy-e-ambiente-efemero.md)).
 - **Lint:** ktlint.
 - **Infraestrutura como código:** Terraform.
-- **Local:** docker-compose em `infra/local/` com PostgreSQL (um banco por serviço), Redis, nginx (no papel do API Gateway), `mock-oauth2-server` (no papel do Cognito) LocalStack (SNS e SQS, conta gratuita com token) e DynamoDB Local com volume nomeado para a tabela do extrato ([ADR 0027](adr/0027-dynamodb-local-com-volume.md)). Perfil `apps` sobe os cinco serviços pelas imagens Docker. Testes de integração com Testcontainers.
+- **Local:** docker-compose em `infra/local/` com PostgreSQL (um banco por serviço), Redis, nginx (no papel do API Gateway), `mock-oauth2-server` (no papel do Cognito), LocalStack (SNS e SQS, conta gratuita com token) e DynamoDB Local com volume nomeado para a tabela do extrato ([ADR 0027](adr/0027-dynamodb-local-com-volume.md)). Perfil `apps` sobe os cinco serviços pelas imagens Docker. Testes de integração com Testcontainers.
 - **Frontend (etapa 9):** Angular + BFF em Node/NestJS.
 - **Diagramas:** Mermaid (no `README.md`).
 
