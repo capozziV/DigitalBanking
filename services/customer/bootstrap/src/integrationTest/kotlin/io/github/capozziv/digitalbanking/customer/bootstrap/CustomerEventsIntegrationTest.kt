@@ -114,6 +114,55 @@ class CustomerEventsIntegrationTest : CustomerIntegrationTest() {
         ).isEqualTo(1L)
     }
 
+    /** Two registered customers change to the same new phone at once; [poolSize] 1 forces the fully serialized interleaving. */
+    private fun changeToSamePhone(poolSize: Int) {
+        val first = UUID.randomUUID()
+        val second = UUID.randomUUID()
+        api.post("/customers", body(), JwtTestSupport.customerToken(first))
+        api.post("/customers", body(), JwtTestSupport.customerToken(second))
+        val contested = nextPhone()
+
+        val statuses =
+            Executors.newFixedThreadPool(poolSize).use { executor ->
+                listOf(first, second)
+                    .map { sub ->
+                        executor.submit<Int> {
+                            api
+                                .put(
+                                    "/customers/me/phone",
+                                    """{"phone":"$contested"}""",
+                                    JwtTestSupport.customerToken(sub),
+                                ).status
+                        }
+                    }.map { it.get(30, TimeUnit.SECONDS) }
+            }
+
+        // Count winners and losers: a serialized run may refuse the second one before the index does, but never lets both win.
+        assertThat(statuses.count { it == 200 }).describedAs("statuses: $statuses").isEqualTo(1)
+        assertThat(statuses.count { it == 409 }).describedAs("statuses: $statuses").isEqualTo(1)
+        assertThat(
+            ownerJdbc
+                .sql("select count(*) from customer where phone = :phone")
+                .param("phone", contested)
+                .query(Long::class.java)
+                .single(),
+        ).isEqualTo(1L)
+        assertThat(
+            ownerJdbc
+                .sql("select count(*) from outbox where event_type = 'CustomerPhoneChanged' and aggregate_id in (:a, :b)")
+                .param("a", first.toString())
+                .param("b", second.toString())
+                .query(Long::class.java)
+                .single(),
+        ).describedAs("only the winner emits CustomerPhoneChanged").isEqualTo(1L)
+    }
+
+    @Test
+    fun `two customers changing to the same phone at once get exactly one 200 and one 409`() = changeToSamePhone(poolSize = 2)
+
+    @Test
+    fun `two customers changing to the same phone one after the other get exactly one 200 and one 409`() = changeToSamePhone(poolSize = 1)
+
     @Test
     fun `a repeated registration writes no second event`() {
         val sub = UUID.randomUUID()
