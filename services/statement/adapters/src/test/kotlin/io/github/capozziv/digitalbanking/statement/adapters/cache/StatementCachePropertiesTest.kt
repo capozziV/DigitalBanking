@@ -43,6 +43,13 @@ class StatementCachePropertiesTest {
     fun `a zero or negative ttl is rejected`() {
         assertThatThrownBy { StatementCacheProperties(ttl = Duration.ZERO, ttlJitter = Duration.ZERO) }
             .isInstanceOf(IllegalArgumentException::class.java)
-            .hasMessageContaining("ttl")
+            .hasMessageContaining("positive")
+    }
+
+    @Test
+    fun `a negative ttl is rejected`() {
+        assertThatThrownBy { StatementCacheProperties(ttl = Duration.ofSeconds(-5), ttlJitter = Duration.ZERO) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("positive")
     }
 }

@@ -14,8 +14,8 @@ data class StatementCacheProperties(
     val ttlJitter: Duration = Duration.ofSeconds(10),
 ) {
     init {
-        require(!ttl.isNegative && !ttl.isZero) { "statement.cache.ttl must be positive, was $ttl" }
         require(!ttlJitter.isNegative) { "statement.cache.ttl-jitter must not be negative, was $ttlJitter" }
-        require(ttl > ttlJitter) { "statement.cache.ttl-jitter ($ttlJitter) must be shorter than statement.cache.ttl ($ttl)" }
+        // With a non-negative jitter this also makes the ttl positive.
+        require(ttl > ttlJitter) { "statement.cache.ttl ($ttl) must be positive and longer than statement.cache.ttl-jitter ($ttlJitter)" }
     }
 }
