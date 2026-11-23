@@ -72,10 +72,10 @@ Tabela única `statement`, chave `accountId` (`S`, partição) + `sequence` (`N`
 1. O `StatementEventListener` recebe a mensagem de `statement-accounts.fifo` (grupo FIFO por conta, então `AccountOpened` chega antes dos lançamentos da conta).
 2. `LedgerEntryRecorded` v1 → `RecordStatementEntryUseCase` → `PutItem` com `ConditionExpression attribute_not_exists(accountId)`.
    - Gravou → confirma.
-   - `ConditionalCheckFailedException` → `GetItem` da mesma chave: mesmo `entryId` = repetição, confirma sem efeito; `entryId` diferente = inconsistência, lança `ConflictingStatementEntryException` (log ERROR, a mensagem vai para a DLQ depois de 5 tentativas).
+   - `ConditionalCheckFailedException` → `GetItem` da mesma chave: mesmo `entryId` = repetição, confirma sem efeito; `entryId` diferente = inconsistência, lança `ConflictingStatementEntryException` (log ERROR, a mensagem vai para a DLQ depois de 120 tentativas, cerca de 1 hora, desde o #239).
 3. `AccountOpened` v1 → `RegisterAccountUseCase` → `PutItem` condicional do item da conta (repetição confirma sem efeito).
 4. Outro tipo de evento (ex.: `AccountTypeChanged`) ou versão desconhecida → log INFO e confirma.
-5. Payload malformado → falha, volta para a fila e vai para a DLQ na 5ª tentativa.
+5. Payload malformado → falha, volta para a fila e vai para a DLQ na 120ª tentativa (era a 5ª; passou para 120 no #239, cerca de 1 hora).
 
 Sem tabela `processed_events`: a chave do item é a idempotência (ADR 0018).
 

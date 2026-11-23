@@ -356,6 +356,12 @@ def main():
         block = re.search(rf'resource "{resource}" \{{(.*?)\n\}}', tf, re.S)
         if not block or not re.search(r"^\s*content_based_deduplication\s*=\s*false\s*$", block.group(1), re.M):
             errors.append(f"Terraform: {resource.split(chr(34))[0]} sem content_based_deduplication = false")
+    # O maxReceiveCount da fila vem de each.value.max_receive_count, e o padrao do resources.json entra pelo merge dos locals.
+    this_queue = re.search(r'resource "aws_sqs_queue" "this" \{(.*?)\n\}', tf, re.S)
+    if not this_queue or not re.search(r"^\s*maxReceiveCount\s*=\s*each\.value\.max_receive_count\s*$", this_queue.group(1), re.M):
+        errors.append("Terraform: aws_sqs_queue.this sem maxReceiveCount = each.value.max_receive_count")
+    if not re.search(r"^\s*queues\s*=.*merge\(\{\s*max_receive_count\s*=\s*local\.spec\.max_receive_count\s*\},\s*q\)", tf, re.M):
+        errors.append("Terraform: locals.queues sem o padrao max_receive_count (merge com local.spec.max_receive_count)")
     sub = re.search(r'resource "aws_sns_topic_subscription" "this" \{(.*?)\n\}', tf, re.S)
     if not sub or not re.search(r"^\s*raw_message_delivery\s*=\s*true\s*$", sub.group(1), re.M):
         errors.append("Terraform: assinatura sem raw_message_delivery = true")

@@ -4,7 +4,9 @@ locals {
   spec = jsondecode(file("${path.module}/resources.json"))
 
   topics = { for t in local.spec.topics : t.name => t }
-  queues = { for q in local.spec.queues : q.name => q }
+  # Toda fila de consumo tem max_receive_count: o do resources.json ou o padrao; um erro de digitacao no
+  # main.tf vira erro no plan (sem try/lookup que esconda).
+  queues = { for q in local.spec.queues : q.name => merge({ max_receive_count = local.spec.max_receive_count }, q) }
   dlqs   = { for q in local.spec.dead_letter_queues : q.name => q }
   tables = { for t in local.spec.dynamodb_tables : t.name => t }
 }
@@ -51,7 +53,7 @@ resource "aws_sqs_queue" "this" {
 
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.dlq[each.value.dlq].arn
-    maxReceiveCount     = try(each.value.max_receive_count, local.spec.max_receive_count)
+    maxReceiveCount     = each.value.max_receive_count
   })
 
   lifecycle {
