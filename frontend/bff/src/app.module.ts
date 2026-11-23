@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { AuthController } from './auth/auth.controller.js';
-import { BackendErrorFilter } from './backend/backend-error.filter.js';
 import { BackendClient, FETCH } from './backend/backend-client.js';
 import { APP_CONFIG, loadConfig, type AppConfig } from './config/config.js';
+import { ErrorFilter } from './errors/error.filter.js';
 import { HealthController } from './health.controller.js';
 import { CognitoIdentityProvider } from './identity/cognito-identity-provider.js';
 import { IdentityProvider } from './identity/identity-provider.js';
@@ -50,7 +50,7 @@ import { CLOCK, SessionService } from './session/session.service.js';
     },
     { provide: CLOCK, useValue: () => Date.now() },
     { provide: FETCH, useValue: fetch },
-    { provide: APP_FILTER, useClass: BackendErrorFilter },
+    { provide: APP_FILTER, useClass: ErrorFilter },
     SessionService,
     SessionGuard,
     BackendClient,

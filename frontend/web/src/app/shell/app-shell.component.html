@@ -53,6 +53,14 @@
     @if (wide()) {
       <div class="content-bell"><app-notification-bell /></div>
     }
+    @if (session.signOutFailed()) {
+      <p class="form-error" role="alert">
+        Não foi possível confirmar a saída. Sua sessão pode continuar aberta.
+        <button class="btn btn-outline btn-auto" type="button" (click)="signOut()">
+          Tentar de novo
+        </button>
+      </p>
+    }
     @if (session.loadFailed()) {
       <app-load-error (retry)="retry()" />
     }

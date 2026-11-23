@@ -90,7 +90,7 @@ O builder confere os caminhos exatos de cada rota no OpenAPI de cada serviço.
 
   O builder define o desenho exato e o registra.
 - **Validação da senha** de 6 dígitos também no BFF, não só na tela.
-- **`Idempotency-Key`** gerada no Angular ao abrir o formulário de transferência; o BFF só repassa.
+- **`Idempotency-Key`** gerada no Angular ao abrir o formulário de transferência; o BFF só repassa. *(Superado em 2026-11-22: uma chave por tentativa, ver a emenda do ADR 0005.)*
 - **Status da transferência** por polling (RxJS) a partir do Angular, com intervalo e prazo definidos pelo builder.
 
 ### 6.4 Mudanças no backend e na infraestrutura
@@ -99,6 +99,7 @@ O builder confere os caminhos exatos de cada rota no OpenAPI de cada serviço.
   - Entra pelo outbox como os demais lançamentos, para o extrato e o notification.
   - Termo novo no `CONTEXT.md`: **Bônus de boas-vindas**.
   - O valor fica numa configuração, com o padrão de 10000.
+  - **Nota (decisão de 2026-11-22, [ADR 0026](../../adr/0026-bonus-de-boas-vindas-por-cliente.md)):** o bônus é só na primeira conta do cliente; encerrar e reabrir não repete, e a conta nova nasce com saldo zero.
 - **customer: telefone do cliente.**
   - O cliente ganha o campo telefone: celular brasileiro, guardado em E.164 (`+55DD9XXXXXXXX`), com formato validado e **único** entre os clientes. **Não há verificação** do número, nem real nem simulada.
   - **Troca do telefone** em "Minha conta": o número novo também precisa ser único. Uma transferência é resolvida no momento do envio, então trocar o telefone depois não afeta transferências já feitas.

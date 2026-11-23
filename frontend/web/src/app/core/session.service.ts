@@ -22,6 +22,9 @@ interface SessionDTO {
 
 const UNREAD_POLL_MS = 30_000;
 
+const isSessionGone = (error: unknown): boolean =>
+  error instanceof HttpErrorResponse && error.status === 401;
+
 /** Holds who is signed in. Tokens never reach the browser: only the BFF cookie does. */
 @Injectable({ providedIn: 'root' })
 export class SessionService {
@@ -37,6 +40,8 @@ export class SessionService {
   readonly unreadCount = signal(0);
   /** The last load failed for a reason other than a lost session (BFF down, network). */
   readonly loadFailed = signal(false);
+  /** The last sign-out was not confirmed by the BFF: the session cookie may still work. */
+  readonly signOutFailed = signal(false);
 
   private loading: Promise<void> | null = null;
   private refreshing: Promise<void> | null = null;
@@ -79,11 +84,16 @@ export class SessionService {
     await firstValueFrom(this.http.post('/bff/auth/confirm', { email, code }));
   }
 
+  /** The cookie is HttpOnly, so only the BFF can end the session: a failure is not a sign-out. */
   async signOut(): Promise<void> {
+    this.signOutFailed.set(false);
     try {
       await firstValueFrom(this.http.post('/bff/auth/sign-out', {}));
-    } catch {
-      // The local state is cleared either way.
+    } catch (error) {
+      if (!isSessionGone(error)) {
+        this.signOutFailed.set(true);
+        return;
+      }
     }
     this.clear();
     await this.router.navigateByUrl('/entrar');
@@ -93,6 +103,8 @@ export class SessionService {
   clear(): void {
     this.stopUnreadPolling();
     this.discardUnreadInFlight();
+    this.signOutFailed.set(false);
+    this.loadFailed.set(false);
     this.authenticated.set(false);
     this.email.set(null);
     this.customer.set(null);
@@ -157,7 +169,6 @@ export class SessionService {
     try {
       const session = await firstValueFrom(this.http.get<SessionDTO>('/bff/auth/session'));
       if (!session.authenticated) {
-        this.loadFailed.set(false);
         this.clear();
         return;
       }
@@ -167,8 +178,7 @@ export class SessionService {
       this.loaded.set(true);
       this.loadFailed.set(false);
     } catch (error) {
-      if (error instanceof HttpErrorResponse && error.status === 401) {
-        this.loadFailed.set(false);
+      if (isSessionGone(error)) {
         this.clear();
         return;
       }

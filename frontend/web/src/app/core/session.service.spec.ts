@@ -123,6 +123,46 @@ describe('SessionService', () => {
     expect(navigate).toHaveBeenCalledWith('/entrar');
   });
 
+  for (const status of [503, 500, 403, 0]) {
+    it(`does not declare the sign-out done when the POST fails with ${status}`, async () => {
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+      service.authenticated.set(true);
+      service.email.set('a@b.com');
+      const promise = service.signOut();
+      const req = http.expectOne('/bff/auth/sign-out');
+      if (status === 0) req.error(new ProgressEvent('error'));
+      else req.flush({}, { status, statusText: 'Error' });
+      await promise;
+      expect(service.authenticated()).toBe(true);
+      expect(service.email()).toBe('a@b.com');
+      expect(service.signOutFailed()).toBe(true);
+      expect(navigate).not.toHaveBeenCalled();
+    });
+  }
+
+  it('counts a session that no longer exists (401) as signed out', async () => {
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    service.authenticated.set(true);
+    const promise = service.signOut();
+    http.expectOne('/bff/auth/sign-out').flush({}, { status: 401, statusText: 'Unauthorized' });
+    await promise;
+    expect(service.authenticated()).toBe(false);
+    expect(service.signOutFailed()).toBe(false);
+    expect(navigate).toHaveBeenCalledWith('/entrar');
+  });
+
+  it('forgets a failed load when the session is cleared', () => {
+    service.loadFailed.set(true);
+    service.clear();
+    expect(service.loadFailed()).toBe(false);
+  });
+
+  it('forgets a failed sign-out when the session is cleared', () => {
+    service.signOutFailed.set(true);
+    service.clear();
+    expect(service.signOutFailed()).toBe(false);
+  });
+
   it('loads the unread count', async () => {
     const promise = service.refreshUnread();
     http.expectOne('/bff/notifications/unread-count').flush({ count: 3 });

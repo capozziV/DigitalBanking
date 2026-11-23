@@ -137,6 +137,20 @@ class JdbcRepositoriesIntegrationTest : AccountsIntegrationTest() {
     }
 
     @Test
+    fun `existsOtherByCustomerId sees another account of the customer in any status, never the excluded one nor other customers`() {
+        val first = openAccount()
+        assertThat(accounts.existsOtherByCustomerId(first.customerId, first.id)).isFalse()
+        assertThat(accounts.existsOtherByCustomerId(first.customerId, UUID.randomUUID())).isTrue()
+        assertThat(accounts.existsOtherByCustomerId(UUID.randomUUID(), first.id)).isFalse()
+
+        tx.inTransaction { accounts.updateStatus(first.copy(status = AccountStatus.CLOSED)) }
+        val second = Account(ids.newId(), first.customerId, AccountType.FREE)
+        tx.inTransaction { accounts.insert(second, "open-${second.id}") }
+
+        assertThat(accounts.existsOtherByCustomerId(first.customerId, second.id)).isTrue()
+    }
+
+    @Test
     fun `second account of the same customer with another key is DUPLICATE_CUSTOMER`() {
         val first = openAccount()
         val second = Account(ids.newId(), first.customerId, AccountType.FREE)

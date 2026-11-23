@@ -27,6 +27,10 @@ export class RedisKeyValueStore implements KeyValueStore, OnModuleDestroy {
     return (await this.redis.set(key, value, 'NX')) === 'OK';
   }
 
+  async setIfExists(key: string, value: string, ttlSeconds: number): Promise<boolean> {
+    return (await this.redis.set(key, value, 'EX', ttlSeconds, 'XX')) === 'OK';
+  }
+
   async delete(key: string): Promise<void> {
     await this.redis.del(key);
   }

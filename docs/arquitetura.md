@@ -63,6 +63,9 @@ O BFF não passa pelo API Gateway: chama os Services do cluster direto. Testes m
 - Arrendamento (`locked_until`) no lugar de trava de banco durante a chamada HTTP.
 - (ver [ADR 0016](adr/0016-saga-orquestrada-por-http.md) e a [spec da etapa 2](superpowers/specs/2026-10-27-etapa-2-transfers-design.md))
 
+### Falha longa no extrato
+- Decidido em 2026-11-22, a implementar (#239): o `statement` tenta por cerca de 1 hora (120 recepções de 30 s) antes da DLQ, em vez de 2,5 min. Custo aceito: mensagem defeituosa segura os lançamentos seguintes daquela conta por até 1 hora. Sem alarme, retenção maior nem backup por ora: passada 1 hora, o lançamento fica na DLQ sem aviso até o reenvio manual ou a derrubada do ambiente.
+
 ### Cache
 - Extrato: cache-aside só no Redis (sem Caffeine), só a 1ª página com `limit` 20, TTL 60 s ± 10 s, invalidação ao consumir o lançamento por versão por conta (um script Lua incrementa a versão e apaga a página; a leitura só grava se a versão não mudou, senão `statement.cache.writes{result=stale}`), fallback para o DynamoDB com timeout de 100 ms se o Redis cair (sem circuit breaker). Resíduo aceito: se a versão se perder ou a invalidação falhar no Redis, página velha por no máximo um TTL.
 - Saldo para autorizar débito nunca vem de cache.
@@ -98,6 +101,7 @@ O BFF não passa pelo API Gateway: chama os Services do cluster direto. Testes m
 - **Identidade:** o id do cliente é o `sub` do usuário. Três chamadores: cliente, admin (grupo `admin`, claim configurável) e serviço (token de máquina por client credentials, escopo `digitalbanking/internal`). Recurso de outro cliente devolve `404`; sem token, `401`; rota de admin sem o grupo, `403`.
 - `accounts` (abrir conta) e `transfers` (criar transferência) consultam o `customer` na hora, sem cache; inexistente ou bloqueado dá `422`, `customer` fora dá `503`.
 - **Status da conta** (`ACTIVE`, `BLOCKED`, `CLOSED`): conferido sob a trava da conta, no débito e no crédito. Admin bloqueia e desbloqueia por `PUT /admin/accounts/{id}/status`; o dono (ou admin) encerra por `POST /accounts/{id}/close`, com saldo zero. No encerramento o `accounts` consulta o `transfers` de forma síncrona (`GET /internal/accounts/{id}/pending-transfers`, só token de máquina; transferência pendente dá `422 pending-transfers`, `transfers` fora dá `503 transfers-unavailable`), o que fecha um ciclo síncrono com a saga. Lançamento depois da consulta recusa o encerramento (ver [ADR 0023](adr/0023-status-da-conta-e-encerramento.md)).
+- **Bônus de boas-vindas** (R$ 100): um por cliente, só na primeira conta; encerrar e reabrir não repete (a conta nova nasce com saldo zero). Ao abrir, na mesma transação e depois do insert, o `accounts` credita só se o cliente não tem outra conta, inclusive encerrada; o índice único parcial de conta não encerrada por cliente serializa as aberturas (ver [ADR 0026](adr/0026-bonus-de-boas-vindas-por-cliente.md)).
 - `401` e `403` em Problem Details; desconexão do cliente não vira `500`. `/actuator/health` aberto sem detalhes; o resto do actuator só para admin.
 - **Terraform da borda** (`infra/terraform/modules/identity` e `edge`): parte do ambiente efêmero `envs/aws`, aplicado pelo `aws-up` ([ADR 0021](adr/0021-deploy-e-ambiente-efemero.md)).
 - **Bibliotecas compartilhadas** (só infraestrutura): `libs/security` (resource server, `Caller`, token de máquina), `libs/observabilidade` (filtro de correlation ID, propagação nas chamadas HTTP de saída e interceptor SQS que põe o ID da mensagem no MDC) e `libs/testing-security` (emissor de JWT de teste).
@@ -132,7 +136,7 @@ O BFF não passa pelo API Gateway: chama os Services do cluster direto. Testes m
 - Angular (standalone components, signals); Angular Material como biblioteca de componentes.
 - BFF em NestJS: login e cadastro pela API do Cognito (`SignUp`, `ConfirmSignUp`, `InitiateAuth` com `USER_PASSWORD_AUTH`), com app client próprio e sem hosted UI ([ADR 0024](adr/0024-login-e-telefone-do-app.md)), sessão no Redis, cookie `HttpOnly`, CSRF, refresh de token, correlation ID via `AsyncLocalStorage`, logs JSON com pino.
 - BFF expõe endpoints por tela (agregação), não proxy genérico.
-- `Idempotency-Key` gerada no Angular ao abrir o formulário de transferência; o BFF só repassa.
+- `Idempotency-Key` gerada no Angular por tentativa (usuário + telefone + valor), guardada no `sessionStorage` da aba até o estado final aparecer; o BFF só repassa. Limite: outra aba gera chave nova (#241).
 - Status da saga por polling (RxJS).
 - Front e BFF na mesma origem (API Gateway -> ALB interno roteando `/` e `/bff`), sem CORS; o BFF chama os Services do cluster direto.
 - Organização: `frontend/web` (Angular), `frontend/bff` (NestJS), `frontend/e2e` (Playwright), com workspaces npm e job próprio no CI.
@@ -141,4 +145,4 @@ O BFF não passa pelo API Gateway: chama os Services do cluster direto. Testes m
 ## Em aberto
 Fonte única das decisões pendentes; cada item tem um cartão `Decision` no [board](https://github.com/users/capozziV/projects/2). Ao decidir, registre no ADR indicado (ou crie um), remova o item daqui e feche o cartão.
 
-- **Bônus de boas-vindas repetido (#237):** encerrar e reabrir a conta repete o bônus de R$ 100 (o bônus é por conta), sem fim e com limite diário novo. Opções: (a) um bônus por cliente (recomendada); (b) aceitar o comportamento e registrar em ADR. Decisão do usuário.
+Nenhum item em aberto.

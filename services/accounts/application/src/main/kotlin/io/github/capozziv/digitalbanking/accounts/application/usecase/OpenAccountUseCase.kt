@@ -35,9 +35,10 @@ data class OpenAccountResult(
 )
 
 /**
- * Opens the account and returns its view read in the same transaction. A new account starts with the welcome bonus
- * credit (sequence 1, recorded in that transaction), so its balance is the bonus; with no bonus configured (null)
- * it starts at zero.
+ * Opens the account and returns its view read in the same transaction. The welcome bonus is per customer: the first
+ * account a customer ever opens starts with the bonus credit (sequence 1, recorded in that transaction), so its
+ * balance is the bonus. Any later account (the customer closed the earlier one and reopened), or no bonus
+ * configured (null), starts at zero with no entry and no bonus event.
  *
  * First asks the `customer` service, outside the transaction (no connection held during the call), whether the
  * customer exists and is active: [CustomerNotFoundException], [CustomerBlockedException] or
@@ -74,8 +75,11 @@ class OpenAccountUseCase(
             when (accounts.insert(account, idempotencyKey)) {
                 InsertAccountResult.INSERTED -> {
                     outbox.append(event)
+                    // The welcome bonus is per customer: only the first account ever opened gets it, even if the
+                    // earlier one is closed. The insert above already serialized concurrent openings of the customer.
+                    val bonusAmount = welcomeBonus.takeUnless { accounts.existsOtherByCustomerId(customerId, account.id) }
                     val balance =
-                        welcomeBonus?.let { amount ->
+                        bonusAmount?.let { amount ->
                             val bonus =
                                 account.credit(
                                     last = null,

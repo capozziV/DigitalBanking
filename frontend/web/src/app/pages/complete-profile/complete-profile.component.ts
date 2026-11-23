@@ -76,7 +76,8 @@ export class CompleteProfileComponent {
       await firstValueFrom(
         this.http.post('/bff/customers', { name: name.trim(), phone: phoneDigits(phone) }),
       );
-      await this.session.loadMe();
+      // Not `loadMe`: if this load fails, the guard of Início shows the error screen.
+      await this.session.reload();
       await this.router.navigateByUrl('/inicio');
     } catch (error) {
       this.error.set(problemMessage(error, 'Não foi possível concluir o cadastro.'));

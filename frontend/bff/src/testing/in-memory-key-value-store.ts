@@ -28,6 +28,12 @@ export class InMemoryKeyValueStore implements KeyValueStore {
     return true;
   }
 
+  async setIfExists(key: string, value: string, ttlSeconds: number): Promise<boolean> {
+    if (!this.live(key)) return false;
+    await this.set(key, value, ttlSeconds);
+    return true;
+  }
+
   async delete(key: string): Promise<void> {
     this.entries.delete(key);
   }

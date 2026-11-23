@@ -3,12 +3,12 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { SessionService } from '../../core/session.service';
+import type { AccountSummary } from '../../shared/api';
 import { tick } from '../../testing/dom';
 import { HomeComponent } from './home.component';
 
-const account = {
-  id: 'a1',
-  customerId: 'c1',
+// No id: the browser never gets an account id from the BFF.
+const account: AccountSummary = {
   type: 'GOLD',
   status: 'OPEN',
   balance: 482015,
@@ -122,6 +122,9 @@ describe('HomeComponent', () => {
     await fixture.whenStable();
     expect(el().textContent).toContain('Você ainda não tem conta');
     expect(el().textContent).not.toContain('Não foi possível carregar');
+    expect(el().textContent).toContain(
+      'Abra uma conta para transferir. O bônus de boas-vindas vale só para a primeira conta.',
+    );
   });
 
   it('shows the message of a failed account opening', async () => {
