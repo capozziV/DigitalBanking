@@ -197,3 +197,54 @@ resource "aws_budgets_budget" "monthly" {
     }
   }
 }
+
+# --- X-Ray Transaction Search (conta inteira) ---
+# O endpoint OTLP do X-Ray so aceita spans com ele ligado. Fica aqui, e nao no env, porque o destroy do
+# aws_xray_trace_segment_destination e um no-op no provider (a conta continuaria com o destino) e porque o grupo
+# aws/spans precisa existir ANTES do destino, com retencao: se o X-Ray o cria sozinho, nasce sem expirar nunca.
+
+resource "aws_cloudwatch_log_group" "xray_spans" {
+  name              = "aws/spans"
+  retention_in_days = 1
+}
+
+# Politica de recurso do X-Ray para gravar no grupo: a mesma da documentacao do Transaction Search.
+data "aws_iam_policy_document" "xray_spans" {
+  statement {
+    sid     = "TransactionSearchXRayAccess"
+    effect  = "Allow"
+    actions = ["logs:PutLogEvents"]
+    resources = [
+      "arn:aws:logs:${var.region}:${data.aws_caller_identity.current.account_id}:log-group:aws/spans:*",
+      "arn:aws:logs:${var.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/application-signals/data:*",
+    ]
+
+    principals {
+      type        = "Service"
+      identifiers = ["xray.amazonaws.com"]
+    }
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws:xray:${var.region}:${data.aws_caller_identity.current.account_id}:*"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+}
+
+resource "aws_cloudwatch_log_resource_policy" "xray_spans" {
+  policy_name     = "capzzpay-xray-spans"
+  policy_document = data.aws_iam_policy_document.xray_spans.json
+}
+
+resource "aws_xray_trace_segment_destination" "this" {
+  destination = "CloudWatchLogs"
+
+  depends_on = [aws_cloudwatch_log_group.xray_spans, aws_cloudwatch_log_resource_policy.xray_spans]
+}

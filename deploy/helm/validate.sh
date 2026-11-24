@@ -86,6 +86,25 @@ grep -q 'net.ipv4.ip_unprivileged_port_start' "$tmp/web.yaml" || { echo "ERRO: w
 grep -q 'IDENTITY_PROVIDER: "cognito"' "$tmp/bff.yaml" || { echo "ERRO: bff sem IDENTITY_PROVIDER cognito" >&2; exit 1; }
 grep -q 'COOKIE_SECURE: "true"' "$tmp/bff.yaml" || { echo "ERRO: bff com cookie sem Secure" >&2; exit 1; }
 
+echo "== otel-collector"
+helm lint "$here/otel-collector" --strict
+helm template otel-collector "$here/otel-collector" -n digitalbanking > "$tmp/otel-collector.yaml"
+kubeconform -strict -summary -kubernetes-version "$k8s_version" -schema-location default "$tmp/otel-collector.yaml"
+m="$tmp/otel-collector.yaml"
+# O Pod Identity (Terraform, modules/access) liga o papel pelo nome da ServiceAccount; os values dos servicos apontam
+# o OTLP para o Service de mesmo nome (check-observability.py confere os dois lados).
+grep -qE '^      serviceAccountName: otel-collector$' "$m" || { echo "ERRO: coletor com serviceAccountName diferente de otel-collector" >&2; exit 1; }
+awk '/^kind: ServiceAccount/{f=1} f&&/^  name:/{print $2; exit}' "$m" | grep -qx otel-collector || { echo "ERRO: coletor com ServiceAccount de outro nome" >&2; exit 1; }
+if grep -q 'eks.amazonaws.com/role-arn' "$m"; then echo "ERRO: coletor com anotacao IRSA na ServiceAccount" >&2; exit 1; fi
+grep -q 'runAsNonRoot: true' "$m" || { echo "ERRO: coletor pode rodar como root" >&2; exit 1; }
+grep -q 'readOnlyRootFilesystem: true' "$m" || { echo "ERRO: coletor com sistema de arquivos gravavel" >&2; exit 1; }
+if grep -qE 'us-east-1' "$m"; then echo "ERRO: coletor com regiao diferente de sa-east-1" >&2; exit 1; fi
+grep -q 'traces_endpoint: https://xray.sa-east-1.amazonaws.com/v1/traces' "$m" || { echo "ERRO: coletor sem o endpoint OTLP do X-Ray em sa-east-1" >&2; exit 1; }
+# Nunca segredo nem chave de acesso no chart: as credenciais vem do Pod Identity.
+if grep -qiE 'secretKeyRef|aws_access_key|aws_secret' "$m"; then echo "ERRO: coletor com segredo no chart" >&2; exit 1; fi
+# A configuracao sobe de verdade na imagem do ADOT (precisa de docker; OTEL_CONFIG_CHECK=skip pula, so fora do CI).
+"$here/otel-collector/check-config.sh"
+
 echo "== db-init"
 db_init_sets=(--set dbHost=validate.cluster-x.sa-east-1.rds.amazonaws.com
   --set masterSecretId=arn:aws:secretsmanager:sa-east-1:123456789012:secret:rds!db-validate

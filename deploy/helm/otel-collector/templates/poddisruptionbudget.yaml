@@ -1,0 +1,12 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Values.name }}
+  labels:
+    {{- include "collector.labels" . | nindent 4 }}
+spec:
+  # Uma replica: maxUnavailable 1 deixa o upgrade de nos andar (telemetria perdida por alguns segundos e aceitavel).
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      {{- include "collector.selectorLabels" . | nindent 6 }}

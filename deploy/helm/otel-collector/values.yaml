@@ -1,0 +1,37 @@
+# Coletor ADOT do ambiente AWS (etapa 10). Um Deployment com um Service interno `otel-collector:4318` (OTLP/HTTP), no
+# mesmo namespace dos servicos: eles recebem OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318 nos values.
+# A ServiceAccount tem o nome fixo `otel-collector`: o Pod Identity (Terraform, modules/access) liga o papel a ela,
+# no namespace do release. Sem anotacao IRSA.
+
+# Nome do Service, da ServiceAccount e do Deployment; o endpoint dos values e o Terraform dependem dele.
+name: otel-collector
+
+image:
+  # ECR Publico da AWS; os nos saem pelo NAT Gateway. Versao fixa (nunca latest).
+  repository: public.ecr.aws/aws-observability/aws-otel-collector
+  tag: v0.51.0
+  pullPolicy: IfNotPresent
+
+# Regiao do ambiente (a mesma do Terraform): X-Ray, CloudWatch Logs e as metricas EMF ficam nela.
+region: sa-east-1
+
+# Espaco de nomes das metricas no CloudWatch (o painel do Terraform e o IAM do coletor usam o mesmo).
+metricsNamespace: capzzpay
+
+# Grupo de logs das metricas EMF (o Terraform cria com retencao de 1 dia). Os logs dos servicos vao para
+# /capzzpay/<servico>, um grupo por servico (tambem do Terraform).
+emfLogGroup: /capzzpay/metrics
+logGroupPrefix: /capzzpay
+
+port: 4318
+
+# uid do usuario `aoc` da imagem; numerico para o runAsNonRoot do Kubernetes poder conferir.
+runAsUser: 4317
+
+# memory_limiter do coletor fica abaixo do limite do contêiner (limit_mib 160 de 256).
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 256Mi

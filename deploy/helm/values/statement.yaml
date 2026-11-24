@@ -17,6 +17,9 @@ requiredEnv:
   - STATEMENT_REDIS_HOST
 
 env:
+  # Coletor ADOT do namespace (chart otel-collector, OTLP/HTTP); so existe na AWS. Coletor fora nao atrasa o servico.
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  OTEL_SERVICE_NAME: statement
   STATEMENT_JWT_ISSUER_URI: ""
   STATEMENT_JWT_GROUPS_CLAIM: "cognito:groups"
   STATEMENT_AWS_ENDPOINT: ""

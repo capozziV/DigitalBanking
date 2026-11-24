@@ -7,3 +7,8 @@ output "db_init_role_arn" {
   description = "ARN do papel do Job db-init (Pod Identity)."
   value       = aws_iam_role.db_init.arn
 }
+
+output "collector_role_arn" {
+  description = "ARN do papel do coletor ADOT (Pod Identity)."
+  value       = aws_iam_role.collector.arn
+}

@@ -17,6 +17,9 @@ requiredEnv:
   - NOTIFICATION_JWT_ISSUER_URI
 
 env:
+  # Coletor ADOT do namespace (chart otel-collector, OTLP/HTTP); so existe na AWS. Coletor fora nao atrasa o servico.
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  OTEL_SERVICE_NAME: notification
   NOTIFICATION_DB_URL: ""
   NOTIFICATION_DB_USER: notification_app
   NOTIFICATION_DB_OWNER_USER: notification_owner

@@ -18,6 +18,9 @@ requiredEnv:
   - CUSTOMER_TOPIC_ARN
 
 env:
+  # Coletor ADOT do namespace (chart otel-collector, OTLP/HTTP); so existe na AWS. Coletor fora nao atrasa o servico.
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  OTEL_SERVICE_NAME: customer
   CUSTOMER_DB_URL: ""
   CUSTOMER_DB_USER: customer_app
   CUSTOMER_DB_OWNER_USER: customer_owner

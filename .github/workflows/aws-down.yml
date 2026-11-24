@@ -1,6 +1,6 @@
 name: aws-down
 
-# Derruba o ambiente efemero na AWS (ADR 0019): helm uninstall dos servicos e do db-init, terraform destroy do
+# Derruba o ambiente efemero na AWS (ADR 0019): helm uninstall dos servicos, do db-init e do coletor ADOT, terraform destroy do
 # envs/aws e conferencia do que sobrou (infra/aws/leftovers.sh, que so lista: falha o job se sobrou algo).
 # O chart sai antes do destroy: com o controller de pe, os TargetGroupBinding saem e o ALB e as ENIs nao ficam presos.
 # Manual (workflow_dispatch) ou chamado pelo aws-reaper (workflow_call). So da main.
@@ -82,7 +82,7 @@ jobs:
 
       # Servicos primeiro (os TargetGroupBinding saem com o controller ainda de pe), depois o db-init. Falha aqui nao
       # pode impedir o destroy: continue-on-error, e o passo "Falhar se o Helm falhou" marca o job no fim.
-      - name: helm uninstall dos servicos e do db-init
+      - name: helm uninstall dos servicos, do db-init e do coletor
         id: uninstall
         if: ${{ env.CLUSTER_NAME != '' }}
         continue-on-error: true

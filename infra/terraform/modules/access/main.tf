@@ -149,3 +149,40 @@ resource "aws_eks_pod_identity_association" "db_init" {
   service_account = var.db_init_service_account
   role_arn        = aws_iam_role.db_init.arn
 }
+
+# Coletor ADOT (chart deploy/helm/otel-collector): traces pelo endpoint OTLP do X-Ray (SigV4; a acao que o endpoint
+# autoriza e xray:PutTraceSegments, que nao aceita recurso), logs e metricas EMF so nos grupos do projeto. As metricas
+# vao como registros EMF no CloudWatch Logs (awsemf), entao nao ha cloudwatch:PutMetricData. Os grupos sao do
+# Terraform (modules/observability): nao ha logs:CreateLogGroup.
+data "aws_iam_policy_document" "collector" {
+  statement {
+    sid       = "SendTraces"
+    actions   = ["xray:PutTraceSegments"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid     = "WriteProjectLogGroups"
+    actions = ["logs:CreateLogStream", "logs:PutLogEvents", "logs:DescribeLogStreams"]
+    # O ARN do grupo termina em :* na API de logs; o :* de log stream cobre os streams do grupo.
+    resources = [for arn in var.collector_log_group_arns : "${arn}:*"]
+  }
+}
+
+resource "aws_iam_role" "collector" {
+  name               = "${var.name}-otel-collector"
+  assume_role_policy = data.aws_iam_policy_document.assume.json
+}
+
+resource "aws_iam_role_policy" "collector" {
+  name   = "${var.name}-otel-collector"
+  role   = aws_iam_role.collector.id
+  policy = data.aws_iam_policy_document.collector.json
+}
+
+resource "aws_eks_pod_identity_association" "collector" {
+  cluster_name    = var.cluster_name
+  namespace       = var.namespace
+  service_account = var.collector_service_account
+  role_arn        = aws_iam_role.collector.arn
+}

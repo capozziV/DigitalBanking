@@ -158,10 +158,11 @@ jobs:
       - name: kubeconfig do EKS
         run: aws eks update-kubeconfig --region "$AWS_REGION" --name "$CLUSTER_NAME"
 
-      # db-init antes dos servicos (o helm espera o Job e o script confere status.succeeded), Secrets a partir do
+      # Coletor ADOT primeiro (etapa 10: X-Ray, CloudWatch Logs e metricas EMF; os servicos exportam OTLP para o Service
+      # dele), depois o db-init antes dos servicos (o helm espera o Job e o script confere status.succeeded), Secrets a partir do
       # Secrets Manager, os cinco servicos e o app (bff, depois web) no namespace digitalbanking, sem ARN de papel
       # (Pod Identity). O bff usa o app client do Cognito (cognito_bff_client_id) e o Redis provisionado.
-      - name: Instalar o db-init, os cinco servicos, o bff e o web
+      - name: Instalar o coletor, o db-init, os cinco servicos, o bff e o web
         run: infra/aws/deploy-services.sh "$TF_OUTPUTS" "$ECR_REGISTRY" "$IMAGE_TAG"
 
       - name: Credenciais da AWS (OIDC) para o seed e o smoke

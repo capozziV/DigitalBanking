@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Instala no EKS, a partir das saidas do Terraform (envs/aws), o Job db-init, os cinco servicos e o app (bff e web),
+# Instala no EKS, a partir das saidas do Terraform (envs/aws), o coletor ADOT, o Job db-init, os cinco servicos e o app (bff e web),
 # no namespace do Pod Identity (digitalbanking). Usado pelo workflow aws-up.
 #   deploy-services.sh <outputs.json> <registro-ecr> <tag>             instala (exige helm, kubectl e aws CLI)
 #   deploy-services.sh --render <dir> <outputs.json> <registro-ecr> <tag>   so renderiza (helm template), sem cluster
 #                                                                           nem AWS: o CI confere o mapeamento
 # outputs.json: `terraform output -json`. registro-ecr: <conta>.dkr.ecr.<regiao>.amazonaws.com (repositorios
 # digital-banking/<servico> do bootstrap). tag: SHA do commit.
-# Ordem: db-init (hook post-install: o helm espera o Job e falha junto; depois confere .status.succeeded), Secrets
+# Ordem: coletor ADOT (otel-collector, etapa 10: os servicos exportam OTLP para o Service dele; fora do ar, so perdem
+# telemetria), db-init (hook post-install: o helm espera o Job e falha junto; depois confere .status.succeeded), Secrets
 # do Kubernetes a partir do Secrets Manager e os servicos (--wait, um por vez). Nenhum ARN de papel vai aos charts:
 # o Pod Identity liga o papel pela ServiceAccount no namespace.
 set -euo pipefail
@@ -87,16 +88,20 @@ load_service_args() {
 if [ -n "$render_dir" ]; then
   mkdir -p "$render_dir"
   helm template db-init "$charts/db-init" "${db_init_args[@]}" > "$render_dir/db-init.yaml"
+  helm template otel-collector "$charts/otel-collector" -n "$namespace" > "$render_dir/otel-collector.yaml"
   for svc in "${services[@]}" "${app_services[@]}"; do
     load_service_args "$svc"
     helm template "$svc" "$charts/service" -n "$namespace" "${args[@]}" > "$render_dir/$svc.yaml"
   done
-  echo "renderizado em $render_dir: db-init ${services[*]} ${app_services[*]}"
+  echo "renderizado em $render_dir: db-init otel-collector ${services[*]} ${app_services[*]}"
   exit 0
 fi
 
 echo "== namespace $namespace"
 kubectl create namespace "$namespace" --dry-run=client -o yaml | kubectl apply -f -
+
+echo "== otel-collector"
+helm upgrade --install otel-collector "$charts/otel-collector" -n "$namespace" --wait --timeout 5m
 
 echo "== db-init"
 helm upgrade --install db-init "$charts/db-init" "${db_init_args[@]}" --wait --timeout 15m
@@ -126,4 +131,4 @@ for svc in "${services[@]}" "${app_services[@]}"; do
   load_service_args "$svc"
   helm upgrade --install "$svc" "$charts/service" -n "$namespace" "${args[@]}" --wait --timeout 15m
 done
-echo "OK: db-init, ${services[*]} e ${app_services[*]} instalados em $namespace"
+echo "OK: otel-collector, db-init, ${services[*]} e ${app_services[*]} instalados em $namespace"

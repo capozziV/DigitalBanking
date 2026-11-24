@@ -20,6 +20,9 @@ requiredEnv:
   - ACCOUNTS_TOPIC_ARN
 
 env:
+  # Coletor ADOT do namespace (chart otel-collector, OTLP/HTTP); so existe na AWS. Coletor fora nao atrasa o servico.
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  OTEL_SERVICE_NAME: accounts
   ACCOUNTS_DB_URL: ""
   ACCOUNTS_DB_USER: accounts_app
   ACCOUNTS_DB_OWNER_USER: accounts_owner

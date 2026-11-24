@@ -38,6 +38,9 @@ O Terraform não cria os bancos e usuários dentro do RDS: ele fica em sub-rede 
 ## Namespace `digitalbanking`
 As associações do Pod Identity valem só no namespace `kubernetes_namespace` (padrão `digitalbanking`). Os charts não fixam namespace: a Task 6 instala `db-init` e os cinco serviços com `-n digitalbanking` (ou passa outro `kubernetes_namespace` ao Terraform). Em outro namespace os pods sobem sem papel e sem acesso à AWS.
 
+## X-Ray Transaction Search no `bootstrap`
+O `bootstrap` cria o grupo `aws/spans` (retenção de 1 dia), a política de recurso `capzzpay-xray-spans` e o `aws_xray_trace_segment_destination` (CloudWatch Logs): é da conta, sobrevive ao ambiente e o `destroy` do destino é um no-op no provider. O papel do GitHub já é `AdministratorAccess`, que cobre `logs:PutRetentionPolicy`, `logs:PutResourcePolicy` e `xray:UpdateTraceSegmentDestination`; o deny de guardrails só barra `budgets:*`, `iam:*` do próprio papel e o bucket do estado, então nada novo foi liberado. Quem aplica o `bootstrap` (o usuário, local) precisa dessas mesmas permissões. Se o X-Ray já criou o `aws/spans` (Transaction Search ligado antes, no console), importe antes do `apply`: `terraform import aws_cloudwatch_log_group.xray_spans aws/spans`. O `envs/aws/check-observability.py` confere que esses recursos moram no `bootstrap` e não voltaram ao módulo.
+
 ## Nomes iguais no Terraform e nos charts
 `envs/aws/check-service-names.py` falha se as chaves de `local.services` do `modules/access` diferirem dos `name:` de `deploy/helm/values/*.yaml` (a ServiceAccount do chart leva o nome do serviço), se `database_services` do `modules/data` diferir dos `services` do `db-init` ou dos values com `<SERVICO>_DB_URL`, ou se a ServiceAccount do `db-init` diferir de `db_init_service_account`.
 
