@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
+import { trace } from '@opentelemetry/api';
 import type { NextFunction, Request, Response } from 'express';
 import type { Logger } from 'pino';
 
@@ -22,6 +23,7 @@ export function correlationMiddleware(logger: Logger) {
     const incoming = request.header(CORRELATION_HEADER);
     const correlationId = incoming && VALID_ID.test(incoming) ? incoming : randomUUID();
     response.setHeader(CORRELATION_HEADER, correlationId);
+    trace.getActiveSpan()?.setAttribute('correlation.id', correlationId);
     const startedAt = Date.now();
     runWithCorrelationId(correlationId, () => {
       response.on('finish', () => {
