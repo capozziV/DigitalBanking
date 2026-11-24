@@ -28,3 +28,12 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
 }
+
+// No test exports telemetry to a collector that may be running on the machine (OTLP on 127.0.0.1:4318, the default of
+// the services). Spans, metrics and logs are still produced; a test that checks the OTLP export turns it back on with
+// its own properties, which win over system properties.
+tasks.withType<Test>().configureEach {
+    systemProperty("management.tracing.export.otlp.enabled", "false")
+    systemProperty("management.otlp.metrics.export.enabled", "false")
+    systemProperty("management.logging.export.otlp.enabled", "false")
+}

@@ -23,6 +23,7 @@ import io.github.capozziv.digitalbanking.transfers.domain.RecordedEntry
 import io.github.capozziv.digitalbanking.transfers.domain.StepCall
 import io.github.capozziv.digitalbanking.transfers.domain.StepOutcome
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import io.micrometer.observation.ObservationRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -60,6 +61,7 @@ class HttpAccountsGatewayContractIntegrationTest {
             AccountsClientConfiguration().accountsRestClient(
                 AccountsClientProperties(url = url.toString()),
                 ServiceTokenServers.clientOf(tokenServer),
+                ObservationRegistry.NOOP,
             )
         gateway = HttpAccountsGateway(restClient, AccountsResponseClassifier(SimpleMeterRegistry()))
         MDC.put("correlationId", "corr-contract")

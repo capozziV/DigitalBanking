@@ -22,6 +22,9 @@ object ServiceArchitectureRules {
     /** Infrastructure that neither the domain nor the application layer may use. */
     private val INFRASTRUCTURE_PACKAGES = arrayOf("org.springframework..", "java.sql..", "software.amazon..")
 
+    /** Tracing and metrics: the domain knows neither; spans and meters live behind ports of the application layer. */
+    private val TELEMETRY_PACKAGES = arrayOf("io.opentelemetry..", "io.micrometer..")
+
     fun all(rootPackage: String): List<ArchRule> =
         listOf(
             domainIsIndependent(rootPackage),
@@ -40,7 +43,12 @@ object ServiceArchitectureRules {
             .resideInAPackage("$rootPackage.domain..")
             .should()
             .dependOnClassesThat()
-            .resideInAnyPackage(*INFRASTRUCTURE_PACKAGES, "$rootPackage.application..", "$rootPackage.adapters..")
+            .resideInAnyPackage(
+                *INFRASTRUCTURE_PACKAGES,
+                *TELEMETRY_PACKAGES,
+                "$rootPackage.application..",
+                "$rootPackage.adapters..",
+            )
 
     fun applicationIsIndependent(rootPackage: String): ArchRule =
         noClasses()

@@ -43,7 +43,10 @@ class UnexpectedErrorApiIntegrationTest : StatementWebIntegrationTest() {
         assertProblem(response, 500, "internal-error")
         assertThat(response.rawBody).doesNotContain("secret internal detail")
         assertThat(response.header("X-Correlation-Id")).isEqualTo(correlationId)
-        assertThat(output.out).containsPattern("ERROR.*$correlationId.*unexpected error")
+        // JSON (ECS) log line: the level, the message and the MDC are fields of the same line.
+        assertThat(output.out.lines()).anyMatch {
+            "\"level\":\"ERROR\"" in it && "\"message\":\"unexpected error\"" in it && "\"correlationId\":\"$correlationId\"" in it
+        }
         assertThat(output.out).contains("secret internal detail")
     }
 }

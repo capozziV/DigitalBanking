@@ -15,6 +15,7 @@ import io.github.capozziv.digitalbanking.transfers.adapters.customer.CustomerCli
 import io.github.capozziv.digitalbanking.transfers.application.port.CustomerGateway
 import io.github.capozziv.digitalbanking.transfers.application.port.CustomerLookup
 import io.github.capozziv.digitalbanking.transfers.bootstrap.ServiceTokenServers
+import io.micrometer.observation.ObservationRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -49,7 +50,8 @@ class HttpCustomerGatewayIntegrationTest {
         tokenServer.start()
         ServiceTokenServers.stubTokenEndpoint(tokenServer)
         val properties = CustomerClientProperties(url = "http://localhost:${server.port()}", timeout = Duration.ofMillis(500))
-        gateway = CustomerClientConfiguration().customerGateway(properties, ServiceTokenServers.clientOf(tokenServer))
+        gateway =
+            CustomerClientConfiguration().customerGateway(properties, ServiceTokenServers.clientOf(tokenServer), ObservationRegistry.NOOP)
     }
 
     @AfterEach
@@ -94,7 +96,11 @@ class HttpCustomerGatewayIntegrationTest {
         contractStubServer = WireMock(stubUrl.host, stubUrl.port).also { it.resetRequests() }
         val url = stubUrl.toString()
         val properties = CustomerClientProperties(url = url, timeout = Duration.ofMillis(500))
-        return CustomerClientConfiguration().customerGateway(properties, ServiceTokenServers.clientOf(tokenServer))
+        return CustomerClientConfiguration().customerGateway(
+            properties,
+            ServiceTokenServers.clientOf(tokenServer),
+            ObservationRegistry.NOOP,
+        )
     }
 
     @Test

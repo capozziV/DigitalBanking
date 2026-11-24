@@ -32,6 +32,10 @@ spring:
         endpoint: ${NOTIFICATION_AWS_ENDPOINT:}
 
 digitalbanking:
+  observability:
+    # OTLP/HTTP endpoint of the collector, for traces, metrics and logs. Exports are asynchronous, in batches with a
+    # bounded queue that drops when full: a collector that is down never fails nor slows a request.
+    otlp-endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://127.0.0.1:4318}
   security:
     # Claim of the token that lists the user's groups ("admin" makes an admin); cognito:groups on AWS.
     groups-claim: ${NOTIFICATION_JWT_GROUPS_CLAIM:groups}
@@ -49,6 +53,24 @@ notification:
     refresh-interval: ${NOTIFICATION_DLQ_METRICS_REFRESH_INTERVAL:30s}
 
 management:
+  tracing:
+    sampling:
+      # Every request is traced, locally and on AWS: the volume is a demo's.
+      probability: 1.0
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${digitalbanking.observability.otlp-endpoint}/v1/traces
+    logging:
+      export:
+        otlp:
+          endpoint: ${digitalbanking.observability.otlp-endpoint}/v1/logs
+  otlp:
+    metrics:
+      export:
+        url: ${digitalbanking.observability.otlp-endpoint}/v1/metrics
+        step: 10s
   endpoint:
     health:
       # Only an admin sees the details; /actuator/health itself stays open (liveness for compose and the load balancer).
@@ -61,7 +83,8 @@ management:
         include: health,metrics
 
 logging:
-  pattern:
-    # Correlation id (MDC key of OutboxEventEnvelope.CORRELATION_ID_MDC_KEY), from the SQS message attribute
-    # while an event is consumed.
-    correlation: "[%X{correlationId:-}] "
+  structured:
+    format:
+      # JSON (Elastic Common Schema) on stdout; the MDC goes in as fields: traceId and spanId (Micrometer Tracing) and
+      # correlationId (libs/observabilidade). The same lines also go out by OTLP.
+      console: ecs

@@ -133,7 +133,10 @@ class NotificationEndToEndIntegrationTest {
         assertThat(transfers.awaitTerminal(id, SAGA_FINISH_TIMEOUT)).isEqualTo("COMPLETED")
         notifications.awaitKinds(sender, listOf("WELCOME", "TRANSFER_SENT"), NOTIFICATION_TIMEOUT)
         val correlationId = TransfersApiClient.correlationIdFor(key)
-        environment.notification.awaitLogLine(NOTIFICATION_TIMEOUT) { "[$correlationId]" in it && "TransferCompleted" in it }
+        // The log line is JSON (ECS), with the MDC as fields.
+        environment.notification.awaitLogLine(NOTIFICATION_TIMEOUT) {
+            "\"correlationId\":\"$correlationId\"" in it && "TransferCompleted" in it
+        }
     }
 
     @Test

@@ -34,6 +34,10 @@ spring:
       appUser: ${TRANSFERS_DB_USER:transfers_app}
 
 digitalbanking:
+  observability:
+    # OTLP/HTTP endpoint of the collector, for traces, metrics and logs. Exports are asynchronous, in batches with a
+    # bounded queue that drops when full: a collector that is down never fails nor slows a request.
+    otlp-endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://127.0.0.1:4318}
   security:
     groups-claim: ${TRANSFERS_JWT_GROUPS_CLAIM:groups}
     # Machine token of transfers for its calls to accounts and customer (client credentials). Worst case of one token
@@ -88,15 +92,39 @@ transfers:
     topic-arn: ${TRANSFERS_TOPIC_ARN:arn:aws:sns:us-east-1:000000000000:transfers-events.fifo}
 
 logging:
-  pattern:
-    # Correlation id (MDC key of libs/observabilidade, the same as OutboxEventEnvelope.CORRELATION_ID_MDC_KEY) on every
-    # log line, from the request filter or, for the saga scheduler, from the transfer being resumed.
-    correlation: "[%X{correlationId:-}] "
+  structured:
+    format:
+      # JSON (Elastic Common Schema) on stdout; the MDC goes in as fields: traceId and spanId (Micrometer Tracing) and
+      # correlationId (libs/observabilidade). The same lines also go out by OTLP.
+      console: ecs
 
 server:
   port: 8082
 
 management:
+  tracing:
+    sampling:
+      # Every request is traced, locally and on AWS: the volume is a demo's.
+      probability: 1.0
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${digitalbanking.observability.otlp-endpoint}/v1/traces
+    logging:
+      export:
+        otlp:
+          endpoint: ${digitalbanking.observability.otlp-endpoint}/v1/logs
+  otlp:
+    metrics:
+      export:
+        url: ${digitalbanking.observability.otlp-endpoint}/v1/metrics
+        step: 10s
+  metrics:
+    distribution:
+      percentiles-histogram:
+        # p50/p95 of the saga by histogram_quantile on the published buckets.
+        transfers.saga.duration: true
   endpoints:
     web:
       exposure:

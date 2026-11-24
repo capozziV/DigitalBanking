@@ -210,7 +210,7 @@ class NotificationConsumptionIntegrationTest {
         await { output.out.lines().any { it.contains(eventId.toString()) && it.contains("ignored") } }
         val line = output.out.lines().first { it.contains(eventId.toString()) && it.contains("ignored") }
         // The envelope carries another id, so only the message attribute can put this one in the log.
-        assertThat(line).contains("[$CORRELATION_ID]").doesNotContain(ENVELOPE_CORRELATION_ID)
+        assertThat(line).contains("\"correlationId\":\"$CORRELATION_ID\"").doesNotContain(ENVELOPE_CORRELATION_ID)
     }
 
     @Test
@@ -218,7 +218,7 @@ class NotificationConsumptionIntegrationTest {
         val correlationId = "failing-${UUID.randomUUID()}"
         send(ACCOUNTS_QUEUE, "broken-${UUID.randomUUID()}", """{"eventId":"not-a-uuid","eventType":"AccountOpened"}""", correlationId)
 
-        await { output.out.lines().any { it.contains("Error processing message") && it.contains("[$correlationId]") } }
+        await { output.out.lines().any { it.contains("Error processing message") && it.contains("\"correlationId\":\"$correlationId\"") } }
         // The message keeps failing until the DLQ: wait for it, so the other tests compare the DLQ depth undisturbed.
         await(Duration.ofSeconds(60)) { visibleMessages(ACCOUNTS_DLQ) == accountsDlqAtStart + 1 }
         awaitEmpty(ACCOUNTS_QUEUE)

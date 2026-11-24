@@ -15,4 +15,6 @@ dependencies {
     testImplementation("org.springframework:spring-context")
     testImplementation("org.springframework:spring-web")
     testImplementation(libs.aws.sdk.sns)
+    testImplementation("io.micrometer:micrometer-core")
+    testImplementation("io.opentelemetry:opentelemetry-api")
 }
