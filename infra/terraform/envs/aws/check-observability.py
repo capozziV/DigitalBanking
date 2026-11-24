@@ -139,6 +139,18 @@ for name, tail in re.findall(r'\[local\.ns,\s*"([a-z][a-z0-9_.]+)"((?:,\s*"[^"]*
     keys = re.findall(r'"([^"]*)"', tail)[0::2]
     check_dims(name, set(keys))
 
+# Transaction Search e da conta: o destino, a politica e o grupo aws/spans (com retencao) ficam no bootstrap.
+boot = (TF / "bootstrap/main.tf").read_text()
+for res in ("aws_xray_trace_segment_destination", "aws_cloudwatch_log_resource_policy"):
+    if f'resource "{res}"' not in boot:
+        errors.append(f"bootstrap/main.tf: falta {res} (Transaction Search e da conta)")
+    if f'resource "{res}"' in dashboard:
+        errors.append(f"modules/observability: {res} nao pode ficar no ambiente (destroy no-op); mora no bootstrap")
+if not re.search(r'resource "aws_cloudwatch_log_group" "xray_spans" \{\s*name\s*=\s*"aws/spans"\s*retention_in_days\s*=\s*1\b', boot):
+    errors.append("bootstrap/main.tf: grupo aws/spans ausente ou sem retention_in_days = 1")
+if "aws_cloudwatch_log_group.xray_spans" not in boot.split('resource "aws_xray_trace_segment_destination"')[-1]:
+    errors.append("bootstrap/main.tf: o destino do X-Ray tem de depender do grupo aws/spans (criado antes, com retencao)")
+
 if errors:
     print("check-observability: divergencias na observabilidade da AWS:", file=sys.stderr)
     for e in errors:

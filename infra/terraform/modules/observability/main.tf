@@ -1,13 +1,10 @@
-# Destinos da telemetria do ambiente (etapa 10): grupos de logs, Transaction Search do X-Ray e o painel
-# "Transferencias". O coletor ADOT (chart deploy/helm/otel-collector) escreve aqui; o papel dele fica no
-# modules/access. Tudo e do Terraform e some no destroy, com duas excecoes que a conta guarda (ver README.md do
-# modulo): o destino do Transaction Search (o destroy do provider e um no-op) e o grupo aws/spans, que o X-Ray cria sozinho.
-data "aws_caller_identity" "current" {}
+# Destinos da telemetria do ambiente (etapa 10): grupos de logs e o painel "Transferencias". O coletor ADOT
+# (chart deploy/helm/otel-collector) escreve aqui; o papel dele fica no modules/access. Tudo some no destroy.
+# O Transaction Search do X-Ray e da conta e mora no stack bootstrap (ver README.md do modulo).
 
 locals {
   # Retencao de 1 dia: o ambiente vive no maximo 8 h (aws-reaper), nao ha o que guardar depois.
   retention_in_days = 1
-  account_id        = data.aws_caller_identity.current.account_id
 }
 
 # Um grupo por servico: o awscloudwatchlogs do coletor escreve em <prefixo>/<service.name>.
@@ -24,48 +21,8 @@ resource "aws_cloudwatch_log_group" "metrics" {
   retention_in_days = local.retention_in_days
 }
 
-# Transaction Search (conta inteira): o endpoint OTLP do X-Ray so aceita spans com ele ligado. Os spans vao para o
-# grupo aws/spans (IDs W3C guardados como chegam, todo atributo pesquisavel), com 1% indexado de graca.
-# Politica de recurso do X-Ray para gravar no grupo: a mesma da documentacao do Transaction Search.
-data "aws_iam_policy_document" "xray_spans" {
-  statement {
-    sid     = "TransactionSearchXRayAccess"
-    effect  = "Allow"
-    actions = ["logs:PutLogEvents"]
-    resources = [
-      "arn:aws:logs:${var.region}:${local.account_id}:log-group:aws/spans:*",
-      "arn:aws:logs:${var.region}:${local.account_id}:log-group:/aws/application-signals/data:*",
-    ]
-
-    principals {
-      type        = "Service"
-      identifiers = ["xray.amazonaws.com"]
-    }
-
-    condition {
-      test     = "ArnLike"
-      variable = "aws:SourceArn"
-      values   = ["arn:aws:xray:${var.region}:${local.account_id}:*"]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "aws:SourceAccount"
-      values   = [local.account_id]
-    }
-  }
-}
-
-resource "aws_cloudwatch_log_resource_policy" "xray_spans" {
-  policy_name     = "${var.metrics_namespace}-xray-spans"
-  policy_document = data.aws_iam_policy_document.xray_spans.json
-}
-
-resource "aws_xray_trace_segment_destination" "this" {
-  destination = "CloudWatchLogs"
-
-  depends_on = [aws_cloudwatch_log_resource_policy.xray_spans]
-}
+# Transaction Search (destino, politica e grupo aws/spans) e da conta: fica no stack bootstrap, porque o destroy do
+# destino e um no-op e o grupo precisa de retencao. Sem ele ligado, o endpoint OTLP do X-Ray recusa os spans.
 
 # Painel espelho do Grafana local. A duracao da saga chega como histograma exponencial (os values do transfers na AWS
 # ligam histogram-flavor, delta e segundos): o awsemf a publica como Values/Counts e o CloudWatch calcula p50 e p95.
