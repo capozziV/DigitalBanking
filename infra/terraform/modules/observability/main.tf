@@ -1,7 +1,7 @@
 # Destinos da telemetria do ambiente (etapa 10): grupos de logs, Transaction Search do X-Ray e o painel
 # "Transferencias". O coletor ADOT (chart deploy/helm/otel-collector) escreve aqui; o papel dele fica no
 # modules/access. Tudo e do Terraform e some no destroy, com duas excecoes que a conta guarda (ver README.md do
-# modulo): a configuracao do Transaction Search e o grupo aws/spans, que o X-Ray cria sozinho.
+# modulo): o destino do Transaction Search (o destroy do provider e um no-op) e o grupo aws/spans, que o X-Ray cria sozinho.
 data "aws_caller_identity" "current" {}
 
 locals {
@@ -67,8 +67,9 @@ resource "aws_xray_trace_segment_destination" "this" {
   depends_on = [aws_cloudwatch_log_resource_policy.xray_spans]
 }
 
-# Painel espelho do Grafana local. O awsemf manda a duracao como conjunto de estatisticas (Count, Sum, Min, Max):
-# o CloudWatch mostra media e maximo, nao p50/p95 (o Grafana local calcula os quantis pelos buckets).
+# Painel espelho do Grafana local. A duracao da saga chega como histograma exponencial (os values do transfers na AWS
+# ligam histogram-flavor, delta e segundos): o awsemf a publica como Values/Counts e o CloudWatch calcula p50 e p95.
+# Com buckets explicitos o awsemf so manda Count/Sum/Min/Max (provado em deploy/helm/otel-collector/check-config.sh).
 locals {
   ns = var.metrics_namespace
 
@@ -88,13 +89,11 @@ locals {
     {
       type = "metric", x = 12, y = 0, width = 12, height = 6
       properties = {
-        title  = "Duracao da saga (media e maximo, segundos)"
+        title  = "Duracao da saga, p50 e p95 (segundos)"
         region = var.region, view = "timeSeries", period = 60
         metrics = [
-          [local.ns, "transfers.saga.duration", "status", "COMPLETED", { stat = "Average", label = "COMPLETED media" }],
-          [local.ns, "transfers.saga.duration", "status", "COMPLETED", { stat = "Maximum", label = "COMPLETED maximo" }],
-          [local.ns, "transfers.saga.duration", "status", "COMPENSATED", { stat = "Average", label = "COMPENSATED media" }],
-          [local.ns, "transfers.saga.duration", "status", "COMPENSATED", { stat = "Maximum", label = "COMPENSATED maximo" }],
+          [{ expression = "SEARCH('{${local.ns},status} MetricName=\"transfers.saga.duration\"', 'p50', 60)", id = "p50" }],
+          [{ expression = "SEARCH('{${local.ns},status} MetricName=\"transfers.saga.duration\"', 'p95', 60)", id = "p95" }],
         ]
       }
     },
@@ -154,7 +153,7 @@ locals {
     {
       type = "metric", x = 12, y = 18, width = 12, height = 6
       properties = {
-        title  = "Circuito do limite diario (0 fechado, 1 aberto)"
+        title  = "Circuito do limite diario (0 fechado, 1 aberto, 2 meio aberto)"
         region = var.region, view = "timeSeries", stat = "Maximum", period = 60
         metrics = [
           [local.ns, "transfers.daily_limit.circuit.state"],

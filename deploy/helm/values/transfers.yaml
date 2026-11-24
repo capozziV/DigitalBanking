@@ -24,6 +24,11 @@ env:
   # Coletor ADOT do namespace (chart otel-collector, OTLP/HTTP); so existe na AWS. Coletor fora nao atrasa o servico.
   OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
   OTEL_SERVICE_NAME: transfers
+  # Duracao da saga como histograma exponencial, em delta e em segundos: o awsemf publica Values/Counts e o CloudWatch
+  # calcula p50/p95 (provado em otel-collector/check-config.sh). So na AWS: o local segue com buckets explicitos.
+  MANAGEMENT_OTLP_METRICS_EXPORT_HISTOGRAMFLAVOR: base2_exponential_bucket_histogram
+  MANAGEMENT_OTLP_METRICS_EXPORT_AGGREGATIONTEMPORALITY: delta
+  MANAGEMENT_OTLP_METRICS_EXPORT_BASETIMEUNIT: seconds
   TRANSFERS_DB_URL: ""
   TRANSFERS_DB_USER: transfers_app
   TRANSFERS_DB_OWNER_USER: transfers_owner

@@ -6,7 +6,8 @@
   (modules/observability), grupo EMF = <prefixo>/metrics, regiao = a do envs/aws;
 - um grupo de logs por servico (modules/observability, services) para cada values/<servico>.yaml, menos o web (nginx);
 - cada servico, e o bff, aponta o OTLP para o Service do coletor e se chama pelo proprio `name:`;
-- toda metrica do painel (modules/observability) passa pelo filtro do coletor e tem uma declaracao do awsemf.
+- toda metrica do painel (modules/observability) passa pelo filtro do coletor, tem uma declaracao do awsemf, existe no
+  codigo e usa so dimensoes que o awsemf declara para ela.
 
 Uso: check-observability.py [raiz do repositorio]
 """
@@ -105,6 +106,38 @@ for m in sorted(metrics):
         errors.append(f"{m}: esta no painel e o filtro do coletor derruba")
     if not any(s.match(m) for s in selectors):
         errors.append(f"{m}: esta no painel e nenhum metric_name_selectors do awsemf a cobre")
+
+# Nomes do painel x codigo: um nome com erro que ainda cabe no filtro (outbox\\..+) deixaria o widget vazio. Cada nome
+# tem de existir como literal no codigo de producao; transfers.finished e transfers.saga.duration sao da Task 2 da
+# etapa 10 e so entram no codigo depois dela (ate la, tolerados).
+ETAPA10_NAMES = {"transfers.finished", "transfers.saga.duration"}
+code_literals = set()
+for kt in list((ROOT / "libs").rglob("*.kt")) + list((ROOT / "services").rglob("*.kt")):
+    if {"test", "integrationTest", "build"} & set(kt.parts):
+        continue
+    code_literals.update(re.findall(r'"([a-z][a-z0-9_.]*)"', kt.read_text()))
+for m in sorted(metrics):
+    if m not in code_literals and m not in ETAPA10_NAMES:
+        errors.append(f"{m}: esta no painel e nao existe como nome de metrica no codigo (libs/ e services/)")
+
+# Dimensoes de cada widget x dimensoes declaradas no awsemf para a metrica (senao o widget fica vazio).
+declared = []
+for dims, sel in re.findall(r'dimensions:\s*(\[\[.*?\]\])\s*\n\s*metric_name_selectors:\s*\["([^"]+)"\]', config):
+    sets = {frozenset(x.strip().strip('"') for x in inner.split(",") if x.strip()) for inner in re.findall(r"\[([^\[\]]*)\]", dims[1:-1])}
+    declared.append((re.compile(sel.replace("\\\\", "\\")), sets))
+
+
+def check_dims(name, dims):
+    allowed = [sets for rx, sets in declared if rx.match(name)]
+    if allowed and not any(frozenset(dims) in sets for sets in allowed):
+        errors.append(f"{name}: o painel usa as dimensoes {sorted(dims)} e o awsemf declara {sorted(sorted(x) for sets in allowed for x in sets)}")
+
+
+for dims, name in re.findall(r"SEARCH\('\{\$\{local\.ns\},?([^}]*)\}\s*MetricName=\\\"([^\"\\]+)\\\"", dashboard):
+    check_dims(name, {d.strip().strip('\\"') for d in dims.split(",") if d.strip()})
+for name, tail in re.findall(r'\[local\.ns,\s*"([a-z][a-z0-9_.]+)"((?:,\s*"[^"]*")*)', dashboard):
+    keys = re.findall(r'"([^"]*)"', tail)[0::2]
+    check_dims(name, set(keys))
 
 if errors:
     print("check-observability: divergencias na observabilidade da AWS:", file=sys.stderr)

@@ -2,12 +2,14 @@
 # Confere a configuracao do coletor com a imagem real (ADOT, a mesma do chart), sem AWS: renderiza o chart, troca os
 # enderecos da AWS por um servidor falso local, sobe o coletor com credenciais ficticias e manda OTLP de verdade.
 # Afirma: o coletor sobe (componentes e chaves validos), o filtro derruba o que nao e do painel, o EMF sai com o
-# namespace e as dimensoes declaradas, o log vai para /capzzpay/<service.name> e o trace e assinado para o servico xray.
+# namespace e as dimensoes declaradas, a duracao da saga sai como Values/Counts (p50/p95), o log vai para /capzzpay/<service.name> e o trace e assinado para o servico xray.
 # Exige docker (imagem baixada do ECR Publico), helm, curl e python3. OTEL_CONFIG_CHECK=skip pula (so fora do CI).
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
-if [ "${OTEL_CONFIG_CHECK:-}" = skip ]; then echo "AVISO: check-config do coletor PULADO (OTEL_CONFIG_CHECK=skip)" >&2; exit 0; fi
+if [ "${OTEL_CONFIG_CHECK:-}" = skip ]; then
+  if [ -n "${CI:-}" ]; then echo "ERRO: OTEL_CONFIG_CHECK=skip e proibido no CI" >&2; exit 1; fi
+  echo "AVISO: check-config do coletor PULADO (OTEL_CONFIG_CHECK=skip)" >&2; exit 0; fi
 command -v docker >/dev/null || { echo "ERRO: docker ausente (OTEL_CONFIG_CHECK=skip pula)" >&2; exit 1; }
 
 image="$(awk '/^  repository:/{r=$2} /^  tag:/{t=$2} END{print r ":" t}' "$here/values.yaml")"
@@ -82,11 +84,14 @@ now=$(python3 -c 'import time; print(int(time.time() * 1e9))')
 res='"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"transfers"}}]}'
 post() { curl -fsS -o /dev/null -H 'content-type: application/json' -d "$2" "http://127.0.0.1:$host_port/v1/$1"; }
 post traces '{"resourceSpans":[{'"$res"',"scopeSpans":[{"spans":[{"traceId":"4efaaf4d1e8720b39541901950019ee5","spanId":"0123456789abcdef","name":"Debit","kind":1,"startTimeUnixNano":"'"$now"'","endTimeUnixNano":"'"$((now + 1000000))"'","attributes":[{"key":"transfer.id","value":{"stringValue":"t-1"}}]}]}]}]}'
-# Duas leituras do contador (o awsemf descarta a primeira: so exporta a diferenca) e um metrico fora do painel.
-for i in 1 2; do
+# Dois envios em delta (o que o transfers manda na AWS, com aggregation-temporality=delta): o contador e a duracao da
+# saga como histograma exponencial (histogram-flavor=base2_exponential_bucket_histogram), mais uma metrica fora do painel.
+for _ in 1 2; do
   post metrics '{"resourceMetrics":[{'"$res"',"scopeMetrics":[{"metrics":[
-    {"name":"transfers.finished","sum":{"aggregationTemporality":2,"isMonotonic":true,"dataPoints":[
-      {"asInt":"'"$((i * 3))"'","timeUnixNano":"'"$now"'","attributes":[{"key":"status","value":{"stringValue":"FAILED"}},{"key":"reason","value":{"stringValue":"daily-limit-exceeded"}}]}]}},
+    {"name":"transfers.finished","sum":{"aggregationTemporality":1,"isMonotonic":true,"dataPoints":[
+      {"asInt":"3","timeUnixNano":"'"$now"'","attributes":[{"key":"status","value":{"stringValue":"FAILED"}},{"key":"reason","value":{"stringValue":"daily-limit-exceeded"}}]}]}},
+    {"name":"transfers.saga.duration","unit":"s","exponentialHistogram":{"aggregationTemporality":1,"dataPoints":[
+      {"count":"4","sum":2,"min":0.1,"max":0.9,"scale":3,"zeroCount":"0","positive":{"offset":-10,"bucketCounts":["1","1","2"]},"timeUnixNano":"'"$now"'","attributes":[{"key":"status","value":{"stringValue":"COMPLETED"}}]}]}},
     {"name":"outbox.pending","gauge":{"dataPoints":[{"asInt":"4","timeUnixNano":"'"$now"'"}]}},
     {"name":"jvm.memory.used","gauge":{"dataPoints":[{"asInt":"9","timeUnixNano":"'"$now"'"}]}}]}]}]}'
   now=$((now + 60000000000))
@@ -104,6 +109,9 @@ grep -E '^REQ /v1/traces' "$tmp/fake.log" | grep -q '/sa-east-1/xray/aws4_reques
 has '\"Namespace\":\"capzzpay\"' 'EMF sem o namespace capzzpay'
 has '\"Name\":\"transfers.finished\"' 'EMF sem transfers.finished'
 has '\"Dimensions\":[[\"status\"],[\"reason\",\"status\"]]' 'transfers.finished sem as dimensoes status e status+reason'
+has '\"Name\":\"transfers.saga.duration\",\"Unit\":\"Seconds\"' 'EMF sem transfers.saga.duration em segundos'
+has '\"transfers.saga.duration\":{\"Values\":[' 'duracao da saga sem Values/Counts (o CloudWatch nao calcularia p50/p95)'
+has '\"Counts\":[2,1,1],\"Max\":0.9,\"Min\":0.1,\"Count\":4,\"Sum\":2' 'Counts da duracao nao batem com os buckets enviados (delta)'
 has '\"Name\":\"outbox.pending\"' 'EMF sem outbox.pending'
 has '\"Dimensions\":[[\"service.name\"]]' 'outbox.pending sem a dimensao service.name'
 has 'logGroupName":"/capzzpay/transfers"' 'log nao foi para /capzzpay/transfers'
