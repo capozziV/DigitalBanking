@@ -51,12 +51,14 @@ class ServiceArchitectureRulesTest {
     fun `application rule passes for a clean application`() = assertPasses(ServiceArchitectureRules::applicationIsIndependent)
 
     @Test
-    fun `application rule rejects spring, sql, aws and adapters`() =
+    fun `application rule rejects spring, sql, aws, tracing and adapters`() =
         assertViolatedBy(
             ServiceArchitectureRules::applicationIsIndependent,
             "ApplicationWithSpring",
             "ApplicationWithSql",
             "ApplicationWithAws",
+            "ApplicationWithOpenTelemetry",
+            "ApplicationWithMicrometerTracing",
             "ApplicationUsesAdapters",
         )
 

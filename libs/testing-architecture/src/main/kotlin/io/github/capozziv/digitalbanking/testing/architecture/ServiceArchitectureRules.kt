@@ -25,6 +25,9 @@ object ServiceArchitectureRules {
     /** Tracing and metrics: the domain knows neither; spans and meters live behind ports of the application layer. */
     private val TELEMETRY_PACKAGES = arrayOf("io.opentelemetry..", "io.micrometer..")
 
+    /** Tracing: the application layer opens no span itself; spans live behind its ports, implemented by the adapters. */
+    private val TRACING_PACKAGES = arrayOf("io.opentelemetry..", "io.micrometer.tracing..")
+
     fun all(rootPackage: String): List<ArchRule> =
         listOf(
             domainIsIndependent(rootPackage),
@@ -56,7 +59,7 @@ object ServiceArchitectureRules {
             .resideInAPackage("$rootPackage.application..")
             .should()
             .dependOnClassesThat()
-            .resideInAnyPackage(*INFRASTRUCTURE_PACKAGES, "$rootPackage.adapters..")
+            .resideInAnyPackage(*INFRASTRUCTURE_PACKAGES, *TRACING_PACKAGES, "$rootPackage.adapters..")
 
     fun webDoesNotUsePersistence(rootPackage: String): ArchRule =
         noClasses()
