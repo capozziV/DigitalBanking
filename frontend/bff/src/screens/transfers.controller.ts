@@ -14,6 +14,7 @@ import {
 import { BackendClient, BackendProblemError } from '../backend/backend-client.js';
 import { CurrentSession, SessionGuard } from '../session/session.guard.js';
 import type { Session } from '../session/session.service.js';
+import { annotateTransfer } from '../observability/otel.js';
 import { normalizePhone } from './phone.js';
 import { RecipientTokenService } from './recipient-token.js';
 import { UUID, isNotFound, type AccountDTO, type CustomerDTO, type TransferDTO } from './views.js';
@@ -159,6 +160,7 @@ export class TransfersController {
         { sourceAccountId: source.id, destinationAccountId, amount },
         { ...options, idempotencyKey },
       );
+      annotateTransfer(transfer.id);
       return { id: transfer.id, status: transfer.status };
     } catch (error) {
       // The saga refused it before taking any money (e.g. daily limit): the service answers 422 with the id of the
@@ -170,6 +172,7 @@ export class TransfersController {
         typeof error.problem['transferId'] === 'string' &&
         UUID.test(error.problem['transferId'])
       ) {
+        annotateTransfer(error.problem['transferId']);
         return { id: error.problem['transferId'], status: 'FAILED' };
       }
       throw error;

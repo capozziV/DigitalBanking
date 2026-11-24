@@ -23,4 +23,4 @@ COPY --from=build /app/bff/dist bff/dist
 USER 1000:1000
 EXPOSE 3000
 WORKDIR /app/bff
-CMD ["node", "dist/main.js"]
+CMD ["node", "--import", "./dist/observability/tracing.js", "dist/main.js"]
