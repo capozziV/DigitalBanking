@@ -1,3 +1,5 @@
+import { trace, type Span } from '@opentelemetry/api';
+import { vi } from 'vitest';
 import type { BackendCall } from '../testing/fake-backend.js';
 import { createTestApp, type SignedIn, type TestApp } from '../testing/test-app.js';
 
@@ -480,6 +482,50 @@ describe('screens', () => {
         .send({ recipientToken: recipientTokenValue, amount: 500001 })
         .expect(201);
       expect(response.body).toEqual({ id: TRANSFER_ID, status: 'FAILED' });
+    });
+
+    describe('trace attributes', () => {
+      let attributes: Record<string, unknown>;
+
+      beforeEach(() => {
+        attributes = {};
+        const span = {
+          setAttribute: (key: string, value: unknown) => void (attributes[key] = value),
+        } as unknown as Span;
+        vi.spyOn(trace, 'getActiveSpan').mockReturnValue(span);
+      });
+      afterEach(() => vi.restoreAllMocks());
+
+      it('puts transfer.id on the active span when the transfer is created', async () => {
+        const recipientTokenValue = await recipientToken();
+        await user
+          .post('/bff/transfers')
+          .set('Idempotency-Key', KEY)
+          .send({ recipientToken: recipientTokenValue, amount: 2500 })
+          .expect(201);
+        expect(attributes['transfer.id']).toBe(TRANSFER_ID);
+      });
+
+      it('puts transfer.id on the active span when the saga refuses with 422 FAILED', async () => {
+        t.backend.on('POST', `${TRANSFERS}/transfers`, {
+          status: 422,
+          body: {
+            type: '/problems/transfer-failed',
+            title: 'Transfer failed',
+            status: 422,
+            detail: 'The transfer could not be completed',
+            reason: 'daily-limit-exceeded',
+            transferId: TRANSFER_ID,
+          },
+        });
+        const recipientTokenValue = await recipientToken();
+        await user
+          .post('/bff/transfers')
+          .set('Idempotency-Key', KEY)
+          .send({ recipientToken: recipientTokenValue, amount: 500001 })
+          .expect(201);
+        expect(attributes['transfer.id']).toBe(TRANSFER_ID);
+      });
     });
 
     it('turns the refusal for insufficient available balance (422 with transferId) into a FAILED transfer to follow', async () => {

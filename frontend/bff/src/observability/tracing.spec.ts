@@ -1,6 +1,6 @@
 import { createServer, type IncomingHttpHeaders, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { context, trace } from '@opentelemetry/api';
+import { trace } from '@opentelemetry/api';
 import { InMemorySpanExporter } from '@opentelemetry/sdk-trace';
 import { InMemoryLogRecordExporter } from '@opentelemetry/sdk-logs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -70,13 +70,18 @@ describe('tracing', () => {
   });
 
   it('exports the active trace with the log record', async () => {
+    let traceId = '';
+    let spanId = '';
     await trace.getTracer('test').startActiveSpan('logged', async (span) => {
       const { createLogger } = await import('./logger.js');
       createLogger('info', { write() {} }).info('hello');
-      expect(context.active()).toBeDefined();
+      traceId = span.spanContext().traceId;
+      spanId = span.spanContext().spanId;
       span.end();
     });
     await tracing.forceFlush();
-    expect(logs.getFinishedLogRecords().some((record) => record.body === 'hello')).toBe(true);
+    const record = logs.getFinishedLogRecords().find((r) => r.body === 'hello');
+    expect(record?.spanContext?.traceId).toBe(traceId);
+    expect(record?.spanContext?.spanId).toBe(spanId);
   });
 });

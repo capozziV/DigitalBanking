@@ -50,4 +50,19 @@ describe('logger', () => {
     expect(dump).not.toContain('abc.def');
     expect(dump).toContain('visible');
   });
+
+  it('LOG_LEVEL=debug emits debug lines to the destination and to OTLP', async () => {
+    const lines: string[] = [];
+    const logger = createLogger('debug', { write: (line: string) => void lines.push(line) });
+    logger.debug('verbose detail');
+    await tracing.forceFlush();
+    expect(lines.map((line) => JSON.parse(line).msg)).toEqual(['verbose detail']);
+    expect(logs.getFinishedLogRecords().some((r) => r.body === 'verbose detail')).toBe(true);
+  });
+
+  it('LOG_LEVEL=info drops debug lines', () => {
+    const { lines, logger } = capture();
+    logger.debug('verbose detail');
+    expect(lines).toEqual([]);
+  });
 });

@@ -17,6 +17,8 @@ export interface TracingOptions {
   endpoint?: string;
   spanExporter?: SpanExporter;
   logExporter?: LogRecordExporter;
+  /** Capacity of each batch queue; telemetry beyond it is dropped. */
+  maxQueueSize?: number;
 }
 
 export interface Tracing {
@@ -75,7 +77,11 @@ export function startTracing(options: TracingOptions = {}): Tracing {
     process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] ??
     DEFAULT_OTLP_ENDPOINT
   ).replace(/\/$/, '');
-  const batch = { scheduledDelayMillis: 1000, exportTimeoutMillis: 5000, maxQueueSize: 2048 };
+  const batch = {
+    scheduledDelayMillis: 1000,
+    exportTimeoutMillis: 5000,
+    maxQueueSize: options.maxQueueSize ?? 2048,
+  };
   const spanProcessor = new BatchSpanProcessor({
     exporter: new SanitizingSpanExporter(
       options.spanExporter ??
@@ -90,6 +96,8 @@ export function startTracing(options: TracingOptions = {}): Tracing {
     ...batch,
   });
   const sdk = new NodeSDK({
+    // No host/process detectors: they would export the command line, user and host name.
+    resourceDetectors: [],
     serviceName: options.serviceName ?? process.env['OTEL_SERVICE_NAME'] ?? 'bff',
     spanProcessors: [spanProcessor],
     logRecordProcessors: [logProcessor],

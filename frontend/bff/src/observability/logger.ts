@@ -65,6 +65,10 @@ export function createLogger(level: string, destination?: DestinationStream): Lo
         censor: '[redacted]',
       },
     },
-    multistream([{ stream: destination ?? process.stdout }, { stream: otlpStream }]),
+    // multistream defaults each stream to `info`: pass the level or debug/trace lines are dropped.
+    multistream([
+      { level, stream: destination ?? process.stdout },
+      { level, stream: otlpStream },
+    ]),
   );
 }
