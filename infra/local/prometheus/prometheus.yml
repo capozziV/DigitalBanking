@@ -1,0 +1,7 @@
+# As metricas chegam por OTLP (coletor -> /api/v1/otlp); nao ha scrape. Retencao de 7 dias nas flags do compose.
+global:
+  evaluation_interval: 15s
+
+otlp:
+  # transfers.finished vira transfers_finished_total; o timer em segundos vira transfers_saga_duration_seconds_bucket.
+  translation_strategy: UnderscoreEscapingWithSuffixes

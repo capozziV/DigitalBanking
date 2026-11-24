@@ -85,6 +85,9 @@ services:
       NOTIFICATION_URL: http://host.docker.internal:8083
       STATEMENT_URL: http://host.docker.internal:8084
       CUSTOMER_URL: http://host.docker.internal:8085
+      # Telemetria (etapa 10): o coletor so existe com o profile observability; sem ele a exportacao descarta.
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: bff
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -196,6 +199,8 @@ services:
       CUSTOMER_DB_OWNER_PASSWORD: ${CUSTOMER_DB_OWNER_PASSWORD:-customer_owner}
       CUSTOMER_AWS_ENDPOINT: http://localstack:4566
       CUSTOMER_JWT_ISSUER_URI: http://mock-oauth2-server:8080/default
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: customer
     ports:
       - "8085:8085"
     depends_on: &apps-infra
@@ -231,6 +236,8 @@ services:
       ACCOUNTS_OAUTH_CLIENT_SECRET: ${ACCOUNTS_OAUTH_CLIENT_SECRET:-local-secret}
       ACCOUNTS_CUSTOMER_BASE_URL: http://customer:8085
       ACCOUNTS_TRANSFERS_BASE_URL: http://transfers:8082
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: accounts
     ports:
       - "8081:8081"
     depends_on: *apps-infra
@@ -257,6 +264,8 @@ services:
       TRANSFERS_OAUTH_CLIENT_ID: ${TRANSFERS_OAUTH_CLIENT_ID:-transfers}
       TRANSFERS_OAUTH_CLIENT_SECRET: ${TRANSFERS_OAUTH_CLIENT_SECRET:-local-secret}
       TRANSFERS_CUSTOMER_BASE_URL: http://customer:8085
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: transfers
     ports:
       - "8082:8082"
     depends_on: *apps-infra
@@ -276,6 +285,8 @@ services:
       NOTIFICATION_DB_OWNER_PASSWORD: ${NOTIFICATION_DB_OWNER_PASSWORD:-notification_owner}
       NOTIFICATION_AWS_ENDPOINT: http://localstack:4566
       NOTIFICATION_JWT_ISSUER_URI: http://mock-oauth2-server:8080/default
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: notification
     ports:
       - "8083:8083"
     depends_on: *apps-infra
@@ -293,6 +304,8 @@ services:
       STATEMENT_REDIS_HOST: redis
       STATEMENT_REDIS_PORT: "6379"
       STATEMENT_JWT_ISSUER_URI: http://mock-oauth2-server:8080/default
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: statement
     ports:
       - "8084:8084"
     depends_on:
@@ -303,6 +316,112 @@ services:
       <<: *apps-health
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8084/actuator/health"]
 
+  # Observabilidade (etapa 10), profile observability: sobe com --profile observability (junto de apps ou sozinho).
+  # Nenhum servico depende destes: sem eles a exportacao OTLP dos servicos descarta, nao atrasa. Dados em volumes
+  # proprios (tempo-data, prometheus-data, loki-data, grafana-data), separados dos do usuario. Portas so no loopback.
+  # O coletor (imagem sem shell) nao tem healthcheck do Docker: confira em http://127.0.0.1:13133.
+  otel-collector:
+    profiles: [observability]
+    image: otel/opentelemetry-collector-contrib:${OTEL_COLLECTOR_VERSION:-0.131.0}
+    command: ["--config=/etc/otelcol/config.yaml"]
+    ports:
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+      - "127.0.0.1:13133:13133"
+    volumes:
+      - ./otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
+    depends_on:
+      tempo:
+        condition: service_healthy
+      prometheus:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+
+  tempo:
+    profiles: [observability]
+    image: grafana/tempo:${TEMPO_VERSION:-2.8.2}
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    user: root
+    ports:
+      - "127.0.0.1:3200:3200"
+    volumes:
+      - ./tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    healthcheck:
+      test: ["CMD", "/busybox/wget", "-qO-", "http://127.0.0.1:3200/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  prometheus:
+    profiles: [observability]
+    image: prom/prometheus:${PROMETHEUS_VERSION:-v3.5.0}
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --web.enable-otlp-receiver
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9090/-/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  loki:
+    profiles: [observability]
+    image: grafana/loki:${LOKI_VERSION:-3.5.3}
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    user: root
+    ports:
+      - "127.0.0.1:3100:3100"
+    volumes:
+      - ./loki/loki.yaml:/etc/loki/loki.yaml:ro
+      - loki-data:/loki
+    healthcheck:
+      test: ["CMD", "/busybox/wget", "-qO-", "http://127.0.0.1:3100/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # Acesso anonimo de leitura (Viewer) so porque a porta fica no loopback; o login admin segue ligado.
+  grafana:
+    profiles: [observability]
+    image: grafana/grafana:${GRAFANA_VERSION:-12.1.0}
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      tempo:
+        condition: service_healthy
+      prometheus:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
 volumes:
   postgres-data:
   dynamodb-data:
+  tempo-data:
+  prometheus-data:
+  loki-data:
+  grafana-data:
