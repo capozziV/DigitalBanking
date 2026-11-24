@@ -21,6 +21,9 @@ requiredEnv:
   - TRANSFERS_TOPIC_ARN
 
 env:
+  # Coletor ADOT do namespace (chart otel-collector, OTLP/HTTP); so existe na AWS. Coletor fora nao atrasa o servico.
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  OTEL_SERVICE_NAME: transfers
   TRANSFERS_DB_URL: ""
   TRANSFERS_DB_USER: transfers_app
   TRANSFERS_DB_OWNER_USER: transfers_owner

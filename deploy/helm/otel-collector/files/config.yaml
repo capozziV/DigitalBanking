@@ -1,0 +1,106 @@
+# Configuracao do coletor ADOT (renderizada pelo Helm: regiao, porta e nomes vem dos values).
+# Coletor ou backend fora nunca derruba nem atrasa um servico: o servico exporta em lote para ca, e daqui para a AWS
+# a fila e limitada e a retentativa curta; passado o prazo, o lote e descartado.
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  # O endpoint OTLP do X-Ray exige SigV4 com service xray; as credenciais vem do Pod Identity.
+  sigv4auth/xray:
+    region: {{ .Values.region }}
+    service: xray
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:{{ .Values.port }}
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 160
+    spike_limit_mib: 40
+  batch:
+    timeout: 5s
+    send_batch_size: 512
+  # Metricas que ninguem olha custam por serie: so passam as do painel (nomes Micrometer, com ponto) - as da
+  # etapa 10 (transfers.finished, transfers.saga.duration), o outbox, o cache do extrato, as DLQs e o circuito do limite diario.
+  filter/metrics:
+    error_mode: ignore
+    metrics:
+      metric:
+        - 'not IsMatch(name, "^(transfers\\.finished|transfers\\.saga\\.duration|outbox\\..+|statement\\.cache\\..+|[a-z]+\\.dlq\\.messages|transfers\\.daily_limit\\.circuit\\.state)$")'
+
+exporters:
+  # Traces: endpoint OTLP do X-Ray (precisa do Transaction Search ligado, no Terraform). Guarda os IDs W3C como vem
+  # e deixa todo atributo de span pesquisavel (transfer.id), sem indexed_attributes.
+  otlp_http/xray:
+    traces_endpoint: https://xray.{{ .Values.region }}.amazonaws.com/v1/traces
+    compression: gzip
+    auth:
+      authenticator: sigv4auth/xray
+    timeout: 10s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 10s
+      max_elapsed_time: 30s
+    sending_queue:
+      enabled: true
+      queue_size: 200
+  # Metricas: EMF (registro em CloudWatch Logs que o CloudWatch converte em metrica, sem PutMetricData). So as
+  # dimensoes declaradas viram series; o resto some, para nao pagar por combinacao que ninguem olha.
+  awsemf:
+    region: {{ .Values.region }}
+    namespace: {{ .Values.metricsNamespace }}
+    log_group_name: {{ .Values.emfLogGroup }}
+    log_stream_name: otel
+    dimension_rollup_option: NoDimensionRollup
+    # service.name vira rotulo do ponto (dimensao do outbox); a versao do ADOT ainda so tem o liga/desliga.
+    resource_to_telemetry_conversion:
+      enabled: true
+    metric_declarations:
+      - dimensions: [[status], [status, reason]]
+        metric_name_selectors: ["^transfers\\.finished$"]
+      - dimensions: [[status]]
+        metric_name_selectors: ["^transfers\\.saga\\.duration$"]
+      - dimensions: [[service.name]]
+        metric_name_selectors: ["^outbox\\..+$"]
+      - dimensions: [[result]]
+        metric_name_selectors: ["^statement\\.cache\\..+$"]
+      - dimensions: [[queue]]
+        metric_name_selectors: ["^[a-z]+\\.dlq\\.messages$"]
+      - dimensions: [[]]
+        metric_name_selectors: ["^transfers\\.daily_limit\\.circuit\\.state$"]
+  # Logs: um grupo por servico (/capzzpay/<service.name>), criado pelo Terraform com retencao de 1 dia.
+  awscloudwatchlogs:
+    region: {{ .Values.region }}
+    log_group_name: {{ .Values.logGroupPrefix }}/{ServiceName}
+    log_stream_name: otel
+    sending_queue:
+      enabled: true
+      queue_size: 200
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 10s
+      max_elapsed_time: 30s
+
+service:
+  extensions: [health_check, sigv4auth/xray]
+  telemetry:
+    metrics:
+      level: none
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp_http/xray]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, filter/metrics, batch]
+      exporters: [awsemf]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [awscloudwatchlogs]

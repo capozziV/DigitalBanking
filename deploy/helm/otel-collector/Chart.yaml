@@ -1,0 +1,6 @@
+apiVersion: v2
+name: otel-collector
+description: Coletor ADOT (AWS Distro for OpenTelemetry) do capzzPay no EKS - recebe OTLP/HTTP dos servicos e exporta para X-Ray, CloudWatch Logs e metricas EMF.
+type: application
+version: 0.1.0
+appVersion: "0.51.0"

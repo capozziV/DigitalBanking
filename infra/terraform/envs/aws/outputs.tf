@@ -114,3 +114,8 @@ output "db_master_secret_arn" {
 output "redis_endpoint" {
   value = module.data.redis_endpoint
 }
+
+output "observability_dashboard_name" {
+  description = "Painel de transferencias no CloudWatch."
+  value       = module.observability.dashboard_name
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Passo "helm uninstall" do workflow aws-down: tira o web, o bff, os cinco servicos e o db-init do cluster e espera os
+# Passo "helm uninstall" do workflow aws-down: tira o web, o bff, os cinco servicos, o db-init e o coletor ADOT do cluster e espera os
 # TargetGroupBinding sairem (o controller ainda de pe tira os alvos; o destroy leva os target groups).
 # Entrada (ambiente): AWS_REGION, CLUSTER_NAME, NAMESPACE.
 # Nunca para no primeiro erro: percorre tudo, lista o que falhou e sai com 1 no fim. Quem chama (aws-down) roda o
@@ -27,7 +27,7 @@ if ! kubectl auth can-i list targetgroupbindings.elbv2.k8s.aws -A > /dev/null; t
   failed+=("acesso ao cluster")
 fi
 
-for release in web bff statement notification transfers accounts customer db-init; do
+for release in web bff statement notification transfers accounts customer db-init otel-collector; do
   if status=$(helm status "$release" -n "$NAMESPACE" 2>&1); then
     helm uninstall "$release" -n "$NAMESPACE" --wait --timeout 10m || failed+=("helm uninstall $release")
   elif [[ "$status" == *"release: not found"* ]]; then

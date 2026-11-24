@@ -29,6 +29,14 @@ has db-init 'digitalbanking-db.abcdefghijkl.sa-east-1.rds.amazonaws.com'
 has db-init 'arn:aws:secretsmanager:sa-east-1:123456789012:secret:rds!db-0123-abcdef'
 has db-init '"digitalbanking"'
 
+# Coletor ADOT (etapa 10): instalado antes dos servicos, no namespace do Pod Identity, com a ServiceAccount fixa.
+has otel-collector 'serviceAccountName: otel-collector'
+has otel-collector 'traces_endpoint: https://xray.sa-east-1.amazonaws.com/v1/traces'
+for svc in customer accounts transfers notification statement bff; do
+  has "$svc" 'OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4318"'
+  has "$svc" "OTEL_SERVICE_NAME: \"$svc\""
+done
+
 for svc in customer accounts transfers notification statement; do
   has "$svc" "image: \"$registry/digital-banking/$svc:$tag\""
   has "$svc" "targetGroupARN: \"$(jq -r --arg s "$svc" '.target_group_arns.value[$s]' "$fixture")\""

@@ -86,6 +86,13 @@ module "data" {
   machine_client_secret    = module.identity.machine_client_secret
 }
 
+# Destinos da telemetria (etapa 10): grupos de logs, Transaction Search do X-Ray e o painel do CloudWatch.
+module "observability" {
+  source = "../../modules/observability"
+
+  region = var.region
+}
+
 module "access" {
   source = "../../modules/access"
 
@@ -97,4 +104,6 @@ module "access" {
   table_arns   = module.messaging.table_arns
 
   db_init_secret_arns = module.data.db_init_secret_arns
+
+  collector_log_group_arns = module.observability.log_group_arns
 }

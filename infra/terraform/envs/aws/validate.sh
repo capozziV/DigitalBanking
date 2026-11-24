@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Validacao sem credenciais do ambiente efemero: fmt, init sem backend, validate, tflint (raiz e modulos
 # locais), conferencia do roteamento do ALB contra o nginx local, da mensageria contra o LocalStack e dos
-# nomes de servico entre o Pod Identity e os charts Helm e do throttle da borda.
+# nomes de servico entre o Pod Identity e os charts Helm, do throttle da borda e da observabilidade (coletor, painel e values).
 set -euo pipefail
 cd "$(dirname "$0")"
 config="$PWD/.tflint.hcl"
@@ -12,7 +12,7 @@ terraform validate
 
 tflint --init >/dev/null
 tflint
-for module in network eks edge-alb edge identity messaging data access; do
+for module in network eks edge-alb edge identity messaging data access observability; do
   tflint --chdir="../../modules/$module" --config="$config"
 done
 
@@ -20,3 +20,4 @@ done
 ./check-messaging.py
 ./check-service-names.py
 ./check-edge-throttling.py
+./check-observability.py

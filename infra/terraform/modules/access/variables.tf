@@ -38,3 +38,14 @@ variable "db_init_service_account" {
   type        = string
   default     = "db-init"
 }
+
+variable "collector_service_account" {
+  description = "ServiceAccount do coletor ADOT (chart deploy/helm/otel-collector, campo name), no namespace do release."
+  type        = string
+  default     = "otel-collector"
+}
+
+variable "collector_log_group_arns" {
+  description = "ARNs dos grupos de logs que o coletor escreve (servicos e metricas EMF, modules/observability)."
+  type        = list(string)
+}
