@@ -35,12 +35,14 @@ class ServiceArchitectureRulesTest {
     fun `domain rule passes for a clean domain`() = assertPasses(ServiceArchitectureRules::domainIsIndependent)
 
     @Test
-    fun `domain rule rejects spring, sql, aws and the outer layers`() =
+    fun `domain rule rejects spring, sql, aws, telemetry and the outer layers`() =
         assertViolatedBy(
             ServiceArchitectureRules::domainIsIndependent,
             "DomainWithSpring",
             "DomainWithSql",
             "DomainWithAws",
+            "DomainWithMicrometer",
+            "DomainWithOpenTelemetry",
             "DomainUsesApplication",
             "DomainUsesAdapters",
         )
@@ -49,12 +51,14 @@ class ServiceArchitectureRulesTest {
     fun `application rule passes for a clean application`() = assertPasses(ServiceArchitectureRules::applicationIsIndependent)
 
     @Test
-    fun `application rule rejects spring, sql, aws and adapters`() =
+    fun `application rule rejects spring, sql, aws, tracing and adapters`() =
         assertViolatedBy(
             ServiceArchitectureRules::applicationIsIndependent,
             "ApplicationWithSpring",
             "ApplicationWithSql",
             "ApplicationWithAws",
+            "ApplicationWithOpenTelemetry",
+            "ApplicationWithMicrometerTracing",
             "ApplicationUsesAdapters",
         )
 

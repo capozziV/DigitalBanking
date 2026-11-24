@@ -16,6 +16,9 @@ import java.util.concurrent.TimeUnit
 /**
  * One service running as `java -jar` with its own environment and arguments, on a port chosen once, so restarts keep the URL.
  * Each start appends to `<logDir>/<name>.log`; [logTail] goes into the report of a failed test.
+ *
+ * The OTLP export is off (see [processEnvironment]), as in every Test task of the build: a collector of the local stack
+ * that happens to be up never gets the spans, metrics and logs of the end-to-end runs.
  */
 class ServiceProcess(
     val name: String,
@@ -43,11 +46,14 @@ class ServiceProcess(
             ProcessBuilder(command)
                 .redirectErrorStream(true)
                 .redirectOutput(ProcessBuilder.Redirect.appendTo(logFile.toFile()))
-        builder.environment().putAll(environment)
+        builder.environment().putAll(processEnvironment())
         val started = builder.start()
         process = started
         awaitHealthy(started)
     }
+
+    /** What the process gets on top of the environment of the tests: the OTLP export off, then [environment]. */
+    fun processEnvironment(): Map<String, String> = TELEMETRY_EXPORT_OFF + environment
 
     fun ensureRunning() {
         if (!isRunning) start()
@@ -119,6 +125,14 @@ class ServiceProcess(
         val STOP_TIMEOUT: Duration = Duration.ofSeconds(20)
         val HEALTH_POLL: Duration = Duration.ofMillis(200)
         const val LOG_TAIL_LINES = 200
+
+        /** The three switches the build sets on every Test task, by relaxed binding of the environment. */
+        val TELEMETRY_EXPORT_OFF =
+            mapOf(
+                "MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED" to "false",
+                "MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED" to "false",
+                "MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED" to "false",
+            )
 
         /** The JVM running the tests (the Gradle toolchain's JDK 21) also runs the services. */
         fun javaExecutable(): String =

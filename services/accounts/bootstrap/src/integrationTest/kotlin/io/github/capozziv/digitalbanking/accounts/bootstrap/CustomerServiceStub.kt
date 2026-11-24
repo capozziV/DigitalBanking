@@ -55,6 +55,7 @@ class CustomerServiceStub private constructor(
         val customerId: String,
         val authorization: String?,
         val correlationId: String?,
+        val traceparent: String? = null,
     )
 
     val baseUrl: String get() = "http://127.0.0.1:${server.address.port}"
@@ -78,7 +79,13 @@ class CustomerServiceStub private constructor(
     private fun handleCustomer(exchange: HttpExchange) {
         val id = exchange.requestURI.path.removePrefix(CUSTOMERS_PATH)
         val authorization = exchange.requestHeaders.getFirst("Authorization")
-        lookups += Lookup(id, authorization, exchange.requestHeaders.getFirst("X-Correlation-Id"))
+        lookups +=
+            Lookup(
+                id,
+                authorization,
+                exchange.requestHeaders.getFirst("X-Correlation-Id"),
+                exchange.requestHeaders.getFirst("traceparent"),
+            )
         if (!isServiceToken(authorization)) return exchange.respond(401, """{"status":401}""")
         val customerId = runCatching { UUID.fromString(id) }.getOrNull() ?: return exchange.respond(404, """{"status":404}""")
         when (val behavior = behaviors[customerId] ?: Behavior.Active) {

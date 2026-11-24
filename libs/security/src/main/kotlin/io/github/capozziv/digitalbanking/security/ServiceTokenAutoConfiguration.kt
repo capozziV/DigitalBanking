@@ -1,5 +1,7 @@
 package io.github.capozziv.digitalbanking.security
 
+import io.micrometer.observation.ObservationRegistry
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.boot.autoconfigure.AutoConfiguration
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -20,15 +22,18 @@ import java.time.Duration
 class ServiceTokenAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
-    fun serviceTokenClient(properties: ServiceTokenProperties) =
-        ServiceTokenClient(
-            tokenUri = properties.tokenUri,
-            clientId = properties.clientId,
-            clientSecret = properties.clientSecret,
-            scope = properties.scope,
-            connectTimeout = properties.connectTimeout,
-            readTimeout = properties.readTimeout,
-        )
+    fun serviceTokenClient(
+        properties: ServiceTokenProperties,
+        observationRegistry: ObjectProvider<ObservationRegistry>,
+    ) = ServiceTokenClient(
+        tokenUri = properties.tokenUri,
+        clientId = properties.clientId,
+        clientSecret = properties.clientSecret,
+        scope = properties.scope,
+        connectTimeout = properties.connectTimeout,
+        readTimeout = properties.readTimeout,
+        observationRegistry = observationRegistry.getIfAvailable { ObservationRegistry.NOOP },
+    )
 }
 
 /**

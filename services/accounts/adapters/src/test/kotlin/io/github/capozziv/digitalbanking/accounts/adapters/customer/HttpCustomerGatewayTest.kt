@@ -8,6 +8,7 @@ import com.sun.net.httpserver.HttpServer
 import io.github.capozziv.digitalbanking.accounts.application.CustomersUnavailableException
 import io.github.capozziv.digitalbanking.accounts.application.port.CustomerStatus
 import io.github.capozziv.digitalbanking.security.ServiceTokenClient
+import io.micrometer.observation.ObservationRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
@@ -118,7 +119,9 @@ class HttpCustomerGatewayTest {
         val url = stubUrl.toString()
         val tokenClient = ServiceTokenClient(URI.create("http://127.0.0.1:${server.address.port}/token"), "accounts", "secret")
         val configuration = CustomerClientConfiguration()
-        return HttpCustomerGateway(configuration.customerRestClient(CustomerClientProperties(baseUrl = url), tokenClient))
+        return HttpCustomerGateway(
+            configuration.customerRestClient(CustomerClientProperties(baseUrl = url), tokenClient, ObservationRegistry.NOOP),
+        )
     }
 
     @Test

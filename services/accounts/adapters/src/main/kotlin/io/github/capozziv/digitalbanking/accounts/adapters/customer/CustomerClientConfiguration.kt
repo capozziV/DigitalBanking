@@ -2,7 +2,9 @@ package io.github.capozziv.digitalbanking.accounts.adapters.customer
 
 import io.github.capozziv.digitalbanking.accounts.application.port.CustomerGateway
 import io.github.capozziv.digitalbanking.observability.CorrelationIdRestClientInterceptor
+import io.github.capozziv.digitalbanking.observability.traced
 import io.github.capozziv.digitalbanking.security.ServiceTokenClient
+import io.micrometer.observation.ObservationRegistry
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -19,6 +21,7 @@ class CustomerClientConfiguration {
     fun customerRestClient(
         properties: CustomerClientProperties,
         serviceTokenClient: ServiceTokenClient,
+        observationRegistry: ObservationRegistry,
     ): RestClient {
         // HTTP/1.1 only: the JDK client would otherwise try a cleartext HTTP/2 upgrade on every connection.
         val httpClient =
@@ -32,6 +35,7 @@ class CustomerClientConfiguration {
             .builder()
             .baseUrl(properties.baseUrl)
             .requestFactory(requestFactory)
+            .traced(observationRegistry)
             .requestInterceptor(CorrelationIdRestClientInterceptor())
             .requestInterceptor(serviceTokenClient.interceptor())
             .build()

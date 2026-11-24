@@ -12,6 +12,9 @@ aws-sdk = "2.57.1"
 spring-cloud-aws = "4.2.1"
 # Consumer-driven contracts (ADR 0022): successor of Spring Cloud Contract, built on Spring Boot 4.1.
 stubborn-contract = "0.2.2"
+# Logback appender of OpenTelemetry (logs by OTLP). Not managed by Spring Boot: 2.28.x is the line built on the
+# OpenTelemetry API 1.62.0 of Spring Boot 4.1.1; bump it together with Spring Boot.
+opentelemetry-instrumentation-alpha = "2.28.1-alpha"
 
 [libraries]
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
@@ -34,6 +37,7 @@ aws-sdk-sqs = { module = "software.amazon.awssdk:sqs" }
 # so the project's aws-sdk wins over the one the Spring Cloud AWS BOM brings.
 spring-cloud-aws-bom = { module = "io.awspring.cloud:spring-cloud-aws-dependencies", version.ref = "spring-cloud-aws" }
 spring-cloud-aws-starter-sqs = { module = "io.awspring.cloud:spring-cloud-aws-starter-sqs" }
+opentelemetry-logback-appender = { module = "io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0", version.ref = "opentelemetry-instrumentation-alpha" }
 stubborn-contract-bom = { module = "sh.stubborn:stubborn-contract-dependencies", version.ref = "stubborn-contract" }
 
 # Dependencias de plugin para o build-logic

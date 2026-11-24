@@ -1,6 +1,9 @@
 package io.github.capozziv.digitalbanking.security
 
 import com.sun.net.httpserver.HttpServer
+import io.micrometer.observation.ObservationRegistry
+import io.micrometer.observation.tck.TestObservationRegistry
+import io.micrometer.observation.tck.TestObservationRegistryAssert
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
@@ -69,15 +72,18 @@ class ServiceTokenClientIntegrationTest {
     private val baseUrl = "http://127.0.0.1:${server.address.port}"
     private val clock = MutableClock(Instant.parse("2026-11-13T12:00:00Z"))
 
-    private fun client(tokenUri: URI = URI.create("$baseUrl/token")) =
-        ServiceTokenClient(
-            tokenUri = tokenUri,
-            clientId = "transfers",
-            clientSecret = "s3cret",
-            connectTimeout = Duration.ofMillis(300),
-            readTimeout = Duration.ofMillis(700),
-            clock = clock,
-        )
+    private fun client(
+        tokenUri: URI = URI.create("$baseUrl/token"),
+        observationRegistry: ObservationRegistry = ObservationRegistry.NOOP,
+    ) = ServiceTokenClient(
+        tokenUri = tokenUri,
+        clientId = "transfers",
+        clientSecret = "s3cret",
+        connectTimeout = Duration.ofMillis(300),
+        readTimeout = Duration.ofMillis(700),
+        clock = clock,
+        observationRegistry = observationRegistry,
+    )
 
     @AfterEach
     fun stop() = server.stop(0)
@@ -90,6 +96,44 @@ class ServiceTokenClientIntegrationTest {
         val request = tokenRequests.single()
         assertThat(request.authorization).isEqualTo("Basic " + Base64.getEncoder().encodeToString("transfers:s3cret".toByteArray()))
         assertThat(request.form).containsEntry("grant_type", "client_credentials").containsEntry("scope", "digitalbanking/internal")
+    }
+
+    @Test
+    fun `each request to the token endpoint is an observation, so it is a span of the trace, and a cached token is not`() {
+        val registry = TestObservationRegistry.create()
+        val client = client(observationRegistry = registry)
+
+        client.accessToken()
+        client.accessToken()
+
+        TestObservationRegistryAssert
+            .assertThat(registry)
+            .hasNumberOfObservationsWithNameEqualTo(ServiceTokenClient.TOKEN_REQUEST_OBSERVATION, 1)
+            .hasObservationWithNameEqualTo(ServiceTokenClient.TOKEN_REQUEST_OBSERVATION)
+            .that()
+            .hasBeenStopped()
+            .hasLowCardinalityKeyValue("outcome", "SUCCESS")
+    }
+
+    @Test
+    fun `a failed request to the token endpoint is an observation with the error`() {
+        tokenStatus = 401
+        val registry = TestObservationRegistry.create()
+
+        assertThatThrownBy {
+            client(
+                observationRegistry = registry,
+            ).accessToken()
+        }.isInstanceOf(ServiceTokenUnavailableException::class.java)
+
+        TestObservationRegistryAssert
+            .assertThat(registry)
+            .hasObservationWithNameEqualTo(ServiceTokenClient.TOKEN_REQUEST_OBSERVATION)
+            .that()
+            .hasBeenStopped()
+            .hasLowCardinalityKeyValue("outcome", "FAILURE")
+            .assertThatError()
+            .isInstanceOf(ServiceTokenUnavailableException::class.java)
     }
 
     @Test

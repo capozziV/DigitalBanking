@@ -1,2 +1,3 @@
 io.github.capozziv.digitalbanking.observability.ObservabilityAutoConfiguration
 io.github.capozziv.digitalbanking.observability.SqsCorrelationIdAutoConfiguration
+io.github.capozziv.digitalbanking.observability.TracingAutoConfiguration

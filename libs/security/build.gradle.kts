@@ -22,6 +22,7 @@ dependencies {
     // Services use both libs: proves 401/403 keep the X-Correlation-Id (the correlation filter runs first).
     integrationTestImplementation(project(":libs:observabilidade"))
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-test")
+    integrationTestImplementation("io.micrometer:micrometer-observation-test")
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-actuator")
     integrationTestImplementation(libs.springdoc.openapi.starter.webmvc.ui)
 }

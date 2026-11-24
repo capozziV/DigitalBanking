@@ -1,5 +1,8 @@
 package io.github.capozziv.digitalbanking.security
 
+import io.micrometer.common.KeyValue
+import io.micrometer.observation.Observation
+import io.micrometer.observation.ObservationRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
 import org.springframework.http.client.ClientHttpRequestInterceptor
@@ -34,6 +37,9 @@ import java.util.concurrent.TimeoutException
  * - Worst case of one call: [maxFetchDuration] = [connectTimeout] + [readTimeout] (500 ms + 1.5 s = 2 s by default).
  *   It bounds the whole token request, body included, and a call never waits for more than one token request. A
  *   caller with a time budget per call (the `call-budget` of `transfers`) must add it to its own HTTP timeouts.
+ * - Each request to the token endpoint (not a cached token) is the observation [TOKEN_REQUEST_OBSERVATION], a span of
+ *   the current trace and a timer, with `outcome` `SUCCESS` or `FAILURE`. No `traceparent` goes to the identity
+ *   provider: it is not ours and does not trace.
  *
  * Use: `RestClient.builder().requestInterceptor(serviceTokenClient.interceptor())`. The bean is created by
  * [ServiceTokenAutoConfiguration] when `digitalbanking.security.service-token.token-uri` is set.
@@ -46,6 +52,7 @@ class ServiceTokenClient(
     private val connectTimeout: Duration = DEFAULT_CONNECT_TIMEOUT,
     private val readTimeout: Duration = DEFAULT_READ_TIMEOUT,
     private val clock: Clock = Clock.systemUTC(),
+    private val observationRegistry: ObservationRegistry = ObservationRegistry.NOOP,
 ) {
     private val httpClient =
         HttpClient
@@ -74,7 +81,7 @@ class ServiceTokenClient(
             cached?.takeIf { it.isFresh() }?.let { return it.value }
             lastFailure?.takeIf { it.isRecent() }?.let { throw it.shared() }
             try {
-                return fetch().also { cached = it }.value
+                return observedFetch().also { cached = it }.value
             } catch (e: ServiceTokenUnavailableException) {
                 lastFailure = RecentFailure(e.message.orEmpty(), clock.instant())
                 throw e
@@ -108,6 +115,18 @@ class ServiceTokenClient(
                 if (response.statusCode.value() == HTTP_UNAUTHORIZED) onRejected(token)
             }
         }
+
+    private fun observedFetch(): CachedToken {
+        val observation = Observation.start(TOKEN_REQUEST_OBSERVATION, observationRegistry)
+        try {
+            return observation.openScope().use { fetch() }.also { observation.lowCardinalityKeyValue(SUCCESS) }
+        } catch (e: ServiceTokenUnavailableException) {
+            observation.lowCardinalityKeyValue(FAILURE).error(e)
+            throw e
+        } finally {
+            observation.stop()
+        }
+    }
 
     private fun fetch(): CachedToken {
         val requestedAt = clock.instant()
@@ -182,6 +201,11 @@ class ServiceTokenClient(
         val FAILURE_BACKOFF: Duration = Duration.ofSeconds(1)
         val DEFAULT_CONNECT_TIMEOUT: Duration = Duration.ofMillis(500)
         val DEFAULT_READ_TIMEOUT: Duration = Duration.ofMillis(1500)
+
+        /** Name of the observation (span and timer) of a request to the token endpoint. */
+        const val TOKEN_REQUEST_OBSERVATION = "service.token.requests"
+        private val SUCCESS = KeyValue.of("outcome", "SUCCESS")
+        private val FAILURE = KeyValue.of("outcome", "FAILURE")
         private const val HTTP_UNAUTHORIZED = 401
         private val log = LoggerFactory.getLogger(ServiceTokenClient::class.java)
     }

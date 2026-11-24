@@ -27,6 +27,10 @@ spring:
           issuer-uri: ${ACCOUNTS_JWT_ISSUER_URI:http://localhost:8090/default}
 
 digitalbanking:
+  observability:
+    # OTLP/HTTP endpoint of the collector, for traces, metrics and logs. Exports are asynchronous, in batches with a
+    # bounded queue that drops when full: a collector that is down never fails nor slows a request.
+    otlp-endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://127.0.0.1:4318}
   security:
     groups-claim: ${ACCOUNTS_JWT_GROUPS_CLAIM:groups}
     # Machine token (client credentials) for the calls to the customer and transfers services.
@@ -64,14 +68,34 @@ accounts:
     topic-arn: ${ACCOUNTS_TOPIC_ARN:arn:aws:sns:us-east-1:000000000000:accounts-events.fifo}
 
 logging:
-  pattern:
-    # Correlation id of the request (MDC key of OutboxEventEnvelope.CORRELATION_ID_MDC_KEY) on every log line.
-    correlation: "[%X{correlationId:-}] "
+  structured:
+    format:
+      # JSON (Elastic Common Schema) on stdout; the MDC goes in as fields: traceId and spanId (Micrometer Tracing) and
+      # correlationId (libs/observabilidade). The same lines also go out by OTLP.
+      console: ecs
 
 server:
   port: 8081
 
 management:
+  tracing:
+    sampling:
+      # Every request is traced, locally and on AWS: the volume is a demo's.
+      probability: 1.0
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${digitalbanking.observability.otlp-endpoint}/v1/traces
+    logging:
+      export:
+        otlp:
+          endpoint: ${digitalbanking.observability.otlp-endpoint}/v1/logs
+  otlp:
+    metrics:
+      export:
+        url: ${digitalbanking.observability.otlp-endpoint}/v1/metrics
+        step: 10s
   endpoints:
     web:
       exposure:

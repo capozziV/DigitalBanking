@@ -23,6 +23,7 @@ import io.github.capozziv.digitalbanking.transfers.domain.Money
 import io.github.capozziv.digitalbanking.transfers.domain.StepCall
 import io.github.capozziv.digitalbanking.transfers.domain.StepOutcome
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import io.micrometer.observation.ObservationRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
@@ -65,7 +66,12 @@ class HttpAccountsGatewayIntegrationTest {
 
     private fun gatewayFor(url: String): AccountsGateway {
         val properties = AccountsClientProperties(url = url)
-        val restClient = AccountsClientConfiguration().accountsRestClient(properties, ServiceTokenServers.clientOf(tokenServer))
+        val restClient =
+            AccountsClientConfiguration().accountsRestClient(
+                properties,
+                ServiceTokenServers.clientOf(tokenServer),
+                ObservationRegistry.NOOP,
+            )
         return HttpAccountsGateway(restClient, AccountsResponseClassifier(SimpleMeterRegistry()))
     }
 
