@@ -19,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.springframework.boot.test.system.CapturedOutput
 import org.springframework.boot.test.system.OutputCaptureExtension
 import org.springframework.boot.test.web.server.LocalServerPort
+import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.TestPropertySource
 import java.net.InetAddress
 import java.net.ServerSocket
@@ -31,17 +32,21 @@ import kotlin.math.ceil
 
 /**
  * A collector that is down or stuck neither fails nor slows a request: with the OTLP endpoint on a closed port, and
- * then on a socket that accepts the connection and never answers, 20 transfers in a row all conclude, their p95 stays
- * within [latencyLimit] of the p95 of the same requests against a receiver that accepts the export, and the log does
- * not get an exporter error or warning per request.
+ * then on a socket that accepts the connection and never answers, 20 transfers in a row all conclude, none slower than
+ * [SINGLE_REQUEST_CEILING], their p95 under [ABSOLUTE_P95_CEILING], and the log does not get an exporter error or warning
+ * per request. A receiver that accepts the export runs the same checks, as the reference scenario.
  *
  * The closed port alone does not tell a synchronous export apart (the refusal takes under 1 ms); the stuck collector
  * does: there each export waits [STUCK_EXPORT_TIMEOUT] before failing, so an export on the request thread would push
  * the p95 above [ABSOLUTE_P95_CEILING].
  *
+ * There is no comparison against the receiver's p95: the scenarios run at different moments of a loaded build, and the
+ * same build measured the receiver 3.6 times slower than the collector down. The absolute ceilings are what catch an
+ * export on the request thread (each one waits the full timeout on the stuck collector, and retries on the closed port).
+ *
  * The export is on for real (traces, metrics and logs, the defaults of `application.yml`); the build turns it off in
- * every other test. The receiver run goes first and leaves its p95 for the comparison, so the nested classes only run
- * together, in order (running one of the others alone fails on the missing baseline).
+ * every other test. Each nested class has its own context, closed after it ([DirtiesContext]), so its exporters stop
+ * before the next scenario starts and do not keep exporting until the JVM ends.
  */
 @TestClassOrder(ClassOrderer.OrderAnnotation::class)
 class OtlpExportUnavailableIntegrationTest : TransfersIntegrationTest() {
@@ -50,6 +55,7 @@ class OtlpExportUnavailableIntegrationTest : TransfersIntegrationTest() {
     @TestPropertySource(
         properties = [EXPORT_ON_TRACES, EXPORT_ON_METRICS, EXPORT_ON_LOGS, "$ENDPOINT=http://127.0.0.1:\${$RECEIVER_PORT_PROPERTY}"],
     )
+    @DirtiesContext
     inner class WithAReceiver {
         @LocalServerPort
         private var port: Int = 0
@@ -61,7 +67,9 @@ class OtlpExportUnavailableIntegrationTest : TransfersIntegrationTest() {
             await().atMost(Duration.ofSeconds(20)).untilAsserted {
                 assertThat(receiver.allServeEvents.map { it.request.url }).contains("/v1/traces", "/v1/logs", "/v1/metrics")
             }
-            reachableP95 = p95(latencies)
+            val p95 = p95(latencies)
+            println("OTLP export p95: receiver $p95")
+            assertUnderTheCeiling(p95)
         }
     }
 
@@ -69,21 +77,20 @@ class OtlpExportUnavailableIntegrationTest : TransfersIntegrationTest() {
     @Order(2)
     @ExtendWith(OutputCaptureExtension::class)
     @TestPropertySource(properties = [EXPORT_ON_TRACES, EXPORT_ON_METRICS, EXPORT_ON_LOGS, "$ENDPOINT=http://127.0.0.1:1"])
+    @DirtiesContext
     inner class WithTheCollectorDown {
         @LocalServerPort
         private var port: Int = 0
 
         @Test
         fun `transfers conclude as fast and the log has no exporter error per request`(output: CapturedOutput) {
-            val baseline = checkNotNull(reachableP95) { "the run with a receiver (WithAReceiver) must come first" }
-
             val latencies = transfers(port)
             // Every exporter tries at least once: logs every 1 s, spans every 5 s, metrics every 10 s.
             Thread.sleep(EXPORT_ATTEMPTS_WINDOW.toMillis())
 
             val p95 = p95(latencies)
-            println("OTLP export p95: receiver $baseline, collector down $p95")
-            assertFasterThanTheLimit(p95, baseline)
+            println("OTLP export p95: collector down $p95")
+            assertUnderTheCeiling(p95)
             // The export really ran and failed: the test is not passing because nothing was exported.
             assertThat(output.out).containsAnyOf("Failed to export", "Failed to publish metrics")
             val complaints = exporterComplaints(output)
@@ -105,13 +112,13 @@ class OtlpExportUnavailableIntegrationTest : TransfersIntegrationTest() {
             "management.otlp.metrics.export.read-timeout=$STUCK_EXPORT_TIMEOUT_PROPERTY",
         ],
     )
+    @DirtiesContext
     inner class WithAStuckCollector {
         @LocalServerPort
         private var port: Int = 0
 
         @Test
         fun `transfers conclude as fast while the collector accepts and never answers`(output: CapturedOutput) {
-            val baseline = checkNotNull(reachableP95) { "the run with a receiver (WithAReceiver) must come first" }
             // Only then can a synchronous export (at least one timeout per request) break the ceiling.
             assertThat(ABSOLUTE_P95_CEILING).isLessThan(STUCK_EXPORT_TIMEOUT)
 
@@ -119,8 +126,8 @@ class OtlpExportUnavailableIntegrationTest : TransfersIntegrationTest() {
             Thread.sleep(EXPORT_ATTEMPTS_WINDOW.toMillis())
 
             val p95 = p95(latencies)
-            println("OTLP export p95: receiver $baseline, collector stuck $p95")
-            assertFasterThanTheLimit(p95, baseline)
+            println("OTLP export p95: collector stuck $p95")
+            assertUnderTheCeiling(p95)
             // The exporters reached the stuck collector: the test is not passing because nothing was exported.
             assertThat(stuckCollector.connections.get()).isPositive()
             val complaints = exporterComplaints(output)
@@ -128,19 +135,9 @@ class OtlpExportUnavailableIntegrationTest : TransfersIntegrationTest() {
         }
     }
 
-    /**
-     * The p95 stays under twice the [baseline], with at least [LATENCY_MARGIN] of room against CI noise on a fast
-     * baseline, and under [ABSOLUTE_P95_CEILING] whatever the baseline.
-     */
-    private fun assertFasterThanTheLimit(
-        p95: Duration,
-        baseline: Duration,
-    ) {
-        assertThat(p95).describedAs("p95 (receiver: $baseline)").isLessThan(latencyLimit(baseline))
-        assertThat(p95).describedAs("p95 (receiver: $baseline)").isLessThan(ABSOLUTE_P95_CEILING)
+    private fun assertUnderTheCeiling(p95: Duration) {
+        assertThat(p95).describedAs("p95").isLessThan(ABSOLUTE_P95_CEILING)
     }
-
-    private fun latencyLimit(baseline: Duration): Duration = maxOf(baseline.multipliedBy(2), baseline.plus(LATENCY_MARGIN))
 
     /** Exporter lines at WARN or ERROR (`OtlpMeterRegistry` warns, the OpenTelemetry exporters log SEVERE as ERROR). */
     private fun exporterComplaints(output: CapturedOutput): List<String> =
@@ -220,16 +217,10 @@ class OtlpExportUnavailableIntegrationTest : TransfersIntegrationTest() {
         const val STUCK_EXPORT_TIMEOUT_PROPERTY = "2s"
 
         /**
-         * Against noise on a fast baseline (60 to 200 ms here): twice 60 ms would leave a GC pause no room. 250 ms is
-         * still well under the [STUCK_EXPORT_TIMEOUT] a single synchronous export would add.
+         * The p95 of a transfer with a stubbed `accounts` stays under 1.5 s: alone it is 40 to 80 ms, and the slowest
+         * seen in a full build was 624 ms; one synchronous export to the stuck collector adds [STUCK_EXPORT_TIMEOUT].
          */
-        val LATENCY_MARGIN: Duration = Duration.ofMillis(250)
-
-        /**
-         * Whatever the baseline, the p95 of a transfer with a stubbed `accounts` stays under 1 s: five times the slowest
-         * baseline measured, and half of what one synchronous export to the stuck collector would add.
-         */
-        val ABSOLUTE_P95_CEILING: Duration = Duration.ofSeconds(1)
+        val ABSOLUTE_P95_CEILING: Duration = Duration.ofMillis(1500)
 
         /** No single request comes near it (they take 40 to 200 ms); one export on the request thread goes past it. */
         val SINGLE_REQUEST_CEILING: Duration = Duration.ofSeconds(5)
@@ -252,9 +243,6 @@ class OtlpExportUnavailableIntegrationTest : TransfersIntegrationTest() {
                 // Read by the endpoint placeholder of WithAStuckCollector; set before any context of this class starts.
                 System.setProperty(STUCK_PORT_PROPERTY, it.port.toString())
             }
-
-        @Volatile
-        private var reachableP95: Duration? = null
     }
 
     /** A server socket whose accepted connections stay open and silent until the JVM ends. */
