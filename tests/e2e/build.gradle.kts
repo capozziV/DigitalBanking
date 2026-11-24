@@ -15,6 +15,8 @@ dependencies {
     integrationTestImplementation(libs.testcontainers.junit.jupiter)
     integrationTestImplementation(libs.postgresql)
     integrationTestImplementation("tools.jackson.core:jackson-databind")
+    // Backend for the SLF4J output of Testcontainers, so a container that does not start leaves its log in the report.
+    integrationTestRuntimeOnly("ch.qos.logback:logback-classic")
 }
 
 // The jars and the init scripts reach the tests as system properties. The jars come from the output of each service's
