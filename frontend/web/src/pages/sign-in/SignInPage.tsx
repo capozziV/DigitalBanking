@@ -50,13 +50,14 @@ export function SignInPage() {
               <GradientText>Sem atrito.</GradientText>
             </p>
           </Reveal>
-          <Reveal delay={0.05} className="hidden justify-start lg:flex">
+          <Reveal delay={0.05} className="flex justify-start">
             <AccountCard type="BLACK" last4="4821" size="lg" />
           </Reveal>
         </>
       }
     >
-      <AuthHeading>Entrar</AuthHeading>
+      {/* The card carries the brand name, so the heading does not repeat it. */}
+      <AuthHeading brand={false}>Entrar</AuthHeading>
       <FormError>{error}</FormError>
       <form onSubmit={submit} noValidate className="flex flex-col gap-4">
         <Field

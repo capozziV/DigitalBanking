@@ -32,10 +32,10 @@ export function AuthLayout({ children, aside }: { children: ReactNode; aside?: R
   );
 }
 
-export function AuthHeading({ children }: { children: string }) {
+export function AuthHeading({ children, brand = true }: { children: string; brand?: boolean }) {
   return (
     <div className="flex flex-col gap-1">
-      <p className="text-sm font-semibold text-muted-foreground">capzzPay</p>
+      {brand ? <p className="text-sm font-semibold text-muted-foreground">capzzPay</p> : null}
       <h1 className="font-heading text-3xl leading-tight font-bold tracking-tight">{children}</h1>
     </div>
   );

@@ -49,10 +49,16 @@ describe('SignInPage', () => {
     expect(email.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('hides the aside card below desktop, so the phone shows one capzzPay (the heading)', async () => {
+  it('shows the Black card on phones too, without a hidden class in its ancestors', async () => {
     renderRoutes('/entrar');
     const card = await screen.findByRole('img', { name: 'Cartão Black' });
-    expect(card.parentElement).toHaveClass('hidden', 'lg:flex');
+    expect(card.closest('.hidden')).toBeNull();
+  });
+
+  it('shows capzzPay once as visible text in the sign-in content (the card brand)', async () => {
+    renderRoutes('/entrar');
+    await screen.findByRole('img', { name: 'Cartão Black' });
+    expect(screen.getAllByText('capzzPay')).toHaveLength(1);
   });
 
   it('caps the password field at six characters', async () => {
