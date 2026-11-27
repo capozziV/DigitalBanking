@@ -56,7 +56,7 @@ Propostas da coordenadora, aceitas pelo usuário no fluxo da conversa:
 ## Mockups das telas (aprovados pelo usuário em 2026-11-26)
 Em `.superpowers/brainstorm/*/content/telas-noite-apple.html`, fora do git. Resumo para quem constrói:
 - **Entrar:** luzes no fundo, título com gradiente, cartão Black flutuando, e-mail, senha e "Criar conta".
-- **Início:** saudação com o nome, saldo disponível em destaque (saldo e cheque especial abaixo), cartão do tipo da conta, atalhos (Transferir, Extrato, Limite) e últimos lançamentos com a contraparte.
+- **Início:** saudação com o nome, **saldo** em destaque (pode ser negativo) e, abaixo, cheque especial e "disponível para usar" (saldo + cheque especial). *Mudança do usuário em 2026-11-26: o saldo disponível em destaque parecia dinheiro em conta.*, cartão do tipo da conta, atalhos (Transferir, Extrato, Limite) e últimos lançamentos com a contraparte.
 - **Transferir em passos:** 1) telefone do destino, com o nome encontrado; 2) valor, com teclado numérico grande e a barra do limite diário disponível; 3) confirmar. Depois, uma tela de resultado animada (pendente → concluída, recusada ou devolvida). As chamadas ao BFF e a regra da chave não mudam: a chave é aberta só na confirmação, com dono, telefone e valor, como hoje.
 - **Extrato:** lançamentos agrupados por dia, com a hora, o saldo depois de cada um e "Carregar mais" pelo cursor.
 - **Minha conta:** cartão do tipo de conta, tipo, cheque especial, limite diário, celular (editável), Sair e Encerrar conta.
