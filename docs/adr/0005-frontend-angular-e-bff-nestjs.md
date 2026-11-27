@@ -1,6 +1,6 @@
 # 0005 — Frontend Angular e BFF em NestJS
 
-- **Status:** aceito; o login OAuth2 com `openid-client` foi trocado pelo login pela API do Cognito no [ADR 0024](0024-login-e-telefone-do-app.md)
+- **Status:** aceito; o login OAuth2 com `openid-client` foi trocado pelo login pela API do Cognito no [ADR 0024](0024-login-e-telefone-do-app.md); o Angular e o Angular Material foram substituídos por React, Tailwind e shadcn/ui no [ADR 0029](0029-frontend-em-react-tailwind-shadcn.md) (o BFF e o resto seguem valendo)
 - **Data:** 2026-10-21
 
 ## Contexto

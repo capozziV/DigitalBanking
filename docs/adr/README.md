@@ -8,7 +8,7 @@ Registros de decisões arquiteturais. Formato: `NNNN-titulo-em-kebab-case.md`.
 | 0002 | Clean Architecture por serviço | aceito | [0002](0002-clean-architecture-por-servico.md) |
 | 0003 | Transactional Outbox e mensageria SNS/SQS | aceito | [0003](0003-transactional-outbox-e-mensageria.md) |
 | 0004 | API Gateway HTTP API na borda | aceito | [0004](0004-api-gateway-http-api-na-borda.md) |
-| 0005 | Frontend Angular e BFF em NestJS | aceito | [0005](0005-frontend-angular-e-bff-nestjs.md) |
+| 0005 | Frontend Angular e BFF em NestJS | aceito; Angular substituído pelo 0029 | [0005](0005-frontend-angular-e-bff-nestjs.md) |
 | 0006 | Observabilidade só com correlation ID | aceito | [0006](0006-observabilidade-com-correlation-id.md) |
 | 0007 | Conta e ledger no mesmo serviço (`accounts`) | aceito | [0007](0007-conta-e-ledger-no-accounts.md) |
 | 0008 | Extrato (`statement`) com CQRS no DynamoDB | aceito | [0008](0008-statement-cqrs-dynamodb.md) |
@@ -31,3 +31,4 @@ Registros de decisões arquiteturais. Formato: `NNNN-titulo-em-kebab-case.md`.
 | 0025 | Nome da contraparte nas notificações | aceito | [0025](0025-nome-da-contraparte-nas-notificacoes.md) |
 | 0026 | Bônus de boas-vindas por cliente | aceito | [0026](0026-bonus-de-boas-vindas-por-cliente.md) |
 | 0027 | DynamoDB Local com volume no ambiente local | aceito | [0027](0027-dynamodb-local-com-volume.md) |
+| 0029 | Frontend em React, Tailwind e shadcn/ui (substitui o Angular do 0005) | aceito | [0029](0029-frontend-em-react-tailwind-shadcn.md) |
