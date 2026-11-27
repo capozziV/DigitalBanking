@@ -93,4 +93,51 @@ describe('AmountStep', () => {
     await press('5');
     expect(screen.getByRole('button', { name: 'Continuar' })).toBeEnabled();
   });
+
+  it.each([null, 475_000])('stops the keypad at the cap with available=%s', async (available) => {
+    render(<Harness available={available} limit={available} />);
+    await press(...Array<string>(20).fill('9'));
+    const shown = screen.getByRole('status', { name: 'Valor' }).textContent ?? '';
+    const digits = Number(shown.replace(/\D/g, ''));
+    expect(digits).toBeLessThanOrEqual(Number.MAX_SAFE_INTEGER);
+    expect(digits).toBe(99_999_999_999);
+  });
+
+  it.each([null, 475_000])(
+    'stops the physical keyboard at the cap with available=%s',
+    async (available) => {
+      render(<Harness available={available} limit={available} />);
+      const user = userEvent.setup({ delay: null });
+      await user.keyboard('9'.repeat(20));
+      const digits = Number(
+        (screen.getByRole('status', { name: 'Valor' }).textContent ?? '').replace(/\D/g, ''),
+      );
+      expect(digits).toBeLessThanOrEqual(Number.MAX_SAFE_INTEGER);
+      expect(digits).toBeGreaterThan(0);
+      await user.keyboard('1');
+      expect(
+        Number(
+          (screen.getByRole('status', { name: 'Valor' }).textContent ?? '').replace(/\D/g, ''),
+        ),
+      ).toBe(digits);
+    },
+  );
+
+  it('ignores digits typed inside a dialog or a textarea on top', async () => {
+    render(
+      <>
+        <Harness />
+        <div role="dialog" aria-label="Aviso">
+          <button type="button">dentro</button>
+        </div>
+        <textarea aria-label="Nota" />
+      </>,
+    );
+    const user = userEvent.setup({ delay: null });
+    await user.click(screen.getByRole('button', { name: 'dentro' }));
+    await user.keyboard('123');
+    await user.click(screen.getByLabelText('Nota'));
+    await user.keyboard('456');
+    expect(screen.getByRole('status', { name: 'Valor' })).toHaveTextContent('R$ 0,00');
+  });
 });

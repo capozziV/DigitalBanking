@@ -37,7 +37,8 @@ export function AmountStep({
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.ctrlKey || event.metaKey || event.altKey) return;
-      if (event.target instanceof HTMLInputElement) return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest('input, textarea, select, [contenteditable], [role="dialog"]')) return;
       if (/^[0-9]$/.test(event.key)) onChange(appendDigit(cents, Number(event.key)));
       else if (event.key === 'Backspace') onChange(dropDigit(cents));
     };
