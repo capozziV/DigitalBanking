@@ -1,6 +1,6 @@
 # Etapa 11 — Frontend do capzzPay em React, com redesenho
 
-**Data:** 2026-11-26 · **Cartão:** [#261](https://github.com/capozziV/DigitalBanking/issues/261) · **Status:** rascunho, aguardando aprovação do usuário
+**Data:** 2026-11-26 · **Cartão:** [#261](https://github.com/capozziV/DigitalBanking/issues/261) · **Status:** aprovada pelo usuário em 2026-11-26
 
 ## Intenção
 O capzzPay é a parte do portfólio que as pessoas veem. Hoje o web funciona, mas o visual é básico. O usuário quer que quem abrir o app (recrutador, amigo) sinta nos primeiros segundos que está diante de algo **muito moderno e tecnológico, no nível de um site da Apple, com animação diferenciada**.
@@ -17,7 +17,8 @@ Para isso, o web sai do Angular para **React + Tailwind + shadcn/ui**, que é on
 - Página de apresentação pública antes do login e login como vitrine: ficam no cartão [#262](https://github.com/capozziV/DigitalBanking/issues/262).
 - Qualquer mudança no BFF, nos serviços Kotlin, no Terraform ou no chart Helm, além do que o build novo do web exigir.
 - Tema claro. Só tema escuro nesta etapa.
-- Telas ou fluxos novos.
+- Telas novas. A única mudança de fluxo é a transferência em passos (abaixo).
+- Totais "entrou/saiu no mês" no extrato: exigem uma rota nova no BFF e ficam no cartão [#263](https://github.com/capozziV/DigitalBanking/issues/263).
 
 ## Anti-objetivos (falha mesmo se funcionar)
 - Cara de "site genérico de IA": Inter em tudo, gradiente roxo-azul sem propósito, card dentro de card, ícone em quadradinho sobre cada título. O detector da Impeccable tem de passar.
@@ -51,6 +52,15 @@ Propostas da coordenadora, aceitas pelo usuário no fluxo da conversa:
 │ └──────────────────────────────────────┘  │
 └───────────────────────────────────────────┘
 ```
+
+## Mockups das telas (aprovados pelo usuário em 2026-11-26)
+Em `.superpowers/brainstorm/*/content/telas-noite-apple.html`, fora do git. Resumo para quem constrói:
+- **Entrar:** luzes no fundo, título com gradiente, cartão Black flutuando, e-mail, senha e "Criar conta".
+- **Início:** saudação com o nome, saldo disponível em destaque (saldo e cheque especial abaixo), cartão do tipo da conta, atalhos (Transferir, Extrato, Limite) e últimos lançamentos com a contraparte.
+- **Transferir em passos:** 1) telefone do destino, com o nome encontrado; 2) valor, com teclado numérico grande e a barra do limite diário disponível; 3) confirmar. Depois, uma tela de resultado animada (pendente → concluída, recusada ou devolvida). As chamadas ao BFF e a regra da chave não mudam: a chave é aberta só na confirmação, com dono, telefone e valor, como hoje.
+- **Extrato:** lançamentos agrupados por dia, com a hora, o saldo depois de cada um e "Carregar mais" pelo cursor.
+- **Minha conta:** cartão do tipo de conta, tipo, cheque especial, limite diário, celular (editável), Sair e Encerrar conta.
+- **Computador:** barra lateral com o sininho e o contador, e o início em blocos de vidro (saldo com ações, cartão, últimos lançamentos, limite diário).
 
 ## O que o web faz hoje (e continua fazendo)
 **Telas e rotas** (os caminhos ficam iguais, porque o nginx e os e2e dependem deles):
