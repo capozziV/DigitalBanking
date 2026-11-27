@@ -1,26 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BffError, bff, onSessionLost, onUnavailable } from './bff-client';
+import { BffError, bff, onSessionLost } from './bff-client';
 import { FakeBff } from './test-support';
 
 describe('bff', () => {
   let fake: FakeBff;
   const sessionLost = vi.fn();
-  const unavailable = vi.fn();
   let offLost: () => void;
-  let offUnavailable: () => void;
 
   beforeEach(() => {
     fake = new FakeBff().install();
     sessionLost.mockClear();
-    unavailable.mockClear();
     offLost = onSessionLost(sessionLost);
-    offUnavailable = onUnavailable(unavailable);
     document.cookie = 'bank_csrf=token-123; path=/';
   });
 
   afterEach(() => {
     offLost();
-    offUnavailable();
     document.cookie = 'bank_csrf=; path=/; max-age=0';
     vi.unstubAllGlobals();
   });
@@ -97,7 +92,6 @@ describe('bff', () => {
       status: 422,
     });
     expect(sessionLost).not.toHaveBeenCalled();
-    expect(unavailable).not.toHaveBeenCalled();
   });
 
   it('throws BffError with a null problem when the body is not JSON', async () => {
@@ -115,7 +109,6 @@ describe('bff', () => {
     fake.only('/bff/home').respond(401, {});
     await expect(promise).rejects.toBeInstanceOf(BffError);
     expect(sessionLost).toHaveBeenCalledTimes(1);
-    expect(unavailable).not.toHaveBeenCalled();
   });
 
   it('401 on /bff/auth/sign-in does not', async () => {
@@ -126,28 +119,44 @@ describe('bff', () => {
     expect(sessionLost).not.toHaveBeenCalled();
   });
 
-  it('network error notifies unavailable', async () => {
+  it('401 outside /bff/ does not notify session lost', async () => {
+    const promise = bff('/other/home' as `/bff/${string}`);
+    fake.only('/other/home').respond(401, {});
+    await expect(promise).rejects.toBeInstanceOf(BffError);
+    expect(sessionLost).not.toHaveBeenCalled();
+  });
+
+  it('network error throws BffError with status 0 and no problem', async () => {
     const promise = bff('/bff/home');
     fake.only('/bff/home').fail();
     const error = (await promise.catch((e: unknown) => e)) as BffError;
     expect(error).toBeInstanceOf(BffError);
     expect(error.status).toBe(0);
-    expect(unavailable).toHaveBeenCalledTimes(1);
+    expect(error.problem).toBeNull();
     expect(sessionLost).not.toHaveBeenCalled();
   });
 
-  it.each([502, 503, 504])('%d notifies unavailable', async (status) => {
+  it.each([500, 502, 503, 504])('%d throws BffError with the problem, in place', async (status) => {
     const promise = bff('/bff/home');
-    fake.only('/bff/home').respond(status, {});
-    await expect(promise).rejects.toMatchObject({ status });
-    expect(unavailable).toHaveBeenCalledTimes(1);
+    fake.only('/bff/home').respond(status, { title: 'Down', detail: 'Cognito out', status });
+    await expect(promise).rejects.toMatchObject({
+      status,
+      problem: { title: 'Down', detail: 'Cognito out', status },
+    });
+    expect(sessionLost).not.toHaveBeenCalled();
   });
 
-  it('500 does not notify unavailable', async () => {
-    const promise = bff('/bff/home');
-    fake.only('/bff/home').respond(500, {});
-    await expect(promise).rejects.toMatchObject({ status: 500 });
-    expect(unavailable).not.toHaveBeenCalled();
+  it('a body that cannot be read throws BffError with the status', async () => {
+    const broken = {
+      ok: true,
+      status: 200,
+      text: () => Promise.reject(new TypeError('body stream failed')),
+    } as unknown as Response;
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(broken));
+    const error = (await bff('/bff/home').catch((e: unknown) => e)) as BffError;
+    expect(error).toBeInstanceOf(BffError);
+    expect(error.status).toBe(200);
+    expect(error.problem).toBeNull();
   });
 
   it('stops notifying after the listener is removed', async () => {

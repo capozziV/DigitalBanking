@@ -1,11 +1,9 @@
 import type { ProblemDetails } from './problem';
 
 const CSRF_COOKIE = 'bank_csrf';
-const UNAVAILABLE_STATUSES = new Set([502, 503, 504]);
 
 type Listener = () => void;
 const sessionLostListeners = new Set<Listener>();
-const unavailableListeners = new Set<Listener>();
 
 /** Every failure of a BFF call: `status` 0 means the request never got an answer. */
 export class BffError extends Error {
@@ -26,14 +24,8 @@ export function onSessionLost(listener: Listener): () => void {
   return () => sessionLostListeners.delete(listener);
 }
 
-/** Called when the BFF cannot be reached (network error, 502, 503 or 504). */
-export function onUnavailable(listener: Listener): () => void {
-  unavailableListeners.add(listener);
-  return () => unavailableListeners.delete(listener);
-}
-
-const notify = (listeners: Set<Listener>): void => {
-  for (const listener of [...listeners]) listener();
+const notifySessionLost = (): void => {
+  for (const listener of [...sessionLostListeners]) listener();
 };
 
 function readCookie(name: string): string | null {
@@ -81,16 +73,22 @@ export async function bff<T = unknown>(path: `/bff/${string}`, init: BffInit = {
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
     });
   } catch {
-    notify(unavailableListeners);
     throw new BffError(0, null, 'The BFF could not be reached');
   }
 
-  const body = parseBody(await response.text());
+  let text: string;
+  try {
+    text = await response.text();
+  } catch {
+    throw new BffError(response.status, null, 'The BFF answer could not be read');
+  }
+  const body = parseBody(text);
   if (response.ok) return body as T;
 
   const problem = body !== null && typeof body === 'object' ? (body as ProblemDetails) : null;
   // Auth calls report their own 401 (wrong password, no session yet) on the form itself.
-  if (response.status === 401 && !path.startsWith('/bff/auth/')) notify(sessionLostListeners);
-  if (UNAVAILABLE_STATUSES.has(response.status)) notify(unavailableListeners);
+  if (response.status === 401 && path.startsWith('/bff/') && !path.startsWith('/bff/auth/')) {
+    notifySessionLost();
+  }
   throw new BffError(response.status, problem);
 }
