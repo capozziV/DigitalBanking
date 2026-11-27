@@ -168,6 +168,15 @@ Se o serviço for `web` ou `bff`, recarregue em seguida o nginx, que resolve ess
 docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml exec nginx nginx -s reload
 ```
 
+### Web em desenvolvimento (React)
+Para mexer no web com recarga automática, em vez de reconstruir a imagem, rode o Vite na pasta `frontend/` (Node 24, `npm ci` na primeira vez):
+```bash
+npm run dev -w web   # http://localhost:5173; /bff vai por proxy para http://127.0.0.1:3000
+npm test             # unidade do web e do bff
+npm run build        # tsc + vite build (web/dist) e nest build (bff)
+```
+O proxy espera o BFF em `127.0.0.1:3000` (`npm run start:dev -w bff`, com as variáveis de [`frontend/README.md`](../frontend/README.md)); o contêiner `bff` do compose não publica essa porta. Para ver o web atrás do nginx, reconstrua a imagem como acima.
+
 ### Migrar o extrato de uma stack anterior ao DynamoDB Local
 Vale para a stack cujo extrato ainda está no DynamoDB do LocalStack. **A origem só existe enquanto aquele contêiner do LocalStack não parar nem for recriado**, e o compose novo o recria. Por isso a ordem importa: copie antes de qualquer `up` geral. O script só lê a origem, só cria o que falta no destino e falha se a contagem ou o conteúdo divergirem; pode ser repetido enquanto a origem existir e o `statement` estiver parado.
 

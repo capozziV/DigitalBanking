@@ -7,7 +7,7 @@
 - **Lint:** ktlint.
 - **Infraestrutura como código:** Terraform.
 - **Local:** docker-compose em `infra/local/` com PostgreSQL (um banco por serviço), Redis, nginx (no papel do API Gateway), `mock-oauth2-server` (no papel do Cognito), LocalStack (SNS e SQS, conta gratuita com token) e DynamoDB Local com volume nomeado para a tabela do extrato ([ADR 0027](adr/0027-dynamodb-local-com-volume.md)). Perfil `apps` sobe os cinco serviços pelas imagens Docker. Testes de integração com Testcontainers.
-- **Frontend (etapa 9):** Angular + BFF em Node/NestJS.
+- **Frontend (etapas 9 e 11):** SPA React + Tailwind + shadcn/ui ([ADR 0029](adr/0029-frontend-em-react-tailwind-shadcn.md)) + BFF em Node/NestJS.
 - **Diagramas:** Mermaid (no `README.md`).
 
 ## Serviços
@@ -22,21 +22,21 @@
 ### Componentes do app do cliente (etapa 9)
 | Componente | Responsabilidade | Dados |
 |---|---|---|
-| web | App Angular compilado, servido por nginx na rota `/` | sem estado |
+| web | SPA React compilada (Vite), servida por nginx na rota `/` | sem estado |
 | bff | NestJS: endpoints por tela, login pela API do Cognito, sessão e CSRF; rota `/bff` | sessão no Redis |
 
 `web` e `bff` ficam na mesma origem (`/` e `/bff`). Login, senha de 6 dígitos e telefone: [ADR 0024](adr/0024-login-e-telefone-do-app.md).
 
 ## Fluxo de entrada
 ```
-Navegador (Angular)
+Navegador (React)
    │ cookie de sessão HttpOnly + token CSRF
    ▼
 API Gateway HTTP API (autorizador JWT Cognito nas rotas da API)
    │ VPC Link
    ▼
 ALB interno ── rotas da API → customer / accounts / transfers / statement / notification
-            ├─ /     → Angular (nginx)
+            ├─ /     → web React (nginx)
             └─ /bff  → BFF (NestJS, sessão no Redis)
                           │ Bearer token Cognito + X-Correlation-Id
                           ▼
@@ -132,14 +132,14 @@ O BFF não passa pelo API Gateway: chama os Services do cluster direto. Testes m
 - Actuator fora da borda; endpoint público do EKS aberto para `0.0.0.0/0`; Redis sem TLS nem AUTH.
 - (ver [ADR 0021](adr/0021-deploy-e-ambiente-efemero.md), [`infra/terraform/README.md`](../infra/terraform/README.md) e [`deploy/helm/README.md`](../deploy/helm/README.md))
 
-### Frontend (etapa 9)
-- Angular (standalone components, signals); Angular Material como biblioteca de componentes.
+### Frontend (etapas 9 e 11)
+- Web: SPA Vite + React + TypeScript + Tailwind v4 + shadcn/ui, tema escuro único ("Noite Apple"); React Router, TanStack Query e Motion; Vitest + Testing Library. Lógica de negócio (sessão, cliente do BFF, chave da transferência, centavos, telefone, Problem Details) em módulos TypeScript puros em `frontend/web/src/lib/`. Em desenvolvimento, o Vite faz proxy de `/bff` para `http://127.0.0.1:3000` ([ADR 0029](adr/0029-frontend-em-react-tailwind-shadcn.md), que substitui o Angular do ADR 0005).
 - BFF em NestJS: login e cadastro pela API do Cognito (`SignUp`, `ConfirmSignUp`, `InitiateAuth` com `USER_PASSWORD_AUTH`), com app client próprio e sem hosted UI ([ADR 0024](adr/0024-login-e-telefone-do-app.md)), sessão no Redis, cookie `HttpOnly`, CSRF, refresh de token, correlation ID via `AsyncLocalStorage`, logs JSON com pino.
 - BFF expõe endpoints por tela (agregação), não proxy genérico.
-- `Idempotency-Key` gerada no Angular por tentativa (usuário + telefone + valor), guardada no `sessionStorage` da aba até o estado final aparecer; o BFF só repassa. Limite: outra aba gera chave nova (#241).
-- Status da saga por polling (RxJS).
+- `Idempotency-Key` gerada no web por tentativa (usuário + telefone + valor), guardada no `sessionStorage` da aba até o estado final aparecer; o BFF só repassa. Limite: outra aba gera chave nova (#241).
+- Status da saga por polling (TanStack Query).
 - Front e BFF na mesma origem (API Gateway -> ALB interno roteando `/` e `/bff`), sem CORS; o BFF chama os Services do cluster direto.
-- Organização: `frontend/web` (Angular), `frontend/bff` (NestJS), `frontend/e2e` (Playwright), com workspaces npm e job próprio no CI.
+- Organização: `frontend/web` (React), `frontend/bff` (NestJS), `frontend/e2e` (Playwright), com workspaces npm e job próprio no CI.
 - (ver [ADR 0005](adr/0005-frontend-angular-e-bff-nestjs.md))
 
 ## Em aberto

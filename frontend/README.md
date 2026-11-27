@@ -1,29 +1,30 @@
 # Frontend
 
-Aplicativo do cliente da etapa 9: `web` (Angular), `bff` (NestJS) e `e2e` (Playwright), em npm workspaces.
+Aplicativo do cliente da etapa 9: `web` (React, [ADR 0029](../docs/adr/0029-frontend-em-react-tailwind-shadcn.md)), `bff` (NestJS) e `e2e` (Playwright), em npm workspaces.
 
 ## Versões (conferidas em 2026-11-19 nas fontes primárias)
 
 | Peça               | Versão | Fonte                                                                                         |
 | ------------------ | ------ | --------------------------------------------------------------------------------------------- |
-| Node               | 24 LTS | `nodejs.org/dist/index.json` (24 "Krypton" e 26 "Lithium" são LTS; Angular 22 exige `^24.15`) |
+| Node               | 24 LTS | `nodejs.org/dist/index.json` (24 "Krypton" e 26 "Lithium" são LTS; `engines` pede `>=24.15`)  |
 | npm                | 11     | vem com o Node 24                                                                             |
-| Angular e Material | 22.3.0 | registro npm (`@angular/cli`, `@angular/material`, tag `latest`)                              |
+| React, Vite, Tailwind | 19, 8, 4 | `frontend/web/package.json` (React 19, Vite 8, Tailwind 4, shadcn/ui)                    |
 | NestJS             | 12.5.1 | registro npm (`@nestjs/core`, tag `latest`; CLI 12.0.13)                                      |
 | Playwright         | 1.65.1 | registro npm (`@playwright/test`, tag `latest`)                                               |
 
-Escolhemos o Node 24 (já instalado no ambiente) e não o 26: ambos são LTS e atendem ao Angular 22 e ao Nest 12. `.nvmrc` fixa o 24.
+Escolhemos o Node 24 (já instalado no ambiente) e não o 26: ambos são LTS e atendem ao Vite 8 e ao Nest 12. `.nvmrc` fixa o 24.
 
 ## Ferramentas
 
-- Teste de unidade do `web`: Vitest pelo `ng test` (padrão do Angular 22, com jsdom).
+- Teste de unidade do `web`: Vitest com Testing Library e jsdom (`npm test -w web`). A lógica de negócio fica em `web/src/lib/`, sem React, testada sozinha.
+- Design: skill Impeccable (`PRODUCT.md` e `DESIGN.md` em `web/`); o CI roda `impeccable detect` e falha com achados.
 - Teste de unidade do `bff`: Vitest com SWC (`unplugin-swc`) para emitir os metadados dos decorators do Nest; HTTP com `supertest`.
-- Lint: ESLint (flat config na raiz, `typescript-eslint` e `angular-eslint`) e Prettier (`npm run format` formata).
-- E2E: Playwright (Chromium). Sem `BASE_URL`, sobe o `ng serve` em `127.0.0.1:4200`; com `BASE_URL`, testa a pilha indicada. Os specs em `e2e/tests/` rodam contra a pilha real (nginx, BFF, cinco serviços; sem `page.route`), cada um com e-mail e telefone próprios; o usuário de demonstração vem do `infra/local/seed.sh` (rode o seed antes). No CI, o job `frontend-e2e` sobe o perfil `apps` do compose com as imagens do job `images`, roda o seed e o Playwright com `BASE_URL=http://127.0.0.1`; o relatório e os traces saem como artefato `playwright-report` em falha.
+- Lint: ESLint (flat config na raiz, `typescript-eslint`, `react-hooks` e `jsx-a11y`) e Prettier (`npm run format` formata).
+- E2E: Playwright (Chromium). Sem `BASE_URL`, sobe o servidor do Vite (`npm run dev -w web`); com `BASE_URL`, testa a pilha indicada. Os specs em `e2e/tests/` rodam contra a pilha real (nginx, BFF, cinco serviços; sem `page.route`), cada um com e-mail e telefone próprios; o usuário de demonstração vem do `infra/local/seed.sh` (rode o seed antes). No CI, o job `frontend-e2e` sobe o perfil `apps` do compose com as imagens do job `images`, roda o seed e o Playwright com `BASE_URL=http://127.0.0.1`; o relatório e os traces saem como artefato `playwright-report` em falha.
 
 ## Tema
 
-Tema próprio sobre o Angular Material, sem cor: fundo `#f5f5f7`, texto `#1d1d1f`, secundário `#86868b`, fonte do sistema (`-apple-system`, SF), cartões brancos com raio de 18 px e sombra leve. Tokens em `web/src/styles.scss`.
+Tema escuro único, "Noite Apple": fundo preto, luzes difusas, painéis de vidro e o cartão 3D como peça de assinatura. Tokens em variáveis CSS do Tailwind; decisões visuais em `web/DESIGN.md` e `web/PRODUCT.md`.
 
 ## Comandos (na pasta `frontend/`)
 
@@ -31,9 +32,12 @@ Tema próprio sobre o Angular Material, sem cor: fundo `#f5f5f7`, texto `#1d1d1f
 npm ci
 npm run lint     # ESLint + Prettier
 npm test         # unidade do web e do bff
-npm run build    # web (ng build) e bff (nest build)
+npm run build    # web (tsc + vite build, saída em web/dist) e bff (nest build)
 npm run e2e      # Playwright (primeira vez: npx playwright install chromium)
+npm run dev -w web   # Vite em desenvolvimento; /bff vai por proxy para http://127.0.0.1:3000
 ```
+
+Para o `dev`, deixe o BFF no ar na porta 3000 (`npm run start:dev -w bff`, com as variáveis abaixo e o Redis do compose).
 
 O BFF escuta na porta 3000 com prefixo global `/bff`; `GET /bff/health` devolve `{ "status": "UP" }`.
 
