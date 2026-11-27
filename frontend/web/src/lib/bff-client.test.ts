@@ -1,0 +1,169 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { BffError, bff, onSessionLost } from './bff-client';
+import { FakeBff } from './test-support';
+
+describe('bff', () => {
+  let fake: FakeBff;
+  const sessionLost = vi.fn();
+  let offLost: () => void;
+
+  beforeEach(() => {
+    fake = new FakeBff().install();
+    sessionLost.mockClear();
+    offLost = onSessionLost(sessionLost);
+    document.cookie = 'bank_csrf=token-123; path=/';
+  });
+
+  afterEach(() => {
+    offLost();
+    document.cookie = 'bank_csrf=; path=/; max-age=0';
+    vi.unstubAllGlobals();
+  });
+
+  it('adds X-CSRF-Token from bank_csrf on POST', async () => {
+    const promise = bff('/bff/transfers', { method: 'POST', body: { amount: 2500 } });
+    const call = fake.only('/bff/transfers');
+    expect(call.headers.get('X-CSRF-Token')).toBe('token-123');
+    expect(call.method).toBe('POST');
+    expect(call.body).toEqual({ amount: 2500 });
+    expect(call.headers.get('Content-Type')).toBe('application/json');
+    expect(call.credentials).toBe('same-origin');
+    call.respond(200, {});
+    await promise;
+  });
+
+  it('does not add it on GET', async () => {
+    const promise = bff('/bff/home');
+    const call = fake.only('/bff/home');
+    expect(call.headers.has('X-CSRF-Token')).toBe(false);
+    expect(call.credentials).toBe('same-origin');
+    call.respond(200, {});
+    await promise;
+  });
+
+  it('does not add it outside /bff/', async () => {
+    const promise = bff('https://other.example/x' as `/bff/${string}`, { method: 'POST' });
+    const call = fake.only('https://other.example/x');
+    expect(call.headers.has('X-CSRF-Token')).toBe(false);
+    call.respond(200, {});
+    await promise;
+  });
+
+  it('decodes the cookie value', async () => {
+    document.cookie = 'bank_csrf=a%2Fb; path=/';
+    const promise = bff('/bff/x', { method: 'DELETE' });
+    const call = fake.only('/bff/x');
+    expect(call.headers.get('X-CSRF-Token')).toBe('a/b');
+    call.respond(204);
+    await promise;
+  });
+
+  it('sends custom headers such as Idempotency-Key', async () => {
+    const promise = bff('/bff/transfers', { method: 'POST', headers: { 'Idempotency-Key': 'k1' } });
+    const call = fake.only('/bff/transfers');
+    expect(call.headers.get('Idempotency-Key')).toBe('k1');
+    call.respond(200, {});
+    await promise;
+  });
+
+  it('returns the parsed JSON body', async () => {
+    const promise = bff<{ count: number }>('/bff/notifications/unread-count');
+    fake.only('/bff/notifications/unread-count').respond(200, { count: 3 });
+    expect(await promise).toEqual({ count: 3 });
+  });
+
+  it('returns undefined when the answer has no body', async () => {
+    const promise = bff('/bff/notifications/read', { method: 'POST' });
+    fake.only('/bff/notifications/read').respond(204);
+    expect(await promise).toBeUndefined();
+  });
+
+  it('throws BffError with the status and the problem details', async () => {
+    const promise = bff('/bff/transfers', { method: 'POST' });
+    fake
+      .only('/bff/transfers')
+      .respond(422, { title: 'Refused', detail: 'No balance', status: 422 });
+    const error = await promise.catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(BffError);
+    expect((error as BffError).status).toBe(422);
+    expect((error as BffError).problem).toEqual({
+      title: 'Refused',
+      detail: 'No balance',
+      status: 422,
+    });
+    expect(sessionLost).not.toHaveBeenCalled();
+  });
+
+  it('throws BffError with a null problem when the body is not JSON', async () => {
+    const promise = bff('/bff/home');
+    const call = fake.only('/bff/home');
+    call.respond(404, undefined);
+    const error = (await promise.catch((e: unknown) => e)) as BffError;
+    expect(error).toBeInstanceOf(BffError);
+    expect(error.status).toBe(404);
+    expect(error.problem).toBeNull();
+  });
+
+  it('401 outside /bff/auth notifies session lost once', async () => {
+    const promise = bff('/bff/home');
+    fake.only('/bff/home').respond(401, {});
+    await expect(promise).rejects.toBeInstanceOf(BffError);
+    expect(sessionLost).toHaveBeenCalledTimes(1);
+  });
+
+  it('401 on /bff/auth/sign-in does not', async () => {
+    const promise = bff('/bff/auth/sign-in', { method: 'POST', body: {} });
+    fake.only('/bff/auth/sign-in').respond(401, {});
+    const error = (await promise.catch((e: unknown) => e)) as BffError;
+    expect(error.status).toBe(401);
+    expect(sessionLost).not.toHaveBeenCalled();
+  });
+
+  it('401 outside /bff/ does not notify session lost', async () => {
+    const promise = bff('/other/home' as `/bff/${string}`);
+    fake.only('/other/home').respond(401, {});
+    await expect(promise).rejects.toBeInstanceOf(BffError);
+    expect(sessionLost).not.toHaveBeenCalled();
+  });
+
+  it('network error throws BffError with status 0 and no problem', async () => {
+    const promise = bff('/bff/home');
+    fake.only('/bff/home').fail();
+    const error = (await promise.catch((e: unknown) => e)) as BffError;
+    expect(error).toBeInstanceOf(BffError);
+    expect(error.status).toBe(0);
+    expect(error.problem).toBeNull();
+    expect(sessionLost).not.toHaveBeenCalled();
+  });
+
+  it.each([500, 502, 503, 504])('%d throws BffError with the problem, in place', async (status) => {
+    const promise = bff('/bff/home');
+    fake.only('/bff/home').respond(status, { title: 'Down', detail: 'Cognito out', status });
+    await expect(promise).rejects.toMatchObject({
+      status,
+      problem: { title: 'Down', detail: 'Cognito out', status },
+    });
+    expect(sessionLost).not.toHaveBeenCalled();
+  });
+
+  it('a body that cannot be read throws BffError with the status', async () => {
+    const broken = {
+      ok: true,
+      status: 200,
+      text: () => Promise.reject(new TypeError('body stream failed')),
+    } as unknown as Response;
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(broken));
+    const error = (await bff('/bff/home').catch((e: unknown) => e)) as BffError;
+    expect(error).toBeInstanceOf(BffError);
+    expect(error.status).toBe(200);
+    expect(error.problem).toBeNull();
+  });
+
+  it('stops notifying after the listener is removed', async () => {
+    offLost();
+    const promise = bff('/bff/home');
+    fake.only('/bff/home').respond(401, {});
+    await expect(promise).rejects.toBeInstanceOf(BffError);
+    expect(sessionLost).not.toHaveBeenCalled();
+  });
+});

@@ -16,11 +16,11 @@ Uma linha por it(...) dos specs do Angular. Tasks 2-7 marcam cada item; sai na T
 
 ## src/app/core/auth.interceptor.spec.ts
 
-- [ ] L35: 'sends the CSRF header on non-GET requests', () => {
-- [ ] L42: 'does not send the CSRF header on GET', () => {
-- [ ] L49: 'does not send the CSRF header to other origins', () => {
-- [ ] L56: 'clears the session and goes to Entrar on 401', () => {
-- [ ] L66: 'lets a wrong password on sign in reach the screen', () => {
+- [x] L35: 'sends the CSRF header on non-GET requests', () => { -> src/lib/bff-client.test.ts: adds X-CSRF-Token from bank_csrf on POST
+- [x] L42: 'does not send the CSRF header on GET', () => { -> src/lib/bff-client.test.ts: does not add it on GET
+- [x] L49: 'does not send the CSRF header to other origins', () => { -> src/lib/bff-client.test.ts: does not add it outside /bff/
+- [x] L56: 'clears the session and goes to Entrar on 401', () => { -> src/lib/bff-client.test.ts + session.test.ts: 401 outside /bff/auth notifies session lost once; 401 outside /bff/auth clears the session (redirect to /entrar is the guard in Task 3)
+- [x] L66: 'lets a wrong password on sign in reach the screen', () => { -> src/lib/bff-client.test.ts: 401 on /bff/auth/sign-in does not
 
 ## src/app/core/guards.spec.ts
 
@@ -38,31 +38,31 @@ Uma linha por it(...) dos specs do Angular. Tasks 2-7 marcam cada item; sai na T
 
 ## src/app/core/session.service.spec.ts
 
-- [ ] L23: 'loads an anonymous session', async () => {
-- [ ] L31: 'loads the profile when authenticated', async () => {
-- [ ] L43: 'treats a failed session call as anonymous', async () => {
-- [ ] L50: 'keeps the session when the BFF is unavailable (503)', async () => {
-- [ ] L63: 'clears the session when the BFF answers 401', async () => {
-- [ ] L72: 'does not reload a loaded session', async () => {
-- [ ] L80: 'signs in and then loads the session', async () => {
-- [ ] L97: 'signs up and reports whether a code is required', async () => {
-- [ ] L103: 'confirms the sign up code', async () => {
-- [ ] L111: 'signs out, clears the state and goes to Entrar', async () => {
-- [ ] L127: `does not declare the sign-out done when the POST fails with ${status}`, async () => {
-- [ ] L143: 'counts a session that no longer exists (401) as signed out', async () => {
-- [ ] L154: 'forgets a failed load when the session is cleared', () => {
-- [ ] L160: 'forgets a failed sign-out when the session is cleared', () => {
-- [ ] L166: 'loads the unread count', async () => {
-- [ ] L173: 'keeps the last unread count when the call fails', async () => {
-- [ ] L181: 'does not overlap unread calls', async () => {
-- [ ] L189: 'does not let a count requested before marking as read overwrite the new one', async () => {
-- [ ] L201: 'keeps one call in flight after a fresh read finishes behind a stale one', async () => {
-- [ ] L214: 'ignores a count that arrives after clear and does not reuse that call for the next user', async () => {
-- [ ] L248: 'refreshes every 30 seconds while the tab is visible', async () => {
-- [ ] L260: 'skips the tick while the tab is hidden', async () => {
-- [ ] L267: 'refreshes right away when the tab becomes visible again', async () => {
-- [ ] L277: 'does not start a second timer when started twice', async () => {
-- [ ] L284: 'stops when asked and when the session is cleared', async () => {
+- [x] L23: 'loads an anonymous session', async () => { -> src/lib/session.test.ts: loads an anonymous session
+- [x] L31: 'loads the profile when authenticated', async () => { -> src/lib/session.test.ts: loads the profile when authenticated
+- [x] L43: 'treats a failed session call as anonymous', async () => { -> src/lib/session.test.ts: treats a failed session call as anonymous
+- [x] L50: 'keeps the session when the BFF is unavailable (503)', async () => { -> src/lib/session.test.ts: keeps the session when the BFF is unavailable (503)
+- [x] L63: 'clears the session when the BFF answers 401', async () => { -> src/lib/session.test.ts: clears the session when the BFF answers 401
+- [x] L72: 'does not reload a loaded session', async () => { -> src/lib/session.test.ts: does not reload a loaded session
+- [x] L80: 'signs in and then loads the session', async () => { -> src/lib/session.test.ts: signs in and then loads the session
+- [x] L97: 'signs up and reports whether a code is required', async () => { -> src/lib/session.test.ts: signs up and reports whether a code is required
+- [x] L103: 'confirms the sign up code', async () => { -> src/lib/session.test.ts: confirms the sign up code
+- [x] L111: 'signs out, clears the state and goes to Entrar', async () => { -> src/lib/session.test.ts: signs out and clears the state (redirect to /entrar is Task 3)
+- [x] L127: `does not declare the sign-out done when the POST fails with ${status}`, async () => { -> src/lib/session.test.ts: does not declare the sign-out done when the POST fails with %d
+- [x] L143: 'counts a session that no longer exists (401) as signed out', async () => { -> src/lib/session.test.ts: counts a session that no longer exists (401) as signed out
+- [x] L154: 'forgets a failed load when the session is cleared', () => { -> src/lib/session.test.ts: forgets a failed load when the session is cleared
+- [x] L160: 'forgets a failed sign-out when the session is cleared', () => { -> src/lib/session.test.ts: forgets a failed sign-out when the session is cleared
+- [x] L166: 'loads the unread count', async () => { -> src/lib/session.test.ts: loads the unread count
+- [x] L173: 'keeps the last unread count when the call fails', async () => { -> src/lib/session.test.ts: keeps the last unread count when the call fails
+- [x] L181: 'does not overlap unread calls', async () => { -> src/lib/session.test.ts: does not overlap unread calls
+- [x] L189: 'does not let a count requested before marking as read overwrite the new one', async () => { -> src/lib/session.test.ts: does not let a count requested before marking as read overwrite the new one
+- [x] L201: 'keeps one call in flight after a fresh read finishes behind a stale one', async () => { -> src/lib/session.test.ts: keeps one call in flight after a fresh read finishes behind a stale one
+- [x] L214: 'ignores a count that arrives after clear and does not reuse that call for the next user', async () => { -> src/lib/session.test.ts: stale unread answer is discarded after clear
+- [x] L248: 'refreshes every 30 seconds while the tab is visible', async () => { -> src/lib/session.test.ts: refreshes every 30 seconds while the tab is visible
+- [x] L260: 'skips the tick while the tab is hidden', async () => { -> src/lib/session.test.ts: skips the tick while the tab is hidden
+- [x] L267: 'refreshes right away when the tab becomes visible again', async () => { -> src/lib/session.test.ts: refreshes right away when the tab becomes visible again
+- [x] L277: 'does not start a second timer when started twice', async () => { -> src/lib/session.test.ts: does not start a second timer when started twice
+- [x] L284: 'stops when asked and when the session is cleared', async () => { -> src/lib/session.test.ts: stops when asked and when the session is cleared
 
 ## src/app/pages/account/account.component.spec.ts
 
@@ -129,8 +129,8 @@ Uma linha por it(...) dos specs do Angular. Tasks 2-7 marcam cada item; sai na T
 
 ## src/app/pages/transfer/transfer-attempt.store.spec.ts
 
-- [ ] L13: 'says whether the key already existed', async () => {
-- [ ] L21: 'a late settle of an older attempt does not drop the key of a newer one', async () => {
+- [x] L13: 'says whether the key already existed', async () => { -> src/lib/transfer-attempt.test.ts: says whether the key already existed
+- [x] L21: 'a late settle of an older attempt does not drop the key of a newer one', async () => { -> src/lib/transfer-attempt.test.ts: a late settle of an older attempt does not drop the key of a newer one
 
 ## src/app/pages/transfer/transfer.component.spec.ts
 
@@ -152,8 +152,8 @@ Uma linha por it(...) dos specs do Angular. Tasks 2-7 marcam cada item; sai na T
 - [ ] L301: 'keeps the key when the user leaves the page after a lost answer and returns', async () => {
 - [ ] L311: 'keeps the key when the tab reloads after a lost answer', async () => {
 - [ ] L321: 'keeps the key when the same user signs in again', async () => {
-- [ ] L334: 'never gives the key to another user of the tab, and keeps it for its owner', async () => {
-- [ ] L352: 'does not leave the e-mail or the phone readable in the tab storage', async () => {
+- [x] L334: 'never gives the key to another user of the tab, and keeps it for its owner', async () => { -> src/lib/transfer-attempt.test.ts: never gives the key to another user of the tab, and keeps it for its owner (store rule; the screen still goes to Task 7)
+- [x] L352: 'does not leave the e-mail or the phone readable in the tab storage', async () => { -> src/lib/transfer-attempt.test.ts: does not leave the e-mail or the phone readable in the tab storage
 - [ ] L361: 'keeps the key when the user leaves before the final status', async () => {
 - [ ] L373: 'keeps the key when the final answer arrives after the user left the page', async () => {
 - [ ] L387: 'keeps the key for "Nova transferência" while the status is still not final', async () => {
@@ -177,9 +177,9 @@ Uma linha por it(...) dos specs do Angular. Tasks 2-7 marcam cada item; sai na T
 
 ## src/app/shared/amount.spec.ts
 
-- [ ] L4: [
-- [ ] L16: [
-- [ ] L32: 'never goes through floating point', () => {
+- [x] L4: [ -> src/lib/money.test.ts: reads %s as %d cents
+- [x] L16: [ -> src/lib/money.test.ts: refuses %s
+- [x] L32: 'never goes through floating point', () => { -> src/lib/money.test.ts: never goes through floating point
 
 ## src/app/shared/app-footer.component.spec.ts
 
@@ -198,27 +198,27 @@ Uma linha por it(...) dos specs do Angular. Tasks 2-7 marcam cada item; sai na T
 
 ## src/app/shared/money.pipe.spec.ts
 
-- [ ] L6: 'formats cents as reais with thousands separator', () => {
-- [ ] L10: 'puts the sign before the currency symbol', () => {
-- [ ] L14: 'pads cents below one real', () => {
-- [ ] L19: 'groups millions', () => {
-- [ ] L23: 'shows a dash for missing or fractional values', () => {
+- [x] L6: 'formats cents as reais with thousands separator', () => { -> src/lib/money.test.ts: formats cents as reais with thousands separator
+- [x] L10: 'puts the sign before the currency symbol', () => { -> src/lib/money.test.ts: puts the sign before the currency symbol
+- [x] L14: 'pads cents below one real', () => { -> src/lib/money.test.ts: pads cents below one real
+- [x] L19: 'groups millions', () => { -> src/lib/money.test.ts: groups millions
+- [x] L23: 'shows a dash for missing or fractional values', () => { -> src/lib/money.test.ts: shows a dash for missing or fractional values
 
 ## src/app/shared/password.spec.ts
 
-- [ ] L7: 'accepts exactly six digits', () => {
-- [ ] L11: 'rejects five digits', () => {
-- [ ] L15: 'rejects seven digits', () => {
-- [ ] L19: 'rejects letters', () => {
-- [ ] L23: 'rejects empty', () => {
-- [ ] L35: 'passes when equal', () => {
-- [ ] L39: 'fails when different', () => {
+- [x] L7: 'accepts exactly six digits', () => { -> src/lib/password.test.ts: accepts exactly six digits
+- [x] L11: 'rejects five digits', () => { -> src/lib/password.test.ts: rejects five digits
+- [x] L15: 'rejects seven digits', () => { -> src/lib/password.test.ts: rejects seven digits
+- [x] L19: 'rejects letters', () => { -> src/lib/password.test.ts: rejects letters
+- [x] L23: 'rejects empty', () => { -> src/lib/password.test.ts: rejects empty
+- [x] L35: 'passes when equal', () => { -> src/lib/password.test.ts: passes when equal
+- [x] L39: 'fails when different', () => { -> src/lib/password.test.ts: fails when different
 
 ## src/app/shared/phone.spec.ts
 
-- [ ] L5: 'masks progressively', () => {
-- [ ] L13: 'ignores non digits and extra digits', () => {
-- [ ] L18: 'validates a Brazilian mobile number', () => {
+- [x] L5: 'masks progressively', () => { -> src/lib/phone.test.ts: masks progressively
+- [x] L13: 'ignores non digits and extra digits', () => { -> src/lib/phone.test.ts: ignores non digits and extra digits
+- [x] L18: 'validates a Brazilian mobile number', () => { -> src/lib/phone.test.ts: validates a Brazilian mobile number
 
 ## src/app/shell/app-shell.component.spec.ts
 
