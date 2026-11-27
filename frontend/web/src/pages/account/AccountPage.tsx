@@ -19,6 +19,7 @@ import { formatCents } from '@/lib/money';
 import { displayPhone, formatPhone, isMobilePhone, phoneDigits } from '@/lib/phone';
 import { problemMessage } from '@/lib/problem';
 import { loadMe, signOut, useSession } from '@/lib/session';
+import { useHome } from '../home/use-home';
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -32,6 +33,9 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 /** My account: the card, the customer and account data, phone change, sign out and close. */
 export function AccountPage() {
   const { customer, account } = useSession();
+  // Same query as Home: cached under one key, so there is no second request.
+  const home = useHome(account !== null);
+  const dailyLimit = home.data?.dailyLimit ?? null;
 
   const [phone, setPhone] = useState('');
   const [phoneTouched, setPhoneTouched] = useState(false);
@@ -156,6 +160,7 @@ export function AccountPage() {
                 <Row label="Tipo">{accountTypeLabel(account.type)}</Row>
                 <Row label="Saldo">{formatCents(account.balance)}</Row>
                 <Row label="Cheque especial">{formatCents(account.overdraftLimit)}</Row>
+                <Row label="Limite diário">{dailyLimit ? formatCents(dailyLimit.limit) : '—'}</Row>
               </dl>
               <Button
                 type="button"

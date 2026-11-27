@@ -35,6 +35,28 @@ describe('groupByDay', () => {
     expect(group.label).toBe('Ontem');
   });
 
+  it('labels "Ontem" across a month and a year boundary', () => {
+    const month = groupByDay(
+      [entry('a', '2026-11-30T20:00:00Z')],
+      new Date('2026-12-01T15:00:00Z'),
+    );
+    expect(month[0].label).toBe('Ontem');
+    const year = groupByDay([entry('b', '2026-12-31T20:00:00Z')], new Date('2027-01-01T15:00:00Z'));
+    expect(year[0].label).toBe('Ontem');
+    const leap = groupByDay([entry('c', '2028-02-29T20:00:00Z')], new Date('2028-03-01T15:00:00Z'));
+    expect(leap[0].label).toBe('Ontem');
+  });
+
+  it('does not call a two-day-old entry "Ontem"', () => {
+    const [group] = groupByDay([entry('old', '2026-11-18T15:00:00Z')], NOW);
+    expect(group.label).toBe('18 de novembro de 2026');
+  });
+
+  it('does not call the same day of the previous month "Ontem"', () => {
+    const [group] = groupByDay([entry('old', '2026-10-19T15:00:00Z')], NOW);
+    expect(group.label).toBe('19 de outubro de 2026');
+  });
+
   it('keeps the same day in one group across pages', () => {
     const groups = groupByDay(
       [entry('a', '2026-11-20T14:00:00Z'), entry('b', '2026-11-20T11:00:00Z')],

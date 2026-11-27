@@ -52,6 +52,37 @@ describe('AccountPage', () => {
     expect(screen.getByRole('img', { name: 'Cartão Gold' })).toBeInTheDocument();
   });
 
+  it('shows the daily limit from /bff/home, in one request', async () => {
+    render();
+    await waitFor(() => expect(bff.pending('/bff/home')).toHaveLength(1));
+    const row = screen.getByText('Limite diário').closest('div') as HTMLElement;
+    expect(row).toHaveTextContent('—');
+    bff.only('/bff/home').respond(200, {
+      account: goldAccount,
+      dailyLimit: { limit: 500000, used: 120000, available: 380000 },
+      latestEntries: [],
+    });
+    await waitFor(() => expect(row).toHaveTextContent(/R\$\s5\.000,00/));
+    expect(bff.calls.filter((c) => c.path === '/bff/home')).toHaveLength(1);
+  });
+
+  it('keeps the page working when the daily limit cannot be loaded', async () => {
+    render();
+    await waitFor(() => expect(bff.pending('/bff/home')).toHaveLength(1));
+    bff.only('/bff/home').respond(503, {});
+    await waitFor(() => expect(bff.pending('/bff/home')).toHaveLength(0));
+    const row = screen.getByText('Limite diário').closest('div') as HTMLElement;
+    expect(row).toHaveTextContent('—');
+    expect(screen.getByText('Ana Souza')).toBeInTheDocument();
+  });
+
+  it('does not ask for the daily limit without an account', () => {
+    fakeSession.customer({ account: null });
+    render();
+    expect(bff.calls.filter((c) => c.path === '/bff/home')).toHaveLength(0);
+    expect(screen.queryByText('Limite diário')).not.toBeInTheDocument();
+  });
+
   it('masks the phone while typing, sends only digits and reloads the profile', async () => {
     const user = userEvent.setup();
     render();
@@ -77,7 +108,7 @@ describe('AccountPage', () => {
     expect(
       screen.getByText('Informe um celular com DDD, como (11) 98765-4321.'),
     ).toBeInTheDocument();
-    expect(bff.calls).toHaveLength(0);
+    expect(bff.calls.filter((c) => c.path !== '/bff/home')).toHaveLength(0);
   });
 
   it('shows the message when the phone is already used', async () => {
@@ -96,10 +127,10 @@ describe('AccountPage', () => {
     await user.click(screen.getByRole('button', { name: 'Encerrar conta' }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('Tem certeza?');
-    expect(bff.calls).toHaveLength(0);
+    expect(bff.calls.filter((c) => c.path !== '/bff/home')).toHaveLength(0);
     await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(bff.calls).toHaveLength(0);
+    expect(bff.calls.filter((c) => c.path !== '/bff/home')).toHaveLength(0);
     expect(screen.getByRole('button', { name: 'Encerrar conta' })).toBeInTheDocument();
   });
 

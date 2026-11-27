@@ -45,7 +45,7 @@ export function EntryList({
               <span className="truncate text-sm">
                 {entry.description ?? (credit ? 'Crédito' : 'Débito')}
               </span>
-              <span className="text-xs text-muted">{detailOf(entry, detail)}</span>
+              <span className="text-xs text-muted-foreground">{detailOf(entry, detail)}</span>
             </span>
             <span
               data-testid="amount"
@@ -53,7 +53,7 @@ export function EntryList({
               className={
                 credit
                   ? 'text-sm font-semibold whitespace-nowrap text-positive'
-                  : 'text-sm whitespace-nowrap text-muted'
+                  : 'text-sm whitespace-nowrap text-muted-foreground'
               }
             >
               {credit ? '+' : '−'} {formatCents(entry.amount)}

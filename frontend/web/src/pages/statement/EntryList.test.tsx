@@ -55,4 +55,15 @@ describe('EntryList', () => {
     render(<EntryList entries={[credit]} detail="home" />);
     expect(screen.getByRole('listitem')).toHaveTextContent('19/11/2026 às 09:00');
   });
+
+  it('reads secondary text with the text token, never the glass background token', () => {
+    render(<EntryList entries={[credit, debit]} detail="statement" />);
+    const rows = screen.getAllByRole('listitem');
+    const detail = within(rows[0]).getByText(/saldo/);
+    expect(detail).toHaveClass('text-muted-foreground');
+    expect(detail).not.toHaveClass('text-muted');
+    const amount = within(rows[1]).getByTestId('amount');
+    expect(amount).toHaveClass('text-muted-foreground');
+    expect(amount).not.toHaveClass('text-muted');
+  });
 });

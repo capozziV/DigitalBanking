@@ -61,12 +61,12 @@ export function StatementPage() {
         <Reveal>
           {groups.length === 0 ? (
             <GlassPanel className="p-5">
-              <p className="text-sm text-muted">Nenhum lançamento ainda.</p>
+              <p className="text-sm text-muted-foreground">Nenhum lançamento ainda.</p>
             </GlassPanel>
           ) : (
             groups.map((group) => (
               <section key={group.key} className="mb-5">
-                <h2 className="mb-2 px-1 text-xs font-medium tracking-wide text-muted uppercase">
+                <h2 className="mb-2 px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
                   {group.label}
                 </h2>
                 <GlassPanel className="px-4 py-1">

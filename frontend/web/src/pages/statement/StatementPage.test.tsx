@@ -87,14 +87,56 @@ describe('StatementPage', () => {
   it('says so when there are no entries', async () => {
     await open();
     bff.only('/bff/statement').respond(200, { entries: [], nextCursor: null });
-    expect(await screen.findByText('Nenhum lançamento ainda.')).toBeInTheDocument();
+    const empty = await screen.findByText('Nenhum lançamento ainda.');
+    expect(empty).toHaveClass('text-muted-foreground');
+    expect(empty).not.toHaveClass('text-muted');
+  });
+
+  it('keeps one group for a day that spans two pages, and the heading is readable', async () => {
+    const user = userEvent.setup();
+    await open();
+    bff.only('/bff/statement').respond(200, {
+      entries: [{ ...entry('1', 'CREDIT', 100, 'Ana Souza'), createdAt: '2026-11-20T14:00:00Z' }],
+      nextCursor: 'p2',
+    });
+    await screen.findByText('Ana Souza');
+    await user.click(screen.getByRole('button', { name: 'Carregar mais' }));
+    await waitFor(() => expect(bff.pending('/bff/statement?cursor=p2')).toHaveLength(1));
+    bff.only('/bff/statement?cursor=p2').respond(200, {
+      entries: [
+        { ...entry('2', 'DEBIT', 200, 'Bruno Lima'), createdAt: '2026-11-20T11:00:00Z' },
+        { ...entry('3', 'DEBIT', 300, 'Carla Mendes'), createdAt: '2026-11-19T20:00:00Z' },
+      ],
+      nextCursor: null,
+    });
+    await screen.findByText('Bruno Lima');
+    const headings = screen.getAllByRole('heading', { level: 2 });
+    expect(headings.map((h) => h.textContent)).toEqual(['Hoje', 'Ontem']);
+    for (const heading of headings) expect(heading).toHaveClass('text-muted-foreground');
+    const today = headings[0].closest('section') as HTMLElement;
+    expect(within(today).getAllByRole('listitem')).toHaveLength(2);
+  });
+
+  it('asks for the next page with the exact, URL-encoded cursor and no other request', async () => {
+    const user = userEvent.setup();
+    await open();
+    bff.only('/bff/statement').respond(200, {
+      entries: [entry('1', 'CREDIT', 100, 'Ana Souza')],
+      nextCursor: 'a b/c=',
+    });
+    await screen.findByText('Ana Souza');
+    await user.click(screen.getByRole('button', { name: 'Carregar mais' }));
+    await waitFor(() => expect(bff.pending('/bff/statement?cursor=a%20b%2Fc%3D')).toHaveLength(1));
+    expect(bff.pending('/bff/statement')).toHaveLength(0);
   });
 
   it('shows the retry notice when the load fails and tries again', async () => {
     const user = userEvent.setup();
     await open();
     bff.only('/bff/statement').respond(503, {});
-    expect(await screen.findByText(/Não foi possível carregar/)).toBeInTheDocument();
+    const notice = await screen.findByText(/Não foi possível carregar/);
+    expect(notice.closest('p')).toHaveClass('text-muted-foreground');
+    expect(notice.closest('p')).not.toHaveClass('text-muted');
     await user.click(screen.getByRole('button', { name: 'Tentar de novo' }));
     await waitFor(() => expect(bff.pending('/bff/statement')).toHaveLength(1));
     bff.only('/bff/statement').respond(200, {

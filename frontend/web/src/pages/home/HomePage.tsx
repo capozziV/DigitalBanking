@@ -1,4 +1,3 @@
-import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { Button } from '@/components/ui/button';
@@ -6,27 +5,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AccountCard } from '@/design/AccountCard';
 import { GlassPanel } from '@/design/GlassPanel';
 import { CountUp, Reveal } from '@/design/motion';
-import {
-  accountTypeLabel,
-  type AccountSummary,
-  type AccountType,
-  type DailyLimit,
-  type Entry,
-} from '@/lib/api-types';
-import { bff, BffError } from '@/lib/bff-client';
+import { accountTypeLabel, type AccountType, type DailyLimit } from '@/lib/api-types';
+import { bff } from '@/lib/bff-client';
 import { formatCents } from '@/lib/money';
 import { problemMessage } from '@/lib/problem';
 import { loadMe, useSession } from '@/lib/session';
 import { EntryList } from '../statement/EntryList';
 import { LoadError } from '../statement/LoadError';
-
-interface HomeDTO {
-  account: AccountSummary | null;
-  dailyLimit: DailyLimit | null;
-  latestEntries: Entry[];
-}
-
-const NO_ACCOUNT: HomeDTO = { account: null, dailyLimit: null, latestEntries: [] };
+import { NO_ACCOUNT, useHome } from './use-home';
 
 const usedPercent = (limit: DailyLimit | null): number =>
   !limit || limit.limit <= 0 ? 0 : Math.min(100, Math.round((limit.used / limit.limit) * 100));
@@ -38,22 +24,7 @@ export function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const hasAccount = session.account !== null;
 
-  // Without an account in the session there is nothing to ask the BFF for. No cache past the
-  // screen: the next person to sign in on this tab must not see this balance.
-  const query = useQuery({
-    queryKey: ['home'],
-    enabled: hasAccount,
-    retry: false,
-    gcTime: 0,
-    queryFn: async (): Promise<HomeDTO> => {
-      try {
-        return await bff<HomeDTO>('/bff/home');
-      } catch (caught) {
-        if (caught instanceof BffError && caught.status === 404) return NO_ACCOUNT;
-        throw caught;
-      }
-    },
-  });
+  const query = useHome(hasAccount);
   const failed = query.isError;
   const home = query.data ?? (hasAccount ? null : NO_ACCOUNT);
 

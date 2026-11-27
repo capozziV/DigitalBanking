@@ -90,6 +90,12 @@ describe('HomePage', () => {
   it('home shows "Abrir conta" when account is null, without calling /bff/home, and opens it', async () => {
     const user = userEvent.setup();
     fakeSession.customer({ account: null });
+    // Like the real store: after the reload the session has the new account.
+    fakeSession.actions.loadMe.mockImplementationOnce(async () => {
+      fakeSession.set({ account });
+      // The store notifies React, which renders the account before loadMe's caller continues.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
     renderWithProviders(<HomePage />);
     const openButton = await screen.findByRole('button', { name: 'Abrir conta' });
     expect(screen.queryByTestId('balance')).not.toBeInTheDocument();
@@ -102,6 +108,10 @@ describe('HomePage', () => {
     call.respond(200, {});
     await waitFor(() => expect(fakeSession.actions.loadMe).toHaveBeenCalled());
     await waitFor(() => expect(bff.pending('/bff/home')).toHaveLength(1));
+    // Let a second request, if the code makes one, show up before counting.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    // One GET only: the query starts by itself once the session has the account.
+    expect(bff.calls.filter((c) => c.path === '/bff/home')).toHaveLength(1);
     bff.only('/bff/home').respond(200, {
       account: { ...account, balance: 10000, availableBalance: 10000, overdraftLimit: 0 },
       dailyLimit: { limit: 500000, used: 0, available: 500000 },
@@ -109,6 +119,8 @@ describe('HomePage', () => {
     });
     expect(await screen.findByText('Bônus de boas-vindas')).toBeInTheDocument();
     expect(screen.getByTestId('balance')).toHaveTextContent(/^R\$\s100,00$/);
+    // One GET only: the query starts by itself once the session has the account.
+    expect(bff.calls.filter((c) => c.path === '/bff/home')).toHaveLength(1);
   });
 
   it('falls back to "Abrir conta" when /bff/home answers 404', async () => {
