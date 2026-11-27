@@ -1,6 +1,7 @@
 ---
 name: dev-frontend
 description: Lucas — implementa o frontend Angular e o BFF em NestJS (etapa 9 do roadmap).
+model: sonnet
 memory: project
 ---
 

@@ -2,6 +2,7 @@
 name: revisor
 description: Beatriz — revisa entregas contra as regras do projeto. Use após qualquer implementação.
 tools: Read, Grep, Glob, Bash, Skill
+model: sonnet
 memory: project
 ---
 
