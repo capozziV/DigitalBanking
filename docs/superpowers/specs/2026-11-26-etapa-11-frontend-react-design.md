@@ -56,10 +56,14 @@ Propostas da coordenadora, aceitas pelo usuário no fluxo da conversa:
 ## Mockups das telas (aprovados pelo usuário em 2026-11-26)
 Em `.superpowers/brainstorm/*/content/telas-noite-apple.html`, fora do git. Resumo para quem constrói:
 - **Entrar:** luzes no fundo, título com gradiente, cartão Black flutuando, e-mail, senha e "Criar conta".
-- **Início:** saudação com o nome, **saldo** em destaque (pode ser negativo) e, abaixo, cheque especial e "disponível para usar" (saldo + cheque especial). *Mudança do usuário em 2026-11-26: o saldo disponível em destaque parecia dinheiro em conta.*, cartão do tipo da conta, atalhos (Transferir, Extrato, Limite) e últimos lançamentos com a contraparte.
+- **Início:** saudação com o nome, **"Saldo"** em destaque (pode ser negativo) e, embaixo, "Conta {Tipo} · Saldo disponível {saldo + cheque especial}". *Mudança do usuário em 2026-11-26: o saldo disponível em destaque parecia dinheiro em conta.*, cartão do tipo da conta, atalhos (Transferir, Extrato, Limite) e últimos lançamentos com a contraparte.
 - **Transferir em passos:** 1) telefone do destino, com o nome encontrado; 2) valor, com teclado numérico grande e a barra do limite diário disponível; 3) confirmar. Depois, uma tela de resultado animada (pendente → concluída, recusada ou devolvida). As chamadas ao BFF e a regra da chave não mudam: a chave é aberta só na confirmação, com dono, telefone e valor, como hoje.
 - **Extrato:** lançamentos agrupados por dia, com a hora, o saldo depois de cada um e "Carregar mais" pelo cursor.
 - **Minha conta:** cartão do tipo de conta, tipo, cheque especial, limite diário, celular (editável), Sair e Encerrar conta.
+- **Mudanças do usuário depois de ver o app (2026-11-26):**
+  - Login no celular: cartão em cima, formulário embaixo (no computador segue lado a lado, cartão à esquerda).
+  - Seta de voltar (←) no canto superior esquerdo de toda tela interna, menos o Início. Na transferência volta ao passo anterior sem perder o digitado (no 1º passo, ao Início); nas outras telas volta à tela anterior do histórico ou, sem histórico do app, ao Início.
+  - O mesmo "Saldo" em destaque e "Saldo disponível" embaixo vale para Minha conta e para o computador.
 - **Computador:** barra lateral com o sininho e o contador, e o início em blocos de vidro (saldo com ações, cartão, últimos lançamentos, limite diário).
 
 ## O que o web faz hoje (e continua fazendo)
