@@ -1,11 +1,11 @@
-import { screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { App } from '@/app';
-import { renderWithProviders } from '@/test/render';
 
 describe('App', () => {
-  it('renders the capzzPay name', () => {
-    renderWithProviders(<App />);
-    expect(screen.getByText('capzzPay')).toBeInTheDocument();
+  it('opens on Entrar for a visitor, with the capzzPay title', async () => {
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: 'Entrar' })).toBeInTheDocument();
+    await waitFor(() => expect(document.title).toBe('Entrar · capzzPay'));
   });
 });
