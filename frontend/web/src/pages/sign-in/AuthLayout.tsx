@@ -7,7 +7,11 @@ import { Footer } from '@/shell/Footer';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-/** Black field with the ambient lights; `aside` is the brand side, only for the first impression. */
+/**
+ * Black field with the ambient lights. The form comes first in the DOM, so on a phone it is what
+ * the user meets first; `aside` (the brand side, only for the first impression) follows it.
+ * On desktop the row is reversed so the aside stays on the left, side by side with the form.
+ */
 export function AuthLayout({ children, aside }: { children: ReactNode; aside?: ReactNode }) {
   return (
     <div className="relative isolate flex min-h-dvh flex-col overflow-hidden">
@@ -15,13 +19,13 @@ export function AuthLayout({ children, aside }: { children: ReactNode; aside?: R
       <main
         className={cn(
           'relative z-10 mx-auto flex w-full flex-1 flex-col justify-center gap-8 px-5 py-10 md:px-10',
-          aside ? 'max-w-5xl lg:flex-row lg:items-center lg:gap-16' : 'max-w-md',
+          aside ? 'max-w-5xl lg:flex-row-reverse lg:items-center lg:gap-16' : 'max-w-md',
         )}
       >
-        {aside ? <div className="flex flex-col gap-6 lg:flex-1">{aside}</div> : null}
         <Reveal delay={0.1} className={aside ? 'w-full lg:max-w-md lg:flex-1' : 'w-full'}>
           <GlassPanel className="flex flex-col gap-5 p-6 md:p-8">{children}</GlassPanel>
         </Reveal>
+        {aside ? <div className="flex flex-col gap-6 lg:flex-1">{aside}</div> : null}
       </main>
       <Footer className="relative z-10 px-5 py-6 text-center" />
     </div>

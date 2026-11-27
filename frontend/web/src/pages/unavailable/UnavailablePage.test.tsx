@@ -36,6 +36,20 @@ describe('UnavailablePage', () => {
     await waitFor(() => expect(pathname(router)).toBe('/inicio'));
   });
 
+  it('returns to the page it came from, not the start, after a successful retry', async () => {
+    fakeSession.actions.reload.mockImplementationOnce(async () => {
+      fakeSession.set({ loadFailed: false });
+      return undefined;
+    });
+    const { router } = renderRoutes('/extrato');
+    await waitFor(() => expect(pathname(router)).toBe('/indisponivel'));
+    expect(router.state.location.state).toEqual({ from: '/extrato' });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Tentar de novo' }));
+    await waitFor(() => expect(pathname(router)).toBe('/extrato'));
+    expect(pathname(router)).not.toBe('/inicio');
+  });
+
   it('stays on the screen while the reload still fails', async () => {
     fakeSession.actions.reload.mockImplementationOnce(async () => undefined);
     const visited: string[] = [];

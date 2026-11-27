@@ -42,6 +42,19 @@ describe('SignInPage', () => {
     expect(fakeSession.actions.signIn).not.toHaveBeenCalled();
   });
 
+  it('puts the form before the brand aside in the DOM', async () => {
+    renderRoutes('/entrar');
+    const email = await screen.findByLabelText('E-mail');
+    const card = screen.getByRole('img', { name: 'Cartão Black' });
+    expect(email.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('hides the aside card below desktop, so the phone shows one capzzPay (the heading)', async () => {
+    renderRoutes('/entrar');
+    const card = await screen.findByRole('img', { name: 'Cartão Black' });
+    expect(card.parentElement).toHaveClass('hidden', 'lg:flex');
+  });
+
   it('caps the password field at six characters', async () => {
     renderRoutes('/entrar');
     await fill('ana@example.com', '1234567');

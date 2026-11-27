@@ -44,14 +44,13 @@ export function SignInPage() {
       aside={
         <>
           <Reveal>
-            <p className="text-sm font-semibold text-muted-foreground">capzzPay</p>
-            <p className="mt-2 font-heading text-4xl leading-[1.05] font-bold tracking-tight md:text-5xl">
+            <p className="font-heading text-4xl leading-[1.05] font-bold tracking-tight md:text-5xl">
               Seu dinheiro.
               <br />
               <GradientText>Sem atrito.</GradientText>
             </p>
           </Reveal>
-          <Reveal delay={0.05} className="flex justify-center lg:justify-start">
+          <Reveal delay={0.05} className="hidden justify-start lg:flex">
             <AccountCard type="BLACK" last4="4821" size="lg" />
           </Reveal>
         </>
