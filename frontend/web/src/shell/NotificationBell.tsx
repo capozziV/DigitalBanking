@@ -4,7 +4,7 @@ import { Link } from 'react-router';
 import { cn } from 'cn';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { unreadBadge } from '@/shell/nav-items';
-import { useSession } from '@/shell/session-stub';
+import { useSession } from '@/lib/session';
 
 /**
  * The bell with the unread count. The panel opens without leaving the page; its list of recent

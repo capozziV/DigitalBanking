@@ -3,10 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeSession } from '@/test/fake-session';
 import { renderRoutes } from '@/test/render-routes';
 
-vi.mock('@/shell/session-stub', async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  ...(await import('@/test/fake-session')).fakeSessionModule(),
-}));
+vi.mock('@/lib/session', async () => (await import('@/test/fake-session')).fakeSessionModule());
 
 const pathname = (router: ReturnType<typeof renderRoutes>['router']) =>
   router.state.location.pathname;
@@ -76,6 +73,34 @@ describe('guards', () => {
     expect(await screen.findByRole('heading', { name: 'Início' })).toBeInTheDocument();
   });
 
+  it('keeps a customer screen mounted while the session reloads', async () => {
+    fakeSession.customer();
+    renderRoutes('/extrato');
+    const heading = await screen.findByRole('heading', { name: 'Extrato' });
+    const shell = screen.getByRole('contentinfo');
+
+    act(() => fakeSession.set({ loaded: false }));
+
+    expect(heading).toBeInTheDocument();
+    expect(shell).toBeInTheDocument();
+    act(() => fakeSession.customer());
+    expect(screen.getByRole('heading', { name: 'Extrato' })).toBe(heading);
+  });
+
+  it('keeps Entrar mounted while signing in, then goes into the app', async () => {
+    fakeSession.visitor();
+    const { router } = renderRoutes('/entrar');
+    const heading = await screen.findByRole('heading', { name: 'Entrar' });
+
+    // signIn: reload() marks the session unloaded and fills it in before it is loaded again.
+    act(() => fakeSession.set({ loaded: false, authenticated: true, email: 'ana@example.test' }));
+    expect(heading).toBeInTheDocument();
+    expect(pathname(router)).toBe('/entrar');
+
+    act(() => fakeSession.customer());
+    await waitFor(() => expect(pathname(router)).toBe('/inicio'));
+  });
+
   it.each(['/inicio', '/entrar', '/completar-cadastro'])(
     'sends a failed session load on %s to Indisponível, remembering the address',
     async (path) => {
@@ -86,30 +111,21 @@ describe('guards', () => {
     },
   );
 
-  it('sends a 401 during a screen to Entrar exactly once', async () => {
+  it('sends a lost session during a screen to Entrar exactly once', async () => {
     fakeSession.customer();
     const { router } = renderRoutes('/extrato');
     await screen.findByRole('heading', { name: 'Extrato' });
     const visits: string[] = [];
     router.subscribe((state) => visits.push(`${state.location.pathname}#${state.location.key}`));
 
+    // Two 401s in a row: the real store clears the session on each one.
     act(() => {
-      fakeSession.emitSessionLost();
-      fakeSession.emitSessionLost();
+      fakeSession.actions.clear();
+      fakeSession.actions.clear();
     });
 
     await waitFor(() => expect(pathname(router)).toBe('/entrar'));
-    expect(fakeSession.actions.clear).toHaveBeenCalled();
     expect(new Set(visits.filter((visit) => visit.startsWith('/entrar#'))).size).toBe(1);
     expect(await screen.findByRole('heading', { name: 'Entrar' })).toBeInTheDocument();
-  });
-
-  it('sends an unreachable BFF during a screen to Indisponível, remembering the address', async () => {
-    fakeSession.customer();
-    const { router } = renderRoutes('/transferir');
-    await screen.findByRole('heading', { name: 'Transferir' });
-    act(() => fakeSession.emitUnavailable());
-    await waitFor(() => expect(pathname(router)).toBe('/indisponivel'));
-    expect(router.state.location.state).toEqual({ from: '/transferir' });
   });
 });

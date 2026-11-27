@@ -3,7 +3,7 @@ import { NavLink } from 'react-router';
 import { cn } from 'cn';
 import { NotificationBell } from '@/shell/NotificationBell';
 import { NAV_ITEMS } from '@/shell/nav-items';
-import { session } from '@/shell/session-stub';
+import { signOut } from '@/lib/session';
 
 /** Desktop navigation (1024 px and up): a quiet glass column; the bell carries the unread count. */
 export function SideNav() {
@@ -34,7 +34,7 @@ export function SideNav() {
       </nav>
       <button
         type="button"
-        onClick={() => void session.signOut()}
+        onClick={() => void signOut()}
         className="mt-auto flex items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-glass hover:text-foreground"
       >
         <LogOut aria-hidden="true" className="size-[1.05rem]" strokeWidth={1.8} />

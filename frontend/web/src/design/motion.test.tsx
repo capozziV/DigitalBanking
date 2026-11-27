@@ -1,8 +1,11 @@
+import type { ReactNode } from 'react';
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AccountCard } from '@/design/AccountCard';
 import { AmbientLights } from '@/design/AmbientLights';
-import { CountUp, usePrefersReducedMotion } from '@/design/motion';
+import { CountUp, PageTransition, Reveal, usePrefersReducedMotion } from '@/design/motion';
+import { formatCents } from '@/lib/money';
+import { MemoryRouter } from 'react-router';
 
 function emulateReducedMotion(reduce: boolean) {
   vi.stubGlobal(
@@ -74,6 +77,46 @@ describe('motion', () => {
     expect(screen.queryByText('R$ 12.480,91')).not.toBeInTheDocument();
     act(() => vi.advanceTimersByTime(3_000));
     expect(screen.getByText('R$ 12.480,91')).toBeInTheDocument();
+  });
+
+  it.each([1_248_091, 1, 29, -8_990, Number.MAX_SAFE_INTEGER])(
+    'ends on exactly formatCents(%i)',
+    (cents) => {
+      vi.useFakeTimers();
+      emulateReducedMotion(false);
+      const { container } = render(<CountUp cents={cents} />);
+      act(() => vi.advanceTimersByTime(3_000));
+      expect(container.textContent).toBe(formatCents(cents));
+    },
+  );
+
+  it('shows formatCents of the amount at once when motion is reduced', () => {
+    emulateReducedMotion(true);
+    const { container } = render(<CountUp cents={Number.MAX_SAFE_INTEGER} />);
+    expect(container.textContent).toBe(formatCents(Number.MAX_SAFE_INTEGER));
+  });
+
+  const moving = (element: HTMLElement): boolean =>
+    /opacity|transform/.test(element.getAttribute('style') ?? '');
+
+  it.each([
+    ['PageTransition', (child: ReactNode) => <PageTransition>{child}</PageTransition>],
+    ['Reveal', (child: ReactNode) => <Reveal>{child}</Reveal>],
+  ])('%s renders without motion when motion is reduced', (_name, wrap) => {
+    emulateReducedMotion(true);
+    render(<MemoryRouter>{wrap(<p>conteúdo</p>)}</MemoryRouter>);
+    expect(moving(screen.getByText('conteúdo').parentElement!)).toBe(false);
+  });
+
+  it.each([
+    ['PageTransition', (child: ReactNode) => <PageTransition>{child}</PageTransition>],
+    ['Reveal', (child: ReactNode) => <Reveal>{child}</Reveal>],
+  ])('%s starts transparent with full motion', (_name, wrap) => {
+    emulateReducedMotion(false);
+    render(<MemoryRouter>{wrap(<p>conteúdo</p>)}</MemoryRouter>);
+    const wrapper = screen.getByText('conteúdo').parentElement!;
+    expect(moving(wrapper)).toBe(true);
+    expect(wrapper.style.opacity).toBe('0');
   });
 
   it('formats negative amounts exactly', () => {

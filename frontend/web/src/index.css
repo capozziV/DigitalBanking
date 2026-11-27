@@ -4,6 +4,9 @@
 @import './design/tokens.css';
 @import './design/effects.css';
 
+/* shadcn's dark: variants follow the .dark class on <html>, not the system theme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -45,5 +48,16 @@
 
   a {
     text-underline-offset: 0.2em;
+  }
+
+  /* Reduced motion cuts everything: tw-animate-css enter/exit (popover, sheet, dialog) included. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }

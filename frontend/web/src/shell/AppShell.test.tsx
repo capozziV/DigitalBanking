@@ -5,10 +5,7 @@ import { AppShell } from '@/shell/AppShell';
 import { fakeSession } from '@/test/fake-session';
 import { renderWithProviders } from '@/test/render';
 
-vi.mock('@/shell/session-stub', async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  ...(await import('@/test/fake-session')).fakeSessionModule(),
-}));
+vi.mock('@/lib/session', async () => (await import('@/test/fake-session')).fakeSessionModule());
 
 const LINKS: [string, string][] = [
   ['Início', '/inicio'],
@@ -68,6 +65,14 @@ describe('AppShell', () => {
     expect(fakeSession.actions.startUnreadPolling).toHaveBeenCalledTimes(1);
     unmount();
     expect(fakeSession.actions.stopUnreadPolling).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads the unread count right away, then polls it', () => {
+    renderWithProviders(<AppShell />, { route: '/inicio' });
+    expect(fakeSession.actions.refreshUnread).toHaveBeenCalledTimes(1);
+    expect(fakeSession.actions.refreshUnread.mock.invocationCallOrder[0]).toBeLessThan(
+      fakeSession.actions.startUnreadPolling.mock.invocationCallOrder[0],
+    );
   });
 
   it('shows the footer', () => {

@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { vi } from 'vitest';
-import type { SessionState } from '@/shell/session-stub';
+import type { SessionState } from '@/lib/session';
 
 type Listener = () => void;
 
@@ -17,8 +17,6 @@ const visitor: SessionState = {
 
 let state: SessionState = visitor;
 const subscribers = new Set<Listener>();
-const sessionLost = new Set<Listener>();
-const unavailable = new Set<Listener>();
 
 const set = (partial: Partial<SessionState>): void => {
   state = { ...state, ...partial };
@@ -28,13 +26,18 @@ const set = (partial: Partial<SessionState>): void => {
 const actions = {
   load: vi.fn(async () => undefined),
   reload: vi.fn(async () => undefined),
+  loadMe: vi.fn(async () => undefined),
+  signIn: vi.fn(async () => undefined),
+  signUp: vi.fn(async () => ({ confirmationRequired: false })),
+  confirm: vi.fn(async () => undefined),
   signOut: vi.fn(async () => undefined),
   clear: vi.fn(() => set({ ...visitor })),
+  refreshUnread: vi.fn(async () => undefined),
   startUnreadPolling: vi.fn(),
   stopUnreadPolling: vi.fn(),
 };
 
-/** Drives the session contract from a test: state, actions (spies) and BFF events. */
+/** Drives the session store from a test: state and actions (spies). */
 export const fakeSession = {
   actions,
   set,
@@ -55,19 +58,21 @@ export const fakeSession = {
       },
       ...partial,
     }),
-  emitSessionLost: (): void => [...sessionLost].forEach((listener) => listener()),
-  emitUnavailable: (): void => [...unavailable].forEach((listener) => listener()),
   reset: (): void => {
     state = visitor;
-    sessionLost.clear();
-    unavailable.clear();
     Object.values(actions).forEach((action) => action.mockClear());
   },
 };
 
-/** Module replacement for `vi.mock('@/shell/session-stub', ...)`. */
+/** Module replacement for `vi.mock('@/lib/session', ...)`, with the real module's exports. */
 export function fakeSessionModule() {
   return {
+    ...actions,
+    getSnapshot: (): SessionState => state,
+    subscribe: (subscriber: Listener): (() => void) => {
+      subscribers.add(subscriber);
+      return () => subscribers.delete(subscriber);
+    },
     useSession: (): SessionState =>
       useSyncExternalStore(
         (subscriber) => {
@@ -76,14 +81,5 @@ export function fakeSessionModule() {
         },
         () => state,
       ),
-    session: actions,
-    onSessionLost: (listener: Listener) => {
-      sessionLost.add(listener);
-      return () => sessionLost.delete(listener);
-    },
-    onUnavailable: (listener: Listener) => {
-      unavailable.add(listener);
-      return () => unavailable.delete(listener);
-    },
   };
 }

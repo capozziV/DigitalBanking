@@ -1,23 +1,30 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router';
-import { session, useSession, type SessionState } from '@/shell/session-stub';
+import { load, useSession, type SessionState } from '@/lib/session';
 
 /** Where the guard sends the visitor instead, or null to let them through. */
 type Decide = (state: SessionState) => string | null;
 
 /**
  * Decides only on a session that could be loaded. A failed load says nothing about who the user
- * is: it goes to Indisponível, remembering the address for "Tentar de novo".
+ * is: it goes to Indisponível, remembering the address for "Tentar de novo". While a reload is in
+ * flight (sign-in, Completar cadastro), it keeps deciding on the last loaded session, so the
+ * screen stays mounted; the new session decides once it is loaded.
  */
 function OnLoadedSession({ decide, children }: { decide: Decide; children?: ReactNode }) {
-  const state = useSession();
+  const current = useSession();
   const location = useLocation();
+  const [lastLoaded, setLastLoaded] = useState<SessionState | null>(
+    current.loaded ? current : null,
+  );
+  if (current.loaded && current !== lastLoaded) setLastLoaded(current);
+  const state = current.loaded ? current : (lastLoaded ?? current);
 
   useEffect(() => {
-    if (!state.loaded && !state.loadFailed) void session.load();
-  }, [state.loaded, state.loadFailed]);
+    if (!current.loaded && !current.loadFailed) void load();
+  }, [current.loaded, current.loadFailed]);
 
-  if (state.loadFailed) {
+  if (current.loadFailed) {
     return (
       <Navigate to="/indisponivel" replace state={{ from: location.pathname + location.search }} />
     );

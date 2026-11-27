@@ -1,6 +1,7 @@
 import { domAnimation, LazyMotion, m } from 'motion/react';
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useLocation } from 'react-router';
+import { formatCents } from '@/lib/money';
 
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
 /** Exponential ease-out: fast start, long settle. Shared by every entrance. */
@@ -69,11 +70,6 @@ export function Reveal({
     </LazyMotion>
   );
 }
-
-const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-
-/** Display only: the integer number of cents becomes "R$ 1.234,56". */
-const formatCents = (cents: number): string => brl.format(cents / 100);
 
 /**
  * Counts an amount of cents up to its value. Every frame shows a whole number of cents and the

@@ -46,4 +46,20 @@ describe('theme', () => {
   it('stops every loop when the visitor asks for reduced motion', () => {
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)/);
   });
+
+  it('ties the dark: variant to the .dark class, not to the system theme', () => {
+    const index = readFileSync(resolve(__dirname, 'index.css'), 'utf8');
+    expect(index).toContain('@custom-variant dark (&:where(.dark, .dark *));');
+  });
+
+  it('cuts every animation and transition, shadcn ones included, with reduced motion', () => {
+    const index = readFileSync(resolve(__dirname, 'index.css'), 'utf8');
+    const rule = /@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*?)\n {2}\}/.exec(index);
+    expect(rule).not.toBeNull();
+    const body = rule![1];
+    expect(body).toMatch(/\*,\s*::before,\s*::after\s*\{/);
+    expect(body).toMatch(/animation-duration:\s*0\.01ms !important/);
+    expect(body).toMatch(/animation-iteration-count:\s*1 !important/);
+    expect(body).toMatch(/transition-duration:\s*0\.01ms !important/);
+  });
 });

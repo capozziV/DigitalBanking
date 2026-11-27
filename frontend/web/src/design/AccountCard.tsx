@@ -1,5 +1,5 @@
 import { usePrefersReducedMotion } from '@/design/motion';
-import { accountTypeLabel, type AccountType } from '@/shell/session-stub';
+import { accountTypeLabel, type AccountType } from '@/lib/api-types';
 
 interface AccountCardProps {
   type: AccountType;

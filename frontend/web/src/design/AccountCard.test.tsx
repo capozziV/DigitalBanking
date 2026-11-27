@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { AccountCard } from '@/design/AccountCard';
-import type { AccountType } from '@/shell/session-stub';
+import type { AccountType } from '@/lib/api-types';
 
 describe('AccountCard', () => {
   it.each<[AccountType, string]>([

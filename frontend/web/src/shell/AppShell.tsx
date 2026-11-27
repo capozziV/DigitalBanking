@@ -7,15 +7,23 @@ import { Footer } from '@/shell/Footer';
 import { NotificationBell } from '@/shell/NotificationBell';
 import { SideNav } from '@/shell/SideNav';
 import { TabBar } from '@/shell/TabBar';
-import { session, useSession } from '@/shell/session-stub';
+import {
+  refreshUnread,
+  signOut,
+  startUnreadPolling,
+  stopUnreadPolling,
+  useSession,
+} from '@/lib/session';
 
 /** Frame of every customer screen: lights, navigation, the bell, the screen and the footer. */
 export function AppShell() {
   const { signOutFailed } = useSession();
 
+  // The bell is right at once (the session does not carry the count), then every 30 s.
   useEffect(() => {
-    session.startUnreadPolling();
-    return () => session.stopUnreadPolling();
+    void refreshUnread();
+    startUnreadPolling();
+    return () => stopUnreadPolling();
   }, []);
 
   return (
@@ -36,7 +44,7 @@ export function AppShell() {
               <span className="flex-1">
                 Não foi possível confirmar a saída. Sua sessão pode continuar aberta.
               </span>
-              <Button variant="outline" size="sm" onClick={() => void session.signOut()}>
+              <Button variant="outline" size="sm" onClick={() => void signOut()}>
                 Tentar de novo
               </Button>
             </div>

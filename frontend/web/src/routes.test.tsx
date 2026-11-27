@@ -3,10 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeSession } from '@/test/fake-session';
 import { renderRoutes } from '@/test/render-routes';
 
-vi.mock('@/shell/session-stub', async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  ...(await import('@/test/fake-session')).fakeSessionModule(),
-}));
+vi.mock('@/lib/session', async () => (await import('@/test/fake-session')).fakeSessionModule());
 
 describe('routes', () => {
   beforeEach(() => {
