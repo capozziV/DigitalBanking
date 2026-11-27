@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-26T22:30:00-03:00",
+  "title": "Design System: capzzPay",
+  "extensions": {
+    "colorMeta": {
+      "night": { "role": "neutral", "displayName": "Night" },
+      "moonlight": { "role": "primary", "displayName": "Moonlight" },
+      "light-blue": { "role": "secondary", "displayName": "Luz azul" },
+      "light-lilac": { "role": "secondary", "displayName": "Luz lilás" },
+      "light-pink": { "role": "secondary", "displayName": "Luz rosa" },
+      "positive-mint": { "role": "tertiary", "displayName": "Menta" },
+      "negative-rose": { "role": "tertiary", "displayName": "Rosa de débito" },
+      "alert-red": { "role": "tertiary", "displayName": "Vermelho de alerta" }
+    },
+    "shadows": [
+      {
+        "name": "float",
+        "value": "0 24px 48px -16px rgb(0 0 0 / 0.7), 0 8px 16px -8px rgb(0 0 0 / 0.5)",
+        "purpose": "Only the floating account card."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out-expo",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Every entrance and screen change."
+      },
+      { "name": "page-enter", "value": "420ms", "purpose": "Screen fade and 10px rise." },
+      { "name": "reveal", "value": "600ms", "purpose": "Item entrance, staggered by delay." },
+      {
+        "name": "count-up",
+        "value": "900ms",
+        "purpose": "Balance counting in whole cents to the exact value."
+      },
+      {
+        "name": "card-float",
+        "value": "6.5s",
+        "purpose": "Account card float loop (transform only)."
+      },
+      {
+        "name": "card-sweep",
+        "value": "5.5s",
+        "purpose": "Light sweep across the card (transform only)."
+      }
+    ],
+    "breakpoints": [
+      { "name": "lg", "value": "1024px", "purpose": "Tab bar below, side navigation from here up." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Glass panel",
+      "kind": "card",
+      "refersTo": "glass-panel",
+      "description": "The one container: balance, entries, notifications. Never nested.",
+      "html": "<div class=\"ds-glass\"><p class=\"ds-glass-label\">Saldo disponível</p><p class=\"ds-glass-value\">R$ 12.480,90</p></div>",
+      "css": ".ds-glass { background: rgb(255 255 255 / 0.06); border: 1px solid rgb(255 255 255 / 0.12); border-radius: 22.4px; padding: 20px; color: #f5f5f7; backdrop-filter: blur(18px) saturate(140%); } .ds-glass-label { margin: 0; font-size: 14px; color: rgb(245 245 247 / 0.64); } .ds-glass-value { margin: 4px 0 0; font-size: 36px; font-weight: 650; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Side navigation link",
+      "kind": "nav",
+      "refersTo": "nav-link-active",
+      "description": "Desktop destination; the active one is marked by glass and a full hairline border.",
+      "html": "<a class=\"ds-nav ds-nav-on\" href=\"#\">Início</a><a class=\"ds-nav\" href=\"#\">Extrato</a>",
+      "css": ".ds-nav { display: block; padding: 10px 12px; border-radius: 18.2px; border: 1px solid transparent; color: rgb(245 245 247 / 0.64); font-size: 14px; text-decoration: none; transition: background 0.2s, color 0.2s; } .ds-nav:hover { background: rgb(255 255 255 / 0.06); color: #f5f5f7; } .ds-nav:focus-visible { outline: 2px solid #b18cff; outline-offset: 2px; } .ds-nav-on { background: rgb(255 255 255 / 0.1); border-color: rgb(255 255 255 / 0.12); color: #f5f5f7; }"
+    },
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one primary action of a screen.",
+      "html": "<button class=\"ds-btn\">Continuar</button>",
+      "css": ".ds-btn { height: 46px; padding: 0 24px; border: 0; border-radius: 14px; background: #f5f5f7; color: #000; font-weight: 600; font-size: 14px; transition: opacity 0.2s, transform 0.2s; } .ds-btn:hover { opacity: 0.88; } .ds-btn:active { transform: translateY(1px); } .ds-btn:focus-visible { outline: 2px solid #b18cff; outline-offset: 2px; }"
+    },
+    {
+      "name": "Account card",
+      "kind": "custom",
+      "description": "Signature piece: tilted floating card with a periodic light sweep; finish by account type.",
+      "html": "<div class=\"ds-card\" role=\"img\" aria-label=\"Cartão Black\"><span class=\"ds-card-type\">Black</span><span class=\"ds-card-chip\"></span><span class=\"ds-card-num\">•••• 4821</span></div>",
+      "css": ".ds-card { position: relative; width: 288px; aspect-ratio: 1.586; border-radius: 18px; overflow: hidden; color: #fff; background: linear-gradient(135deg, #2c2c31, #0b0b0e); border: 1px solid rgb(255 255 255 / 0.2); box-shadow: 0 24px 48px -16px rgb(0 0 0 / 0.7); transform: perspective(900px) rotateX(10deg) rotateY(-10deg); } .ds-card-type { position: absolute; top: 20px; right: 20px; font-size: 12px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; } .ds-card-chip { position: absolute; top: 60px; left: 20px; width: 37px; height: 28px; border-radius: 6px; background: linear-gradient(135deg, #f4e2a6, #b8954a); } .ds-card-num { position: absolute; left: 20px; bottom: 18px; font-size: 14px; letter-spacing: 0.14em; opacity: 0.86; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Noite Apple",
+    "overview": "Pure black field lit by slow diffuse lights, content floating on frosted glass, and the floating account card as the one authored moment. Chosen by the user among six mockups (stage 11 spec).",
+    "keyCharacteristics": [
+      "Pure black field",
+      "Diffuse blue/lilac/pink light",
+      "Frosted glass panels",
+      "Floating 3D account card with light sweep",
+      "System font stack, no Inter"
+    ],
+    "rules": [
+      {
+        "name": "A Regra da Luz",
+        "body": "Color only enters as light, never as a flat fill.",
+        "section": "colors"
+      },
+      {
+        "name": "A Regra do Piso",
+        "body": "No functional text below 11px.",
+        "section": "typography"
+      },
+      {
+        "name": "A Regra do Vidro Único",
+        "body": "Glass is never nested in glass.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Let the card be the one authored moment of a screen",
+      "Mark states by shape, not by color alone",
+      "Keep loops on transform/opacity and stop them under reduced motion"
+    ],
+    "donts": [
+      "Inter anywhere",
+      "Glass inside glass",
+      "Unread count outside the bell",
+      "Colored side bar on an active item",
+      "Functional text below 11px"
+    ]
+  }
+}

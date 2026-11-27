@@ -1,11 +1,16 @@
-import { screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '@/app';
-import { renderWithProviders } from '@/test/render';
+import { fakeSession } from '@/test/fake-session';
+
+vi.mock('@/lib/session', async () => (await import('@/test/fake-session')).fakeSessionModule());
 
 describe('App', () => {
-  it('renders the capzzPay name', () => {
-    renderWithProviders(<App />);
-    expect(screen.getByText('capzzPay')).toBeInTheDocument();
+  beforeEach(() => fakeSession.reset());
+
+  it('opens on Entrar for a visitor, with the capzzPay title', async () => {
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: 'Entrar' })).toBeInTheDocument();
+    await waitFor(() => expect(document.title).toBe('Entrar · capzzPay'));
   });
 });

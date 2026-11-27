@@ -1,0 +1,254 @@
+/*
+ * Hand-written effects of Noite Apple. Every loop moves only transform or opacity, and every loop
+ * stops under prefers-reduced-motion (and under data-still="true", set from the same preference).
+ */
+
+/* Ambient lights: soft radial glows drifting behind the content. */
+.ambient-lights {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ambient-light {
+  position: absolute;
+  width: 70vmax;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  will-change: transform;
+  animation: ambient-drift 22s var(--ease-out-expo) infinite alternate;
+}
+
+.ambient-light--blue {
+  top: -32vmax;
+  left: -24vmax;
+  background: radial-gradient(closest-side, rgb(59 59 255 / 0.5), transparent 72%);
+}
+
+.ambient-light--lilac {
+  right: -30vmax;
+  bottom: -30vmax;
+  background: radial-gradient(closest-side, rgb(193 59 255 / 0.38), transparent 72%);
+  animation-delay: -9s;
+  animation-duration: 26s;
+}
+
+.ambient-light--pink {
+  top: 38%;
+  left: 52%;
+  width: 40vmax;
+  background: radial-gradient(closest-side, rgb(255 122 182 / 0.16), transparent 72%);
+  animation-delay: -15s;
+  animation-duration: 30s;
+}
+
+.ambient-lights[data-intensity='low'] {
+  opacity: 0.72;
+}
+
+.ambient-lights[data-intensity='high'] {
+  opacity: 1;
+}
+
+@keyframes ambient-drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(6vmax, -4vmax, 0) scale(1.12);
+  }
+}
+
+/* Glass: the one material for panels. Translucent, hairline edge, blurred light behind. */
+.glass-panel {
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-2xl);
+  -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(140%);
+  backdrop-filter: blur(var(--blur-glass)) saturate(140%);
+}
+
+/*
+ * Highlighted words in a headline: the blue, lilac, pink light, drifting by crossfade.
+ * impeccable-disable gradient-text -- user chose it: the stage 11 spec "Direção visual: Noite Apple"
+ * (approved 2026-11-26) pins the animated gradient headline; GradientText is its only use.
+ */
+.gradient-text {
+  position: relative;
+  display: inline-block;
+  color: transparent;
+  background: linear-gradient(90deg, var(--accent-1), var(--accent-2) 55%, var(--accent-3));
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.gradient-text::after {
+  content: attr(data-text);
+  content: attr(data-text) / '';
+  position: absolute;
+  inset: 0;
+  color: transparent;
+  background: linear-gradient(90deg, var(--accent-3), var(--accent-1) 50%, var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  opacity: 0;
+  animation: gradient-crossfade 7s ease-in-out infinite alternate;
+}
+
+@keyframes gradient-crossfade {
+  to {
+    opacity: 1;
+  }
+}
+
+/* The signature card: a tilted plate that floats, with a light sweeping across it now and then. */
+.account-card {
+  --card-tilt-x: 10deg;
+  --card-tilt-y: -10deg;
+  position: relative;
+  aspect-ratio: 1.586;
+  overflow: hidden;
+  border-radius: calc(var(--card-width) * 0.064);
+  padding: calc(var(--card-width) * 0.07);
+  color: #fff;
+  box-shadow: var(--shadow-float);
+  transform: perspective(900px) rotateX(var(--card-tilt-x)) rotateY(var(--card-tilt-y));
+  animation: card-float 6.5s ease-in-out infinite;
+  will-change: transform;
+  isolation: isolate;
+}
+
+.account-card[data-size='sm'] {
+  --card-width: 9.5rem;
+  width: var(--card-width);
+}
+
+.account-card[data-size='md'] {
+  --card-width: 18rem;
+  width: min(var(--card-width), 100%);
+}
+
+.account-card[data-size='lg'] {
+  --card-width: 22rem;
+  width: min(var(--card-width), 100%);
+}
+
+.account-card::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 42%;
+  z-index: 1;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.38), transparent);
+  transform: translateX(-140%) skewX(-20deg);
+  animation: card-sweep 5.5s ease-in-out 1.2s infinite;
+  pointer-events: none;
+}
+
+.account-card__brand {
+  font-size: max(11px, calc(var(--card-width) * 0.05));
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  opacity: 0.9;
+}
+
+.account-card__type {
+  position: absolute;
+  top: calc(var(--card-width) * 0.07);
+  right: calc(var(--card-width) * 0.07);
+  font-size: max(11px, calc(var(--card-width) * 0.042));
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.account-card__chip {
+  width: calc(var(--card-width) * 0.13);
+  aspect-ratio: 1.35;
+  margin-top: calc(var(--card-width) * 0.1);
+  border-radius: calc(var(--card-width) * 0.022);
+  background: linear-gradient(135deg, #f4e2a6, #b8954a);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.18);
+}
+
+.account-card__number {
+  position: absolute;
+  left: calc(var(--card-width) * 0.07);
+  bottom: calc(var(--card-width) * 0.06);
+  font-size: max(11px, calc(var(--card-width) * 0.05));
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.14em;
+  opacity: 0.86;
+}
+
+.account-card[data-size='sm'] .account-card__brand,
+.account-card[data-size='sm'] .account-card__number {
+  display: none;
+}
+
+.account-card[data-size='sm'] .account-card__type {
+  letter-spacing: 0.08em;
+}
+
+.account-card[data-finish='free'] {
+  background: linear-gradient(135deg, #3a3f4a, #1c1f26);
+  border: 1px solid rgb(255 255 255 / 0.15);
+}
+
+.account-card[data-finish='standard'] {
+  background: linear-gradient(135deg, #2f5fb8, #101c44 70%);
+  border: 1px solid rgb(160 196 255 / 0.28);
+}
+
+.account-card[data-finish='gold'] {
+  background: linear-gradient(135deg, #ecd394, #b48d45 48%, #7d5f25);
+  color: #1b1407;
+}
+
+.account-card[data-finish='black'] {
+  background: linear-gradient(135deg, #2c2c31, #0b0b0e);
+  border: 1px solid rgb(255 255 255 / 0.2);
+}
+
+.account-card[data-finish='diamond'] {
+  background: linear-gradient(135deg, #d9f2ff, #8fb8ff 45%, #c9a8ff);
+  color: #0b1230;
+}
+
+@keyframes card-float {
+  0%,
+  100% {
+    transform: perspective(900px) translateY(0) rotateX(var(--card-tilt-x))
+      rotateY(var(--card-tilt-y));
+  }
+  50% {
+    transform: perspective(900px) translateY(-6px) rotateX(6deg) rotateY(8deg);
+  }
+}
+
+@keyframes card-sweep {
+  0% {
+    transform: translateX(-140%) skewX(-20deg);
+  }
+  55%,
+  100% {
+    transform: translateX(340%) skewX(-20deg);
+  }
+}
+
+.account-card[data-still='true'],
+.account-card[data-still='true']::after,
+.ambient-lights[data-still='true'] .ambient-light {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .account-card,
+  .account-card::after,
+  .ambient-light,
+  .gradient-text::after {
+    animation: none;
+  }
+}
