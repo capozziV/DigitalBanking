@@ -71,7 +71,9 @@ Os papéis do fluxo são executados pelos agentes de `.claude/agents/`:
 
 - Nas mensagens ao usuário, chame cada agente pelo nome (com o identificador entre parênteses quando ajudar); nos despachos, use o identificador em `subagent_type`.
 - Task que mistura papéis vai para o agente da maior parte do diff; o prompt cita o resto.
-- O modelo de cada despacho segue a seleção de modelo do `superpowers:subagent-driven-development`; informe-o sempre.
+- Cada agente tem um modelo padrão no próprio arquivo (Sonnet; Clara e Explore em Haiku). No despacho, informe o modelo sempre; suba para Opus só em: saga, concorrência, travas ou idempotência (Marina); sistema visual e design pesado (Lucas); Terraform novo na AWS ou mudança grande no CI (Rafael); revisão final da branch e código de dinheiro, sessão ou segurança (Beatriz). A Clara sobe para Sonnet em ADR com trade-off delicado.
+- Re-revisão de correção pequena e tarefa mecânica (renomear, lint, doc simples) vão em Haiku com `effort: low`.
+- A sessão principal roda em Sonnet com advisor Opus (`/advisor opus`); brainstorming, spec e plano de etapa nova, em Opus (`/model opus`).
 - Os agentes só existem quando o repositório está conectado à sessão (clone do GitHub). Sem eles, diga isso e use um agente genérico com o arquivo do agente como parte do prompt.
 
 ## Git

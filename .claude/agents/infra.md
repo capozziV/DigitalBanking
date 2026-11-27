@@ -1,6 +1,7 @@
 ---
 name: infra
 description: Rafael — cuida de docker-compose, emulador AWS, nginx local, CI, Gradle de build e Terraform na AWS.
+model: sonnet
 memory: project
 ---
 

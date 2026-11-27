@@ -1,6 +1,7 @@
 ---
 name: dev-kotlin
 description: Marina — implementa serviços Kotlin/Spring Boot do banco digital (domínio, casos de uso, adapters, testes, migrations).
+model: sonnet
 memory: project
 ---
 
