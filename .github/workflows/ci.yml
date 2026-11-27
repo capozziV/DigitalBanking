@@ -471,7 +471,7 @@ jobs:
         if: always()
         run: docker compose --env-file infra/local/.env.example -f infra/local/docker-compose.yml --profile apps down -v
 
-  # App do cliente (etapa 9): lint, testes de unidade e build do Angular e do BFF, workspaces npm em frontend/.
+  # App do cliente (etapas 9 e 11): lint, detector de design, testes de unidade e build do web (React) e do BFF, workspaces npm em frontend/.
   frontend:
     needs: changes
     if: ${{ needs.changes.outputs.frontend == 'true' || needs.changes.outputs.shared == 'true' }}
@@ -491,9 +491,11 @@ jobs:
         run: npm ci
       - name: Lint (ESLint e Prettier)
         run: npm run lint
-      - name: Testes de unidade (Angular e BFF)
+      - name: Detector de design (Impeccable)
+        run: npx impeccable detect --github web/src
+      - name: Testes de unidade (web e BFF)
         run: npm test
-      - name: Build (Angular e BFF)
+      - name: Build (web e BFF)
         run: npm run build
 
   # Playwright contra o app de verdade: o perfil apps do compose com as imagens do job images (web e BFF inclusos, a
