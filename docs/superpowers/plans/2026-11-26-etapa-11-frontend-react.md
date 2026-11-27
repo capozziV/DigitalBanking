@@ -157,7 +157,7 @@ frontend/e2e/tests/*.spec.ts, support.ts     (Task 8)
 - [ ] **Step 2:** Atualize os cinco cenários Playwright (`skeleton`, `demo-user`, `sign-up-and-first-transfer` com os passos novos, `daily-limit-refusal`, `notification-bell`) para as telas novas, com seletores por papel e rótulo e espera pelo valor final do `CountUp`.
 - [ ] **Step 3:** Suba a stack isolada (projeto compose próprio, nunca o `capzzpay`) com as imagens da branch e rode `npm run e2e` (esperado: 5 passam) e `infra/local/smoke.sh`.
 - [ ] **Step 4:** Rode o Lighthouse mobile contra a imagem (≥ 90 em desempenho e acessibilidade) e meça o JS inicial gzip (≤ 250 KB). Os números entram no relato.
-- [ ] **Step 5:** Rode `/impeccable polish` nas telas, depois `impeccable detect` (0 achados) e `audit` (sem P0/P1).
+- [ ] **Step 5:** Faça o `audit` e o `polish` da Impeccable em **todas** as telas (eles saíram das Tasks 4–7 em 2026-11-26: os agentes não carregam o skill porque o checkout principal está em outra branch). Siga à mão `.claude/skills/impeccable/reference/audit.md` e `polish.md`, olhando as telas no navegador em 390 px e 1280 px. Corrija os P0/P1 e rode `impeccable detect` (0 achados).
 - [ ] **Step 6:** Lint, testes e build de `frontend/`. Commit: `Etapa 11: e2e, desempenho e acabamento`.
 
 ### Task 9: documentação (Clara, `documentador`)
