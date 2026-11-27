@@ -1,6 +1,6 @@
 # capzzPay
 
-O capzzPay é um banco digital **simulado**, feito para portfólio, em microsserviços: sem dinheiro real e sem dados pessoais reais. São cinco serviços em Kotlin + Spring Boot 4.1 (JDK 21), mais o app do cliente (Angular + BFF em NestJS), em monorepo com Gradle, Clean Architecture por serviço e infraestrutura na AWS com Terraform. O foco está em consistência, idempotência, mensageria confiável, cache e observabilidade.
+O capzzPay é um banco digital **simulado**, feito para portfólio, em microsserviços: sem dinheiro real e sem dados pessoais reais. São cinco serviços em Kotlin + Spring Boot 4.1 (JDK 21), mais o app do cliente (SPA React com Tailwind e shadcn/ui, e BFF em NestJS), em monorepo com Gradle, Clean Architecture por serviço e infraestrutura na AWS com Terraform. O foco está em consistência, idempotência, mensageria confiável, cache e observabilidade.
 
 | Serviço | Responsabilidade | Dados |
 |---|---|---|
@@ -9,7 +9,7 @@ O capzzPay é um banco digital **simulado**, feito para portfólio, em microsser
 | `transfers` | Saga de transferência e limite diário | PostgreSQL + Redis |
 | `statement` | Extrato para leitura (CQRS) | DynamoDB + Redis |
 | `notification` | Notificações dentro do aplicativo, a partir de eventos | PostgreSQL |
-| `web` | App do cliente em Angular, servido por nginx | — |
+| `web` | App do cliente em React + Tailwind + shadcn/ui (SPA Vite), servido por nginx | — |
 | `bff` | BFF em NestJS: login, sessão e endpoints por tela | Redis |
 
 Glossário em [`CONTEXT.md`](CONTEXT.md); arquitetura em [`docs/arquitetura.md`](docs/arquitetura.md); etapas em [`docs/roadmap.md`](docs/roadmap.md).
@@ -30,7 +30,7 @@ flowchart LR
     edge -- "VPC Link" --> alb
 
     subgraph eks["EKS (local: docker-compose)"]
-        web["web<br/>(Angular + nginx)"]
+        web["web<br/>(React + Vite + nginx)"]
         bff["bff<br/>(NestJS)"]
         customer["customer"]
         accounts["accounts"]
@@ -114,7 +114,7 @@ infra/local/smoke.sh http://localhost
 Os cinco serviços também sobem pelas imagens Docker (perfil `apps` do compose). Coleções Bruno em [`api/bruno/`](api/bruno/).
 
 ## App do cliente
-Telas em português (Angular servido por nginx) com um BFF em NestJS, na mesma origem: `/` é o app e `/bff` é o BFF ([ADR 0024](docs/adr/0024-login-e-telefone-do-app.md)).
+Telas em português (SPA React servida por nginx) com um BFF em NestJS, na mesma origem: `/` é o app e `/bff` é o BFF ([ADR 0024](docs/adr/0024-login-e-telefone-do-app.md)).
 - **Local:** abra `http://127.0.0.1/` com o compose de pé. O cadastro local pula o código por e-mail.
 - **AWS:** abra a URL `execute-api` que o `aws-up` mostra no resumo do job.
 - **Usuário de demonstração:** o seed o cria com saldo, extrato, uma transferência recusada pelo limite e notificações. O e-mail e a senha vêm das variáveis do seed; na AWS, a senha vem de um segredo, nunca versionada.

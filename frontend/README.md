@@ -2,15 +2,15 @@
 
 Aplicativo do cliente da etapa 9: `web` (React, [ADR 0029](../docs/adr/0029-frontend-em-react-tailwind-shadcn.md)), `bff` (NestJS) e `e2e` (Playwright), em npm workspaces.
 
-## Versões (conferidas em 2026-11-19 nas fontes primárias)
+## Versões (conferidas em 2026-11-19 nas fontes primárias; React, Vite e Tailwind, do `package.json` em 2026-11-26)
 
-| Peça               | Versão | Fonte                                                                                         |
-| ------------------ | ------ | --------------------------------------------------------------------------------------------- |
-| Node               | 24 LTS | `nodejs.org/dist/index.json` (24 "Krypton" e 26 "Lithium" são LTS; `engines` pede `>=24.15`)  |
-| npm                | 11     | vem com o Node 24                                                                             |
-| React, Vite, Tailwind | 19, 8, 4 | `frontend/web/package.json` (React 19, Vite 8, Tailwind 4, shadcn/ui)                    |
-| NestJS             | 12.5.1 | registro npm (`@nestjs/core`, tag `latest`; CLI 12.0.13)                                      |
-| Playwright         | 1.65.1 | registro npm (`@playwright/test`, tag `latest`)                                               |
+| Peça                  | Versão   | Fonte                                                                                          |
+| --------------------- | -------- | ---------------------------------------------------------------------------------------------- |
+| Node                  | 24 LTS   | `nodejs.org/dist/index.json` (24 "Krypton" e 26 "Lithium" são LTS; `engines` pede `>=24.15`)  |
+| npm                   | 11       | vem com o Node 24                                                                              |
+| React, Vite, Tailwind | 19, 8, 4 | `frontend/web/package.json`, em 2026-11-26                                                     |
+| NestJS                | 12.5.1   | registro npm (`@nestjs/core`, tag `latest`; CLI 12.0.13)                                       |
+| Playwright            | 1.65.1   | registro npm (`@playwright/test`, tag `latest`)                                                |
 
 Escolhemos o Node 24 (já instalado no ambiente) e não o 26: ambos são LTS e atendem ao Vite 8 e ao Nest 12. `.nvmrc` fixa o 24.
 
